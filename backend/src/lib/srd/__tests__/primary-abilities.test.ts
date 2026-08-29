@@ -2,9 +2,6 @@ import { describe, it, expect } from "vitest";
 
 import { primaryAbilities } from "@/lib/srd/primary-abilities.js";
 
-// #1529: primaryAbilities now takes the resolved CharacterClass.primaryAbilities
-// column directly (no more className lookup) — the caller (routes/catalog/
-// reference.ts) already holds the catalog row.
 describe("primaryAbilities", () => {
   it("passes through the class's PHB'24 primary abilities verbatim", () => {
     expect(primaryAbilities(["strength"])).toEqual(["strength"]);

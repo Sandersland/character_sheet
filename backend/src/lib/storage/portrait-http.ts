@@ -6,13 +6,10 @@ import { BlobNotFoundError, type BlobObject } from "./blob-store.js";
 import { getBlobStore } from "./index.js";
 import { PORTRAIT_MAX_UPLOAD_BYTES } from "./portrait-image.js";
 
-// The multipart field name — the cross-plan contract pinned with the upload UI
-// (#1616) and entity portraits (#1617), like PORTRAIT_MAX_UPLOAD_BYTES.
+// Cross-plan contract pinned with the upload UI (#1616), like PORTRAIT_MAX_UPLOAD_BYTES.
 export const PORTRAIT_FIELD = "portrait";
 
-// Safe to cache this hard ONLY because the wire URL is versioned (?v=<uuid>,
-// see derivePortraitUrl): a re-upload changes the URL, never the bytes behind
-// an old one. `private` keeps shared proxies from caching an authed response.
+// Safe to cache this hard only because the wire URL is versioned (?v=<uuid>): a re-upload changes the URL, never the bytes behind an old one.
 export const PORTRAIT_CACHE_CONTROL = "private, max-age=31536000, immutable";
 
 class PortraitTooLargeError extends Error {
@@ -23,22 +20,13 @@ class PortraitTooLargeError extends Error {
   }
 }
 
-// Memory storage on purpose: the buffer feeds reencodePortrait directly and
-// the 5 MB cap bounds it — no temp files to clean up. Mount an authorization
-// check BEFORE this middleware so an unauthorized caller never makes us
-// buffer a body.
+// Mount an authorization check BEFORE this middleware so an unauthorized caller never makes us buffer a body.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: PORTRAIT_MAX_UPLOAD_BYTES, files: 1 },
 }).single(PORTRAIT_FIELD);
 
-/**
- * Parses the single-file `portrait` multipart part onto `req.file`, mapping
- * multer's errors onto the app's status-carrying error contract: the size
- * limit becomes 413, every other MulterError (wrong field name, extra files —
- * all client faults) becomes 400 instead of multer's status-less default
- * falling through to a 500.
- */
+// Maps multer's errors onto the app's status-carrying error contract: the size limit becomes 413, every other MulterError becomes 400 instead of multer's status-less default falling through to a 500.
 export const portraitMultipart: RequestHandler = (req, res, next) => {
   upload(req, res, (err: unknown) => {
     if (!err) {
@@ -57,12 +45,7 @@ export const portraitMultipart: RequestHandler = (req, res, next) => {
   });
 };
 
-/**
- * Resolves a stored portrait key to its blob and streams it — the GET serve
- * tail shared by the character (#1615) and entity (#1617) portrait routes.
- * Callers authorize first; a null key, or a stored key whose blob is gone
- * (e.g. wiped fs dir), reads as 404, not a server fault.
- */
+// Callers authorize first; a null key, or a stored key whose blob is gone, reads as 404, not a server fault.
 export async function sendStoredPortrait(res: Response, portraitKey: string | null): Promise<void> {
   if (!portraitKey) throw new NotFoundError("Portrait not found");
   let blob: BlobObject;
@@ -75,18 +58,13 @@ export async function sendStoredPortrait(res: Response, portraitKey: string | nu
   sendPortrait(res, blob);
 }
 
-// Streams a stored portrait blob with the immutable cache contract above.
 function sendPortrait(res: Response, blob: BlobObject): void {
   res.setHeader("Content-Type", blob.contentType);
   res.setHeader("Content-Length", String(blob.size));
   res.setHeader("Cache-Control", PORTRAIT_CACHE_CONTROL);
-  // pipe() never destroys its SOURCE when the destination goes away — a
-  // client dropping mid-transfer would otherwise leak the blob stream (and,
-  // under the s3 driver, its pooled HTTPS connection).
+  // pipe() never destroys its source when the destination goes away — a client dropping mid-transfer would otherwise leak the blob stream.
   res.on("close", () => blob.body.destroy());
-  // Headers are already sent once piping starts, so the terminal errorHandler
-  // can't emit JSON — destroy the response and let the client see a truncated
-  // transfer instead of a hung request.
+  // Headers are already sent once piping starts, so errorHandler can't emit JSON here — destroy the response instead of hanging the request.
   blob.body.on("error", (err) => res.destroy(err));
   blob.body.pipe(res);
 }

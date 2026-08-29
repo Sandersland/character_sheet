@@ -28,7 +28,7 @@ describe("readInventorySnapshot (#1649)", () => {
   });
 
   it("throws with the row id in the message when the blob is malformed", () => {
-    const malformed = { ...VALID_SNAPSHOT, name: "" }; // name: z.string().min(1)
+    const malformed = { ...VALID_SNAPSHOT, name: "" };
     expect(() => readInventorySnapshot({ id: "row-bad-1", snapshot: malformed })).toThrow(/row-bad-1/);
   });
 

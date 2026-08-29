@@ -14,12 +14,7 @@ import {
 } from "./inventory-types.js";
 import { readInventorySnapshot } from "./inventory-snapshot-read.js";
 
-// Paper-doll placement (#565).
-//
-// equippedSlot is the single source of truth for "is this equipped" — the wire
-// `equipped` field derives from (equippedSlot != null). RING holds 2 items;
-// every other slot holds 1. A two-handed weapon sits in MAIN_HAND and LOCKS
-// OFF_HAND (never a second row). Full slots are rejected, not silently displaced.
+// #565: equippedSlot is the single source of truth for "is this equipped" — the wire `equipped` field derives from (equippedSlot != null). Full slots are rejected, not silently displaced.
 
 const RING_SLOT_CAPACITY = 2;
 
@@ -27,12 +22,10 @@ function slotCapacity(slot: EquipSlot): number {
   return slot === "RING" ? RING_SLOT_CAPACITY : 1;
 }
 
-// Human-readable slot name for event summaries / error messages.
 function slotLabel(slot: EquipSlot): string {
   return slot.toLowerCase().replace(/_/g, " ");
 }
 
-// Minimal shape the placement rules read — a subset of InventoryItemWithDetails.
 export interface PlaceableItem {
   category: ItemCategory;
   slot: EquipSlot | null;
@@ -44,8 +37,7 @@ function isTwoHandedWeapon(item: PlaceableItem): boolean {
   return item.category === "weapon" && Boolean(item.weaponDetail?.twoHanded);
 }
 
-// The slots an item may legally occupy. Weapons/body armor derive from detail
-// data; gear declares its slot (null = bag-only). Empty = not equippable.
+// Empty return = not equippable.
 export function allowedSlotsForItem(item: PlaceableItem): EquipSlot[] {
   if (item.category === "weapon") {
     return isTwoHandedWeapon(item) ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"];
@@ -59,17 +51,10 @@ export function allowedSlotsForItem(item: PlaceableItem): EquipSlot[] {
   return [];
 }
 
-// Other currently-equipped rows, with just the two-handed flag needed for the
-// off-hand lock. Excludes the item being (re)placed so a re-slot never self-collides.
+// Excludes the item being (re)placed so a re-slot never self-collides.
 export type EquippedRow = { equippedSlot: EquipSlot | null; weaponDetail: { twoHanded: boolean } | null };
 
-// A two-handed weapon in MAIN_HAND owns both hands, so nothing may occupy
-// OFF_HAND. Exported (#1433) so `serializeCharacter` can serve the flag instead
-// of the client re-deriving it. Keys on `weaponDetail?.twoHanded` alone without
-// re-checking `category === "weapon"` — equivalent because only weapon rows ever
-// get a weaponDetail row, but that is a schema-level guarantee (see
-// InventoryItem's per-category detail relations in schema.prisma), not one the
-// type checker enforces on this shape.
+// #1433: exported so serializeCharacter can serve the flag instead of the client re-deriving it. Keys on `weaponDetail?.twoHanded` alone (only weapon rows ever get one) without re-checking category — a schema-level guarantee, not one the type checker enforces on this shape.
 export function isOffHandLocked(rows: EquippedRow[]): boolean {
   return rows.some((r) => r.equippedSlot === "MAIN_HAND" && Boolean(r.weaponDetail?.twoHanded));
 }
@@ -79,10 +64,7 @@ export async function fetchEquippedRows(
   characterId: string,
   excludeId: string,
 ): Promise<EquippedRow[]> {
-  // A Json column can't be sub-selected (#1649) — `weaponDetail: { select: {
-  // twoHanded } }` becomes selecting the whole `snapshot` and narrowing in TS.
-  // Pulls the full blob for a query that only wants one boolean, but the row
-  // set here is one character's equipped items, so the extra bytes are cheap.
+  // #1649: a Json column can't be sub-selected, so this pulls the whole `snapshot` blob and narrows in TS for a query that only wants one boolean.
   const rows = await tx.inventoryItem.findMany({
     where: { characterId, equippedSlot: { not: null }, id: { not: excludeId } },
     select: { id: true, equippedSlot: true, snapshot: true },
@@ -93,8 +75,6 @@ export async function fetchEquippedRows(
   });
 }
 
-// Returns a clear error string if `item` may NOT occupy `slot` given the other
-// equipped rows, or null when the placement is legal.
 function placementError(rows: EquippedRow[], item: PlaceableItem, slot: EquipSlot): string | null {
   const allowed = allowedSlotsForItem(item);
   if (allowed.length === 0) return `${item.category} items cannot be equipped`;
@@ -113,7 +93,6 @@ function placementError(rows: EquippedRow[], item: PlaceableItem, slot: EquipSlo
   return null;
 }
 
-// First allowed slot with a legal placement, or null when none is available.
 export function firstFreeSlot(rows: EquippedRow[], item: PlaceableItem): EquipSlot | null {
   for (const slot of allowedSlotsForItem(item)) {
     if (placementError(rows, item, slot) === null) return slot;
@@ -121,16 +100,7 @@ export function firstFreeSlot(rows: EquippedRow[], item: PlaceableItem): EquipSl
   return null;
 }
 
-// The equip-time trigger keys donning `item` into `slot` raises (#1688) —
-// matched against every active buff's own `clearOn` list by
-// clearBuffsOnEquipInTx below, instead of a hardcoded per-target clear call.
-// Body armor raises its own category trigger PLUS "equipBodyArmor" (fires for
-// EVERY category — Mage Armor's RAW shape: "the spell ends if the target dons
-// armor", #363); a shield (OFF_HAND) raises only "equipShield" — RAW,
-// wielding a shield doesn't "don armor", so Mage Armor's own clearOn
-// deliberately excludes it. Light armor raises no medium/heavy/shield
-// trigger, which is what lets a Bladesong-shaped buff (clearOn: medium/
-// heavy/shield only) survive donning it.
+// #1688/#363: body armor raises its own category trigger PLUS "equipBodyArmor" (Mage Armor RAW: "the spell ends if the target dons armor"); a shield raises only "equipShield" since wielding one isn't "donning armor". Light armor raises no medium/heavy/shield trigger, letting a Bladesong-shaped buff survive donning it.
 const BODY_ARMOR_TRIGGERS: Record<Exclude<ArmorCategory, "shield">, ClearOnTrigger[]> = {
   light: ["equipBodyArmor", "equipLightArmor"],
   medium: ["equipBodyArmor", "equipMediumArmor"],
@@ -147,12 +117,7 @@ function equipClearTriggers(item: PlaceableItem, slot: EquipSlot): ClearOnTrigge
   return [];
 }
 
-// True-ends every active buff whose own `clearOn` names a trigger this
-// placement just raised (#1688) — the generic counterpart to the old
-// hardcoded "BODY slot -> clear the acUnarmoredBase target" call. Reuses
-// clearBuffByKeyInTx per matching buff rather than a new clearing primitive;
-// equipClearTriggers above is the only new logic, and it answers "which
-// triggers does THIS placement raise", not "which buffs die".
+// #1688: equipClearTriggers answers "which triggers does THIS placement raise", not "which buffs die" — that match happens here, per buff.
 async function clearBuffsOnEquipInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -167,15 +132,13 @@ async function clearBuffsOnEquipInTx(
   if (!row) return;
   const { buffs } = normalizeActiveEffectsMutable(row.activeEffects);
   for (const buff of buffs) {
-    // buff.clearOn is persisted, untrusted text; compare it as a plain string
-    // against the known triggers rather than asserting it IS a ClearOnTrigger.
+    // buff.clearOn is persisted, untrusted text — compared as a plain string, not asserted as a ClearOnTrigger.
     if ((buff.clearOn ?? []).some((t) => (triggers as readonly string[]).includes(t))) {
       await clearBuffByKeyInTx(tx, characterId, buff.key, batchId, sessionId, `donned ${item.name}`);
     }
   }
 }
 
-// Places an item into a validated slot + logs the undoable `equipped` event.
 async function equipIntoSlot(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -200,8 +163,6 @@ async function equipIntoSlot(
   });
 }
 
-// Equips an item into an explicit slot (#565). Validates slot-compatibility,
-// capacity, and the two-handed off-hand lock; rejects a full slot.
 export async function applyEquip(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -216,9 +177,7 @@ export async function applyEquip(
   await equipIntoSlot(tx, characterId, item, op.slot, batchId, sessionId);
 }
 
-// Unequips (equipped=false) by clearing equippedSlot, or equips (equipped=true)
-// by auto-picking the first free compatible slot — the slot-less companion to
-// `equip`. Unequip is always legal so a row can always be cleared.
+// Unequip is always legal so a row can always be cleared.
 export async function applySetEquipped(
   tx: Prisma.TransactionClient,
   characterId: string,

@@ -1,42 +1,17 @@
-/**
- * Shared scaffolding for the Monk focus/ki-cast handlers (shadow-arts,
- * disciplines). Wraps castAbilityInTx with a shared character-select and
- * audit-event tail; the per-subclass 5e rules (effect specs, level gates,
- * pool costs) stay in their own files. Full unification of those divergent
- * parts is the job of the declarative subclass engine (#416) — this module
- * only removes the byte-for-byte clone (fallow dup:a64b5a27).
- */
-
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent, type EventType } from "@/lib/activity/events.js";
 import { snapshotSpellcasting, type SpellcastingMutableState } from "@/lib/spellcasting/spell-state.js";
 import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES } from "./feature-rows-select.js";
 
-/**
- * Character columns both focus-cast handlers re-read per op. The per-subclass 5e
- * rules (focus caps, concentration sets, effect specs) live in their own files,
- * not here — this is only the shared DB projection.
- */
 export const FOCUS_CAST_CHARACTER_SELECT = {
   spellcasting: true,
   resources: true,
   experiencePoints: true,
   abilityScores: true,
   rulesEdition: true,
-  // Every entry (not just the primary) + its level, so a non-primary Monk's
-  // focus gate still resolves via deriveEntryScopedResources (#1072).
-  // subclassRef.slug (#1277) is what deriveEntryScopedActions' cast guard
-  // (shadow-arts.ts) resolves the subclass identity through — see
-  // resolveSubclassSlug. class.features/subclassRef.features (#1912) are the
-  // UNFOLDED FEATURE_ROWS_CLASS_FEATURES/FEATURE_ROWS_SUBCLASS_FEATURES
-  // fragments, not the folded FEATURE_ROWS_ENTRY_SELECT (which collides with
-  // this select's own subclassRef.slug field, see feature-rows-select.ts's
-  // own comment on why some callers can't spread it) — WARRIOR_OF_ELEMENTS_SELECT
-  // (warrior-of-elements.ts) is the shipped precedent this copies: without
-  // this relation, a monk row moved onto ClassFeature (Shadow Arts, Cloak of
-  // Shadows, castDiscipline, #1912) is invisible to shadow-arts.ts's/
-  // disciplines.ts's cast guards even though the wire still shows its card,
-  // the #1528 chunk-0 failure class (#1912's issue).
+  // Every entry (not just primary) + its level, so a non-primary Monk's focus gate still resolves via deriveEntryScopedResources; subclassRef.slug is what the cast guards resolve subclass identity through (resolveSubclassSlug).
+  // class.features/subclassRef.features are the UNFOLDED FEATURE_ROWS_CLASS_FEATURES/FEATURE_ROWS_SUBCLASS_FEATURES fragments, not folded FEATURE_ROWS_ENTRY_SELECT (which collides with this select's own subclassRef.slug). WARRIOR_OF_ELEMENTS_SELECT is the shipped precedent this copies.
+  // Without this relation, a monk row moved onto ClassFeature is invisible to the Shadow Arts/discipline cast guards even though the wire still shows its card.
   classEntries: {
     orderBy: { position: "asc" as const },
     select: {
@@ -49,7 +24,6 @@ export const FOCUS_CAST_CHARACTER_SELECT = {
   },
 } satisfies Prisma.CharacterSelect;
 
-/** The audit-event `type`s emitted by the shared focus-cast tail. */
 type FocusCastEventType = Extract<EventType, "castShadowArt" | "castDiscipline">;
 
 export interface EmitFocusCastEventsParams {
@@ -57,28 +31,19 @@ export interface EmitFocusCastEventsParams {
   batchId: string;
   sessionId: string | null;
   eventType: FocusCastEventType;
-  /** Whether the cast established concentration (drives the write-back + spellcasting event). */
   concentrates: boolean;
-  /** Live post-cast spellcasting state — persisted + snapshotted when concentrating. */
+  // Live post-cast spellcasting state — persisted + snapshotted when concentrating.
   spellState: SpellcastingMutableState;
-  /** Snapshot taken BEFORE the cast mutated `spellState`. */
+  // Snapshot taken BEFORE the cast mutated `spellState`.
   beforeSpell: ReturnType<typeof snapshotSpellcasting>;
-  /** Ability name for the "Concentrating on <name>" summary. */
   concentrationName: string;
-  /** `data` payload for the spellcasting-category concentration event. */
   concentrationData: Record<string, unknown>;
-  /** Summary + `data` for the resources-category cast record. */
   resourceSummary: string;
   resourceData: Record<string, unknown>;
 }
 
-/**
- * Emit the shared audit tail for a focus cast: when the ability concentrates, persist
- * the spellcasting write-back and log the undoable spellcasting-category event
- * (before/after snapshots restore `concentratingOn` on revert); always log the
- * resources-category cast record. Payloads are pinned by the shadow-arts-cast
- * characterization tests.
- */
+// Before/after snapshots restore concentratingOn on revert when the ability concentrates; the resources-category record always logs.
+// Payload shapes are pinned by the shadow-arts-cast characterization tests — changing them may require updating those tests.
 export async function emitFocusCastEvents(
   tx: Prisma.TransactionClient,
   params: EmitFocusCastEventsParams,

@@ -1,10 +1,3 @@
-// Unit coverage for the shared ability-spread machinery background-grants.ts
-// grew in #1681: the two edition-gate predicates (proven opposite verdicts,
-// not coincidentally both-on/both-off) and the shape/apply helpers BOTH the
-// background spread (#1572, character-create.ts's resolveBackgroundGrants)
-// and species increases (#1681, resolveSpeciesGrants) import from here —
-// asserted by symbol (one import, two call sites) rather than re-testing the
-// logic once per call site.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -24,9 +17,6 @@ describe("background-grants shared ability-spread machinery (#1681)", () => {
     ])("%s: species=%s background=%s", (edition, speciesVerdict, backgroundVerdict) => {
       expect(speciesGrantsAbilityIncreases(edition)).toBe(speciesVerdict);
       expect(backgroundGrantsAbilitySpread(edition)).toBe(backgroundVerdict);
-      // Origin feats ride the same 2024-only gate as the background spread —
-      // unchanged by #1681, pinned here so this file is background-grants.ts's
-      // one full-module test rather than splitting per-function files.
       expect(backgroundGrantsOriginFeat(edition)).toBe(backgroundVerdict);
     });
   });

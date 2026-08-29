@@ -4,16 +4,10 @@ import type { SpellComponents } from "@character-sheet/shared-types";
 
 import { Prisma } from "@/generated/prisma/client.js";
 
-// Re-exported so existing consumers (applySpellcastingOperations,
-// deriveGrantedSpells) keep resolving SpellComponents from this module; the
-// definition now lives in shared-types (#820).
+// Re-exported so existing consumers (applySpellcastingOperations, deriveGrantedSpells) keep resolving SpellComponents from here; the definition now lives in shared-types (#820).
 export type { SpellComponents };
 
-// Stored in Character.spellcasting JSON column.
-// `slotsUsed`: slot level (as string key, JSON requirement) → used count.
-// `spells`: the character's known/prepared spell list (snapshotted from catalog
-//   or custom). Each entry has a locally-generated `id` (the entryId used by
-//   operations) independent of the catalog Spell.id (stored as `spellId`).
+// Stored in Character.spellcasting JSON column. Each SpellEntry's `id` (the entryId operations target) is independent of the catalog Spell.id, stored separately as `spellId`.
 
 export interface SpellEntry {
   id: string;             // per-character entry UUID (operation target)
@@ -28,11 +22,10 @@ export interface SpellEntry {
   description: string;
   concentration?: boolean;
   ritual?: boolean;
-  // Spell components ({ verbal, somatic, material, materialDescription? }) and
-  // save-on-damage behavior, snapshotted from the catalog at learn time.
+  // Snapshotted from the catalog at learn time.
   components?: SpellComponents | null;
   saveEffect?: string | null;    // "half" | "none" | null
-  // Structured roll effect (snapshotted from catalog at learn time):
+  // Structured roll effect, snapshotted from the catalog at learn time.
   effectKind?: string | null;    // "damage" | "heal" | "buff" | null (utility)
   effectDiceCount?: number | null;
   effectDiceFaces?: number | null;
@@ -42,49 +35,19 @@ export interface SpellEntry {
   saveAbility?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
-  // AC/stat buff effect (#363): target consumed at the AC-assembly seam
-  // ("ac" | "acUnarmoredBase" | "acFloor") + the flat modifier. Present only
-  // for effectKind "buff"; snapshotted from the catalog at learn time.
+  // buffTarget: "ac" | "acUnarmoredBase" | "acFloor" (#363) — present only when effectKind is "buff"; snapshotted from the catalog at learn time.
   buffTarget?: string | null;
   buffModifier?: number | null;
-  // Provenance of the entry; "subclass" marks a derived, non-persisted grant
-  // (deriveGrantedSpells), "item" a spell granted by a held magic item (#528,
-  // cast from the item). "species" is TWO DIFFERENT MECHANISMS sharing one
-  // tag, distinguished by `id`'s shape, never by a second source value:
-  //   - a #1683 species/LINEAGE grant (a Drow's Dancing Lights) — derived,
-  //     non-persisted exactly like "subclass" (deriveGrantedSpells'
-  //     sourceKind: "species"), `id` always `granted:<name>:<spell>`-shaped.
-  //   - a #1689 species-CHOICE grant (High Elf's Cantrip) — the player
-  //     PICKS it at creation from an open list with no backing catalog
-  //     GrantedSpellSource row, so it IS the persisted record; `id` is a
-  //     random per-character UUID (creationSpellEntry's normal shape), never
-  //     `granted:`-prefixed.
-  // reconcileGrantedSpells (lib/leveling/level-reconciliation.ts) and
-  // persistSpellState (lib/spellcasting/spellcasting.ts) key their
-  // derived-vs-persisted handling off the `granted:` id prefix for exactly
-  // this reason — a source-only check would treat a #1689 pick as a leaked
-  // #1683 grant and strip it.
+  // source "species" is TWO mechanisms sharing one tag, distinguished by id's shape: a #1683 species/lineage grant is derived and non-persisted, id always `granted:<name>:<spell>`-shaped; a #1689 species-CHOICE grant (e.g. High Elf's Cantrip) is player-picked and persisted, id a random per-character UUID.
+  // reconcileGrantedSpells and persistSpellState key their derived-vs-persisted handling off the `granted:` id prefix for exactly this reason — a source-only check would treat a #1689 pick as a leaked #1683 grant and strip it.
   source?: "subclass" | "species" | "item";
   // Item-granted-spell fields (#528), present only when source === "item".
   item?: ItemSpellMeta;
-  // #1689: the FIXED casting ability a species-CHOICE grant specifies (High
-  // Elf's Cantrip: Intelligence, independent of the character's own class
-  // ability) — present only on that kind of "species" entry (see `source`'s
-  // own comment above; a #1683 species/lineage entry never sets this field,
-  // which is what lets deriveSpeciesCastingAbility, serialize/spellcasting.ts,
-  // tell the two apart without a second source value). A plain string, not a
-  // real AbilityName union: this module is a leaf (no back-imports, see the
-  // file banner); the value is written by character-create.ts off
-  // ChooseCantrip.castingAbility, itself z.enum(ABILITY_NAMES)-checked at
-  // that seam, so an invalid ability can never reach here.
+  // Present only on a #1689 species-CHOICE entry — a #1683 species/lineage entry never sets this, which is what lets deriveSpeciesCastingAbility tell the two apart.
+  // A plain string, not an AbilityName union, because this module is a leaf (no back-imports) — the value is z.enum(ABILITY_NAMES)-checked at the seam that writes it, so an invalid value can never reach here.
   castingAbility?: string;
 }
 
-/**
- * Metadata for a spell granted by a magic item (#528). Carries the provenance
- * needed to cast from + track the item's resource, plus the fixed/wielder DC and
- * attack overrides the sheet renders in place of the character's own values.
- */
 export interface ItemSpellMeta {
   inventoryItemId: string;
   capabilityId: string;
@@ -97,19 +60,12 @@ export interface ItemSpellMeta {
   dc?: number | null;         // resolved value when dcMode === "fixed"
   attackMode: "fixed" | "wielder";
   attack?: number | null;     // resolved value when attackMode === "fixed"
-  // Charges-pool fields (#555), present when resource === "charges": the pool
-  // row the cast spends from and its per-cast cost (usesRemaining/usesTotal
-  // then mirror the POOL's remaining/max, shared across the item's spells).
+  // Present when resource === "charges" (#555) — usesRemaining/usesTotal then mirror the pool's remaining/max, shared across the item's spells.
   poolCapabilityId?: string | null;
   chargeCost?: number;
 }
 
-/**
- * The single concentration spell a character is currently maintaining, or null.
- * 5e: a character can concentrate on only one spell at a time — casting a new
- * concentration spell drops any prior one (see castSpell). `entryId` is the
- * per-character SpellEntry id; `spellName` is denormalized for display/log text.
- */
+// spellName is denormalized for display/log text.
 export interface ConcentrationState {
   entryId: string;
   spellName: string;
@@ -118,18 +74,13 @@ export interface ConcentrationState {
 export interface SpellcastingMutableState {
   // JSON object keys must be strings; slot level is stored as e.g. "1", "2".
   slotsUsed: Record<string, number>;
-  // Warlock Mystic Arcanum charges spent this long rest, keyed by spell level
-  // (e.g. "6"). Each level has exactly one charge; 0/absent means available.
+  // Warlock Mystic Arcanum charges spent this long rest, keyed by spell level (e.g. "6"); each level has exactly one charge, 0/absent means available.
   arcanumUsed: Record<string, number>;
   spells: SpellEntry[];
-  // The active concentration spell, or null when not concentrating.
   concentratingOn: ConcentrationState | null;
 }
 
-// Handles both the new compact format AND the legacy blob shape seeded before
-// this migration (which had `ability`, `spellSaveDC`, `spellAttackBonus`,
-// `slots: [{level, total, used}]`, `spells`). The legacy fields are ignored
-// since they're now derived; only `used` counts and `spells` are extracted.
+// Handles both the new compact format and the legacy blob shape seeded before this migration (ability/spellSaveDC/spellAttackBonus/slots[]) — those fields are now derived and ignored; only used counts and spells are extracted.
 
 export function normalizeSpellcastingMutable(json: Prisma.JsonValue): SpellcastingMutableState {
   if (!json || typeof json !== "object" || Array.isArray(json)) {
@@ -137,7 +88,6 @@ export function normalizeSpellcastingMutable(json: Prisma.JsonValue): Spellcasti
   }
   const obj = json as Record<string, unknown>;
 
-  // New compact format: { slotsUsed: {...}, arcanumUsed: {...}, spells: [...] }
   if ("slotsUsed" in obj) {
     return {
       slotsUsed: (obj.slotsUsed as Record<string, number>) ?? {},
@@ -147,7 +97,6 @@ export function normalizeSpellcastingMutable(json: Prisma.JsonValue): Spellcasti
     };
   }
 
-  // Legacy format: { ability, spellSaveDC, ..., slots: [{level, total, used}], spells: [...] }
   const oldSlots = (obj.slots as Array<{ level: number; total: number; used: number }>) ?? [];
   const slotsUsed: Record<string, number> = {};
   for (const s of oldSlots) {
@@ -161,7 +110,6 @@ export function normalizeSpellcastingMutable(json: Prisma.JsonValue): Spellcasti
   };
 }
 
-/** Coerce a stored concentration value into a valid ConcentrationState or null. */
 function normalizeConcentration(value: unknown): ConcentrationState | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const c = value as Record<string, unknown>;
@@ -169,14 +117,8 @@ function normalizeConcentration(value: unknown): ConcentrationState | null {
   return { entryId: c.entryId, spellName: typeof c.spellName === "string" ? c.spellName : "" };
 }
 
-/**
- * Clamp prepared spells to a level-derived cap (#1127): keep the first `limit`
- * user-learned leveled prepared entries (prepared && level>0 && source==null) and
- * mark the rest unprepared — cantrips and granted/item spells never count and are
- * untouched. Pure; returns the original array (trimmedCount 0) when nothing needs
- * trimming. The single shared rule for both the level-down reconciler and the
- * clamp-on-read in serializeCharacter. `limit === null` (non-caster) is a no-op.
- */
+// The single shared rule for both the level-down reconciler and the clamp-on-read in serializeCharacter (#1127).
+// Keeps the first `limit` user-learned leveled prepared entries (prepared && level>0 && source==null); cantrips and granted/item spells never count. limit === null (non-caster) is a no-op.
 export function clampPreparedToLimit(
   spells: SpellEntry[],
   limit: number | null,
@@ -196,11 +138,7 @@ export function clampPreparedToLimit(
   return trimmedCount > 0 ? { spells: clamped, trimmedCount } : { spells, trimmedCount: 0 };
 }
 
-/**
- * Deep-copy the spellcasting state into a before/after event snapshot. Shared by
- * the focus-cast handlers (shadow-arts) so their audit-event snapshots
- * are byte-identical (the payload feeds LIFO undo via activity.ts).
- */
+// Shared by the focus-cast handlers (shadow-arts) so their audit-event snapshots are byte-identical — the payload feeds LIFO undo.
 export function snapshotSpellcasting(state: SpellcastingMutableState) {
   return {
     spellcasting: {

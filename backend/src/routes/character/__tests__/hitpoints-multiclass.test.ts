@@ -10,8 +10,7 @@ import { authCookie } from "@/test-support/auth.js";
 const OWNER_ID = "owner-mc-levelup";
 const CHAR_ID = "test-mc-levelup-1";
 const FIGHTER = "MC Level Fighter";
-// Canonical name so the srd multiclass-prerequisite validator (keyed by class
-// name) applies. Non-destructive upsert (update:{}) leaves any seeded row alone.
+// Must be the canonical seeded name — the multiclass-prerequisite validator looks up by class name.
 const WIZARD = "Wizard";
 let COOKIE: string;
 let fighterId: string;
@@ -25,8 +24,6 @@ async function xp(body: object) {
   return supertest(app).post(`/api/characters/${CHAR_ID}/experience`).set("Cookie", COOKIE).send(body);
 }
 
-// Level 5 (XP 6500) but only 4 HP level-ups applied → exactly one pending.
-// Con 14 (+2), Str 15 (Fighter), Int 13 (meets Wizard multiclass prereq).
 const BASE = {
   id: CHAR_ID,
   name: "MC Level Fixture",
@@ -108,7 +105,7 @@ describe("POST /api/characters/:id/hp — level-up class allocation (#124)", () 
     });
     expect(res.status).toBe(200);
     expect(res.body.hitDice.total).toBe(5);
-    // d10 average 6 + con 2 = 8
+
     expect(res.body.hitPoints.max).toBe(38);
     expect(res.body.classes).toHaveLength(1);
     expect(res.body.classes[0].name).toBe(FIGHTER);
@@ -119,7 +116,7 @@ describe("POST /api/characters/:id/hp — level-up class allocation (#124)", () 
     const res = await hp({ operations: [{ type: "levelUp", method: "average" }] });
     expect(res.status).toBe(200);
     expect(res.body.hitDice.total).toBe(5);
-    expect(res.body.hitPoints.max).toBe(38); // d10 die from hd.die
+    expect(res.body.hitPoints.max).toBe(38);
     expect(res.body.classes[0].level).toBe(5);
   });
 
@@ -129,7 +126,7 @@ describe("POST /api/characters/:id/hp — level-up class allocation (#124)", () 
     });
     expect(res.status).toBe(200);
     expect(res.body.hitDice.total).toBe(5);
-    // d6 average 4 + con 2 = 6
+
     expect(res.body.hitPoints.max).toBe(36);
     expect(res.body.classes).toHaveLength(2);
     expect(res.body.classes.find((c: { name: string }) => c.name === FIGHTER).level).toBe(4);
@@ -141,13 +138,13 @@ describe("POST /api/characters/:id/hp — level-up class allocation (#124)", () 
       operations: [{ type: "levelUp", method: "average", target: { kind: "new", classId: wizardId } }],
     });
     expect(res.status).toBe(200);
-    // Fighter 4 / Wizard 1 — the sole caster derives its own table (2 L1 slots).
+
     expect(res.body.spellcasting).toBeTruthy();
     const l1 = res.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
     expect(l1.total).toBe(2);
-    // No warlock levels → Pact Magic is absent.
+
     expect(res.body.spellcasting.pact).toBeNull();
-    // Every class entry carries its row id (the level-up existing target).
+
     for (const entry of res.body.classes) {
       expect(typeof entry.id).toBe("string");
     }
@@ -179,14 +176,13 @@ describe("POST /api/characters/:id/hp — level-up class allocation (#124)", () 
     expect(up.status).toBe(200);
     expect(up.body.classes).toHaveLength(2);
 
-    // Drop XP to level 4 (2700) → the Wizard entry (highest position) is removed.
     const down = await xp({ operations: [{ type: "set", value: 2700 }] });
     expect(down.status).toBe(200);
     expect(down.body.level).toBe(4);
     expect(down.body.classes).toHaveLength(1);
     expect(down.body.classes[0].name).toBe(FIGHTER);
     expect(down.body.classes[0].level).toBe(4);
-    expect(down.body.hitPoints.max).toBe(30); // Wizard's +6 HP reversed
+    expect(down.body.hitPoints.max).toBe(30);
 
     const entries = await prisma.characterClassEntry.findMany({ where: { characterId: CHAR_ID } });
     expect(entries).toHaveLength(1);
@@ -229,7 +225,7 @@ describe("POST /api/characters/:id/hp — level-up class allocation (#124)", () 
       .post(`/api/characters/${CHAR_ID}/events/${batchId}/revert`)
       .set("Cookie", COOKIE);
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.max).toBe(30); // Wizard's +6 HP reversed
+    expect(res.body.hitPoints.max).toBe(30);
     expect(res.body.classes).toHaveLength(1);
     expect(res.body.classes[0].name).toBe(FIGHTER);
 
@@ -246,8 +242,8 @@ describe("POST /api/characters/:id/hp — level-up class allocation (#124)", () 
     expect(up.status).toBe(200);
     expect(up.body.classes).toHaveLength(2);
 
-    // Grant another pending level (XP 14000 = level 6) so the op reaches the
-    // level-up handler rather than being short-circuited as "no pending level".
+    // Grants another pending level so the op reaches the level-up handler, not the "no pending level" short-circuit.
+
     const bump = await xp({ operations: [{ type: "set", value: 14000 }] });
     expect(bump.status).toBe(200);
 

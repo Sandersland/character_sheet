@@ -1,7 +1,3 @@
-// GET /api/reference serves `species` nested per edition (#1679) — the sole
-// creation-catalog anchor since #1684 pruned the flat `races` list. Own file
-// rather than appending to reference.test.ts: this is a self-contained new
-// field, not a change to any existing assertion.
 import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -79,8 +75,7 @@ describe("GET /api/reference — species (#1679)", () => {
     expect(dwarf2024.abilityIncreases).toEqual([]);
   });
 
-  // #1758: the frontend merges species+variant increases the way
-  // fetchMergedAbilityIncreases does, so it needs the replace flag on the wire.
+  // fetchMergedAbilityIncreases merges species+variant abilityIncreases using this flag (#1758).
   it("serves abilityIncreasesReplace on variants — true for the Astral Elf, false for real subraces (#1758)", async () => {
     const res = await getReference("EDITION_2014");
     const elf = res.body.species.find((s: { name: string }) => s.name === "Elf");
@@ -107,9 +102,6 @@ describe("GET /api/reference — species (#1679)", () => {
     expect(dragonborn2024.variants).toHaveLength(10);
   });
 
-  // #1683: the frontend picker needs a served signal for "this variant needs
-  // a casting-ability choice" — never re-derived client-side (CLAUDE.md: the
-  // frontend never originates a rule).
   describe("needsCastingAbility (#1683)", () => {
     it("is true for a 2024 Elf lineage variant that grants a spell (Drow)", async () => {
       const res = await getReference("EDITION_2024");

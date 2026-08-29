@@ -1,18 +1,5 @@
-/**
- * Buff-end suspended-condition restore (#1121) — the chokepoint invariant:
- * EVERY path that ends a buff restores any condition suspended against it
- * (2014 Mindless Rage, PHB'14 p.49), because the restore lives inside
- * buff-end.ts's shared clear core, not at call sites. Exercises each caller
- * family the re-review flagged as dropping the clear's return value: the
- * direct key-clear (inventory deactivate/remove/sell/unattune, Quivering
- * Palm), the spellcasting dismiss op, the rest sweep (until-rest buffs), the
- * inventory unequip op, and the concentration-end sweep — plus the restore's
- * own immunity re-check (a condition still blocked by ANOTHER active buff's
- * conditionImmunities stays suspended until that buff ends too). The
- * voluntary-toggle and HP->0/long-rest rage paths live in
- * actions-rage-mindless.test.ts. Requires DATABASE_URL (docker compose up db).
- */
-
+// Mindless Rage grants condition immunity — PHB'14 p.49.
+// Every clear path restores a suspended condition via clearBuffsMatchingInTx, not at call sites.
 import { randomUUID } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -155,14 +142,9 @@ describe("buff-end restores suspended conditions on every clearing path (#1121)"
       [{ key: "charmed", gatingBuffKey: "ward" }],
     );
 
-    // Ending the gating buff must NOT restore: the aegis buff still grants
-    // charmed immunity, and restoring would recreate the exact state the
-    // write-guard blocks (#1121 re-review finding: restore bypassed the
-    // immunity check).
     await prisma.$transaction((tx) => clearBuffByKeyInTx(tx, FIXTURE_ID, "ward", randomUUID(), null, "test"));
     expect(await readState()).toEqual({ active: [], suspended: ["charmed"], buffs: ["aegis"] });
 
-    // Ending the still-immune buff re-runs the restore — now unblocked.
     await prisma.$transaction((tx) => clearBuffByKeyInTx(tx, FIXTURE_ID, "aegis", randomUUID(), null, "test"));
     expect(await readState()).toEqual({ active: ["charmed"], suspended: [], buffs: [] });
   });

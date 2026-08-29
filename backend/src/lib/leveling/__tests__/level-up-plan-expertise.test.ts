@@ -1,9 +1,4 @@
-// Pure (no DB) test for the "expertise" level-up plan step (#1588) — mirrors
-// level-up-plan.test.ts's toolProficiency/maneuvers describe block. Rogue's
-// base-class Expertise row is hand-crafted here the same way
-// derive-entry-scoped-resources.test.ts builds it (Rogue carries no TS
-// class module — its rows are literal seed data, prisma/tsconfig's rootDir
-// boundary keeps this src-side test from importing them directly).
+// Rogue's base-class Expertise row is hand-crafted here — Rogue carries no TS class module (its rows are literal seed data), and prisma/tsconfig's rootDir boundary keeps this src-side test from importing them directly.
 import { describe, it, expect } from "vitest";
 
 import { buildLevelUpPlan, type LevelUpPlanCharacter, type TargetClassEntry } from "@/lib/leveling/level-up-plan.js";

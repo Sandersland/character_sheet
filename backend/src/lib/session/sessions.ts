@@ -12,9 +12,7 @@ import {
 import type { Prisma, SpellCastKind } from "@/generated/prisma/client.js";
 import type { CombatState } from "@character-sheet/shared-types";
 
-// Session/combat domain errors carry the HTTP status the central `errorHandler`
-// maps. Default 409 (conflict — wrong session state / not a participant); pass
-// 404 at the not-found throw sites so callers don't sniff the message for it.
+// The central errorHandler reads `.status` on thrown errors; default 409 (conflict), pass 404 at not-found throw sites.
 export class SessionError extends Error {
   status: number;
   constructor(message: string, status = 409) {
@@ -30,12 +28,9 @@ export class CombatError extends Error {
   }
 }
 
-// Auto-close an active session this long after the last participant leaves.
 const SESSION_GRACE_MS = 60 * 60 * 1000;
 
-// Standard include for reads that need participant presence + character names.
-// campaignPreferences rides along so the session UI can offer party-target
-// healing only to allies who opted in (#462); resolved per session.campaignId.
+// campaignPreferences rides along so the session UI can offer party-target healing only to allies who opted in (#462).
 const sessionWithParticipants = {
   participants: {
     include: {
@@ -54,11 +49,7 @@ type SessionWithParticipants = Prisma.SessionGetPayload<{
   include: typeof sessionWithParticipants;
 }>;
 
-/**
- * Returns the id of the character's currently-active session (campaign or
- * solo), or null if no session is active. Signature is load-bearing: threaded
- * into every apply*Operations() lib to tag events.
- */
+// Signature is load-bearing: threaded into every apply*Operations() lib to tag events.
 export async function getActiveSessionId(
   characterId: string,
 ): Promise<string | null> {
@@ -66,12 +57,7 @@ export async function getActiveSessionId(
   return session?.id ?? null;
 }
 
-/**
- * Returns the character's active session (row + participants), or null. A
- * character in a campaign resolves the campaign's active session; a campaign-less
- * character resolves its own active solo session (#1080). Runs maybeAutoClose so
- * a stale session never reports as active.
- */
+// Resolves through maybeAutoClose (via activeSessionForCampaign/activeSoloSessionForCharacter) so a stale session never reports as active.
 export async function getActiveSession(characterId: string) {
   const character = await prisma.character.findUnique({
     where: { id: characterId },
@@ -82,10 +68,6 @@ export async function getActiveSession(characterId: string) {
   return activeSoloSessionForCharacter(characterId);
 }
 
-/**
- * Loads a session and runs maybeAutoClose so a stale one settles before a read.
- * No-op when the session is unknown or already ended.
- */
 export async function autoCloseIfStale(sessionId: string): Promise<void> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
@@ -94,8 +76,6 @@ export async function autoCloseIfStale(sessionId: string): Promise<void> {
   if (session) await maybeAutoClose(session);
 }
 
-/** The campaign's active session (with participants), or null — runs
- *  maybeAutoClose so a stale session never reports as active. */
 export async function activeSessionForCampaign(campaignId: string) {
   const session = await prisma.session.findFirst({
     where: { campaignId, status: "active" },
@@ -116,11 +96,6 @@ async function activeSoloSessionForCharacter(characterId: string) {
   return checked.status === "active" ? checked : null;
 }
 
-/**
- * Closes an active session that can no longer resume — emptied of participants
- * entirely, or abandoned past the grace period. Reused on every active-session
- * read so a stale session settles itself without an explicit end.
- */
 async function maybeAutoClose(
   session: SessionWithParticipants,
 ): Promise<SessionWithParticipants> {
@@ -145,11 +120,7 @@ function autoCloseEndTime(
   return graceExpired ? new Date(lastLeftMs + SESSION_GRACE_MS) : null;
 }
 
-/**
- * Recomputes every participant's summary + the campaign recap from the session's
- * events and persists them, inside the given transaction. Idempotent — used by
- * both session-close and the retroactive-XP recompute.
- */
+// Idempotent — also called from applyExperienceOperations's retroactive recompute.
 export async function recomputeSummaries(
   tx: Prisma.TransactionClient,
   session: SessionWithParticipants,
@@ -198,11 +169,8 @@ async function closeSession(
 ): Promise<void> {
   const batchId = randomUUID();
   await prisma.$transaction(async (tx) => {
-    // Claim the close atomically: a concurrent end/auto-close that already flipped
-    // the row to "ended" matches no rows here, so the loser skips the duplicate
-    // summary recompute + sessionEnded logs. Also clears combat state (#1030
-    // finding #5) — without this an ended session kept serving its last-known
-    // round/combatActive forever (the GET poll has no other gate on staleness).
+    // Filtering on status:"active" claims the close atomically: a concurrent end/auto-close that already flipped the row loses this match and skips the duplicate recompute + logs.
+    // Also clears combat state (#1030 finding #5) — otherwise an ended session keeps serving its last-known round/combatActive forever.
     const { count } = await tx.session.updateMany({
       where: { id: session.id, status: "active" },
       data: { status: "ended", endedAt, combatActive: false, round: 0 },
@@ -242,10 +210,6 @@ async function assertActiveParticipant(
   }
 }
 
-/**
- * Starts a new shared session for a campaign with `characterId` as the first
- * participant. Rejects if a session is already active for the campaign.
- */
 export async function startCampaignSession(
   campaignId: string,
   characterId: string,
@@ -260,8 +224,7 @@ export async function startCampaignSession(
 
   const batchId = randomUUID();
   return prisma.$transaction(async (tx) => {
-    // Authoritative guard: re-check inside the tx so two concurrent starts can't
-    // both pass the pre-check above and create rival sessions.
+    // Re-checked inside the tx so two concurrent starts can't both pass the pre-check above and create rival sessions.
     const conflict = await tx.session.findFirst({
       where: { campaignId, status: "active" },
       select: { id: true },
@@ -294,12 +257,7 @@ export async function startCampaignSession(
   });
 }
 
-/**
- * Starts a character-scoped solo session (campaignId null) with `characterId` as
- * its sole participant (#1080). Rejects a character that belongs to a campaign
- * (use startCampaignSession) and a character that already has an active solo
- * session. Invariant: at most one active solo session per character.
- */
+// Invariant: at most one active solo session per character.
 export async function startSoloSession(characterId: string, title?: string) {
   const character = await prisma.character.findUnique({
     where: { id: characterId },
@@ -321,8 +279,7 @@ export async function startSoloSession(characterId: string, title?: string) {
 
   const batchId = randomUUID();
   return prisma.$transaction(async (tx) => {
-    // Authoritative guard: re-check inside the tx so two concurrent starts can't
-    // both pass the pre-check above and create rival solo sessions.
+    // Re-checked inside the tx so two concurrent starts can't both pass the pre-check above and create rival solo sessions.
     const conflict = await tx.session.findFirst({
       where: { campaignId: null, status: "active", participants: { some: { characterId } } },
       select: { id: true },
@@ -354,10 +311,7 @@ export async function startSoloSession(characterId: string, title?: string) {
   });
 }
 
-/**
- * Adds (or re-adds) a character to an active session. On rejoin the prior
- * leftAt is cleared so the participant keeps a single present interval.
- */
+// On rejoin the prior leftAt is cleared so the participant keeps a single present interval.
 export async function joinSession(sessionId: string, characterId: string) {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
@@ -369,16 +323,11 @@ export async function joinSession(sessionId: string, characterId: string) {
   return prisma.sessionParticipant.upsert({
     where: { sessionId_characterId: { sessionId, characterId } },
     create: { sessionId, characterId },
-    // Clear any per-turn spell interlock on (re)join (#1439 review) — a record
-    // stranded from a prior interval must not block a freshly-rejoined player.
+    // A per-turn spell interlock stranded from a prior interval must not block a freshly-rejoined player (#1439 review).
     update: { leftAt: null, spellCastAsAction: null, spellCastAsBonus: null },
   });
 }
 
-/**
- * Marks a participant as having left now. The session stays open for the rest of
- * the party; it auto-closes once everyone has left for the grace period.
- */
 export async function leaveSession(sessionId: string, characterId: string) {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
@@ -404,11 +353,6 @@ export async function leaveSession(sessionId: string, characterId: string) {
   });
 }
 
-/**
- * Ends a session: computes + persists each participant's summary and the
- * campaign recap, sets status/endedAt, and logs sessionEnded per participant.
- * Returns the ended session with participants + its journal entries.
- */
 export async function endSession(sessionId: string) {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
@@ -438,20 +382,10 @@ const COMBAT_SUMMARIES: Record<CombatEventType, (round?: number) => string> = {
   combatRoundAdvanced: (round) => `Round ${round ?? 2} began`,
 };
 
-// Combat state read out of Session (#1030) + the acting participant's per-turn
-// spell interlock (#1439) — the shape every combat lifecycle mutation returns,
-// and what the cheap poll GET serves. `round`/`combatActive` are the
-// authoritative Session columns (see the Session model's why-comment);
-// `spellEconomy` is resolved from the participant's per-turn cast record via the
-// one shared rule fn (spellEconomyRestrictions). This is the wire `CombatState`
-// (shared-types) — `updatedAt` is the max of the session's and the participant's
-// own so the client's monotonic sync guard advances on a cast (participant-only
-// change) as well as a round change.
+// round/combatActive are the authoritative Session columns; spellEconomy is resolved via the shared rule fn spellEconomyRestrictions.
+// updatedAt is the max of the session's and the participant's own, so the client's monotonic sync guard advances on a cast-only change too.
 export type { CombatState };
 
-// The columns behind a served CombatState — Session's round/combatActive/
-// updatedAt and, for the acting character, the participant's per-turn cast
-// record + its updatedAt (#1439).
 async function readCombatColumns(
   db: Prisma.TransactionClient,
   sessionId: string,
@@ -465,12 +399,7 @@ async function readCombatColumns(
   participantUpdatedAt: Date | null;
   edition: RulesEdition;
 } | null> {
-  // ONE query so round/combatActive, the participant's cast record, and the
-  // character's edition come from a single committed snapshot (#1439 review):
-  // two separate findUniques could straddle a concurrent combat mutation and
-  // serve a torn state. The nested participant read is filtered to the acting
-  // character (the include is a join in one round-trip, not a second statement);
-  // `rulesEdition` rides the same join because the interlock is edition-specific.
+  // ONE query so round/combatActive, the cast record, and edition come from a single committed snapshot — two separate findUniques could straddle a concurrent combat mutation and serve a torn state (#1439 review).
   const session = await db.session.findUnique({
     where: { id: sessionId },
     select: {
@@ -498,15 +427,11 @@ async function readCombatColumns(
     spellCastAsAction: participant?.spellCastAsAction ?? null,
     spellCastAsBonus: participant?.spellCastAsBonus ?? null,
     participantUpdatedAt: participant?.updatedAt ?? null,
-    // A missing participant (guarded against by the route) can't resolve an
-    // edition; fall back to the schema default so the flags stay well-defined.
+    // A missing participant can't resolve an edition; fall back to the schema default so the flags stay well-defined.
     edition: participant?.character.rulesEdition ?? DEFAULT_RULES_EDITION,
   };
 }
 
-// Assemble the wire CombatState from the read columns: resolve the interlock via
-// the shared rule fn (edition-specific) and take the freshest `updatedAt` of
-// session/participant.
 function toCombatState(cols: NonNullable<Awaited<ReturnType<typeof readCombatColumns>>>): CombatState {
   const updatedAt =
     cols.participantUpdatedAt && cols.participantUpdatedAt > cols.sessionUpdatedAt
@@ -515,16 +440,13 @@ function toCombatState(cols: NonNullable<Awaited<ReturnType<typeof readCombatCol
   return {
     round: cols.round,
     combatActive: cols.combatActive,
-    // ISO string on the wire, matching the client's `updatedAt: string` — the
-    // existing Session.updatedAt contract.
+    // ISO string on the wire, matching the client's `updatedAt: string`.
     updatedAt: updatedAt.toISOString(),
     spellEconomy: spellEconomyRestrictions(cols.spellCastAsAction, cols.spellCastAsBonus, cols.edition),
   };
 }
 
-// Read + assemble a session's CombatState for the acting character (#1439). The
-// combat lifecycle mutations call this after their update inside the same tx;
-// the poll GET calls it standalone.
+// Takes a TransactionClient so it works both inside a tx (combat mutations) and standalone (poll GET, passed the plain prisma client).
 async function buildCombatState(
   db: Prisma.TransactionClient,
   sessionId: string,
@@ -534,10 +456,7 @@ async function buildCombatState(
   return cols ? toCombatState(cols) : null;
 }
 
-// Clear ONE participant's per-turn spell-cast record (#1439) — the per-CHARACTER
-// turn boundary (advanceCombatRound: this character's turn ended). The @updatedAt
-// bump is load-bearing: it advances the served CombatState's `updatedAt` so the
-// client syncs the cleared flags past its own monotonic guard.
+// The @updatedAt bump here is load-bearing: it advances the served CombatState's updatedAt so the client syncs the cleared flags past its own monotonic guard.
 async function resetTurnSpellCast(
   tx: Prisma.TransactionClient,
   sessionId: string,
@@ -549,15 +468,7 @@ async function resetTurnSpellCast(
   });
 }
 
-// Clear EVERY participant's per-turn spell-cast record (#1439 review) — the
-// combat-LEVEL boundaries (startCombat/endCombat) are shared across the whole
-// party, so they reset all participants, not just the caller. Scoping these to
-// the caller stranded another participant's stale block across a combat restart:
-// a player who cast a leveled Action spell but never advanced a round (combat
-// ended mid-turn by someone else) would still be blocked in the next combat, and
-// the `if (count > 0)` idempotency guard stops a no-op re-press from
-// self-clearing it. advanceCombatRound stays per-character (resetTurnSpellCast) —
-// only the ending character's own turn resets there.
+// startCombat/endCombat are party-wide boundaries, so they reset every participant, not just the caller — scoping to the caller stranded another participant's stale block across a combat restart (#1439 review). advanceCombatRound stays per-character via resetTurnSpellCast.
 async function resetAllTurnSpellCasts(tx: Prisma.TransactionClient, sessionId: string): Promise<void> {
   await tx.sessionParticipant.updateMany({
     where: { sessionId },
@@ -565,32 +476,9 @@ async function resetAllTurnSpellCasts(tx: Prisma.TransactionClient, sessionId: s
   });
 }
 
-/**
- * Record what a spell resolution cast in its economy slot this turn (#1439), so
- * the bonus-action interlock resolves server-side. Called from the resolveAction
- * transaction for a spell op (entryId present) whose character is in an active
- * session. `economy` is the op's cost kind; a reaction cast never restricts the
- * action/bonus economy, so it is not recorded. `kind` is leveled iff a slot was
- * spent (a cantrip has no slotLevel) — the only distinction the interlock reads.
- *
- * The interlock is a per-turn/combat concept: it is cleared at turn boundaries
- * (startTurn/round advance), and OUT of combat there are no turn boundaries to
- * clear it, so a record written while `combatActive` is false would linger and
- * serve a spurious `bonusActionLimitedToCantrips` block until combat next starts
- * (#1875 review). So this is a no-op unless the session's combat is active. That
- * check is a `session: { combatActive: true }` filter on the write's own WHERE —
- * NOT a separate read-then-write: under READ COMMITTED a concurrent endCombat
- * committing between a preliminary read and the update would strand a stale
- * interlock in post-combat state (the very lingering-block bug, via TOCTOU).
- * Folding it into the updateMany makes "combat still active" and the write one
- * atomic condition.
- *
- * A cantrip write must NOT downgrade an existing `leveled` record for the same
- * economy slot this turn (#1439 review): under Action Surge a leveled Action
- * spell then a cantrip both cost the Action, and the cantrip must not lift the
- * block. So a `cantrip` update is gated on the field not already being leveled;
- * a `leveled` write always lands (it can only raise the restriction).
- */
+// A record written while combatActive is false would linger and serve a spurious block once combat next starts (#1875 review), so this is a no-op unless combat is active.
+// The `session: { combatActive: true }` filter is folded into the updateMany's own WHERE, not a separate read-then-write: under READ COMMITTED a concurrent endCombat between a preliminary read and the update would strand a stale interlock (TOCTOU).
+// A cantrip write must NOT downgrade an existing `leveled` record for the same slot this turn — under Action Surge a leveled Action spell then a cantrip both cost the Action, and the cantrip must not lift the block.
 export async function recordTurnSpellCast(
   tx: Prisma.TransactionClient,
   sessionId: string,
@@ -599,15 +487,9 @@ export async function recordTurnSpellCast(
   kind: SpellCastKind,
 ): Promise<void> {
   if (economy === "reaction") return;
-  // `session: { combatActive: true }` gates the write atomically (see JSDoc):
-  // the row updates only if combat is still active AT WRITE TIME, so a
-  // concurrent endCombat can't leave a stranded interlock.
   if (economy === "action") {
     await tx.sessionParticipant.updateMany({
-      // A cantrip may write over null (initial) or an existing cantrip, but NOT
-      // over `leveled` — a bare `{ not: "leveled" }` would also exclude the null
-      // row (SQL NULL comparison), skipping the first cantrip cast, so match
-      // null OR cantrip explicitly. A leveled write always lands.
+      // A bare `{ not: "leveled" }` would also exclude the null row (SQL NULL comparison), skipping the first cantrip cast — match null OR cantrip explicitly.
       where: kind === "cantrip"
         ? { sessionId, characterId, session: { combatActive: true }, OR: [{ spellCastAsAction: null }, { spellCastAsAction: "cantrip" }] }
         : { sessionId, characterId, session: { combatActive: true } },
@@ -641,15 +523,7 @@ async function logCombatLifecycleEvent(
   });
 }
 
-/**
- * Starts combat: sets combatActive=true and round=1 (a fresh encounter always
- * begins at round 1). Idempotent — guarded by `updateMany({combatActive:
- * false})` — so a second participant re-pressing Start Combat while combat is
- * already live cannot stomp a running round back to 1; there's no initiative
- * order (#1030 scope) to say only one participant "owns" starting combat, so
- * any of them may call this concurrently. The audit event only fires on the
- * real false→true transition, never on a no-op re-press.
- */
+// Idempotent: the updateMany({combatActive:false}) guard means a stale re-press can't reset a running round; no initiative order (#1030 scope) means any participant may call this concurrently.
 export async function startCombat(characterId: string, sessionId: string): Promise<CombatState> {
   await assertActiveParticipant(sessionId, characterId);
   return prisma.$transaction(async (tx) => {
@@ -657,11 +531,7 @@ export async function startCombat(characterId: string, sessionId: string): Promi
       where: { id: sessionId, combatActive: false },
       data: { combatActive: true, round: 1 },
     });
-    // Gate BOTH side-effects on the real false→true transition (count > 0): a
-    // no-op re-press while combat is already live must not log a second
-    // combatStarted NOR clear a valid in-progress bonus-action block (#1439
-    // review). A fresh encounter starts every turn clean — this is the server
-    // twin of the reducer's startCombat reset.
+    // count>0 gates both the audit log and the turn-cast reset to the real false→true transition, so a no-op re-press can't re-log or clear an in-progress block (#1439 review).
     if (count > 0) {
       await logCombatLifecycleEvent(characterId, sessionId, "combatStarted", undefined, tx);
       await resetAllTurnSpellCasts(tx, sessionId);
@@ -670,11 +540,7 @@ export async function startCombat(characterId: string, sessionId: string): Promi
   });
 }
 
-/**
- * Ends combat: sets combatActive=false and resets round=0 (mirrors the local
- * reducer's endCombat → initialState). Idempotent for the same reason as
- * startCombat — a stale second "End Combat" click is a no-op, not a re-log.
- */
+// Idempotent for the same reason as startCombat: a stale second End Combat is a no-op, not a re-log.
 export async function endCombat(characterId: string, sessionId: string): Promise<CombatState> {
   await assertActiveParticipant(sessionId, characterId);
   return prisma.$transaction(async (tx) => {
@@ -682,8 +548,6 @@ export async function endCombat(characterId: string, sessionId: string): Promise
       where: { id: sessionId, combatActive: true },
       data: { combatActive: false, round: 0 },
     });
-    // Same gating as startCombat (#1439 review): only the real true→false
-    // transition logs and clears; a stale second End Combat is a pure no-op.
     if (count > 0) {
       await logCombatLifecycleEvent(characterId, sessionId, "combatEnded", undefined, tx);
       await resetAllTurnSpellCasts(tx, sessionId);
@@ -692,19 +556,8 @@ export async function endCombat(characterId: string, sessionId: string): Promise
   });
 }
 
-/**
- * Advances the round by exactly 1. THE ROUND NUMBER IS NEVER CLIENT INPUT
- * (#1030): callers send intent only ("my turn ended"), and the server decides
- * the number via an atomic `round = round + 1` UPDATE — Postgres serializes
- * concurrent UPDATEs to the same row, so two participants ending their turns
- * at the same instant both land (round advances by 2, not lost to a
- * read-then-write race). There is no initiative order yet, so every genuine
- * end-turn call is its own +1; this function has no way to distinguish "two
- * real turns ended" from "one call fired twice" and doesn't try to — that
- * would need whose-turn-is-it tracking, an explicit non-goal for this phase.
- * 409s if combat isn't active — advancing a round with no encounter running
- * is meaningless, and the client only ever calls this while `inCombat`.
- */
+// THE ROUND NUMBER IS NEVER CLIENT INPUT (#1030): the server increments atomically (`round = round + 1`), so Postgres serializes concurrent same-instant end-turns instead of losing one to a read-then-write race.
+// No initiative order yet (explicit non-goal this phase), so every end-turn call is its own +1 — this function can't distinguish two real turns from one call firing twice.
 export async function advanceCombatRound(characterId: string, sessionId: string): Promise<CombatState> {
   await assertActiveParticipant(sessionId, characterId);
   return prisma.$transaction(async (tx) => {
@@ -713,8 +566,6 @@ export async function advanceCombatRound(characterId: string, sessionId: string)
       data: { round: { increment: 1 } },
     });
     if (count === 0) throw new CombatError(`Session ${sessionId} is not in combat`);
-    // The round advancing is this character's turn ending — reset their per-turn
-    // spell interlock (#1439), the server twin of the reducer's endTurn reset.
     await resetTurnSpellCast(tx, sessionId, characterId);
     const state = await buildCombatStateOrThrow(tx, sessionId, characterId);
     await logCombatLifecycleEvent(characterId, sessionId, "combatRoundAdvanced", state.round, tx);
@@ -722,9 +573,7 @@ export async function advanceCombatRound(characterId: string, sessionId: string)
   });
 }
 
-// buildCombatState + the invariant that the session exists here (the mutations
-// have already updated it under the same tx) — a null return would be a
-// programmer error, not a client one.
+// The session is guaranteed to exist here (the mutations already updated it under the same tx) — a null return would be a programmer error, not a client one.
 async function buildCombatStateOrThrow(
   tx: Prisma.TransactionClient,
   sessionId: string,
@@ -735,9 +584,7 @@ async function buildCombatStateOrThrow(
   return state;
 }
 
-/** Cheap read for the combat-state poll (#1030): round/combatActive plus the
- *  acting character's resolved per-turn spell interlock (#1439). No participant
- *  gate here — the route checks the caller is a session participant. */
+// No participant gate here — the route checks the caller is a session participant.
 export async function getCombatState(
   sessionId: string,
   characterId: string,

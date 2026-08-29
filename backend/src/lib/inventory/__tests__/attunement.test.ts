@@ -42,12 +42,7 @@ async function makeItem(
   return row.id;
 }
 
-// #1377: the served `attunementCap` and the 409 that rejects the 4th attune must
-// resolve to ONE constant. No behavioural test can prove that — attune-3-then-409
-// passes identically against two independent `3`s — so this is a structural check
-// on the module source instead: exactly one numeric 3 in the whole file, which is
-// ATTUNEMENT_LIMIT's initializer. If you legitimately need another 3 in here,
-// name it; don't loosen this.
+// #1377: the served `attunementCap` and the 409 threshold must resolve to ONE constant; checked structurally since a behavioral test can't distinguish two independent 3s.
 describe("ATTUNEMENT_LIMIT is the file's only 3", () => {
   it("has exactly one numeric 3 outside comments", async () => {
     const source = await readFile(
@@ -122,16 +117,10 @@ describe("attune / unattune operations (#545)", () => {
     const err = await applyInventoryOperations(characterId, [{ type: "attune", inventoryItemId: ids[3] }]).catch((e) => e);
     expect(err).toBeInstanceOf(AttunementLimitError);
     expect((err as AttunementLimitError).status).toBe(409);
-    // The rejected 4th item stays unattuned.
     expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: ids[3] } })).attuned).toBe(false);
   });
 
-  // TOCTOU regression (#1888, identical shape to the weapon-bond cap race fixed
-  // in #1854): two concurrent attune calls each read the pre-write attuned count,
-  // so without a lock inside the transaction both can pass `< ATTUNEMENT_LIMIT`
-  // and both commit, landing a 4th attuned item past the cap. Fires two real
-  // concurrent transactions (separate connections, like two browser tabs) via
-  // Promise.all rather than sequential awaits, which would never exercise the race.
+  // TOCTOU regression (#1888): concurrent attunes must serialize inside the transaction lock, or both can read a pre-write count under ATTUNEMENT_LIMIT and commit past the cap.
   it("attuning two items concurrently at 1-away-from-cap never exceeds the 3-item cap", async () => {
     const [already1, already2, b, c] = await Promise.all(
       ["Already 1", "Already 2", "B", "C"].map((n) => makeItem(characterId, `Item ${n}`)),
@@ -162,10 +151,7 @@ describe("attune / unattune operations (#545)", () => {
     expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).attuned).toBe(false);
   });
 
-  // #1684: the species prereq now resolves through raceSelection.species/
-  // variant (catalog-linked), not the free-drifting raceSelection.name string
-  // — proven against a REAL speciesId/variantId anchor, not the fixture's own
-  // homebrew `raceSelection: { create: { name: "Elf" } }` (no FK).
+  // #1684: species prereq resolves via raceSelection.speciesId/variantId, not the free-text raceSelection.name.
   it("resolves a species prerequisite against a real speciesId/variantId-anchored character (variant name wins)", async () => {
     const dwarf = await prisma.species.findFirstOrThrow({
       where: { slug: "dwarf", edition: "EDITION_2014" },
@@ -193,9 +179,7 @@ describe("attune / unattune operations (#545)", () => {
     await applyInventoryOperations(speciesCharacter.id, [{ type: "attune", inventoryItemId: itemId }]);
     expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).attuned).toBe(true);
 
-    // The parent species' own name ("Dwarf") does NOT satisfy a prerequisite
-    // pinned to the more specific variant name — proves the match resolves
-    // the VARIANT relation, not just "some species field or other".
+    // A prerequisite pinned to the variant name must not match the parent species' own name.
     const wrongItemId = await makeItem(speciesCharacter.id, "Axe of Generic Dwarves", {
       attunementPrereqKind: "species",
       attunementPrereqValue: "Dwarf",

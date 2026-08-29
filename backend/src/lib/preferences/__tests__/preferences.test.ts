@@ -84,8 +84,7 @@ describe("mergePreferencesPatch (write path)", () => {
   });
 
   it("strips unknown/hostile keys from the stored base rather than re-persisting them", () => {
-    // Parsed via JSON.parse (not an object literal) so "__proto__" lands as a
-    // real own key — matching how a Json column value actually deserializes.
+    // Parsed via JSON.parse (not an object literal) so "__proto__" lands as a real own key — matching how a Json column value actually deserializes.
     const hostileBase: unknown = JSON.parse(
       '{"theme":"dark","__proto__":{"polluted":true},"constructor":{"prototype":{"x":1}}}',
     );

@@ -2,9 +2,7 @@ import { z } from "zod";
 
 import type { NormalizedProfile, ProviderDefinition } from "@/lib/auth/oauth/types.js";
 
-// Google's OIDC userinfo payload (the subset we use). `email_verified` gates
-// whether we trust the address; unverified → we store null rather than risk
-// account-takeover by an unverified-email collision.
+// `email_verified` gates whether we trust the address; unverified → store null rather than risk account-takeover by an unverified-email collision.
 const googleProfileSchema = z.object({
   sub: z.string().min(1),
   email: z.string().optional(),
@@ -33,7 +31,6 @@ export const googleProvider: ProviderDefinition = {
   clientIdEnv: "GOOGLE_CLIENT_ID",
   clientSecretEnv: "GOOGLE_CLIENT_SECRET",
   mapProfile: mapGoogleProfile,
-  // Google-specific OAuth2 extensions: ask for a refresh token (offline) and
-  // force the consent screen so the refresh token is actually returned.
+  // Asks for a refresh token (offline) and forces the consent screen so the refresh token is actually returned.
   extraAuthParams: { access_type: "offline", prompt: "consent" },
 };

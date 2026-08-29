@@ -1,10 +1,3 @@
-/**
- * AC-derivation route tests (#361). armorClass is derived at read time from the
- * equipped body armor + effective Dex (per category) + shield, never persisted.
- * Real Postgres in beforeEach, supertest against the shared `app`. Custom armor is
- * acquired equipped so no catalog seeding is needed.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -19,7 +12,6 @@ let COOKIE: string;
 
 const FIXTURE_ID = "test-armor-class-character-1";
 
-// Dex 16 (+3) so light/medium/unarmored differences are visible.
 const FIXTURE = {
   id: FIXTURE_ID,
   name: "AC Test Fixture",
@@ -59,12 +51,12 @@ describe("derived armorClass", () => {
 
   it("is 10 + Dex when nothing is equipped", async () => {
     const res = await get();
-    expect(res.body.armorClass).toBe(13); // 10 + 3
+    expect(res.body.armorClass).toBe(13);
   });
 
   it("equipping Leather gives 11 + full Dex", async () => {
     const res = await acquire(leather);
-    expect(res.body.armorClass).toBe(14); // 11 + 3
+    expect(res.body.armorClass).toBe(14);
   });
 
   it("heavy Chain Mail ignores Dex (16)", async () => {
@@ -74,13 +66,13 @@ describe("derived armorClass", () => {
 
   it("medium Half Plate caps Dex at +2", async () => {
     const res = await acquire(halfPlate);
-    expect(res.body.armorClass).toBe(17); // 15 + min(3, 2)
+    expect(res.body.armorClass).toBe(17);
   });
 
   it("a shield adds +2 on top of body armor", async () => {
     await acquire(chainMail);
     const res = await acquire(shield);
-    expect(res.body.armorClass).toBe(18); // 16 + 2
+    expect(res.body.armorClass).toBe(18);
   });
 
   it("reverts to 10 + Dex when armor is unequipped", async () => {
@@ -94,24 +86,24 @@ describe("derived armorClass", () => {
 
   it("re-derives from effective Dex with nothing persisted on armorClass", async () => {
     await acquire(halfPlate);
-    // Raise Dex to 20 (+5); medium cap still limits the bonus to +2.
+
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: { abilityScores: { ...FIXTURE.abilityScores, dexterity: 20 } },
     });
     const res = await get();
-    expect(res.body.armorClass).toBe(17); // 15 + min(5, 2), unchanged by higher Dex
-    // And unarmored re-derives to reflect the new Dex.
+    expect(res.body.armorClass).toBe(17);
+
     const bodyId = res.body.inventory[0].id;
     const unequipped = await supertest.agent(app).set("Cookie", COOKIE).post(url)
       .send({ operations: [{ type: "setEquipped", inventoryItemId: bodyId, equipped: false }] });
-    expect(unequipped.body.armorClass).toBe(15); // 10 + 5
+    expect(unequipped.body.armorClass).toBe(15);
   });
 
   it("only one body armor occupies the BODY slot; swapping re-derives AC", async () => {
-    const first = await acquire(leather); // 11 + 3 = 14, auto-equipped into BODY
+    const first = await acquire(leather);
     expect(first.body.armorClass).toBe(14);
-    // A second body armor can't auto-equip while BODY is full — it stays in the bag.
+
     const second = await acquire(chainMail);
     expect(second.body.armorClass).toBe(14);
     const leatherId = second.body.inventory.find((i: { name: string; id: string }) => i.name === "Test Leather")!.id;
@@ -124,7 +116,7 @@ describe("derived armorClass", () => {
   });
 
   it("barbarian Unarmored Defense adds Con while unarmored, and shields stack", async () => {
-    // Dex 16 (+3), Con 14 (+2): 10 + 3 + 2 = 15.
+
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: {
@@ -139,7 +131,7 @@ describe("derived armorClass", () => {
   });
 
   it("monk Unarmored Defense adds Wis while unarmored but is lost with a shield", async () => {
-    // Dex 16 (+3), Wis 18 (+4): 10 + 3 + 4 = 17; a shield disqualifies the monk formula (PHB p.78).
+    // A shield disqualifies the monk AC formula (PHB p.78).
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: {
@@ -150,7 +142,7 @@ describe("derived armorClass", () => {
     const res = await get();
     expect(res.body.armorClass).toBe(17);
     const withShield = await acquire(shield);
-    expect(withShield.body.armorClass).toBe(15); // base 10 + Dex 3 + shield 2, not monk 17
+    expect(withShield.body.armorClass).toBe(15);
   });
 
   it("equipping body armor overrides a barbarian's Unarmored Defense", async () => {
@@ -162,15 +154,12 @@ describe("derived armorClass", () => {
       },
     });
     const res = await acquire(chainMail);
-    expect(res.body.armorClass).toBe(16); // heavy armor wins, Con ignored
+    expect(res.body.armorClass).toBe(16);
   });
 
   it("a feat armorClass improvement stacks on the derived base", async () => {
-    await acquire(chainMail); // 16
-    // Level 4 (2700 XP) grants one advancement slot, so the injected feat isn't
-    // clamped out. Needs a real classEntries row (#1073: the slot cap sums per
-    // class entry — a class-less character earns no slots, unlike the former
-    // primary-class × total fallback).
+    await acquire(chainMail);
+
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: {
@@ -199,7 +188,7 @@ describe("derived armorClass", () => {
       },
     });
     const res = await get();
-    expect(res.body.armorClass).toBe(17); // 16 + 1 feat bonus
+    expect(res.body.armorClass).toBe(17);
     expect(res.body.armorClassBreakdown).toEqual([
       { label: "Test Chain Mail", value: 16 },
       { label: "Feats", value: 1 },
@@ -207,10 +196,7 @@ describe("derived armorClass", () => {
   });
 
   it("applies the Defense Fighting Style feat's armorClassWhileArmored only while armored (#1137)", async () => {
-    // Fighter L1 so the fs feat survives the read-clamp; the feat carries the
-    // armorClassWhileArmored improvement the former Defense scalar applied.
-    // #1529: the fs-slot cap now resolves via CharacterClass.fightingStyleFeatLevel
-    // through the class FK relation — classId must link to the real seeded row.
+
     const fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" }, select: { id: true } })).id;
     await prisma.character.update({
       where: { id: FIXTURE_ID },
@@ -232,12 +218,12 @@ describe("derived armorClass", () => {
         },
       },
     });
-    // Unarmored first: the Defense feat contributes nothing (10 + Dex 3 = 13).
+
     const unarmored = await get();
     expect(unarmored.body.armorClass).toBe(13);
-    // Armored: +1 from the Defense feat, labeled with the feat name.
+
     const armored = await acquire(chainMail);
-    expect(armored.body.armorClass).toBe(17); // 16 + 1 Defense
+    expect(armored.body.armorClass).toBe(17);
     expect(armored.body.armorClassBreakdown).toContainEqual({ label: "Defense", value: 1 });
     const sum = armored.body.armorClassBreakdown.reduce(
       (t: number, p: { value: number }) => t + p.value,
@@ -262,7 +248,7 @@ describe("derived armorClass", () => {
   it("breaks down Half Plate + Shield into labeled parts", async () => {
     await acquire(halfPlate);
     const res = await acquire(shield);
-    expect(res.body.armorClass).toBe(19); // 15 + min(3, 2) + 2
+    expect(res.body.armorClass).toBe(19);
     expect(res.body.armorClassBreakdown).toEqual([
       { label: "Test Half Plate", value: 15 },
       { label: "Dex (max +2)", value: 2 },
@@ -270,9 +256,8 @@ describe("derived armorClass", () => {
     ]);
   });
 
-  // Draconic Resilience (#1122, PHB'14 p.106): "When you aren't wearing armor,
-  // your AC equals 13 + your Dexterity modifier." 2014-only for now — the 2024
-  // fork (10+Dex+Cha at Sorcerer L3) is out of scope, see draconicResilienceBase.
+  // Draconic Resilience: AC = 13 + Dex modifier while unarmored (#1122, PHB'14 p.106).
+
   describe("Draconic Resilience (#1122, 2014)", () => {
     beforeEach(async () => {
       await prisma.character.update({
@@ -287,7 +272,7 @@ describe("derived armorClass", () => {
 
     it("unarmored Draconic sorcerer with Dex 14 has AC 15, +2 with a shield", async () => {
       const res = await get();
-      expect(res.body.armorClass).toBe(15); // 13 + Dex 2
+      expect(res.body.armorClass).toBe(15);
       expect(res.body.armorClassBreakdown).toEqual([
         { label: "Draconic Resilience", value: 13 },
         { label: "Dex", value: 2 },
@@ -298,7 +283,7 @@ describe("derived armorClass", () => {
 
     it("wearing armor lets the armor formula win (feature inactive)", async () => {
       const res = await acquire(chainMail);
-      expect(res.body.armorClass).toBe(16); // heavy armor, Draconic Resilience suppressed
+      expect(res.body.armorClass).toBe(16);
       expect(res.body.armorClassBreakdown).toEqual([{ label: "Test Chain Mail", value: 16 }]);
     });
 
@@ -308,13 +293,13 @@ describe("derived armorClass", () => {
         data: { subclass: "Wild Magic" },
       });
       const res = await get();
-      expect(res.body.armorClass).toBe(12); // 10 + Dex 2, no override
+      expect(res.body.armorClass).toBe(12);
     });
 
     it("is gated to EDITION_2014 (2024 fork not implemented, #1122)", async () => {
       await prisma.character.update({ where: { id: FIXTURE_ID }, data: { rulesEdition: "EDITION_2024" } });
       const res = await get();
-      expect(res.body.armorClass).toBe(12); // 10 + Dex 2, override withheld pending the 2024 fork
+      expect(res.body.armorClass).toBe(12);
     });
   });
 });

@@ -1,18 +1,3 @@
-/**
- * GET /api/feats?asiLevel= against FIXTURE rows (#1438) — the companion to the
- * real-seeded-catalog cases in feats.test.ts. `?? 19` (Epic Boon) stays
- * fixture-only: PHB'14 has no epic_boon feats at all, so no real 2014 row can
- * ever reach that branch, and every real 2024 epic_boon row carries an explicit
- * levelPrerequisite 19. `?? 4` (General) is ALSO covered by the fixture here
- * (proving the route passes a ROW's own override, not a constant, via
- * GENERAL_AT_EIGHT) but is no longer unreachable from the real catalog since
- * #1310: every one of the 26 EDITION_2014 general rows has a NULL
- * levelPrerequisite — see feats.test.ts's "2014 general/origin feats" suite
- * for that proof against the seed itself.
- *
- * Fixtures are uniquely named and deleted BY NAME in afterAll — never a
- * deleteMany over a seeded row (docs/testing.md).
- */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 

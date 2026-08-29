@@ -14,10 +14,6 @@ import { seededSpeciesId } from "@/test-support/species.js";
 const TEST_USER = { id: "test-user-1", email: "fixture-owner@test.local" };
 let COOKIE: string;
 const TEST_RACE = { name: "Test Race", speed: 30 };
-// #1684: the flat Race model is gone — speciesId is the creation-route
-// anchor. Shares TEST_RACE's own display name so `expect(...).race` pins
-// below stay unchanged; edition-invariant (EDITION_2024), no variants, no
-// #1690 choice trait, so every createBody below needs no further fields.
 const TEST_SPECIES = { name: TEST_RACE.name, slug: "zzz-fixture-characters-test", speed: TEST_RACE.speed, edition: "EDITION_2024" as const };
 let testSpeciesId: string;
 const TEST_CLASS = {
@@ -67,22 +63,16 @@ const FIXTURE = {
 };
 
 describe("characters routes", () => {
-  // Track every character created over the course of a test (the fixture
-  // plus anything a POST test creates) so afterEach can clean all of them
-  // up, even ids we don't know ahead of time.
   let createdCharacterIds: string[] = [];
 
   beforeEach(async () => {
-    // Every character needs an owner (Character.ownerId is NOT NULL). Upsert a
-    // dedicated fixture user so the create below can connect to it.
     await prisma.user.upsert({
       where: { id: TEST_USER.id },
       create: TEST_USER,
       update: TEST_USER,
     });
     COOKIE = await authCookie(TEST_USER.id);
-    // Sequential rather than Promise.all — see the matching comment in
-    // charactersRouter's POST handler.
+    // Sequential upserts, not Promise.all — mirrors charactersRouter's POST handler ordering.
     const species = await prisma.species.upsert({
       where: { slug_edition: { slug: TEST_SPECIES.slug, edition: TEST_SPECIES.edition } },
       create: TEST_SPECIES,
@@ -121,11 +111,6 @@ describe("characters routes", () => {
         },
       },
     });
-    // #1649: InventoryItem detail now lives on `snapshot`, not the four
-    // Inventory*Detail relations — created separately (rather than nested
-    // under character.create) so inventoryItemFixtureData's snapshot build
-    // can be spread in; itemId is layered on top since the fixture helper
-    // has no catalog-item concept.
     await prisma.inventoryItem.create({
       data: {
         ...inventoryItemFixtureData({
@@ -158,9 +143,7 @@ describe("characters routes", () => {
     await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
   });
 
-  // The catalog rows are upserted (not deleted) between tests so reruns don't
-  // churn ids — but a later file on this worker inherits the same database, so
-  // they must not linger as selectable catalog options once the suite is done.
+  // Catalog rows are upserted (not deleted) between tests to keep ids stable across reruns; deleted here so they don't leak into a later file sharing this worker's database.
   afterAll(async () => {
     await prisma.species.deleteMany({ where: { slug: TEST_SPECIES.slug } });
     await prisma.characterClass.deleteMany({ where: { name: TEST_CLASS.name } });
@@ -197,9 +180,7 @@ describe("characters routes", () => {
         ownerId: TEST_USER.id,
       }),
     ]);
-    // Deliberately unscoped — the whole Character table, which only a
-    // per-worker database makes assertable (#1269). It doubles as a leak
-    // detector for any earlier file sharing this worker.
+    // Deliberately unscoped whole-table count — a leak detector, only assertable because each worker has its own database (#1269).
     expect(await prisma.character.count()).toBe(2);
   });
 
@@ -255,9 +236,6 @@ describe("characters routes", () => {
   });
 
   describe("Barbarian Fast Movement speed derivation", () => {
-    // Creates a bare character with the given class entries and optional equipped
-    // body-armor category, then returns its serialized speed. classId is left null
-    // (nullable FK) so no catalog rows are needed — the derivation keys off name.
     const makeAndGetSpeed = async (
       classEntries: { name: string; level: number }[],
       equippedArmorCategory?: "light" | "medium" | "heavy" | "shield",
@@ -281,7 +259,6 @@ describe("characters routes", () => {
         },
       });
       if (equippedArmorCategory) {
-        // #1649: armor detail now lives on InventoryItem.snapshot.
         await prisma.inventoryItem.create({
           data: inventoryItemFixtureData({
             characterId: id,
@@ -353,7 +330,6 @@ describe("characters routes", () => {
   });
 
   it("POST /api/characters/:id/experience sets XP and recomputes level", async () => {
-    // experiencePoints was removed from PATCH — use the dedicated XP endpoint
     const response = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/experience`)
       .send({ operations: [{ type: "set", value: 6500 }] });
@@ -388,10 +364,7 @@ describe("characters routes", () => {
     expect(response.status).toBe(400);
   });
 
-  // The portrait wire seam (#1615): portraitUrl left PATCH when portraits
-  // became uploaded blobs — a client-supplied URL was the IDOR the upload
-  // pipeline closes. The wire field survives read-only, derived from
-  // Character.portraitKey.
+  // portraitUrl is read-only, derived from Character.portraitKey — a client-supplied URL was an IDOR (#1615).
   describe("portrait wire seam (#1615)", () => {
     it.each([
       ["set", "https://example.com/p.jpg"],
@@ -429,7 +402,6 @@ describe("characters routes", () => {
   });
 
   it("PATCH 404s for unknown id", async () => {
-    // experiencePoints was removed from PATCH — use currency which is still patchable
     const response = await supertest.agent(app).set("Cookie", COOKIE)
       .patch("/api/characters/does-not-exist")
       .send({ currency: { cp: 0, sp: 0, gp: 1, pp: 0 } });
@@ -438,9 +410,7 @@ describe("characters routes", () => {
   });
 
   describe("POST /api/characters", () => {
-    // A function, not a const: speciesId isn't known until the outer
-    // beforeEach's upsert runs, so each call reads the CURRENT testSpeciesId
-    // rather than one captured at describe-body evaluation time.
+    // A function, not a const — speciesId isn't known until the outer beforeEach's upsert runs, so each call reads the CURRENT testSpeciesId.
     const createBody = () => ({
       name: "New Hero",
       alignment: "Lawful Good",
@@ -476,9 +446,7 @@ describe("characters routes", () => {
         experiencePoints: 0,
         speed: TEST_RACE.speed,
         hitDice: { total: 1, die: "d10" },
-        // constitution 14 -> +2 modifier, d10 hit die -> 12 max HP
         hitPoints: { current: 12, max: 12, temp: 0 },
-        // dexterity 12 -> +1 modifier
         armorClass: 11,
         initiativeBonus: 1,
         savingThrowProficiencies: ["strength"],
@@ -519,9 +487,6 @@ describe("characters routes", () => {
       createdCharacterIds = createdCharacterIds.filter((existingId) => existingId !== id);
     });
 
-    // #1616 closed #1615's interim accepted-and-ignored state: the create UI
-    // stages a file and uploads via portraitRouter after create, so a client-
-    // supplied URL is rejected by .strict() like every other unknown field.
     it("rejects portraitUrl in the create payload with 400 (#1616)", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
@@ -583,13 +548,6 @@ describe("characters routes", () => {
       expect(response.status).toBe(400);
     });
 
-    // ── 2024 background ability spread + Origin feat (#1130) ──────────────
-    // Uses the seeded Criminal background (abilityChoices dex/con/int, Origin
-    // feat Alert) with a species anchor + Fighter class. Halfling: 2024 Human
-    // carries its own #1690 choice trait (Skillful/Versatile, would 400 every
-    // body below for an unrelated reason) and 2024 Dwarf carries its own
-    // Dwarven Toughness (+1 maxHp/level, would corrupt this block's own
-    // exact-HP assertions) — Halfling has neither in EDITION_2024.
     describe("background ability spread + Origin feat (#1130)", () => {
       const criminalBody = {
         name: "Sneak",
@@ -609,17 +567,14 @@ describe("characters routes", () => {
         expect(res.status).toBe(201);
         createdCharacterIds.push(res.body.id);
 
-        // Spread folded into effective scores.
         expect(res.body.abilityScores.dexterity).toBe(15);
         expect(res.body.abilityScores.intelligence).toBe(13);
         expect(res.body.abilityScores.constitution).toBe(14);
 
-        // Origin feat = a slot-exempt advancement entry; slots stay 0/0 at level 1.
         expect(res.body.advancements).toHaveLength(1);
         expect(res.body.advancements[0]).toMatchObject({ kind: "feat", origin: true, featName: "Alert" });
         expect(res.body.advancementSlots).toEqual({ total: 0, used: 0 });
 
-        // DEX 15 → +2 base init, plus Alert's +PB (2 at level 1) = 4.
         expect(res.body.initiativeBonus).toBe(4);
       });
 
@@ -636,7 +591,6 @@ describe("characters routes", () => {
         const res = await post({ ...criminalBody, backgroundAbilities: { constitution: 2, dexterity: 1 } });
         expect(res.status).toBe(201);
         createdCharacterIds.push(res.body.id);
-        // CON 14→16 (+3 mod), Fighter d10 → 13 max HP.
         expect(res.body.abilityScores.constitution).toBe(16);
         expect(res.body.hitPoints.max).toBe(13);
       });
@@ -645,7 +599,7 @@ describe("characters routes", () => {
         const res = await post(criminalBody);
         expect(res.status).toBe(201);
         createdCharacterIds.push(res.body.id);
-        expect(res.body.abilityScores.dexterity).toBe(13); // unchanged
+        expect(res.body.abilityScores.dexterity).toBe(13);
         expect(res.body.advancements).toHaveLength(1);
         expect(res.body.advancements[0]).toMatchObject({ origin: true, featName: "Alert" });
       });
@@ -658,8 +612,7 @@ describe("characters routes", () => {
       it.each([
         ["a single +3", { dexterity: 3 }],
         ["+2/+2 (sum 4)", { dexterity: 2, constitution: 2 }],
-        // All three are in Criminal's choices but sum to 4 → exercises the shape
-        // check itself (not the choices-membership short-circuit).
+        // Exercises the shape check itself, not the choices-membership short-circuit.
         ["in-choices sum 4 (1/1/2)", { dexterity: 1, constitution: 1, intelligence: 2 }],
       ])("rejects an illegal shape (%s) with 400", async (_label, backgroundAbilities) => {
         const res = await post({ ...criminalBody, backgroundAbilities });
@@ -685,13 +638,6 @@ describe("characters routes", () => {
       });
     });
 
-    // ── 2014: neither grant exists (#1504, #1572) ──────────────────────────
-    // Origin feats and the background ability spread are both PHB'24-only
-    // mechanics (see backend/src/lib/rules/background-grants.ts). Reuses the
-    // SAME Criminal row as the 2024 describe block above — under EDITION_2014
-    // it must grant neither, proving the gate is on the requesting character's
-    // edition, not on whether the background/feat rows are edition-tagged
-    // (Criminal/Alert both resolve for 2014 in other respects).
     describe("2014 characters get no origin feat and no ability spread (#1504, #1572)", () => {
       const criminal2014Body = {
         name: "Sneak (2014)",
@@ -702,12 +648,7 @@ describe("characters routes", () => {
         abilityScores: { strength: 10, dexterity: 13, constitution: 14, intelligence: 12, wisdom: 10, charisma: 8 },
       };
 
-      // Lightfoot Halfling (species DEX+2, variant CHA+1, #1681 fixed increases)
-      // — CON stays untouched by either bump, so the HP assertion below still
-      // isolates "no BACKGROUND spread baked in" cleanly. Every 2014 species
-      // grants SOMETHING (#1681, unlike the pruned legacy no-speciesId path),
-      // so "ability scores exactly as submitted" is no longer provable —
-      // this asserts the submitted scores plus exactly the species bump instead.
+      // Lightfoot Halfling: DEX+2, CHA+1; CON stays untouched, isolating the no-background-spread assertion below.
       async function post(body: object) {
         const halfling = await prisma.species.findFirstOrThrow({
           where: { slug: "halfling", edition: "EDITION_2014" },
@@ -726,12 +667,10 @@ describe("characters routes", () => {
         expect(res.body.advancements).toHaveLength(0);
         expect(res.body.abilityScores).toEqual({
           ...criminal2014Body.abilityScores,
-          dexterity: 15, // 13 + species DEX+2
-          charisma: 9, // 8 + Lightfoot CHA+1
+          dexterity: 15,
+          charisma: 9,
         });
-        // No BACKGROUND spread baked in: CON stays exactly 14 (untouched by
-        // Halfling's own increases) → +2 mod, Fighter d10 → 12 max HP (not the
-        // 13 a CON-touching 2024 spread would produce, per the sibling test above).
+        // CON untouched (14) → 12 max HP, not the 13 a background spread would give.
         expect(res.body.hitPoints.max).toBe(12);
       });
 
@@ -742,22 +681,9 @@ describe("characters routes", () => {
       });
     });
 
-    // ── Starting equipment tests ──────────────────────────────────────────
-    // These tests rely on the seeded catalog (Wizard/Fighter classes, Human
-    // race, Sage/Soldier backgrounds, and the weapon/armor/gear items) which
-    // is applied via `prisma db seed` before running the test suite.
     describe("with startingEquipment (package mode)", () => {
-      // Simplest package path: Wizard with no open picks. This whole describe
-      // block exercises the PHB'14 FOUR-group package shape (Group 0:
-      // Quarterstaff, Group 1: Component Pouch, Group 2: Scholar's Pack
-      // (expands via PACK_CONTENTS -> 6 rows), Group 3: Spellbook auto-grant)
-      // by fixed group/optionIndex — the EDITION_2024 Wizard package (#1535)
-      // is ONE group of two lettered options instead, so every body here
-      // pins rulesEdition explicitly rather than relying on
-      // DEFAULT_RULES_EDITION (2024).
-      // A function, not a const — speciesId is resolved via an async DB
-      // lookup (Human 2014 has no #1690 choice trait, matching this block's
-      // "no player choices" bodies), unavailable at describe-body evaluation time.
+      // PHB'14 Wizard package has 4 fixed groups; EDITION_2024's has 1 lettered group (#1535) — bodies here pin rulesEdition rather than relying on the default.
+      // A function, not a const — speciesId requires an async DB lookup, unavailable at describe-body evaluation time.
       const wizardBody = async () => ({
         name: "Merlin",
         alignment: "Neutral Good",
@@ -793,28 +719,19 @@ describe("characters routes", () => {
         expect(response.status).toBe(201);
         createdCharacterIds.push(response.body.id);
 
-        // Scholar's Pack expands to 6 items, plus Quarterstaff, Component
-        // Pouch, Spellbook = 9 total inventory rows.
         const names: string[] = response.body.inventory.map(
           (i: { name: string }) => i.name
         );
         expect(names).toContain("Quarterstaff");
         expect(names).toContain("Component Pouch");
         expect(names).toContain("Spellbook");
-        // Scholar's Pack is expanded — its individual items appear, not the pack itself
         expect(names).not.toContain("Scholar's Pack");
         expect(names).toContain("Backpack");
-        // Starting gold should be zero for the package path — also the #1564
-        // regression check: every EDITION_2014 option carries gold: 0, so
-        // this real package's currency must stay exactly what it is today
-        // now that package-mode selections can add gold (starting-equipment-
-        // gold.test.ts covers the nonzero accumulation with a fixture package).
+        // Currency stays zero for the package path even though package-mode selections can add gold (#1564).
         expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 0, pp: 0 });
       });
 
       it("creates inventory rows with an open-pick weapon (Fighter martial weapon)", async () => {
-        // Fighter group 1, option 0: martial weapon + shield. Open pick: Longsword
-        // (the PHB'14 four-group shape — pin the edition, see wizardBody's comment above)
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
@@ -853,21 +770,15 @@ describe("characters routes", () => {
         expect(names).toContain("Chain Mail");
         expect(names).toContain("Longsword");
         expect(names).toContain("Shield");
-        // Handaxe ×2 comes as quantity:2 on one row, or one row with qty 2
         expect(names).toContain("Handaxe");
-        // Dungeoneer's Pack expanded
         expect(names).not.toContain("Dungeoneer's Pack");
         expect(names).toContain("Backpack");
         expect(names).toContain("Torch");
-        // The Longsword row should have weaponClass:"martial" snapshotted
         const longsword = response.body.inventory.find(
           (i: { name: string }) => i.name === "Longsword"
         );
         expect(longsword?.weapon?.weaponClass).toBe("martial");
 
-        // issue #51: a freshly created martial character must have its primary
-        // weapon + body armor + shield auto-equipped (one-handed weapon, so the
-        // shield is allowed), but NOT a second weapon (the thrown Handaxes).
         expect(longsword?.equipped).toBe(true);
         const chainMail = response.body.inventory.find(
           (i: { name: string }) => i.name === "Chain Mail"
@@ -884,8 +795,6 @@ describe("characters routes", () => {
       });
 
       it("auto-equips a two-handed weapon alone — no second weapon (issue #51)", async () => {
-        // Fighter group 1, option 1: two martial weapons. The first pick is a
-        // Greataxe (two-handed); the rules preclude equipping the second weapon.
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
@@ -921,13 +830,9 @@ describe("characters routes", () => {
         const greataxe = response.body.inventory.find(
           (i: { name: string }) => i.name === "Greataxe"
         );
-        // Confirm the fixture actually gave us a two-handed weapon.
         expect(greataxe?.weapon?.twoHanded).toBe(true);
         expect(greataxe?.equipped).toBe(true);
 
-        // Two-handed weapon consumes the off-hand: the second weapon stays
-        // unequipped. Body armor — which never contends for the off-hand — still
-        // equips.
         const chainMail = response.body.inventory.find(
           (i: { name: string }) => i.name === "Chain Mail"
         );
@@ -945,9 +850,8 @@ describe("characters routes", () => {
             ...(await wizardBody()),
             startingEquipment: {
               mode: "package",
-              // Wizard has groups.length === 4; optionIndex 99 is out of range
               selections: [
-                { optionIndex: 99 }, // invalid
+                { optionIndex: 99 },
                 { optionIndex: 0 },
                 { optionIndex: 0 },
                 { optionIndex: 0 },
@@ -965,7 +869,6 @@ describe("characters routes", () => {
             ...(await wizardBody()),
             startingEquipment: {
               mode: "package",
-              // Wizard has 4 groups; only 2 provided
               selections: [{ optionIndex: 0 }, { optionIndex: 0 }],
             },
           });
@@ -996,7 +899,7 @@ describe("characters routes", () => {
               mode: "package",
               selections: [
                 { optionIndex: 0 },
-                { optionIndex: 0, openPicks: ["Vorpal Sword of Doom"] }, // not in catalog
+                { optionIndex: 0, openPicks: ["Vorpal Sword of Doom"] },
                 { optionIndex: 1 },
                 { optionIndex: 0 },
               ],
@@ -1029,7 +932,6 @@ describe("characters routes", () => {
               mode: "package",
               selections: [
                 { optionIndex: 0 },
-                // Club is a simple weapon; Fighter group 1 requires "martial"
                 { optionIndex: 0, openPicks: ["Club"] },
                 { optionIndex: 1 },
                 { optionIndex: 0 },
@@ -1042,7 +944,6 @@ describe("characters routes", () => {
       });
 
       it("rejects mode:package for a class with no package definition with 400", async () => {
-        // TEST_CLASS ("Test Class") has no seeded StartingEquipmentPackage row (#1534)
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
@@ -1053,10 +954,7 @@ describe("characters routes", () => {
         expect(response.status).toBe(400);
       });
 
-      // gold mode's range check is wrapped in `if (classDef)` (resolveStartingGold,
-      // #1534) — a class with no package row accepts ANY gold amount unvalidated.
-      // An absurd amount (999999) that would fail every real class's dice range
-      // proves this isn't accidentally passing a narrow check.
+      // resolveStartingGold only range-checks gold when classDef exists (#1534); 999999 proves this isn't accidentally passing a narrow check.
       it("accepts any gold amount unvalidated for a class with no package definition", async () => {
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
@@ -1072,10 +970,7 @@ describe("characters routes", () => {
     });
 
     describe("with startingEquipment (gold mode)", () => {
-      // 2014-only: EDITION_2024's Wizard package has no roll-for-gold rule at
-      // all (gold: null, #1564/#1535) — pin the edition rather than relying
-      // on DEFAULT_RULES_EDITION (2024).
-      // A function, not a const — same reasoning as wizardBody above.
+      // EDITION_2024's Wizard package has no roll-for-gold rule (gold: null, #1564/#1535); this body pins EDITION_2014 rather than relying on the default.
       const baseBody = async () => ({
         name: "Wealthy Adventurer",
         alignment: "True Neutral",
@@ -1095,7 +990,6 @@ describe("characters routes", () => {
       });
 
       it("sets currency.gp and leaves inventory empty", async () => {
-        // Wizard gold: 4d4×10 → min 40, max 160
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({ ...(await baseBody()), startingEquipment: { mode: "gold", gold: 100 } });
@@ -1108,7 +1002,6 @@ describe("characters routes", () => {
       });
 
       it("rejects gold below the class minimum with 400", async () => {
-        // Wizard min = 4×10 = 40
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({ ...(await baseBody()), startingEquipment: { mode: "gold", gold: 0 } });
@@ -1117,7 +1010,6 @@ describe("characters routes", () => {
       });
 
       it("rejects gold above the class maximum with 400", async () => {
-        // Wizard max = 4×4×10 = 160
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({ ...(await baseBody()), startingEquipment: { mode: "gold", gold: 999 } });
@@ -1129,7 +1021,7 @@ describe("characters routes", () => {
     it("omitting startingEquipment creates an empty-inventory character (regression)", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send(createBody()); // createBody has no startingEquipment
+        .send(createBody());
 
       expect(response.status).toBe(201);
       createdCharacterIds.push(response.body.id);
@@ -1139,9 +1031,6 @@ describe("characters routes", () => {
   });
 
   describe("character ownership (#99)", () => {
-    // A function, not a const — see the sibling createBody in "POST
-    // /api/characters" above for why (testSpeciesId isn't known yet at
-    // describe-body evaluation time).
     const createBody = () => ({
       name: "Owned Hero",
       alignment: "Lawful Good",
@@ -1178,8 +1067,6 @@ describe("characters routes", () => {
     });
 
     it("GET /api/characters is owner-scoped (any ?owner param is ignored)", async () => {
-      // The list is always scoped to the authenticated user; a leftover ?owner
-      // query param has no effect. Our fixture (owned by the caller) appears.
       const filtered = await supertest.agent(app).set("Cookie", COOKIE).get(
         "/api/characters?owner=some-nonexistent-user-id",
       );
@@ -1198,8 +1085,7 @@ describe("characters routes", () => {
         prisma.character.findUnique({ where: { id: FIXTURE.id } })
       ).resolves.toBeNull();
 
-      // The afterEach deleteMany is harmless on an already-gone id, but clean
-      // up bookkeeping the same way the cascade test does.
+      // afterEach's deleteMany is a no-op here; this just keeps bookkeeping consistent with the cascade test below.
       createdCharacterIds = createdCharacterIds.filter((id) => id !== FIXTURE.id);
     });
 

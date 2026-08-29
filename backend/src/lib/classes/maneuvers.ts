@@ -1,16 +1,3 @@
-/**
- * Battle Master maneuver cast handler — a focus/die-cast handler alongside
- * applyShadowArtsOperations. A maneuver is a superiority-die-fuelled activated ability
- * catalogued in GrantedAbility (source "maneuver"); casting one spends one die
- * via the shared payAbilityCostInTx pool path, rolls it server-side, and (for
- * Rally) applies self temp HP through the core's self-apply path.
- *
- * The 5e rules that live here: the die is always 1× the current superiority die
- * (no scaling), the announced save DC = 8 + prof + max(Str,Dex) (announcedSaveDC,
- * #1589), and Rally grants die + Cha mod as self temp HP. Placement/save columns
- * come from the catalog; the known list + die size come from resources + deriveResources.
- */
-
 import type { CastManeuverOperation, ManeuverOperation } from "@character-sheet/contracts";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -25,22 +12,19 @@ import { normalizeResourcesMutable, type ManeuverEntry } from "./resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { abilityModifier } from "@/lib/srd/srd.js";
 
-// "strength" → "Str", "dexterity" → "Dex", "wisdom" → "Wis", "constitution" → "Con".
 function abbr(ability: string): string {
   return ability.slice(0, 3).replace(/^./, (c) => c.toUpperCase());
 }
 
 export class InvalidManeuverOperationError extends Error {}
 
-/** Result surfaced to the route so the client can fold the die into a roll. */
 export interface ManeuverCastResult {
   roll: number;
   saveDc: number | null;
   summary: string;
 }
 
-// A maneuver carries no independent roll — its EffectSpec is a bare utility so
-// castAbilityInTx pays the die cost without an auto-summed damage/heal line.
+// EffectSpec is a bare utility (no independent roll) so castAbilityInTx pays the die cost without an auto-summed damage/heal line.
 function maneuverEffectSpec(saveAbility: string | null): EffectSpec {
   return {
     effectType: "utility",
@@ -49,10 +33,7 @@ function maneuverEffectSpec(saveAbility: string | null): EffectSpec {
   };
 }
 
-// Columns/relations re-read per op (5e-rules columns supplied here per the
-// character-transaction contract). Every entry (not just the primary) + its
-// level, so a non-primary Battle Master's save DC/pool still resolves via
-// deriveEntryScopedResources (#1072).
+// Every entry (not just primary) + its level, so a non-primary Battle Master's save DC/pool still resolves via deriveEntryScopedResources.
 const MANEUVER_SELECT = {
   spellcasting: true,
   resources: true,
@@ -67,21 +48,7 @@ const MANEUVER_SELECT = {
 
 type ManeuverRow = Prisma.CharacterGetPayload<{ select: typeof MANEUVER_SELECT }>;
 
-// Gate: only a Battle Master fighter (L3+) has a superiority die + save DC.
-// featureRowsOf (#1528 chunk 0) — Battle Master's superiority-dice pool and
-// its announcedSaveDC are now BOTH row-driven (#1546 Part B: resourceKey/
-// resourceTotals/resourceDieTiers + saveDcAbilities on the Combat Superiority
-// row, read via deriveEntryScopedResourcesForCharacterRow -> registry.ts's
-// deriveRowExtras), which is exactly why this carrier is threaded through
-// here — not a forward-looking comment anymore, but the live path. The gate
-// itself stays Battle-Master-specific in EFFECT (only that subclass's rows
-// populate superiorityDice; #1589 generalised announcedSaveDC's MECHANISM to
-// base-class rows too, but no base-class row populates saveDcAbilities in
-// production today, so this entry's own announcedSaveDC still only ever
-// comes from Combat Superiority) — only the thrown message's TEXT is
-// deliberately class-agnostic (#1532's goal grep), so nobody reads a
-// hardcoded class name here and "helpfully" restores it. Do not re-add the
-// class name to the string below; the why is recorded here, not there.
+// The thrown message's text is deliberately class-agnostic (#1532) even though the gate is effectively Battle-Master-only today — do not hardcode a class name into the string below.
 function resolveSuperiority(row: ManeuverRow): { saveDcBase: number; dieFaces: number } {
   const { derived } = deriveEntryScopedResourcesForCharacterRow(row, featureRowsOf);
 
@@ -95,21 +62,13 @@ function resolveSuperiority(row: ManeuverRow): { saveDcBase: number; dieFaces: n
   return { saveDcBase, dieFaces };
 }
 
-// Resolve the known-maneuver entry + its catalog row (null for custom, die-only
-// maneuvers). Throws if the entry isn't on the character's known list.
 async function loadManeuver(tx: Prisma.TransactionClient, row: ManeuverRow, entryId: string) {
   const resources = normalizeResourcesMutable(row.resources);
   const entry = resources.maneuversKnown.find((m) => m.id === entryId);
   if (!entry) {
     throw new InvalidManeuverOperationError(`Maneuver not known: ${entryId}`);
   }
-  // Deliberately NOT guarded by crossEditionRejection (#1345): entry.maneuverId
-  // is a PERSISTED id from an already-learned maneuver, not a client-supplied
-  // one being admitted — the guard belongs at the write path that snapshotted
-  // it (applyLearnManeuverOp, resources.ts), not here. Guarding this read
-  // would brick an already-learned maneuver the moment its catalog row were
-  // ever forked by edition, which is a false rejection on legitimate data,
-  // worse than the hole #1345 closes.
+  // Deliberately NOT guarded by crossEditionRejection: entry.maneuverId is an already-persisted id (guarded at learn time by applyLearnManeuverOp) — re-guarding here would brick an already-learned maneuver if its catalog row were ever forked by edition.
   const catalog = entry.maneuverId
     ? await tx.grantedAbility.findUnique({ where: { id: entry.maneuverId } })
     : null;
@@ -141,8 +100,7 @@ interface ManeuverCastArgs {
   spellState: ReturnType<typeof normalizeSpellcastingMutable>;
 }
 
-// Spend the die via the shared cost path — pays the pool and (Rally) self-applies
-// temp HP. The pool payer logs its own spendResource event for revert.
+// The pool payer logs its own spendResource event for revert.
 async function spendManeuverDie(
   ctx: CharacterTxContext<ManeuverRow, CastManeuverOperation>,
   { entry, cost, saveAbility, roll, selfTempHp, tempHp, spellState }: ManeuverCastArgs,
@@ -165,7 +123,6 @@ async function spendManeuverDie(
   );
 }
 
-// The resources-category cast record carrying the roll + announced DC.
 async function logManeuverCast(
   ctx: CharacterTxContext<ManeuverRow, CastManeuverOperation>,
   args: { entry: ManeuverEntry; roll: number; dieLabel: string; saveDc: number | null; saveAbility: string | null; summary: string },
@@ -191,8 +148,6 @@ async function logManeuverCast(
   });
 }
 
-// Casts one known maneuver: spends one superiority die (server rolls it) and
-// logs the resources-category castManeuver event. See applyManeuverOperations.
 async function castManeuver(
   ctx: CharacterTxContext<ManeuverRow, CastManeuverOperation>,
 ): Promise<ManeuverCastResult> {
@@ -223,14 +178,8 @@ async function castManeuver(
   return { roll, saveDc, summary };
 }
 
-/**
- * Applies a batch of maneuver operations atomically. Mirrors
- * applyShadowArtsOperations: one batchId, LIFO-undoable events, state re-read
- * per op. Each cast: the pool payer logs its own spendResource event (refunds
- * the die on revert); the resources-category castManeuver event carries the
- * roll + announced DC. Returns one ManeuverCastResult per op (client folds the
- * die into the relevant attack/damage total per the maneuver's placement).
- */
+// Mirrors applyShadowArtsOperations: one batchId, LIFO-undoable events, state re-read per op.
+// Returns one ManeuverCastResult per op — the client folds the die into the relevant attack/damage total per the maneuver's placement.
 export async function applyManeuverOperations(
   characterId: string,
   operations: ManeuverOperation[],

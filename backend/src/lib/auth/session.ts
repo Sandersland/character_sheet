@@ -3,14 +3,9 @@ import crypto from "node:crypto";
 import { prisma } from "@/lib/core/prisma.js";
 import { resolvePreferences, type ResolvedPreferences } from "@/lib/preferences/preferences.js";
 
-// Opaque server-side sessions — the method-agnostic identity layer. Any auth
-// method (OAuth today, password/magic-link later) mints a session the same way.
-// Cookie handling lives in ./cookies.js; OAuth-only PKCE/state in ./oauth/pkce.js.
-
-// Session cookie name. `cs_` = character-sheet namespace.
 export const SESSION_COOKIE = "cs_session";
 
-// 30-day session lifetime, exposed in seconds for the Set-Cookie Max-Age.
+// Exposed in seconds for the Set-Cookie Max-Age.
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 
@@ -19,13 +14,11 @@ export interface SessionUser {
   email: string | null;
   name: string | null;
   imageUrl: string | null;
-  // null = this account has never stored preferences (#1178) — see
-  // resolvePreferences for why that's a distinct state from "stored defaults".
+  // #1178: null = this account has never stored preferences — see resolvePreferences for why that's distinct from "stored defaults".
   preferences: ResolvedPreferences | null;
 }
 
-// Mint a new session. The token is the AuthSession primary key (the schema
-// gives `id` no default precisely so we store this opaque value verbatim).
+// The token is the AuthSession primary key — the schema gives `id` no default precisely so we store this opaque value verbatim.
 export async function createSession(userId: string): Promise<string> {
   const token = crypto.randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
@@ -33,8 +26,7 @@ export async function createSession(userId: string): Promise<string> {
   return token;
 }
 
-// Resolve a session token to its user, or null if the token is unknown or
-// expired. Expired rows are deleted best-effort (never throws on the cleanup).
+// An expired token's row is deleted best-effort as a side effect.
 export async function lookupSession(token: string): Promise<SessionUser | null> {
   if (!token) return null;
 
@@ -58,8 +50,7 @@ export async function lookupSession(token: string): Promise<SessionUser | null> 
   };
 }
 
-// Delete a session (logout). deleteMany so an already-absent token is a no-op
-// rather than a throw.
+// deleteMany so an already-absent token is a no-op rather than a throw.
 export async function destroySession(token: string): Promise<void> {
   if (!token) return;
   await prisma.authSession.deleteMany({ where: { id: token } });

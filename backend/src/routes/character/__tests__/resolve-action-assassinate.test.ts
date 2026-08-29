@@ -1,10 +1,3 @@
-/**
- * Assassinate route integration tests (#1526) — the `assassinate` flag on a
- * resolveAction op. Own dedicated fixture (a 2014 Assassin) rather than
- * extending resolve-action.test.ts's Wizard fixture, mirroring how that
- * file's own Wizard fixture is scoped to spellcasting concerns.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -42,7 +35,6 @@ const FIXTURE_BASE = {
   currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
 };
 
-// A weapon swing declaring Assassinate — hit lands, converted to a crit.
 function assassinateOp(actionId = "action-1") {
   return {
     type: "resolveAction" as const,
@@ -55,7 +47,6 @@ function assassinateOp(actionId = "action-1") {
   };
 }
 
-// A later, non-toggled swing — normal hit, no Assassinate flag.
 function plainOp(actionId = "action-2") {
   return {
     type: "resolveAction" as const,
@@ -164,10 +155,7 @@ describe("POST /api/characters/:id/resolve-action/transactions — Assassinate (
     expect(res.status).toBe(400);
   });
 
-  // Mutation-proof (#1526 AC): the eligibility gate, not just the frontend
-  // toggle's visibility, is what stands between a 2024 Assassin and a
-  // mechanic PHB'24 deleted (#1231) — a crafted request bypassing the UI
-  // must still be rejected.
+  // The eligibility gate, not just the frontend toggle's visibility, must reject a crafted request bypassing the UI (#1526).
   it("400s Assassinate from a 2024 Assassin L3 — SRD 5.2/PHB'24 deleted the auto-crit clause", async () => {
     await createFixture(3, "Assassin", "EDITION_2024", rogueClassId);
 

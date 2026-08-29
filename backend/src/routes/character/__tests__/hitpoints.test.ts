@@ -12,13 +12,11 @@ import { battleMasterResourceRowsData, fighterResourceRowsData } from "@/test-su
 const OWNER_ID = "owner-hitpoints";
 let COOKIE: string;
 
-// A fixture character with known state for HP / hit-dice tests.
-// Constitution 14 → conMod +2; d10 hit die; level 2 (XP 300).
 const FIXTURE = {
   id: "test-hp-character-1",
   name: "HP Test Fixture",
   alignment: "True Neutral",
-  experiencePoints: 300, // level 2
+  experiencePoints: 300,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 20, max: 22, temp: 5, deathSaves: { successes: 0, failures: 0 } },
@@ -26,7 +24,7 @@ const FIXTURE = {
   abilityScores: {
     strength: 10,
     dexterity: 12,
-    constitution: 14, // +2 conMod
+    constitution: 14,
     intelligence: 10,
     wisdom: 10,
     charisma: 10,
@@ -37,12 +35,11 @@ const FIXTURE = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-// A second fixture for "negative Con" edge cases — Con 6 → conMod -2.
 const FIXTURE_LOW_CON = {
   ...FIXTURE,
   id: "test-hp-character-2",
   name: "Low-Con HP Fixture",
-  abilityScores: { ...FIXTURE.abilityScores, constitution: 6 }, // -2 conMod
+  abilityScores: { ...FIXTURE.abilityScores, constitution: 6 },
 };
 
 async function post(characterId: string, body: object) {
@@ -84,13 +81,10 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── damage ──────────────────────────────────────────────────────────────
-
   it("damage: temp absorbs before current", async () => {
-    // start: temp 5, current 20, max 22
     const res = await post(FIXTURE.id, { operations: [{ type: "damage", amount: 8 }] });
     expect(res.status).toBe(200);
-    // 5 temp absorbed; 3 from current: 20 - 3 = 17
+
     expect(res.body.hitPoints.temp).toBe(0);
     expect(res.body.hitPoints.current).toBe(17);
   });
@@ -109,21 +103,17 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── heal ─────────────────────────────────────────────────────────────────
-
   it("heal: adds to current, caps at max", async () => {
-    // current 20, max 22
     const res = await post(FIXTURE.id, { operations: [{ type: "heal", amount: 10 }] });
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(22); // capped
+    expect(res.body.hitPoints.current).toBe(22);
   });
 
   it("heal: at 0 HP resets death saves", async () => {
-    // First damage to 0
     await post(FIXTURE.id, { operations: [{ type: "damage", amount: 999 }] });
-    // Roll a death save so it's non-zero
-    await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 5 }] }); // failure
-    // Now heal
+
+    await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 5 }] });
+
     const res = await post(FIXTURE.id, { operations: [{ type: "heal", amount: 1 }] });
     expect(res.status).toBe(200);
     expect(res.body.hitPoints.current).toBe(1);
@@ -135,13 +125,10 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── setTemp ──────────────────────────────────────────────────────────────
-
   it("setTemp: takes the higher (5e no-stacking rule)", async () => {
-    // start: temp 5; new value 3 → stays 5
     const res1 = await post(FIXTURE.id, { operations: [{ type: "setTemp", amount: 3 }] });
     expect(res1.body.hitPoints.temp).toBe(5);
-    // new value 10 → goes up to 10
+
     const res2 = await post(FIXTURE.id, { operations: [{ type: "setTemp", amount: 10 }] });
     expect(res2.body.hitPoints.temp).toBe(10);
   });
@@ -151,18 +138,14 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── shortRest ────────────────────────────────────────────────────────────
-
   it("shortRest: heals by roll+conMod for each die, increments spent", async () => {
-    // conMod +2; rolls [5, 8]: gain = (5+2)=7 + (8+2)=10 = 17; but current (20)+17>22 → caps at 22
     const res = await post(FIXTURE.id, { operations: [{ type: "shortRest", rolls: [5, 8] }] });
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(22); // capped at max
+    expect(res.body.hitPoints.current).toBe(22);
     expect(res.body.hitDice.spent).toBe(2);
   });
 
   it("shortRest: 400s when spending more dice than available", async () => {
-    // total 2, spent 0 → available 2; try spending 3
     const res = await post(FIXTURE.id, {
       operations: [{ type: "shortRest", rolls: [5, 5, 5] }],
     });
@@ -170,7 +153,6 @@ describe("POST /api/characters/:id/hp", () => {
   });
 
   it("shortRest: 400s when a roll is out of range (> faces)", async () => {
-    // d10 → valid range 1..10; roll of 11 is invalid
     const res = await post(FIXTURE.id, {
       operations: [{ type: "shortRest", rolls: [11] }],
     });
@@ -181,28 +163,25 @@ describe("POST /api/characters/:id/hp", () => {
     await prisma.character.create({
       data: { ...FIXTURE_LOW_CON, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull },
     });
-    // conMod -2; rolls [1]: gain = max(0, 1-2) = 0; current stays 20
+
     const res = await post(FIXTURE_LOW_CON.id, {
       operations: [{ type: "shortRest", rolls: [1] }],
     });
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(20); // unchanged
-    expect(res.body.hitDice.spent).toBe(1); // die still spent
+    expect(res.body.hitPoints.current).toBe(20);
+    expect(res.body.hitDice.spent).toBe(1);
   });
 
-  // ── longRest ─────────────────────────────────────────────────────────────
-
   it("longRest: restores full HP, clears temp, resets death saves, recovers dice", async () => {
-    // First spend a die and deal damage
     await post(FIXTURE.id, { operations: [{ type: "shortRest", rolls: [3] }] });
     await post(FIXTURE.id, { operations: [{ type: "damage", amount: 15 }] });
-    // Now long rest
+
     const res = await post(FIXTURE.id, { operations: [{ type: "longRest" }] });
     expect(res.status).toBe(200);
     expect(res.body.hitPoints.current).toBe(res.body.hitPoints.max);
     expect(res.body.hitPoints.temp).toBe(0);
     expect(res.body.hitPoints.deathSaves).toEqual({ successes: 0, failures: 0 });
-    // total 2 → recover max(1, ceil(2/2))=1 die; spent was 1 → 1-1=0
+
     expect(res.body.hitDice.spent).toBe(0);
   });
 
@@ -234,7 +213,7 @@ describe("POST /api/characters/:id/hp", () => {
     const res = await post(FIXTURE.id, { operations: [{ type: "longRest" }] });
     expect(res.status).toBe(200);
     expect(res.body.conditions.exhaustion).toBe(0);
-    // No exhaustion part in the long-rest summary.
+
     const activity = await supertest(app).get(`/api/characters/${FIXTURE.id}/activity`).set("Cookie", COOKIE);
     const ev = (activity.body as Array<{ type: string; summary: string }>).find((e) => e.type === "longRest")!;
     expect(ev.summary).not.toMatch(/[Ee]xhaustion/);
@@ -256,20 +235,16 @@ describe("POST /api/characters/:id/hp", () => {
     expect(undo.body.conditions.exhaustion).toBe(3);
   });
 
-  // ── levelUp ──────────────────────────────────────────────────────────────
-
   it("levelUp (average): increments total, bumps max+current by fixed average+conMod", async () => {
-    // XP=300 → level 2; hitDice.total=2 → pendingLevelUps=0 normally.
-    // Give the character XP for level 3 to create a pending level-up.
     await prisma.character.update({
       where: { id: FIXTURE.id },
-      data: { experiencePoints: 900 }, // level 3
+      data: { experiencePoints: 900 },
     });
     const res = await post(FIXTURE.id, {
       operations: [{ type: "levelUp", method: "average" }],
     });
     expect(res.status).toBe(200);
-    // d10 average = floor(10/2)+1 = 6; +2 conMod → gain 8
+
     expect(res.body.hitDice.total).toBe(3);
     expect(res.body.hitPoints.max).toBe(FIXTURE.hitPoints.max + 8);
     expect(res.body.hitPoints.current).toBe(FIXTURE.hitPoints.current + 8);
@@ -281,7 +256,7 @@ describe("POST /api/characters/:id/hp", () => {
       where: { id: FIXTURE.id },
       data: { experiencePoints: 900 },
     });
-    // roll = 7; gain = max(1, 7+2) = 9
+
     const res = await post(FIXTURE.id, {
       operations: [{ type: "levelUp", method: "roll", roll: 7 }],
     });
@@ -295,13 +270,12 @@ describe("POST /api/characters/:id/hp", () => {
       data: { experiencePoints: 900 },
     });
     const res = await post(FIXTURE.id, {
-      operations: [{ type: "levelUp", method: "roll", roll: 11 }], // d10 max is 10
+      operations: [{ type: "levelUp", method: "roll", roll: 11 }],
     });
     expect(res.status).toBe(400);
   });
 
   it("levelUp: 400s when no level-up is pending (hitDice.total >= derivedLevel)", async () => {
-    // XP=300 → level 2; total=2 → no pending
     const res = await post(FIXTURE.id, {
       operations: [{ type: "levelUp", method: "average" }],
     });
@@ -317,17 +291,14 @@ describe("POST /api/characters/:id/hp", () => {
       operations: [{ type: "levelUp", method: "average" }],
     });
     expect(res.status).toBe(200);
-    // The classes array in the serialized character should reflect the repaired level
+
     const primaryClass = res.body.classes?.[0];
     if (primaryClass) {
       expect(primaryClass.level).toBe(3);
     }
   });
 
-  // ── deathSave ────────────────────────────────────────────────────────────
-
   it("deathSave: 400s when not at 0 HP", async () => {
-    // current is 20 (not 0)
     const res = await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 10 }] });
     expect(res.status).toBe(400);
   });
@@ -364,19 +335,17 @@ describe("POST /api/characters/:id/hp", () => {
 
   it("deathSave: 3 successes → stable (saves reset, still 0 HP)", async () => {
     await post(FIXTURE.id, { operations: [{ type: "damage", amount: 999 }] });
-    await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 15 }] }); // 1 success
-    await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 12 }] }); // 2 successes
-    const res = await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 10 }] }); // 3 → stable
+    await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 15 }] });
+    await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 12 }] });
+    const res = await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 10 }] });
     expect(res.status).toBe(200);
     expect(res.body.hitPoints.current).toBe(0);
     expect(res.body.hitPoints.deathSaves).toEqual({ successes: 0, failures: 0 });
   });
 
-  // ── stabilize ────────────────────────────────────────────────────────────
-
   it("stabilize: resets death saves while leaving current at 0", async () => {
     await post(FIXTURE.id, { operations: [{ type: "damage", amount: 999 }] });
-    await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 5 }] }); // 1 failure
+    await post(FIXTURE.id, { operations: [{ type: "deathSave", roll: 5 }] });
     const res = await post(FIXTURE.id, { operations: [{ type: "stabilize" }] });
     expect(res.status).toBe(200);
     expect(res.body.hitPoints.current).toBe(0);
@@ -388,12 +357,10 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── response shape ───────────────────────────────────────────────────────
-
   it("returns the full updated Character on success", async () => {
     const res = await post(FIXTURE.id, { operations: [{ type: "damage", amount: 1 }] });
     expect(res.status).toBe(200);
-    // Spot-check the full shape
+
     expect(res.body).toHaveProperty("id", FIXTURE.id);
     expect(res.body).toHaveProperty("hitPoints");
     expect(res.body).toHaveProperty("hitDice");
@@ -402,11 +369,7 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.body.hitDice).toHaveProperty("spent");
   });
 
-  // ── batch visibility ──────────────────────────────────────────────────────
-
   it("multi-op batch: op 2 sees op 1's persisted HP", async () => {
-    // start: temp 5, current 20, max 22. damage 8 → temp 0, current 17;
-    // heal 4 operates on 17 → 21 (a stale re-read of current 20 would cap at 22).
     const res = await post(FIXTURE.id, {
       operations: [
         { type: "damage", amount: 8 },
@@ -419,12 +382,7 @@ describe("POST /api/characters/:id/hp", () => {
   });
 });
 
-// ── exhaustion max-HP halving interacts with heal/shortRest/longRest (#1321) ─
-// PHB'14 p. 291 tier 4 ("Hit point maximum halved") plus PHB'14 p. 196/197's
-// current-can't-exceed-max ceiling: heal/shortRest must clamp to the HALVED
-// max (not 400), and longRest must recover exhaustion BEFORE recomputing the
-// post-rest max (decision 6) — reducing first is the only reading under which
-// "regains all lost hit points" (PHB'14 p. 186) is true of the rested character.
+// PHB'14 p. 291 (max halved) + p. 196/197 (current cannot exceed max): longRest must recover exhaustion before recomputing max, or p. 186's "regains all lost hit points" does not hold (decision 6).
 const EXH_OWNER_ID = "owner-hitpoints-exhaustion";
 const EXH_FIXTURE = {
   id: "test-hp-exhaustion-1",
@@ -494,21 +452,16 @@ describe("POST /api/characters/:id/hp — exhaustion max-HP halving (2014, #1321
 
     const activity = await supertest(app).get(`/api/characters/${EXH_FIXTURE.id}/activity`).set("Cookie", COOKIE);
     const ev = (activity.body as Array<{ type: string; data?: { hpRestored?: number } }>).find((e) => e.type === "longRest")!;
-    // Started at current 10 (fixture); post-recovery max is 15 → hpRestored 5,
-    // NOT 30 - 10 = 20 (the pre-recovery, exhaustion-5 max would floor even lower).
+    // hpRestored is 5 (10→15), not 30−10=20 — the pre-recovery, exhaustion-5 max would floor even lower.
     expect(ev.data!.hpRestored).toBe(5);
   });
 });
-
-// ── rest undo preserves resource sub-fields (issue #319) ────────────────────
 
 const FS_OWNER_ID = "owner-hitpoints-rest-undo";
 const BM_FIXTURE_ID = "test-hp-rest-undo-fighter";
 const BM_CATALOG_NAME = "HP Rest Undo Battle Master";
 
-// Level-4 Battle Master Fighter: Fighting Style feat (L1), 1 ASI (L4), 3 maneuvers
-// (L3), Student-of-War tool (L3) and a 4×d8 superiority pool all entitled, so
-// serializeCharacter's clamp-on-read keeps every stored sub-field.
+// Fully entitled at every slot so serializeCharacter's clamp-on-read keeps every stored sub-field (nothing gets stripped).
 const BM_RESOURCES = {
   used: { superiorityDice: 3 },
   maneuversKnown: [{ id: "mv-1", name: "Trip Attack" }],
@@ -523,7 +476,7 @@ const BM_FIXTURE = {
   id: BM_FIXTURE_ID,
   name: "Rest Undo Battle Master",
   alignment: "Lawful Neutral",
-  experiencePoints: 2700, // level 4
+  experiencePoints: 2700,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 20, max: 36, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -566,9 +519,7 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
   beforeEach(async () => {
     await ensureTestOwner(FS_OWNER_ID);
     bmCookie = await authCookie(FS_OWNER_ID);
-    // fightingStyleFeatLevel (#1529): the fs-slot cap resolves via this
-    // column through the class FK relation now — needed for the Defense feat
-    // this fixture asserts survives the rest-undo snapshot.
+    // fightingStyleFeatLevel (#1529) is needed for the Defense feat this fixture asserts survives the rest-undo snapshot.
     const cls = await prisma.characterClass.upsert({
       where: { name: BM_CATALOG_NAME },
       create: {
@@ -583,17 +534,10 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
       },
       update: { fightingStyleFeatLevel: 1, subclassLevel: 3 },
     });
-    // Second Wind/Action Surge are row-driven (#1528) and tied to a specific
-    // classId — this bespoke class needs its own rows for the base pools this
-    // test's `used` snapshot asserts on.
+
     await prisma.classFeature.deleteMany({ where: { classId: cls.id } });
     await prisma.classFeature.createMany({ data: fighterResourceRowsData(cls.id) });
-    // #1546 Part B-ii: Battle Master's superiorityDice pool + maneuver/tool
-    // choice counts are ROW-driven now too (fighter.ts's resourceFn/
-    // deriveExtras are gone) — a bespoke Subclass row with no ClassFeature
-    // children would silently lose them, same failure mode as the base
-    // class's rows above (#1546 Part B-i, Ruling 2). Shared helper, not a
-    // per-file copy.
+
     const bm = await upsertEditionRow(
       prisma.subclass,
       { classId: cls.id, name: BM_SUBCLASS_NAME, edition: null },
@@ -621,7 +565,7 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
   function assertSubFieldsIntact(body: { resources: { maneuversKnown: Array<{ name: string }>; toolProficienciesKnown: Array<{ name: string }> }; advancements: Array<{ slot?: string; featName?: string; abilityDeltas: Record<string, number> }> }) {
     expect(body.resources.maneuversKnown.map((m) => m.name)).toContain("Trip Attack");
     expect(body.resources.toolProficienciesKnown.map((t) => t.name)).toContain("Smith's Tools");
-    // Both the ASI and the Fighting Style feat survive the rest-undo snapshot (#818/#1137).
+
     expect(body.advancements).toHaveLength(2);
     expect(body.advancements.find((a) => a.slot !== "fightingStyle")?.abilityDeltas).toEqual({ strength: 2 });
     expect(body.advancements.some((a) => a.slot === "fightingStyle" && a.featName === "Defense")).toBe(true);
@@ -635,7 +579,7 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
     const undo = await revert(ev.batchId!);
     expect(undo.status).toBe(200);
     assertSubFieldsIntact(undo.body);
-    // The spent superiority die is re-expended by the undo.
+
     expect(undo.body.resources.pools.find((p: { key: string }) => p.key === "superiorityDice").used).toBe(3);
   });
 
@@ -656,14 +600,7 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
 
     const ev = await restEvent("longRest");
     expect(ev.before!.resources!.used).toEqual({ superiorityDice: 3 });
-    // secondWind/actionSurge now appear at 0 (#1227's recharge fix): both now
-    // genuinely recharge on a Long Rest (previously "shortRest"-only, a live
-    // bug — neither pool ever reset on a long rest despite its own
-    // description promising it), so resetRestResources' write condition
-    // (`poolRechargesOn(...) || restored > 0`) fires for them here even
-    // though this level-4 Battle Master never spent either — the same
-    // "materialize used[key]=0 on a recharging rest" behavior every other
-    // fully-recharging pool (e.g. Indomitable, Rage) already has.
+
     expect(ev.after!.resources!.used).toEqual({ superiorityDice: 0, secondWind: 0, actionSurge: 0 });
     expect(ev.after!.resources).not.toEqual(ev.before!.resources);
   });

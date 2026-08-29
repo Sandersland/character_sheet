@@ -1,6 +1,3 @@
-// Pure unit tests for resolveEditionRow (#1306) — the single place the
-// exact-edition-then-NULL-fallback ordering is expressed for the five
-// edition-tagged catalogs (Feat, Subclass, GrantedAbility, Action, Background).
 import { describe, expect, it } from "vitest";
 
 import { crossEditionRejection, resolveEditionCatalog, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
@@ -33,7 +30,6 @@ describe("resolveEditionRow", () => {
       { id: "exact-2014", edition: "EDITION_2014" },
     ];
     expect(resolveEditionRow(rows, "EDITION_2014")?.id).toBe("exact-2014");
-    // The order they're passed in shouldn't matter.
     expect(resolveEditionRow([...rows].reverse(), "EDITION_2014")?.id).toBe("exact-2014");
   });
 
@@ -84,7 +80,6 @@ describe("resolveEditionCatalog", () => {
       id: string;
       edition: "EDITION_2014" | "EDITION_2024" | null;
     }
-    // Same name, different classes — a name-only key would wrongly collapse these.
     const rows: SubclassLikeRow[] = [
       { classId: "fighter", name: "Champion", id: "fighter-champion", edition: null },
       { classId: "monk", name: "Champion", id: "monk-champion", edition: null },
@@ -142,7 +137,6 @@ describe("withEditionOrShared", () => {
         { OR: [{ edition: "EDITION_2024" }, { edition: null }] },
       ],
     });
-    // The caller's own OR survives intact, nested inside the outer AND.
     expect(composed.AND[0]).toBe(callerWhere);
   });
 
@@ -155,9 +149,7 @@ describe("withEditionOrShared", () => {
         { OR: [{ edition: "EDITION_2014" }, { edition: null }] },
       ],
     });
-    // The caller's own AND survives intact, nested inside the outer AND —
-    // a spreadable `{...where, ...fragment}` shape would have overwritten
-    // this key with the fragment's own AND instead.
+    // A spreadable `{...where, ...fragment}` shape would overwrite the caller's own AND with the fragment's.
     expect(composed.AND[0]).toBe(callerWhere);
   });
 });

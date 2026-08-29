@@ -9,24 +9,9 @@ import {
 } from "./inventory-currency.js";
 import type { DeletedInventoryItemSnapshot } from "./inventory-snapshot.js";
 
-// Undo / revert.
-//
-// Reverses one already-applied inventory CharacterEvent inside the caller's
-// revert transaction (activityRouter). Shape-driven, NOT type-driven:
-// event `type` names (acquired/consumed/sold/…) are shared across ops, so the
-// row action is decided by the snapshot shape instead:
-//
-//   before == null            → the op CREATED the row (acquire) → delete it
-//   data.deletedItem present  → the op DELETED the row → recreate from snapshot
-//   else                      → the row still exists → restore scalar(s) from before
-//
-// Currency is reversed first: data.currencyDelta is the signed amount applied
-// at write time (negative for a purchase, positive for a sale), so subtracting
-// it per-denomination undoes either direction. A negative result (the player
-// has since spent the proceeds) throws InsufficientCurrencyError, which rolls
-// back the whole revert batch.
-// Undo of a rest-recharge event: it has no single entityId, so restore each
-// item's pre-rest spent count. Handled before the entityId guard in the caller.
+// Row action is decided by snapshot shape, not event type: before==null deletes the row, a deletedItem snapshot recreates it, otherwise scalars restore from before; currency reverses first since InsufficientCurrencyError must roll back the whole batch.
+
+// Has no single entityId, so restores each item's pre-rest spent count instead. Handled before the entityId guard in the caller.
 async function revertRecharge(
   tx: Prisma.TransactionClient,
   recharged: { id: string; previousSpent: number }[],
@@ -39,8 +24,7 @@ async function revertRecharge(
   }
 }
 
-// Reverses a purchase/sale currency movement — currencyDelta is the signed
-// amount applied at write time, so debiting it per-denomination undoes either way.
+// currencyDelta is the signed amount applied at write time, so debiting it per-denomination undoes either direction.
 async function reverseCurrencyDelta(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -51,11 +35,7 @@ async function reverseCurrencyDelta(
   await setCharacterCurrency(tx, characterId, currencyDebit(current, currencyDelta));
 }
 
-// Re-links a deleted row's provenance FK on recreate: it survives only when the
-// referent still exists (else null — the snapshot is self-contained / SetNull).
-// `campaignItemId` is the pre-#1646 name for the same FK and still appears in
-// audit blobs written before the merge; ids were preserved, so it resolves
-// against Item unchanged.
+// #1646: `campaignItemId` is the pre-merge name for the same FK, still appearing in older audit blobs; ids were preserved, so it resolves against Item unchanged. Survives only when the referent still exists, else null.
 async function resolveSnapshotRefs(
   tx: Prisma.TransactionClient,
   deletedItem: DeletedInventoryItemSnapshot,
@@ -66,12 +46,7 @@ async function resolveSnapshotRefs(
   return { itemId: existing ? candidate : null };
 }
 
-// Recreates a deleted row from its undo snapshot, reusing the original id so
-// soft-reference entityIds on other events stay valid. #1649 simplified this:
-// the frozen half is the already-persisted `snapshot` blob, written back
-// verbatim — no per-capability id re-minting (a capability's `key` is just an
-// opaque string carried inside that blob, not tied to a live row anymore) and
-// no nested weapon/armor/consumable/capability creates (those tables are gone).
+// Reuses the original id so soft-reference entityIds on other events stay valid. #1649: the frozen half is the already-persisted `snapshot` blob, written back verbatim — no per-capability id re-minting, no nested detail-table creates.
 async function recreateDeletedItem(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -107,11 +82,6 @@ async function recreateDeletedItem(
   });
 }
 
-// Restores the scalar(s) captured in a surviving row's `before` snapshot:
-// quantity (partial sell/adjust), equippedSlot (setEquipped), attuned
-// (attune/unattune), weaponBonded (bondWeapon/unbondWeapon, #1854),
-// activatedUsesSpent (activate), usesRemaining (charged use), and
-// capabilityUsed (a #555 charges-pool spend).
 async function restoreScalars(
   tx: Prisma.TransactionClient,
   entityId: string,
@@ -131,16 +101,12 @@ async function restoreScalars(
   if (before.attuned !== undefined) updateData.attuned = before.attuned;
   if (before.weaponBonded !== undefined) updateData.weaponBonded = before.weaponBonded;
   if (before.activatedUsesSpent !== undefined) updateData.activatedUsesSpent = before.activatedUsesSpent;
-  // Promoted out of InventoryConsumableDetail (#1648) — a plain InventoryItem
-  // column, so restoring it is just another field in this same update.
+  // #1648: usesRemaining is a plain InventoryItem column, so restoring it is just another field in this same update.
   if (before.usesRemaining !== undefined) updateData.usesRemaining = before.usesRemaining;
   if (Object.keys(updateData).length > 0) {
     await tx.inventoryItem.update({ where: { id: entityId }, data: updateData });
   }
-  // updateMany (not update) so a vanished row is a no-op — capabilityId is
-  // event-blob field naming, historical from when it named an InventoryCapability
-  // row's id; the value it carries is the same capabilityKey InventoryCapabilityUse
-  // is keyed by.
+  // updateMany (not update) so a vanished row is a no-op — capabilityId is historical event-blob field naming; the value it carries is capabilityKey.
   if (before.capabilityUsed !== undefined) {
     await tx.inventoryCapabilityUse.updateMany({
       where: { capabilityKey: before.capabilityUsed.capabilityId },
@@ -171,18 +137,13 @@ export async function revertInventoryEvent(
     return;
   }
 
-  // Defensive: nothing to act on without a row id. Checked BEFORE the currency
-  // reversal so a malformed event carrying a currencyDelta but no entityId can't
-  // mutate currency without a corresponding row action. Well-formed events
-  // always have an entityId, so this is a pure no-op for them.
+  // Checked BEFORE the currency reversal so a malformed event carrying a currencyDelta but no entityId can't mutate currency without a corresponding row action.
   if (!event.entityId) return;
 
-  // 1. Reverse any currency movement (purchase or sale proceeds).
   await reverseCurrencyDelta(tx, characterId, data?.currencyDelta ?? undefined);
 
-  // 2. Reverse the row mutation, shape-driven.
   if (event.before === null) {
-    // Creation (acquire) → delete the created row; detail rows cascade.
+    // Detail rows cascade.
     await tx.inventoryItem.delete({ where: { id: event.entityId } });
     return;
   }

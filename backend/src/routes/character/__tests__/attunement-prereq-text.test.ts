@@ -1,15 +1,3 @@
-/**
- * Wire contract for the served attunementPrereqText (#1382).
- *
- * The client no longer composes the 5e "requires attunement by a …" phrasing, so
- * the payload field and the phrase applyAttune rejects with must be one string:
- * the equality test below reads the expected message out of the GET payload
- * rather than a literal, so a future edit to describeAttunementPrereq can't drift
- * the two apart silently. A vowel-initial value exercises the same pair (#1485),
- * because the article agreement is the edit most likely to be applied to one tier
- * and forgotten on the other.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -120,8 +108,8 @@ describe("GET /api/characters/:id — attunementPrereqText (#1382)", () => {
   });
 
   it("serves the same vowel-agreed text to both tiers (#1485)", async () => {
-    // The fixture has no raceSelection, so a species prerequisite is unmet and the
-    // attune lands on the 400 prerequisite path rather than the 409 attunement cap.
+    // No raceSelection on the fixture, so the species prereq is unmet, hitting the 400 prerequisite path, not the 409 cap.
+
     const item = await makeItem("Elven Chain", {
       requiresAttunement: true,
       attunementPrereqKind: "species",

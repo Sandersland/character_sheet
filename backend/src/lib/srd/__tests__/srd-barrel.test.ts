@@ -19,10 +19,6 @@ import * as characterDerive from "@/lib/srd/character-derive.js";
 import * as feats from "@/lib/srd/feats.js";
 import * as barrel from "@/lib/srd/srd.js";
 
-// Pins the #663 decomposition of srd.ts into topical files, each importable
-// on its own, with srd.ts kept as a thin re-export barrel (byte-identical
-// public API — same object identities, not copies). #1137 retired fighting-styles.
-
 describe("srd.ts topical decomposition (#663)", () => {
   it("splits rules data into independently-importable topical files", () => {
     expect(alignments.ALIGNMENTS).toBeDefined();

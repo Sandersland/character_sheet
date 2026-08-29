@@ -6,10 +6,6 @@ import {
   xpEventSummary,
 } from "@/lib/leveling/experience-ops.js";
 
-// Pure-logic oracle for the XP op summary/resolution helpers — pins the
-// byte-identical timeline strings + clamp/validation rules the transaction
-// handler depends on (extracted from applyExperienceOperations).
-
 describe("resolveXpChange", () => {
   it("award adds a signed delta and clamps the total at 0", () => {
     expect(resolveXpChange({ type: "award", amount: 450 }, 900)).toEqual({
@@ -20,7 +16,6 @@ describe("resolveXpChange", () => {
       newXp: 700,
       eventType: "xpAward",
     });
-    // Deducting past 0 floors the total, never goes negative.
     expect(resolveXpChange({ type: "award", amount: -5000 }, 1000)).toEqual({
       newXp: 0,
       eventType: "xpAward",

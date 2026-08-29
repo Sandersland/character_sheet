@@ -8,24 +8,12 @@ import type { serializeInventoryItem } from "./inventory.js";
 type SerializedInventoryItem = ReturnType<typeof serializeInventoryItem>;
 type UnarmedAttacksView = ReturnType<typeof buildUnarmedAttacksView>;
 
-/** An inventory row already narrowed to "equipped weapon with a weapon view". */
 type EquippedWeapon = SerializedInventoryItem & {
   weapon: NonNullable<SerializedInventoryItem["weapon"]>;
 };
 
-/**
- * Dice-valued on-hit riders from THIS item's active capabilities (Flame Tongue
- * +2d6 fire), scoped to the one item so another item's bonus can never leak into
- * its row. Only an additive dice-valued damage capability is a rider — a scalar,
- * a `setTo`, or a non-damage target is not.
- *
- * `isItemActive` is the gate, so an attunement-required item that is merely
- * equipped serves no riders (#1272: the client used to re-derive this).
- *
- * `index` is the position in the item's FULL capabilities list, not in the
- * filtered subset: rider ids are persisted as attack-tally `formId`s, so
- * renumbering them would orphan in-flight rows.
- */
+// isItemActive is the gate — an attunement-required item that's merely equipped serves no riders.
+// index is the position in the FULL capabilities list, not the filtered subset: rider ids are persisted as attack-tally formIds, so renumbering would orphan in-flight rows.
 function itemDamageRiders(item: SerializedInventoryItem): AttackDamageRider[] {
   if (!isItemActive(item)) return [];
   const riders: AttackDamageRider[] = [];
@@ -50,9 +38,7 @@ function equippedWeapons(inventory: SerializedInventoryItem[]): EquippedWeapon[]
   );
 }
 
-// One equipped weapon's row, composed from the values serializeInventoryItem
-// already derived — never re-derived here, which is what makes
-// `attackSpec.modifier === inventory[].weapon.attackBonus` true by construction.
+// Composed from values serializeInventoryItem already derived — never re-derived here, so attackSpec.modifier === inventory[].weapon.attackBonus by construction.
 function weaponRow(item: EquippedWeapon): AttackRow {
   const { damage, attackBonus, attackBonusComponents } = item.weapon;
   return {
@@ -79,25 +65,10 @@ function weaponRow(item: EquippedWeapon): AttackRow {
   };
 }
 
-/**
- * The single Two-Weapon Fighting off-hand row (#732), or undefined when the
- * loadout holds fewer than two weapons. Prefers the weapon in the OFF_HAND
- * paper-doll slot, falling back to the second equipped weapon.
- *
- * Row presence is not action availability: a row is emitted whenever two weapons
- * are equipped, exactly as before. Whether the swing may be taken this turn is the
- * two-Light-weapons rule, identical in SRD 5.1 / PHB'14 p. 72 and SRD 5.2, and the
- * Two-Weapon Fighting style does NOT waive it (#1496) — it grants damage only. That
- * SAME two-Light-weapons condition also gates whether the served damage keeps the
- * ability modifier: `hasOffHandAbilityDamage` (#1640) consults `weapons` for it, so
- * the DAMAGE VALUE this row serves is already Light-correct. Turn-availability
- * (whether the swing may be taken at all) still belongs to the gated action row
- * (#1435) — this file only serves the numbers.
- *
- * `damageSpec.modifier` and `damageComponents` both come from the one
- * `deriveOffHandDamage` result, which is what keeps
- * `abilityMod + meleeDamageBonus === damageSpec.modifier` true on this row (#1235).
- */
+// Two-Weapon Fighting off-hand row (#732) — undefined when fewer than two weapons are equipped; prefers the OFF_HAND slot, falling back to the second equipped weapon.
+// Turn-availability (whether the swing may be taken at all) is the two-Light-weapons rule (SRD 5.1/PHB'14 p. 72, SRD 5.2) — the Fighting Style does NOT waive it (#1496); this file only serves the numbers (#1435).
+// hasOffHandAbilityDamage (#1640) applies that same Light-weapons condition to whether the ability modifier is included, so the damage value here is already Light-correct.
+// damageSpec.modifier and damageComponents both come from the one deriveOffHandDamage result, keeping abilityMod + meleeDamageBonus === damageSpec.modifier true (#1235).
 function offHandRow(
   weapons: EquippedWeapon[],
   advancements: AdvancementEntry[],
@@ -121,8 +92,6 @@ function offHandRow(
   };
 }
 
-// The unarmed/improvised rows restate the already-derived buildUnarmedAttacksView
-// output as rows; both stay on the payload too, since other surfaces read them.
 function unarmedRow(unarmed: UnarmedAttacksView["unarmedStrike"]): AttackRow {
   return {
     id: "unarmed",
@@ -159,18 +128,8 @@ function improvisedRow(improvised: UnarmedAttacksView["improvisedWeapon"]): Atta
   };
 }
 
-/**
- * Every way the character can swing, fully resolved (#1434) — see `AttackRow`.
- *
- * Composed from the ALREADY-SERIALIZED inventory rather than the Prisma rows, so
- * the numbers on a row are the same objects the sheet reads on
- * `inventory[].weapon` and cannot drift from them.
- *
- * Order is load-bearing (the turn sheet's main-weapon summary reads the first
- * row): equipped weapons in inventory order, then the off-hand row, then
- * unarmed, then improvised. Equipped weapons are emitted UN-deduped — collapsing
- * two Daggers into one card is a presentation choice the client still owns.
- */
+// Composed from the ALREADY-SERIALIZED inventory, so a row's numbers are the same objects the sheet reads off inventory[].weapon and cannot drift.
+// Order is load-bearing (the turn sheet's main-weapon summary reads the first row): equipped weapons in inventory order, then off-hand, then unarmed, then improvised. Emitted UN-deduped — collapsing duplicates is a client-owned presentation choice.
 export function buildAttackRowsView(
   inventory: SerializedInventoryItem[],
   { unarmedStrike, improvisedWeapon }: UnarmedAttacksView,

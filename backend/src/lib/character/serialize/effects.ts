@@ -12,10 +12,7 @@ import type { RollModifier } from "@/lib/srd/srd.js";
 import { conditionDefinition, exhaustionRollEffects } from "@/lib/srd/condition-data.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 
-// The per-target modifier channel both skills and weapon math read: active cast
-// buffs (buffsByTarget) merged with active-item scalar passiveBonus contributions
-// (#545). Keyed the same way (skill name / meleeDamage / attackRoll) so item
-// bonuses and buffs sum together.
+// Keyed by skill name / meleeDamage / attackRoll / etc. so item bonuses and buffs sum by target (#545).
 export type TargetModifierMap = Record<string, Array<{ modifier: number; source: string; condition?: string }>>;
 
 function mergeTargetModifiers(
@@ -36,9 +33,6 @@ function mergeTargetModifiers(
   return out;
 }
 
-// The per-target modifier channel for one character: active cast buffs merged
-// with active-item scalar passiveBonus contributions (#545), keyed by target
-// (skill name / meleeDamage / attackRoll / ac / speed / …).
 export function buildTargetModifiers(
   row: CharacterWithRelations,
   activeEffects: ReturnType<typeof normalizeActiveEffectsMutable>,
@@ -54,10 +48,7 @@ export function buildTargetModifiers(
   return mergeTargetModifiers(buffsByTarget(activeEffects), itemPassiveBonuses);
 }
 
-// State-driven roll modifiers (#486): advantage/disadvantage grants from active
-// conditions (5e rules data in srd) merged with active-effect buffs (e.g. Rage).
-// Derived on read — the frontend resolves the effective mode per roll
-// (adv + disadv from different sources cancel to normal, RAW).
+// adv + disadv from different sources cancel to normal (RAW); the frontend resolves the effective mode per roll.
 export function buildRollModifiers(
   conditions: ConditionsMutableState,
   activeEffects: ActiveEffectsMutableState,
@@ -65,9 +56,7 @@ export function buildRollModifiers(
 ): RollModifier[] {
   const out: RollModifier[] = [];
   for (const entry of conditions.active) {
-    // conditionDefinition asserts its lookup always succeeds — safe here only
-    // because normalizeConditionsMutable already dropped any entry.key that
-    // fails isKnownCondition, so every key reaching this loop is a real one.
+    // Safe to assert: normalizeConditionsMutable already dropped any entry.key that fails isKnownCondition.
     const def = conditionDefinition(entry.key, edition);
     for (const effect of def.rollEffects ?? []) out.push({ ...effect, source: def.label });
   }

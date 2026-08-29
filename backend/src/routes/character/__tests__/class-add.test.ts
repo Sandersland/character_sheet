@@ -1,13 +1,3 @@
-/**
- * Add-class (multiclass) class-transaction route tests — issue #125.
- * Fixture: a level-5 Fighter (XP 6500) with only 4 HP level-ups applied → one
- * pending level, so adding a class allocates that pending level and both entries
- * fit under the XP-derived cap. Con 14 (+2), Str 15 (Fighter), Int 13 (meets the
- * Wizard multiclass prerequisite). The Wizard catalog row is the shared canonical
- * name so the srd validator (keyed by class name) applies; the Fighter catalog is
- * uniquely named so afterAll cleanup never touches a seeded row.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -31,11 +21,11 @@ const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Add Class Test Fighter",
   alignment: "True Neutral",
-  experiencePoints: 6500, // derived level 5
+  experiencePoints: 6500,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-  hitDice: { total: 4, die: "d10", spent: 0 }, // one pending level-up
+  hitDice: { total: 4, die: "d10", spent: 0 },
   abilityScores: {
     strength: 15,
     dexterity: 12,
@@ -107,8 +97,6 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
   });
 
-  // ── single-class serialization is unchanged for existing consumers ─────────────
-
   it("single-class fixture keeps the flat class/level shape", async () => {
     const res = await get();
     expect(res.status).toBe(200);
@@ -118,22 +106,17 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
     expect(res.body.classes[0]).toMatchObject({ name: "fighter", level: 4 });
   });
 
-  // ── happy path: adds a level-1 entry at the next position + rolls HP ───────────
-
   it("adds Wizard as a 2nd entry at the next position and bumps HP", async () => {
     const res = await tx({ operations: [{ type: "addClass", classId: wizardId }] });
     expect(res.status).toBe(200);
-    // d6 average 4 + con 2 = 6
     expect(res.body.hitPoints.max).toBe(36);
     expect(res.body.hitDice.total).toBe(5);
     expect(res.body.classes).toHaveLength(2);
     const wizard = res.body.classes.find((c: { name: string }) => c.name === WIZARD);
     expect(wizard.level).toBe(1);
-    // combined level unchanged (still 5); flat shape still points at position-0.
     expect(res.body.level).toBe(5);
     expect(res.body.class).toBe("fighter");
 
-    // Persisted at position 1.
     const entries = await prisma.characterClassEntry.findMany({
       where: { characterId: FIXTURE_ID },
       orderBy: { position: "asc" },
@@ -142,8 +125,6 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
     expect(entries[1].name).toBe(WIZARD);
     expect(entries[1].level).toBe(1);
   });
-
-  // ── prerequisite enforcement ──────────────────────────────────────────────────
 
   it("rejects the add when the 5e ability prerequisite is unmet", async () => {
     await prisma.character.update({
@@ -154,7 +135,6 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/Intelligence 13/);
 
-    // No entry created, HP untouched.
     const entries = await prisma.characterClassEntry.findMany({ where: { characterId: FIXTURE_ID } });
     expect(entries).toHaveLength(1);
   });
@@ -166,7 +146,6 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
   });
 
   it("rejects the add when there is no pending level-up (would exceed level cap)", async () => {
-    // Apply the pending level so hitDice.total == derived level 5 — nothing to spend.
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: { hitDice: { total: 5, die: "d10", spent: 0 } },
@@ -175,14 +154,11 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/pending level-up/i);
 
-    // No phantom entry created and hit dice untouched (no over-cap state).
     const entries = await prisma.characterClassEntry.findMany({ where: { characterId: FIXTURE_ID } });
     expect(entries).toHaveLength(1);
     const char = await prisma.character.findUniqueOrThrow({ where: { id: FIXTURE_ID } });
     expect((char.hitDice as { total: number }).total).toBe(5);
   });
-
-  // ── guards ──────────────────────────────────────────────────────────────────
 
   it("404s for an unknown character", async () => {
     const res = await supertest(app)
@@ -203,11 +179,7 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
     expect(res.status).toBe(400);
   });
 
-  // ── multi-op batch: per-op visibility of prior ops' writes ────────────────────
-
   it("a two-addClass batch sees the first op's writes (positions, hit dice, HP compound)", async () => {
-    // Two pending level-ups (derived level 5, only 3 applied), and fighter at
-    // level 3 so the final entry-level sum (3+1+1) fits the derived cap.
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: { hitDice: { total: 3, die: "d10", spent: 0 } },
@@ -216,7 +188,6 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
       where: { characterId: FIXTURE_ID },
       data: { level: 3 },
     });
-    // Barbarian: canonical name (srd prereq Str 13 — fixture Str 15 meets it).
     const b = await prisma.characterClass.upsert({
       where: { name: "Barbarian" },
       create: {
@@ -237,13 +208,12 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
       ],
     });
     expect(res.status).toBe(200);
-    // Op 2 must observe op 1's persisted hitDice/hitPoints/classEntries:
-    // HP 30 + (d6 avg 4 + con 2) + (d12 avg 7 + con 2) = 45, dice 3 + 1 + 1 = 5.
+    // Op 2 must observe op 1's persisted hitDice/hitPoints/classEntries.
     expect(res.body.hitPoints.max).toBe(45);
     expect(res.body.hitDice.total).toBe(5);
     expect(res.body.classes).toHaveLength(3);
 
-    // Positions compound (a stale second op would also compute position 1).
+    // Guards against a stale second op re-computing position 1.
     const entries = await prisma.characterClassEntry.findMany({
       where: { characterId: FIXTURE_ID },
       orderBy: { position: "asc" },
@@ -251,8 +221,6 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
     expect(entries.map((e) => e.position)).toEqual([0, 1, 2]);
     expect(entries.map((e) => e.name)).toEqual(["fighter", WIZARD, "Barbarian"]);
   });
-
-  // ── audit event + undo ────────────────────────────────────────────────────────
 
   it("logs a class/classAdded event and undo deletes the entry + restores HP", async () => {
     const add = await tx({ operations: [{ type: "addClass", classId: wizardId }] });

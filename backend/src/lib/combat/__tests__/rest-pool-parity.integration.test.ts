@@ -1,21 +1,4 @@
-// #1221: end-to-end proof that adding shortRestRegain/restPoolRegain left every
-// EXISTING pool's rest behaviour unchanged. Battle Master superiority dice
-// (shortRest) and Monk Focus (short-or-long) already have short-rest coverage
-// through applyShortRestOp — rest-multiclass.integration.test.ts and
-// routes/character/__tests__/hitpoints.test.ts's rest-undo suite. The gap this
-// file closed was Barbarian Rage (longRest): no existing test exercised it
-// through a real rest op, and it was the ONLY one of the three that the filed
-// mutation proof ("default shortRestRegain to 1") could actually detect —
-// superiority dice and Focus already fully reset to 0 on a short rest, so a
-// 1-use top-up on top of a full reset is unobservable on them.
-//
-// #1223 UPDATE: Rage itself now declares shortRestRegain: 1 in EDITION_2024
-// (SRD 5.2 p.20's partial short-rest top-up) — the "no shortRestRegain
-// declared" premise this file's title still names is true ONLY for
-// EDITION_2014 now, so `createBarbarian` pins `rulesEdition: "EDITION_2014"`
-// explicitly (the schema default is EDITION_2024, #1223 discovered this file
-// relied on that default implicitly). The 2024 partial-regain case is proved
-// separately by rest-pool-barbarian-rage.integration.test.ts.
+// createBarbarian pins rulesEdition to EDITION_2014 explicitly — the schema default is EDITION_2024.
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -49,8 +32,8 @@ async function createBarbarian() {
       id: BARB_ID,
       name: "Rest Pool Parity Barbarian",
       ownerId: OWNER_ID,
-      rulesEdition: "EDITION_2014", // see file header: 2024 now declares shortRestRegain (#1223)
-      experiencePoints: 0, // level 1 — 2 rage uses in both editions
+      rulesEdition: "EDITION_2014",
+      experiencePoints: 0,
       hitPoints: { current: 10, max: 12, temp: 0 },
       hitDice: { total: 1, die: "d12", spent: 0 },
       abilityScores: { strength: 16, dexterity: 14, constitution: 14, intelligence: 8, wisdom: 10, charisma: 8 },
@@ -73,7 +56,8 @@ describe("Rage (longRest) rest parity — unchanged by #1221 (Barbarian declares
 
     const row = await readRow(BARB_ID);
     const used = (row.resources as { used: Record<string, number> }).used;
-    expect(used.rage ?? 0).toBe(1); // unchanged — this is the assertion the "?? 1" mutation turns red
+    // The assertion a "default shortRestRegain to 1" mutation would turn red.
+    expect(used.rage ?? 0).toBe(1);
   });
 
   it("long rest fully restores Rage to 0 expended", async () => {

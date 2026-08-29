@@ -1,10 +1,3 @@
-/**
- * Tests for POST /api/characters/:id/advancement/transactions and the
- * feat-improvement modifier layer (deriveFeatBonuses applied at read time).
- *
- * Run with: DATABASE_URL=postgresql://... npx vitest run
- */
-
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -18,11 +11,9 @@ import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 const OWNER_ID = "owner-advancement";
 let COOKIE: string;
 
-// XP thresholds
-const XP_LVL_4 = 2700; // level 4 — 1 ASI slot (first unlock)
-const XP_LVL_19 = 305000; // level 19 — Epic Boon unlock (sync with XP_THRESHOLDS)
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const XP_LVL_4 = 2700;
+// Keep in sync with XP_THRESHOLDS.
+const XP_LVL_19 = 305000;
 
 async function postAdvancement(characterId: string, body: object) {
   return supertest(app)
@@ -49,8 +40,6 @@ async function postUndo(characterId: string, batchId: string) {
     .send({});
 }
 
-// ── Catalog fixtures ──────────────────────────────────────────────────────────
-
 const CLASS_NAME = "Test Fighter (Advancement Suite)";
 
 const BASE_ABILITY_SCORES = {
@@ -58,26 +47,23 @@ const BASE_ABILITY_SCORES = {
   intelligence: 10, wisdom: 10, charisma: 10,
 };
 
-// Level-4 character with 3 hitDice.total (1 pending level-up), base speed 30,
-// initiative seeded from DEX mod = +2.
 const FIXTURE_ID = "test-advancement-1";
 const FIXTURE = {
   id: FIXTURE_ID,
   name: "Test Advancement Fixture",
   alignment: "True Neutral",
-  experiencePoints: XP_LVL_4,  // level 4 — 1 ASI slot
-  initiativeBonus: 2,           // DEX 14 → +2
+  experiencePoints: XP_LVL_4,
+  initiativeBonus: 2,
   speed: 30,
   hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-  hitDice: { total: 3, die: "d10", spent: 0 }, // 1 pending level-up
+  // hitDice.total trails XP-derived level 4 by one, leaving one pending level-up for tests to apply.
+  hitDice: { total: 3, die: "d10", spent: 0 },
   abilityScores: BASE_ABILITY_SCORES,
   savingThrowProficiencies: [],
   skills: [],
   toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
-
-// ── Suite setup ───────────────────────────────────────────────────────────────
 
 let alertFeatId: string;
 let mobileFeatId: string;
@@ -88,7 +74,6 @@ let epicBoonFeatId: string;
 
 describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
   beforeAll(async () => {
-    // Upsert catalog rows once for the whole suite.
     await prisma.characterClass.upsert({
       where: { name: CLASS_NAME },
       create: {
@@ -102,7 +87,6 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       update: {},
     });
 
-    // Upsert the three feats with improvements (mirrors seed.ts).
     const alertFeat = await upsertEditionRow(
       prisma.feat,
       { name: "Alert (Advancement Suite)", edition: null },
@@ -139,8 +123,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     );
     toughFeatId = toughFeat.id;
 
-    // Category-gating fixtures (PHB'24): Origin/Fighting Style never offered as an
-    // ASI slot; Epic Boon only at level 19+ with a +1 cap of 30.
+    // PHB'24: Origin/Fighting Style are never an ASI slot; Epic Boon requires level 19+ with a +1 cap of 30.
     const originFeat = await upsertEditionRow(
       prisma.feat,
       { name: "Origin Test Feat (Advancement Suite)", edition: null },
@@ -172,8 +155,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     );
     epicBoonFeatId = epicBoonFeat.id;
 
-    // PHB'24 Alert models initiative as +PB via scaling: "proficiencyBonus" — assert
-    // the improvements JSON (incl. scaling) round-trips through GET /api/feats.
+    // PHB'24: Alert models initiative as +proficiencyBonus via scaling.
     const scalingImprovements = [{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }];
     await upsertEditionRow(
       prisma.feat,
@@ -189,7 +171,6 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
   });
 
   afterAll(async () => {
-    // Clean up catalog rows created by this suite.
     await prisma.feat.deleteMany({
       where: { name: { in: [
         "Alert (Advancement Suite)", "Mobile (Advancement Suite)", "Tough (Advancement Suite)",
@@ -201,7 +182,6 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
   });
 
   beforeEach(async () => {
-    // Each test gets a fresh fixture character with a class entry.
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
     await prisma.character.create({
@@ -220,8 +200,6 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     await prisma.character.delete({ where: { id: FIXTURE_ID } }).catch(() => null);
   });
 
-  // ── Alert (+5 initiative) ─────────────────────────────────────────────────
-
   describe("Alert feat", () => {
     it("increases initiativeBonus by 5 on the GET response", async () => {
       await postAdvancement(FIXTURE_ID, {
@@ -229,7 +207,6 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       });
       const res = await getCharacter(FIXTURE_ID);
       expect(res.status).toBe(200);
-      // FIXTURE has initiativeBonus: 2 (DEX 14). Alert adds 5 → expect 7.
       expect(res.body.initiativeBonus).toBe(7);
     });
 
@@ -247,7 +224,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
         operations: [{ type: "removeAdvancement", entryId }],
       });
       const res = await getCharacter(FIXTURE_ID);
-      expect(res.body.initiativeBonus).toBe(2); // back to base
+      expect(res.body.initiativeBonus).toBe(2);
     });
 
     it("restores initiativeBonus on undo", async () => {
@@ -265,8 +242,6 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
   });
 
-  // ── Mobile (+10 speed) ────────────────────────────────────────────────────
-
   describe("Mobile feat", () => {
     it("increases speed by 10 on the GET response", async () => {
       await postAdvancement(FIXTURE_ID, {
@@ -274,7 +249,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       });
       const res = await getCharacter(FIXTURE_ID);
       expect(res.status).toBe(200);
-      expect(res.body.speed).toBe(40); // 30 + 10
+      expect(res.body.speed).toBe(40);
     });
 
     it("restores speed when the feat is removed", async () => {
@@ -293,34 +268,26 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
   });
 
-  // ── Tough (+2 HP / applied level) ─────────────────────────────────────────
-
   describe("Tough feat", () => {
     it("increases maxHp by 2 × hitDice.total on take", async () => {
-      // hitDice.total = 3 → bonus = 6
       await postAdvancement(FIXTURE_ID, {
         operations: [{ type: "takeFeat", featId: toughFeatId }],
       });
       const res = await getCharacter(FIXTURE_ID);
       expect(res.status).toBe(200);
-      expect(res.body.hitPoints.max).toBe(36); // 30 + 2*3
+      expect(res.body.hitPoints.max).toBe(36);
     });
 
     it("increases bonus by 2 on each subsequent level-up", async () => {
       await postAdvancement(FIXTURE_ID, {
         operations: [{ type: "takeFeat", featId: toughFeatId }],
       });
-      // Apply the pending level-up (hitDice.total goes from 3 → 4).
       await postHp(FIXTURE_ID, { operations: [{ type: "levelUp", method: "average" }] });
       const res = await getCharacter(FIXTURE_ID);
-      // base max after levelUp + HP gain + Tough for level 4
-      // Stored max = 30 (base) + levelUp gain; Tough = 2*4 = 8.
-      // We don't know the exact rolled amount, so just verify Tough portion = 8.
+      // The rolled HP gain is random, so verify only the Tough contribution (2 × hitDice.total) by diffing before/after removal.
       const hitDiceTotal = res.body.hitDice.total;
-      const storedMax = res.body.hitPoints.max; // includes Tough
-      // Tough contribution must be 2 × hitDice.total.
+      const storedMax = res.body.hitPoints.max;
       expect(hitDiceTotal).toBe(4);
-      // effMax = stored-feat-free base + 2*4. We can verify by removing and comparing.
       const entryId = res.body.advancements.find(
         (e: { featName: string }) => e.featName?.includes("Tough"),
       )?.id;
@@ -328,7 +295,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
         operations: [{ type: "removeAdvancement", entryId }],
       });
       const resAfterRemove = await getCharacter(FIXTURE_ID);
-      expect(storedMax - resAfterRemove.body.hitPoints.max).toBe(8); // 2 × 4
+      expect(storedMax - resAfterRemove.body.hitPoints.max).toBe(8);
     });
 
     it("maxHp bonus vanishes when the feat is removed", async () => {
@@ -344,11 +311,10 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
         operations: [{ type: "removeAdvancement", entryId }],
       });
       const afterRemove = (await getCharacter(FIXTURE_ID)).body.hitPoints.max;
-      expect(afterTake - afterRemove).toBe(6); // 2 × 3 applied levels
+      expect(afterTake - afterRemove).toBe(6);
     });
 
     it("clamps current HP to effective max when current > new max (not expected, defensive)", async () => {
-      // Manually set current > base max to test clamp in serializeCharacter.
       await prisma.character.update({
         where: { id: FIXTURE_ID },
         data: {
@@ -361,7 +327,6 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
         operations: [{ type: "takeFeat", featId: toughFeatId }],
       });
       const res = await getCharacter(FIXTURE_ID);
-      // current (30) ≤ effective max (30 + 6 = 36) — no clamping needed here.
       expect(res.body.hitPoints.current).toBeLessThanOrEqual(res.body.hitPoints.max);
     });
 
@@ -369,9 +334,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       await postAdvancement(FIXTURE_ID, {
         operations: [{ type: "takeFeat", featId: toughFeatId }],
       });
-      // Damage the character first so they're below max.
       await postHp(FIXTURE_ID, { operations: [{ type: "damage", amount: 10 }] });
-      // Long rest — should heal to effective max.
       await postHp(FIXTURE_ID, { operations: [{ type: "longRest" }] });
       const res = await getCharacter(FIXTURE_ID);
       expect(res.body.hitPoints.current).toBe(res.body.hitPoints.max);
@@ -381,19 +344,14 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       await postAdvancement(FIXTURE_ID, {
         operations: [{ type: "takeFeat", featId: toughFeatId }],
       });
-      // Take damage so we can heal.
       await postHp(FIXTURE_ID, { operations: [{ type: "damage", amount: 20 }] });
-      // Short rest with a large heal (above effective max) — should clamp.
       await postHp(FIXTURE_ID, {
         operations: [{ type: "shortRest", rolls: [10, 10, 10] }],
       });
       const res = await getCharacter(FIXTURE_ID);
-      // Current should not exceed effective max.
       expect(res.body.hitPoints.current).toBeLessThanOrEqual(res.body.hitPoints.max);
     });
   });
-
-  // ── Custom feat with improvements ─────────────────────────────────────────
 
   describe("custom feat with improvements", () => {
     it("applies speed bonus from a custom feat's improvements", async () => {
@@ -408,7 +366,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
         }],
       });
       const res = await getCharacter(FIXTURE_ID);
-      expect(res.body.speed).toBe(35); // 30 + 5
+      expect(res.body.speed).toBe(35);
     });
 
     it("400s if custom improvements use an unknown target", async () => {
@@ -426,17 +384,12 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
   });
 
-  // ── Over-cap read-clamp ───────────────────────────────────────────────────
-
   describe("feat improvement clamp on read (over-cap)", () => {
     it("excludes feat bonuses beyond the slot cap on GET without an XP op", async () => {
-      // Take the one available slot.
       await postAdvancement(FIXTURE_ID, {
         operations: [{ type: "takeFeat", featId: alertFeatId }],
       });
 
-      // Manually inject a second advancement entry with an initiative improvement
-      // directly into the resources JSON (simulates a state that should be clamped).
       const char = await prisma.character.findUnique({
         where: { id: FIXTURE_ID },
         select: { resources: true },
@@ -459,14 +412,12 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
         data: { resources: { ...resources, advancements } as unknown as Prisma.InputJsonValue },
       });
 
-      // GET should only apply the in-cap feat (Alert +5), not the extra +10.
       const res = await getCharacter(FIXTURE_ID);
-      expect(res.body.initiativeBonus).toBe(7); // base 2 + Alert 5 only
+      expect(res.body.initiativeBonus).toBe(7);
     });
   });
 
-  // ── Category / level gating (PHB'24 pp. 87-88) ────────────────────────────
-
+  // PHB'24 pp. 87-88
   describe("feat category gating", () => {
     it("400s taking an Origin feat via an ASI slot", async () => {
       const res = await postAdvancement(FIXTURE_ID, {
@@ -483,7 +434,6 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
 
     it("allows a General feat at level 4", async () => {
-      // Alert (Advancement Suite) defaults to category general.
       const res = await postAdvancement(FIXTURE_ID, {
         operations: [{ type: "takeFeat", featId: alertFeatId }],
       });
@@ -498,8 +448,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
 
     it("allows an Epic Boon at level 19 and raises the ability past 20 (cap 30)", async () => {
-      // Promote the fixture to level 19 with strength already at 20 — the boon's
-      // +1 must be allowed to 21 (Epic Boon cap 30), which a takeAsi would reject.
+      // Epic Boon's +1 is allowed past the normal ability cap of 20, up to its own cap of 30 — a takeAsi op would reject this.
       await prisma.character.update({
         where: { id: FIXTURE_ID },
         data: {
@@ -516,11 +465,8 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
   });
 
-  // ── Snapshot isolation from catalog edits ─────────────────────────────────
-
   describe("deleted catalog feat", () => {
     it("still serializes the stored featName and improvements after the catalog row is deleted", async () => {
-      // Take Mobile (+10 speed) then delete its catalog row (mirrors a reseed drop).
       await postAdvancement(FIXTURE_ID, {
         operations: [{ type: "takeFeat", featId: mobileFeatId }],
       });
@@ -528,12 +474,10 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
 
       const res = await getCharacter(FIXTURE_ID);
       expect(res.status).toBe(200);
-      // Snapshot survives: name preserved and the +10 speed improvement still applies.
       const entry = res.body.advancements.find((e: { featName?: string }) => e.featName?.includes("Mobile"));
       expect(entry).toBeDefined();
       expect(res.body.speed).toBe(40);
 
-      // Re-create the row so afterAll cleanup and other tests see a stable catalog.
       const recreated = await prisma.feat.create({
         data: {
           name: "Mobile (Advancement Suite)",
@@ -544,8 +488,6 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       mobileFeatId = recreated.id;
     });
   });
-
-  // ── GET /api/feats exposes improvements ───────────────────────────────────
 
   describe("GET /api/feats", () => {
     it("returns improvements on catalog feats", async () => {
@@ -573,16 +515,13 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
   });
 });
 
-// #1137: Fighting Style feats are taken via the advancement endpoint's `slot:
-// "fightingStyle"` channel — a partition separate from the ASI slot cap.
+// The fightingStyle slot is a separate channel from the ASI slot cap (#1137).
 describe("Advancement — Fighting Style feat slot (#1137)", () => {
-  const XP_LVL_3 = 900; // level 3
+  const XP_LVL_3 = 900;
   const FS_ID = "test-adv-fs-1";
   let fsDefenseId: string;
   let generalId: string;
-  // #1529: the fs-slot cap resolves via CharacterClass.fightingStyleFeatLevel
-  // through the class FK relation now — these fixtures must link classId to
-  // the real seeded Fighter/Paladin rows, or the slot cap is 0 (homebrew).
+  // The fs-slot cap resolves via CharacterClass.fightingStyleFeatLevel through the class FK — fixtures must link classId to real seeded rows or the slot cap is 0.
   let fighterClassId: string;
   let paladinClassId: string;
 
@@ -645,7 +584,6 @@ describe("Advancement — Fighting Style feat slot (#1137)", () => {
     const fsEntry = char.advancements.find((a: { featName?: string }) => a.featName === "Defense (FS Suite)");
     expect(fsEntry).toBeDefined();
     expect(fsEntry.slot).toBe("fightingStyle");
-    // The ASI slot is untouched — the fs feat consumed no ASI slot.
     expect(char.advancementSlots.used).toBe(0);
   });
 
@@ -681,8 +619,7 @@ describe("Advancement — Fighting Style feat slot (#1137)", () => {
   });
 
   it("rejects a duplicate Fighting Style feat", async () => {
-    // Fighter 1 / Paladin 2 → two fs slots, so the 2nd Defense fails on dedup,
-    // not on slot exhaustion.
+    // Fighter 1 / Paladin 2 gives two fs slots, so the failure here is dedup, not slot exhaustion.
     await prisma.character.create({
       data: {
         ...FIXTURE, id: "test-adv-fs-mc", ownerId: OWNER_ID, experiencePoints: XP_LVL_3,
@@ -714,7 +651,7 @@ describe("Advancement — Fighting Style feat slot (#1137)", () => {
     });
     expect(res.status).toBe(200);
     const char = (await getCharacter(FS_ID)).body;
-    expect(char.advancementSlots.used).toBe(1); // ASI slot: the general feat only
+    expect(char.advancementSlots.used).toBe(1);
     const fsEntry = char.advancements.find((a: { slot?: string }) => a.slot === "fightingStyle");
     expect(fsEntry.featName).toBe("Defense (FS Suite)");
   });

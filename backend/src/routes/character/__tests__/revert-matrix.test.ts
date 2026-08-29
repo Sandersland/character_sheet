@@ -1,19 +1,3 @@
-/**
- * Revert-matrix characterization for reverseEvent (#615).
- *
- * reverseEvent (lib/activity/activity.ts) is the LIFO-undo core: a switch over event
- * category that restores the before-snapshot. The refactor moves each category
- * branch into a REVERT_HANDLERS registry, so every category needs undo coverage
- * that stays green UNEDITED through the migration.
- *
- * Most categories are already covered by activity.test.ts (hitPoints, experience,
- * spellcasting, resources, currency, class-setSubclass, advancement, inventory)
- * and hitpoints-multiclass.test.ts (class classAdded + classLevelsReconciled).
- * This file fills the two branches with NO existing revert coverage:
- * `conditions` (activity.ts) and `effects` (activity.ts). Together they complete
- * the matrix for the registry extraction.
- */
-
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -63,7 +47,7 @@ async function createWizard(id: string) {
   return prisma.character.create({
     data: {
       ...BASE, ownerId: OWNER_ID, id, name: `RevertMatrix ${id}`,
-      experiencePoints: 900, // wizard level 3 → L1 + L2 slots
+      experiencePoints: 900,
       hitPoints: { current: 20, max: 20, temp: 0, deathSaves: { successes: 0, failures: 0 } },
       hitDice: { total: 3, die: "d6", spent: 0 },
       spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
@@ -73,7 +57,6 @@ async function createWizard(id: string) {
 }
 
 describe("revert-matrix — reverseEvent per-category undo (#615)", () => {
-  // ── conditions branch (activity.ts) ──────────────────────────────────────────
   it("conditions: undo restores the prior conditions + exhaustion snapshot", async () => {
     await createWizard("rm-conditions");
     const url = `/api/characters/rm-conditions/conditions/transactions`;
@@ -86,14 +69,11 @@ describe("revert-matrix — reverseEvent per-category undo (#615)", () => {
     const rev = await post(`/api/characters/rm-conditions/events/${batchId}/revert`, {});
     expect(rev.status).toBe(200);
 
-    // before-snapshot restored: back to the fresh empty conditions state.
     const after = await getChar("rm-conditions");
     expect(after.conditions).toEqual({ active: [], exhaustion: 0, suspended: [] });
   });
 
-  // #1321: setExhaustion 3→4 (PHB'14 p. 291 tier 4) carries the one-way HP
-  // clamp write in the SAME event's before/after — undo must restore both the
-  // exhaustion level AND the pre-clamp current HP, not just conditions.
+  // PHB'14 p.291 tier 4: setExhaustion's HP clamp is a one-way write in the same event — undo must restore both exhaustion and the pre-clamp current HP.
   it("conditions: undo of a setExhaustion that halved the max ALSO restores the pre-clamp current HP", async () => {
     await prisma.character.create({
       data: {
@@ -109,7 +89,7 @@ describe("revert-matrix — reverseEvent per-category undo (#615)", () => {
         id: "rm-conditions-hp",
         name: "RevertMatrix rm-conditions-hp",
         rulesEdition: "EDITION_2014",
-        experiencePoints: 900, // wizard level 3
+        experiencePoints: 900,
         hitPoints: { current: 25, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 3, die: "d6", spent: 0 },
         spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
@@ -120,8 +100,8 @@ describe("revert-matrix — reverseEvent per-category undo (#615)", () => {
     const url = `/api/characters/rm-conditions-hp/conditions/transactions`;
     const applied = await post(url, { operations: [{ type: "setExhaustion", level: 4 }] });
     expect(applied.status).toBe(200);
-    expect(applied.body.hitPoints.max).toBe(15); // floor(30/2)
-    expect(applied.body.hitPoints.current).toBe(15); // clamped down from 25
+    expect(applied.body.hitPoints.max).toBe(15);
+    expect(applied.body.hitPoints.current).toBe(15);
 
     const batchId = await latestBatchId("rm-conditions-hp");
     const rev = await post(`/api/characters/rm-conditions-hp/events/${batchId}/revert`, {});
@@ -133,21 +113,15 @@ describe("revert-matrix — reverseEvent per-category undo (#615)", () => {
     expect(after.hitPoints.current).toBe(25); // pre-clamp current restored, not left at 15
   });
 
-  // ── effects branch (activity.ts) ─────────────────────────────────────────────
   it("effects: undo of a buff cast restores activeEffects (Mage Armor removed)", async () => {
     await createWizard("rm-effects");
-    // Casting Mage Armor applies a durable AC buff → an `effects` buffApplied event.
-    // #1714 forked Mage Armor to EDITION_2014 too (identical buff value in
-    // both editions, so this pick was never actually ambiguous for THIS
-    // test's assertions — pinned anyway so a future edition divergence can't
-    // silently slip through this fixture).
+    // Mage Armor forked to EDITION_2014 too (#1714); pinned to 2024 here so a future edition divergence can't silently slip through this fixture.
     const spell = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Armor", edition: "EDITION_2024" } });
     await applySpellcastingOperations("rm-effects", [{ type: "learnSpell", spellId: spell.id }], OWNER_ID);
     const row = await prisma.character.findUniqueOrThrow({ where: { id: "rm-effects" }, select: { spellcasting: true } });
     const entryId = (row.spellcasting as { spells: { id: string; spellId?: string }[] }).spells.find((s) => s.spellId === spell.id)!.id;
     await applySpellcastingOperations("rm-effects", [{ type: "castSpell", entryId, roll: 0 }], OWNER_ID);
 
-    // Buff is active: unarmored base flips to 13 + Dex(2).
     const buffed = await getChar("rm-effects");
     expect(buffed.armorClassBreakdown).toEqual(expect.arrayContaining([{ label: "Mage Armor", value: 13 }]));
 
@@ -155,7 +129,6 @@ describe("revert-matrix — reverseEvent per-category undo (#615)", () => {
     const rev = await post(`/api/characters/rm-effects/events/${batchId}/revert`, {});
     expect(rev.status).toBe(200);
 
-    // before-snapshot restored: the buff is gone, plain Unarmored 10 base returns.
     const after = await getChar("rm-effects");
     expect(after.armorClassBreakdown).toEqual(expect.arrayContaining([{ label: "Unarmored", value: 10 }]));
     expect(after.armorClassBreakdown).not.toEqual(expect.arrayContaining([{ label: "Mage Armor", value: 13 }]));

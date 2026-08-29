@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { googleProvider } from "@/lib/auth/oauth/providers/google.js";
 
-// The provider's profile mapping is pure and independent of the registry/env —
-// test it directly off the exported definition (no creds, no stubbing).
-
 describe("googleProvider.mapProfile", () => {
   it("maps a verified-email profile", () => {
     const profile = googleProvider.mapProfile({

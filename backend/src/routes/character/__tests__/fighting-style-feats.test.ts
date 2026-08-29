@@ -1,11 +1,3 @@
-/**
- * Fighting Style feats (#1137) — end-to-end derivation. A level-5 Fighter takes
- * a Fighting Style feat via the advancement endpoint's fightingStyle slot, and
- * its mechanical effect is derived at read time exactly as the former scalar
- * styles were: Archery +2 to ranged attack rolls only, Defense +1 AC while
- * wearing body armor only.
- */
-
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -65,9 +57,7 @@ beforeAll(async () => {
     { category: "fighting_style", improvements: [{ target: "armorClassWhileArmored", amount: 1 }] as unknown as Prisma.InputJsonValue },
   );
   defenseFeatId = defense.id;
-  // #1529: the fs-slot cap resolves via CharacterClass.fightingStyleFeatLevel
-  // through the class FK relation now — the fixture below must link classId
-  // to the real seeded Fighter row, or takeStyle's fs feat gets clamped out.
+  // classId must link to the real seeded Fighter row, or takeStyle's feat gets clamped out via CharacterClass.fightingStyleFeatLevel.
   fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" }, select: { id: true } })).id;
 });
 
@@ -91,8 +81,7 @@ beforeEach(async () => {
       classEntries: { create: [{ position: 0, name: "Fighter", classId: fighterClassId, level: 5 }] },
     },
   });
-  // #1649: weapon detail now lives on InventoryItem.snapshot, so these are
-  // created separately rather than nested under character.create.
+
   await prisma.inventoryItem.create({
     data: inventoryItemFixtureData({
       characterId: FIXTURE_ID, name: "Longbow", category: "weapon", equippedSlot: "MAIN_HAND",
@@ -143,14 +132,6 @@ describe("Defense Fighting Style feat", () => {
   });
 });
 
-/**
- * PHB'14 per-class Fighting Style subset (#1495) — hard enforcement at the
- * write path, not just the picker: resolveCatalogFeat rejects a fightingStyle
- * takeFeat op for a style the character's class(es) don't offer, even if the
- * caller bypasses the GET /api/feats?classes= filter entirely. Runs against
- * the REAL SEEDED 2014 catalog (backend/prisma/seed/feats.ts), a second
- * fixture character (a Ranger) alongside this file's Fighter fixture above.
- */
 describe("Fighting Style class gate — write path (#1495)", () => {
   const RANGER_OWNER_ID = "owner-fs-feats-ranger";
   const RANGER_FIXTURE_ID = "test-fs-feats-ranger";
@@ -209,11 +190,7 @@ describe("Fighting Style class gate — write path (#1495)", () => {
     expect(res.status).toBe(200);
   });
 
-  // #1495 review finding: the entry's OWN `name` column is a free-to-diverge
-  // display name (CharacterClassEntry.name), not the catalog's canonical
-  // class name — the gate must read `class.name` through the classId FK, or
-  // a renamed entry's offered set silently empties (nothing in Feat.classes
-  // matches an arbitrary display string).
+  // Gate reads class.name via the classId FK, never CharacterClassEntry.name (free to diverge), or the offered set silently empties.
   it("gates on the CANONICAL class name via classId, not the entry's own (possibly renamed) display name", async () => {
     await prisma.character.update({
       where: { id: RANGER_FIXTURE_ID },
@@ -225,13 +202,6 @@ describe("Fighting Style class gate — write path (#1495)", () => {
   });
 });
 
-/**
- * #1495 review finding: fightingStyleClassNames must only include a class
- * once its OWN entry has reached that class's fightingStyleFeatLevel — not
- * merely because the class has one at all. A Paladin2/Ranger1 multiclass has
- * earned Paladin's Fighting Style (grant L2) but not Ranger's (grant L2,
- * entry only at L1), so the offered union must be Paladin's subset alone.
- */
 describe("Fighting Style class gate — multiclass level threshold (#1495)", () => {
   const MC_OWNER_ID = "owner-fs-feats-mc";
   const MC_FIXTURE_ID = "test-fs-feats-mc";
@@ -261,9 +231,7 @@ describe("Fighting Style class gate — multiclass level threshold (#1495)", () 
   beforeEach(async () => {
     await ensureTestOwner(MC_OWNER_ID);
     mcCookie = await authCookie(MC_OWNER_ID);
-    // Paladin 2 / Ranger 1 = total level 3: Paladin's own entry has reached
-    // its L2 Fighting Style grant; Ranger's own entry (L1) has not reached
-    // its L2 grant yet.
+
     await prisma.character.create({
       data: {
         id: MC_FIXTURE_ID, name: "FS Multiclass Threshold Fixture", alignment: "True Neutral",
@@ -301,13 +269,6 @@ describe("Fighting Style class gate — multiclass level threshold (#1495)", () 
   });
 });
 
-/**
- * #1495 review finding: a custom (homebrew) feat placed in the fightingStyle
- * slot whose NAME matches one of the catalog's own Fighting Style names is a
- * pick of that style through the custom channel, not genuine homebrew — the
- * class gate must apply identically, or a player could route around "hard
- * enforcement" by retyping a rejected catalog row as `custom`.
- */
 describe("Fighting Style class gate — custom feat in the fightingStyle slot (#1495)", () => {
   const CUSTOM_OWNER_ID = "owner-fs-feats-custom";
   const CUSTOM_FIXTURE_ID = "test-fs-feats-custom";
@@ -363,24 +324,18 @@ describe("Fighting Style class gate — custom feat in the fightingStyle slot (#
     expect(res.status).toBe(200);
   });
 
-  // #1495 review finding: when a NULL-edition (unrestricted) row and an
-  // EDITION_2014-tagged (restricted) row share the same name, an unordered
-  // findFirst leaves Postgres free to return either — sometimes the
-  // unrestricted one, which would bypass the class gate entirely.
-  // resolveEditionRow's exact-then-null-fallback must deterministically
-  // prefer the edition-specific row.
+  // resolveEditionRow must deterministically prefer the edition-specific row over a same-named null-edition row, or the class gate can be bypassed.
   describe("edition-ambiguous name resolution", () => {
     const AMBIGUOUS_NAME = "Test Ambiguous Style (FS Gate)";
 
     beforeAll(async () => {
-      // Unrestricted (would pass ANY class) — the row that must NOT win.
       await prisma.feat.create({
         data: {
           name: AMBIGUOUS_NAME, description: "shared, unrestricted", category: "fighting_style",
           edition: null, classes: [],
         },
       });
-      // Paladin-only, EDITION_2014 — a 2014 Ranger must NOT be offered this.
+
       await prisma.feat.create({
         data: {
           name: AMBIGUOUS_NAME, description: "2014, Paladin-only", category: "fighting_style",
@@ -401,14 +356,6 @@ describe("Fighting Style class gate — custom feat in the fightingStyle slot (#
   });
 });
 
-/**
- * #1495 review finding: the served `fightingStyleGrantingClasses` field
- * (GET /api/characters/:id, read by both the sheet picker and the level-up
- * ceremony) must reflect the LEVEL-GATED earned subset, not every class on
- * the roster. A Fighter1/Ranger1 multiclass has earned Fighter's Fighting
- * Style (grant L1) but not Ranger's (grant L2, entry only L1) — the served
- * field must name only Fighter until Ranger's own entry reaches level 2.
- */
 describe("fightingStyleGrantingClasses — served field (#1495)", () => {
   const SERVE_OWNER_ID = "owner-fs-feats-serve";
   const SERVE_FIXTURE_ID = "test-fs-feats-serve";
@@ -437,8 +384,7 @@ describe("fightingStyleGrantingClasses — served field (#1495)", () => {
         savingThrowProficiencies: [], skills: [], toolProficiencies: [],
         currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
         spellcasting: Prisma.JsonNull,
-        // XP 300 = level 2, matching the Fighter1+Ranger1 entry sum exactly —
-        // no clamp-on-read reshuffling to worry about.
+        // XP 300 matches the Fighter1+Ranger1 entry sum exactly, avoiding clamp-on-read reshuffling.
         classEntries: {
           create: [
             { position: 0, name: "Fighter", classId: serveFighterClassId, level: 1 },
@@ -464,8 +410,7 @@ describe("fightingStyleGrantingClasses — served field (#1495)", () => {
       where: { characterId: SERVE_FIXTURE_ID, name: "Ranger" },
       select: { id: true },
     });
-    // XP 900 = level 3, matching the new Fighter1+Ranger2 entry sum — again
-    // no clamp-on-read reshuffling.
+    // XP 900 matches the new Fighter1+Ranger2 entry sum, again avoiding clamp-on-read reshuffling.
     await prisma.character.update({ where: { id: SERVE_FIXTURE_ID }, data: { experiencePoints: 900 } });
     await prisma.characterClassEntry.update({ where: { id: rangerEntry.id }, data: { level: 2 } });
 

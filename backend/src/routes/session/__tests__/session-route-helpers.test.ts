@@ -1,10 +1,3 @@
-/**
- * Unit tests for the shared session-route helpers (#592): characterId body
- * validation. Pure — no DB; a hand-rolled req/res double
- * captures status + body. SessionError/CombatError now carry their own `status`
- * (the central `errorHandler` maps it), covered by domain-error-status.test.ts.
- */
-
 import type { Request, Response } from "express";
 import { describe, expect, it } from "vitest";
 

@@ -1,10 +1,3 @@
-/**
- * Campaign-level session lifecycle + combat/roll + summary route tests (#245).
- * Real Postgres in beforeEach, supertest against the shared `app`. A shared session
- * belongs to a campaign; party members join/leave it. Fixtures build a campaign
- * with an OWNER + a PLAYER, each owning one character attached to the campaign.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -49,7 +42,6 @@ async function makeChar(id: string, name: string, ownerId: string) {
   });
 }
 
-// Build a campaign owned by OWNER, PLAYER joined, both characters attached.
 async function setupCampaign(): Promise<string> {
   const created = await agent(cookieOwner).post("/api/campaigns").send({ name: "Phandalin" });
   const { id: campaignId, inviteCode } = created.body as { id: string; inviteCode: string };
@@ -78,8 +70,6 @@ afterEach(async () => {
   await prisma.character.deleteMany({ where: { id: { in: [CHAR_OWNER, CHAR_PLAYER] } } });
   await prisma.campaign.deleteMany({ where: { ownerId: OWNER } });
 });
-
-// ── Start ─────────────────────────────────────────────────────────────────────
 
 describe("POST /api/campaigns/:campaignId/sessions — start", () => {
   it("starts a shared session with the first member as participant", async () => {
@@ -118,8 +108,6 @@ describe("POST /api/campaigns/:campaignId/sessions — start", () => {
     expect(res.status).toBe(403);
   });
 });
-
-// ── Join / leave ────────────────────────────────────────────────────────────
 
 describe("join / leave", () => {
   it("lets a second member late-join an active session", async () => {
@@ -203,21 +191,18 @@ describe("join / leave", () => {
   });
 });
 
-// ── Auto-close ──────────────────────────────────────────────────────────────
-
 describe("auto-close after the grace period", () => {
   it("auto-closes once every participant has been gone past the grace period", async () => {
     const campaignId = await setupCampaign();
     const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
     const sessionId = start.body.session.id as string;
 
-    // Simulate the sole participant having left two hours ago (past the 1h grace).
+    // Two hours ago is past the 1h SESSION_GRACE_MS.
     await prisma.sessionParticipant.update({
       where: { sessionId_characterId: { sessionId, characterId: CHAR_OWNER } },
       data: { leftAt: new Date(Date.now() - 2 * 60 * 60 * 1000) },
     });
 
-    // Reading the active session triggers the auto-close → 200 null.
     const active = await agent(cookieOwner).get(`/api/characters/${CHAR_OWNER}/sessions/active`);
     expect(active.status).toBe(200);
     expect(active.body).toBeNull();
@@ -232,8 +217,7 @@ describe("auto-close after the grace period", () => {
     const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
     const sessionId = start.body.session.id as string;
 
-    // Deleting the sole participant's character cascades its participant row,
-    // leaving an active session nobody can rejoin or end.
+    // Deleting the character cascades its participant row, leaving an active session nobody can rejoin or end.
     await prisma.character.delete({ where: { id: CHAR_OWNER } });
 
     const active = await agent(cookiePlayer).get(`/api/characters/${CHAR_PLAYER}/sessions/active`);
@@ -251,7 +235,6 @@ describe("auto-close after the grace period", () => {
     const sessionId = start.body.session.id as string;
     await agent(cookiePlayer).post(`${startUrl(campaignId)}/${sessionId}/join`).send({ characterId: CHAR_PLAYER });
 
-    // Owner left long ago, but player is still present → not all left → stays open.
     await prisma.sessionParticipant.update({
       where: { sessionId_characterId: { sessionId, characterId: CHAR_OWNER } },
       data: { leftAt: new Date(Date.now() - 2 * 60 * 60 * 1000) },
@@ -264,8 +247,6 @@ describe("auto-close after the grace period", () => {
   });
 });
 
-// ── End + summaries ─────────────────────────────────────────────────────────
-
 describe("end session", () => {
   it("OWNER force-ends; per-participant summaries and a campaign recap are persisted", async () => {
     const campaignId = await setupCampaign();
@@ -273,8 +254,6 @@ describe("end session", () => {
     const sessionId = start.body.session.id as string;
     await agent(cookiePlayer).post(`${startUrl(campaignId)}/${sessionId}/join`).send({ characterId: CHAR_PLAYER });
 
-    // Each participant logs a roll (resolve-action logRoll op, #1861 — sessionId
-    // is derived from each character's active session).
     await agent(cookieOwner)
       .post(`/api/characters/${CHAR_OWNER}/resolve-action/transactions`)
       .send({ operations: [{ type: "logRoll", kind: "attack", source: "Longsword", total: 17 }] });
@@ -321,8 +300,6 @@ describe("end session", () => {
   });
 });
 
-// ── Combat participant gating ─────────────────────────────────────────────────
-
 describe("combat requires an active participant", () => {
   it("rejects combat/round from a participant who has left", async () => {
     const campaignId = await setupCampaign();
@@ -336,8 +313,6 @@ describe("combat requires an active participant", () => {
     expect(res.status).toBe(409);
   });
 });
-
-// ── Server-authoritative combat state (#1030) ─────────────────────────────────
 
 describe("combat state is server-authoritative", () => {
   async function activeSession(): Promise<{ campaignId: string; sessionId: string }> {
@@ -367,42 +342,33 @@ describe("combat state is server-authoritative", () => {
     const { sessionId } = await activeSession();
     await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
     await agent(cookieOwner).post(roundUrl(sessionId)).send({});
-    await agent(cookieOwner).post(roundUrl(sessionId)).send({}); // round 3
+    await agent(cookieOwner).post(roundUrl(sessionId)).send({});
 
     const restart = await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
     expect(restart.body).toMatchObject({ round: 3, combatActive: true });
 
-    // Only the real false→true transition logs — a re-press doesn't spam the audit log.
     const startedEvents = await prisma.characterEvent.count({
       where: { sessionId, type: "combatStarted" },
     });
     expect(startedEvents).toBe(1);
   });
 
-  // #1439 review: startCombat/endCombat are combat-LEVEL boundaries — they must
-  // clear EVERY participant's per-turn spell interlock, not just the caller's.
-  // Otherwise a player who cast a leveled Action spell but never advanced a round
-  // (combat ended mid-turn by someone else) stays blocked across the restart.
   it("combat/end + restart by another participant clears a stranded participant's spell block", async () => {
     const { campaignId, sessionId } = await activeSession();
     await agent(cookiePlayer).post(`${startUrl(campaignId)}/${sessionId}/join`).send({ characterId: CHAR_PLAYER });
     await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
 
-    // PLAYER cast a leveled Action spell this turn but never advanced a round.
     await prisma.sessionParticipant.update({
       where: { sessionId_characterId: { sessionId, characterId: CHAR_PLAYER } },
       data: { spellCastAsAction: "leveled" },
     });
-    // PLAYER is a 2024 (default-edition) character, so a leveled Action spell
-    // limits the bonus action to cantrips (it doesn't fully block it).
+    // PLAYER is a 2024 (default-edition) character: a leveled Action spell limits the bonus action to cantrips, it doesn't fully block it.
     const blocked = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
     expect(blocked.body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
 
-    // OWNER (not PLAYER) ends and restarts combat.
     await agent(cookieOwner).post(endCombatUrl(sessionId)).send({});
     await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
 
-    // PLAYER's restriction must be cleared — not stranded across the restart.
     const after = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
     expect(after.body.spellEconomy).toEqual({
       bonusActionBlockedByActionSpell: false,
@@ -436,9 +402,7 @@ describe("combat state is server-authoritative", () => {
     const { sessionId } = await activeSession();
     await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
 
-    // Two "end turn" intents firing at once (two participants, or a retry) —
-    // the atomic `round = round + 1` UPDATE must apply both, going 1 → 3, not
-    // lose one to a read-then-write race and land on 2.
+    // The atomic `round = round + 1` UPDATE must apply both concurrent calls, going 1 → 3, not lose one to a read-then-write race and land on 2.
     await Promise.all([
       agent(cookieOwner).post(roundUrl(sessionId)).send({}),
       agent(cookieOwner).post(roundUrl(sessionId)).send({}),
@@ -471,7 +435,6 @@ describe("combat state is server-authoritative", () => {
 
   it("GET .../combat 404s for a character that never joined the session", async () => {
     const { sessionId } = await activeSession();
-    // CHAR_PLAYER exists but never joined this session.
     const res = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
     expect(res.status).toBe(404);
   });
@@ -508,8 +471,6 @@ describe("combat state is server-authoritative", () => {
       .post(`${startUrl(campaignId)}/${sessionId}/leave`)
       .send({ characterId: CHAR_PLAYER });
 
-    // The session is still active (CHAR_OWNER remains) — only the LEFT
-    // participant's poll must stop, not everyone's.
     const left = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
     expect(left.status).toBe(409);
     const stillIn = await agent(cookieOwner).get(combatStateUrl(CHAR_OWNER, sessionId));
@@ -517,14 +478,7 @@ describe("combat state is server-authoritative", () => {
   });
 });
 
-// ── Roll kinds under the `roll` category (#128) ───────────────────────────────
-//
-// Standalone rolls now commit through the resolve-action resolver as a
-// `logRoll` op (#1861), not the retired POST .../roll route — but the persisted
-// event is byte-for-byte the same (category "roll", the same type + `data`
-// shape), which these tests pin. The resolver derives the sessionId from the
-// caller's active session (getActiveSessionId), so an active session is set up
-// per test exactly as before.
+// The logRoll op (#1861) must persist the byte-for-byte same event shape (category "roll", same type + `data`) as the retired POST .../roll route did, which these tests pin.
 describe("roll kinds log under the `roll` category", () => {
   async function activeSession(): Promise<void> {
     const campaignId = await setupCampaign();
@@ -567,7 +521,7 @@ describe("roll kinds log under the `roll` category", () => {
     expect(save!.category).toBe("roll");
     expect(init!.category).toBe("roll");
     expect(save!.summary).toBe("Dexterity save: 12 vs DC 13");
-    expect(init!.summary).toBe("Initiative: 19"); // no DC suffix
+    expect(init!.summary).toBe("Initiative: 19");
   });
 
   it("re-homes attack/damage rolls under the roll category", async () => {
@@ -582,7 +536,6 @@ describe("roll kinds log under the `roll` category", () => {
     expect(dmg!.summary).toBe("Longsword: 9 slashing");
   });
 
-  // #1235: combat-log decomposition fields on the roll event's persisted `data`.
   it("persists verdict/crit flags/modeSources/attackComponents and shares a swingId with its damage event", async () => {
     await activeSession();
     const modeSources = [{ mode: "disadvantage", kind: "attack", source: "Poisoned" }];
@@ -606,7 +559,7 @@ describe("roll kinds log under the `roll` category", () => {
       modeSources, attackComponents,
     });
     expect(dmg!.data).toMatchObject({ swingId: "swing-a", damageComponents });
-    // Same swingId — this IS the correlation; each request's own `batchId` differs.
+    // swingId is the attack/damage correlation; each request's own batchId differs.
     expect((attack!.data as { swingId: string }).swingId).toBe((dmg!.data as { swingId: string }).swingId);
     expect(attack!.batchId).not.toBe(dmg!.batchId);
   });
@@ -633,8 +586,6 @@ describe("roll kinds log under the `roll` category", () => {
     expect(attack!.data).not.toHaveProperty("outcome");
   });
 
-  // #1359: the dropped d20 face of an advantage/disadvantage roll survives the
-  // logRoll op all the way to the persisted event data.
   it("persists droppedFaces on an advantage roll; a normal roll's event has no droppedFaces key", async () => {
     await activeSession();
     await logRoll({
@@ -648,8 +599,7 @@ describe("roll kinds log under the `roll` category", () => {
     });
     expect(events).toHaveLength(2);
     expect(events[0].data).toMatchObject({ faces: [15], droppedFaces: [5] });
-    // Unset optional fields persist as JSON null (like `faces`/`swingId`/etc.),
-    // never as an omitted key — see writeStandaloneRollEvent's `data` object.
+    // writeStandaloneRollEvent persists unset optional fields as JSON null, never as an omitted key.
     expect((events[1].data as { droppedFaces?: unknown }).droppedFaces).toBeNull();
   });
 
@@ -674,8 +624,6 @@ describe("roll kinds log under the `roll` category", () => {
     expect(res.status).toBe(200);
   });
 });
-
-// ── Active-session contract (200 null, never 404 for no campaign/session) ──────
 
 describe("GET /api/characters/:id/sessions/active", () => {
   it("returns 200 null when the character is in no campaign", async () => {
@@ -709,8 +657,6 @@ describe("GET /api/characters/:id/sessions/active", () => {
   });
 });
 
-// ── Campaign session history + detail ─────────────────────────────────────────
-
 describe("campaign session history + detail", () => {
   it("lists the campaign's sessions and returns detail with participants + events", async () => {
     const campaignId = await setupCampaign();
@@ -737,8 +683,6 @@ describe("campaign session history + detail", () => {
     expect(res.status).toBe(404);
   });
 });
-
-// ── sessionId threading ───────────────────────────────────────────────────────
 
 describe("sessionId threading", () => {
   it("tags an HP event with the campaign's active session for a participant", async () => {
@@ -770,8 +714,6 @@ describe("sessionId threading", () => {
   });
 });
 
-// ── Retroactive XP to a past session (issue #45 carried into #245) ─────────────
-
 describe("retroactive XP to a past session", () => {
   it("tags the award to the explicit session and recomputes its participant summary + recap", async () => {
     const campaignId = await setupCampaign();
@@ -798,7 +740,6 @@ describe("retroactive XP to a past session", () => {
     const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
     const sessionId = start.body.session.id as string;
 
-    // CHAR_PLAYER never joined → not a participant of this session.
     const res = await agent(cookiePlayer)
       .post(`/api/characters/${CHAR_PLAYER}/experience`)
       .send({ operations: [{ type: "award", amount: 100 }], sessionId });

@@ -1,20 +1,6 @@
-// Stunning Strike (Monk L5). SRD 5.2 / PHB'24 p.88 (2024): once per turn,
-// after hitting with an Unarmed Strike or a monk weapon, spend 1 focus to
-// force a Constitution save against the monk's focus save DC (8 + prof +
-// Wis): fail -> Stunned until the start of the monk's next turn; success ->
-// the target's speed is halved until the start of the monk's next turn, and
-// the next attack roll against it before then has advantage. SRD 5.1 /
-// PHB'14 p.77 (2014): NO once-per-turn cap (any melee weapon attack hit can
-// attempt one, as long as ki remains), spends 1 ki, and NO success rider at
-// all — a made save simply does nothing further; a failed save is Stunned
-// until the END of the monk's next turn (not the start).
-//
-// This app has no NPC/monster combatant model, so unlike a self-condition
-// the Stunned/half-speed+advantage rider can't be persisted as state on
-// anything — it's narrated only, exactly like a save-forcing spell's
-// announce line. The target's ability scores aren't tracked either, so the
-// save roll is a flat d20 with no modifier — the DC math is exact, but the
-// roll itself is a deliberate simplification pending an NPC stat-block model.
+// Stunning Strike, Monk L5. 2024 (SRD 5.2 / PHB'24 p.88): once per turn, spend 1 focus, Con save vs the monk's focus save DC.
+// 2014 (SRD 5.1 / PHB'14 p.77): no once-per-turn cap, spends 1 ki, no success rider, and a failed save lasts until the END of the monk's next turn (not the start).
+// No NPC/monster model: the Stunned/half-speed+advantage rider is narrated only. The target's ability scores aren't tracked, so the save roll is a flat d20 with no modifier — DC math is exact, but the roll is a deliberate simplification pending an NPC stat-block model.
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { AttemptStunningStrikeOperation, StunningStrikeOperation } from "@character-sheet/contracts";
@@ -32,7 +18,7 @@ export class InvalidStunningStrikeOperationError extends Error {}
 // SRD 5.1 / PHB'14 p.77; SRD 5.2 / PHB'24 p.88 — edition-invariant grant level.
 export const STUNNING_STRIKE_LEVEL = 5;
 
-/** Whether a monk (identified by its own class-entry level, never `character.level`) has Stunning Strike. */
+// monkLevel is the entry's own level, never character.level.
 export function hasStunningStrike(monkLevel: number): boolean {
   return monkLevel >= STUNNING_STRIKE_LEVEL;
 }
@@ -80,7 +66,7 @@ const STUNNING_STRIKE_SELECT = {
 
 type StunningStrikeRow = Prisma.CharacterGetPayload<{ select: typeof STUNNING_STRIKE_SELECT }>;
 
-// Base monk feature (not subclass) — gates on the monk entry's own level directly, mirroring rogueLevel in sneak-attack.ts.
+// Base monk feature (not subclass) — gates on the monk entry's own level directly, mirroring rogueLevel.
 function monkLevel(row: StunningStrikeRow): number {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk")?.level ?? 0;
 }

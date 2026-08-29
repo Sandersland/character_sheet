@@ -1,9 +1,4 @@
-// Test-only helper (#1649). Every reader now sources weapon/armor/consumable/
-// capabilities from InventoryItem.snapshot rather than the four dropped
-// Inventory* mirror tables, so a raw `prisma.inventoryItem.create` fixture
-// needs a snapshot built alongside its scalar/placement fields. This mirrors
-// buildInventorySnapshot's shape (via the same normalize* defaulting the real
-// custom-item acquire path uses) so a fixture author writes one shape, not two.
+// Mirrors buildInventorySnapshot's shape (via the same normalize* defaulting the real custom-item acquire path uses) so a fixture author writes one shape, not two.
 import { randomUUID } from "node:crypto";
 
 import type { EquipSlot, ItemCategory, ItemRarity, Prisma } from "@/generated/prisma/client.js";
@@ -35,15 +30,11 @@ export interface InventoryItemFixtureInput {
   weapon?: WeaponDetailInput;
   armor?: ArmorDetailInput;
   consumable?: ConsumableDetailInput;
-  // `id` is optional — omitted entries are minted a fresh uuid, the same
-  // pre-generation pattern awardCampaignItem/recreateDeletedItem use so the
-  // same id keys both the snapshot's capabilities[].key and a capabilityUses row.
+  // `id` is optional — omitted entries are minted a fresh uuid, the same pre-generation pattern awardCampaignItem/recreateDeletedItem use so the same id keys both the snapshot's capabilities[].key and a capabilityUses row.
   capabilities?: (CapabilityColumns & { id?: string; used?: number })[];
 }
 
-// The parsed detail blocks + minted capability ids shared by both the
-// snapshot build and the scalar create-data below — computed once so the two
-// halves can't drift onto different capability ids or usesRemaining values.
+// Computed once so the snapshot build and the scalar create-data below can't drift onto different capability ids or usesRemaining values.
 function resolvedFixtureParts(input: InventoryItemFixtureInput) {
   return {
     weaponDetail: input.weapon ? normalizeWeaponDetail(input.weapon) : null,
@@ -71,7 +62,6 @@ function fixtureSnapshot(input: InventoryItemFixtureInput, parts: ResolvedFixtur
   }) as unknown as Prisma.InputJsonValue;
 }
 
-// Catalog/description identity fields, defaulted.
 function fixtureIdentity(input: InventoryItemFixtureInput) {
   return {
     characterId: input.characterId,
@@ -86,9 +76,6 @@ function fixtureIdentity(input: InventoryItemFixtureInput) {
   };
 }
 
-// Paper-doll placement + attunement columns, defaulted — split out of
-// inventoryItemFixtureData purely to keep that function's own branch count
-// low (every `??` here is a cyclomatic branch; this is where they live now).
 // fallow-ignore-next-line complexity -- nine independent `?? default` column defaults with no shared branching logic; splitting further would just rename the same defaulting, not reduce it
 function fixturePlacement(input: InventoryItemFixtureInput, consumableDetail: ResolvedFixtureParts["consumableDetail"]) {
   return {
@@ -105,11 +92,6 @@ function fixturePlacement(input: InventoryItemFixtureInput, consumableDetail: Re
   };
 }
 
-// Builds the full `prisma.inventoryItem.create` data object — scalars,
-// placement, `snapshot`, and `capabilityUses` — from one fixture-author-facing
-// shape. Exported (not just a `create` wrapper) so callers needing a
-// transaction client, `connect` relations, or post-create overrides can spread
-// this into their own `.create({ data: { ...here, ... } })` call.
 export function inventoryItemFixtureData(input: InventoryItemFixtureInput): Prisma.InventoryItemUncheckedCreateInput {
   const parts = resolvedFixtureParts(input);
   return {

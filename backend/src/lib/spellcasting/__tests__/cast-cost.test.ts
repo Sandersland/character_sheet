@@ -1,6 +1,3 @@
-// deriveSpellCastCost (epic #1827 Slice 1, #1828): the pure classification a
-// served spell entry's castCost field feeds. Pure function, no DB.
-
 import { describe, expect, it } from "vitest";
 
 import { deriveSpellCastCost } from "@/lib/spellcasting/cast-cost.js";

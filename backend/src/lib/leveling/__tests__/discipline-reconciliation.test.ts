@@ -33,8 +33,7 @@ const BASE = {
   rulesEdition: "EDITION_2014" as const,
 };
 
-// Real seeded Monk class/subclass — a fixture class with no ClassFeature rows
-// would see no pools/choices at all.
+// Real seeded Monk class/subclass — a fixture class with no ClassFeature rows would see no pools/choices at all.
 let classId: string;
 let subclassId: string;
 
@@ -105,9 +104,7 @@ describe("Level-down reconciliation trims fourElementsDisciplines (#1503, generi
   });
 });
 
-// LEVEL_GATED_RECONCILERS is module-local (not exported), so reading its
-// literal array off the source is the only way to pin its shape without
-// widening that module's public surface just for a test.
+// LEVEL_GATED_RECONCILERS is module-local (not exported), so reading its literal array off the source is the only way to pin its shape without widening that module's public surface just for a test.
 describe("LEVEL_GATED_RECONCILERS gained no entry for disciplines (#1503)", () => {
   it("still 9 reconcilers (#1588 added reconcileExpertise, a bespoke list unlike disciplines' generic reuse), reconcileSubclassChoices present, no discipline-specific reconciler added", () => {
     const path = fileURLToPath(new URL("../level-reconciliation.js", import.meta.url)).replace(/\.js$/, ".ts");

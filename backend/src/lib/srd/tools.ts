@@ -1,12 +1,6 @@
-// Full SRD tool list. Used to validate tool-proficiency choices at creation,
-// for the Student of War artisan-tool picker, and in GET /api/reference.
-// Tool proficiency in 5e adds proficiency bonus to ability checks — the
-// governing ability is chosen per check by the DM, not fixed per tool.
+// 5e: tool proficiency adds proficiency bonus to ability checks — the governing ability is chosen per check by the DM, not fixed per tool.
 
-// Canonical definition lives in shared-types (#1564) — Item.toolCategory and
-// StartingEquipmentOpenPick.toolCategory both key against it, so a starting-
-// equipment open pick can filter "musical instrument" as a column read
-// without this module (or a rules TS import) reaching the equipment resolver.
+// Canonical definition lives in shared-types (#1564) — Item.toolCategory and StartingEquipmentOpenPick.toolCategory both key against it.
 import type { ToolCategory } from "@character-sheet/shared-types";
 export type { ToolCategory };
 
@@ -36,9 +30,6 @@ export const TOOLS: readonly ToolDefinition[] = [
   { name: "Tinker's Tools",          category: "artisan",          cost: { gp: 50 },  weight: 10 },
   { name: "Weaver's Tools",          category: "artisan",          cost: { gp: 1  },  weight: 5  },
   { name: "Woodcarver's Tools",      category: "artisan",          cost: { gp: 1  },  weight: 5  },
-  // Gaming sets (#1565: Dragonchess/Three-Dragon Ante added alongside Dice/
-  // Playing Card so Soldier's "Gaming Set (same as above)" pick has all four
-  // SRD variants to resolve against, matching the Item catalog rows added there)
   { name: "Dice Set",                category: "gamingSet",        cost: { sp: 1  },  weight: 0  },
   { name: "Dragonchess Set",         category: "gamingSet",        cost: { gp: 1  },  weight: 0  },
   { name: "Playing Card Set",        category: "gamingSet",        cost: { sp: 5  },  weight: 0  },
@@ -54,7 +45,6 @@ export const TOOLS: readonly ToolDefinition[] = [
   { name: "Pan Flute",               category: "musicalInstrument", cost: { gp: 12 }, weight: 2  },
   { name: "Shawm",                   category: "musicalInstrument", cost: { gp: 2  }, weight: 1  },
   { name: "Viol",                    category: "musicalInstrument", cost: { gp: 30 }, weight: 1  },
-  // Other tools
   { name: "Disguise Kit",            category: "other",            cost: { gp: 25 },  weight: 3  },
   { name: "Forgery Kit",             category: "other",            cost: { gp: 15 },  weight: 5  },
   { name: "Herbalism Kit",           category: "other",            cost: { gp: 5  },  weight: 3  },
@@ -63,12 +53,10 @@ export const TOOLS: readonly ToolDefinition[] = [
   { name: "Thieves' Tools",          category: "other",            cost: { gp: 25 },  weight: 1  },
 ];
 
-/** Returns tools filtered by category. */
 export function toolsByCategory(category: ToolCategory): readonly ToolDefinition[] {
   return TOOLS.filter((t) => t.category === category);
 }
 
-/** Returns true if `name` is a known tool name (case-sensitive). */
 export function isKnownTool(name: string): boolean {
   return TOOLS.some((t) => t.name === name);
 }

@@ -1,6 +1,4 @@
-// Origin feats (background grants, #1130) are exempt from the ASI slot cap:
-// kept on read, never trimmed on level-down, never removable, and don't consume
-// a slot that a real ASI/feat could use.
+// Origin feats (#1130) are exempt from the ASI slot cap: kept on read, never trimmed on level-down, never removable, and do not consume a slot.
 import { randomUUID } from "node:crypto";
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -53,7 +51,7 @@ async function createChar(id: string, xp: number, advancements: unknown[], overr
       name: `OriginFeat ${id}`,
       alignment: "True Neutral",
       experiencePoints: xp,
-      initiativeBonus: 0, // DEX 10 → +0
+      initiativeBonus: 0,
       speed: 30,
       abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
       savingThrowProficiencies: [],
@@ -108,9 +106,9 @@ describe("Origin feats exempt from ASI slot cap (#1130)", () => {
     expect(res.status).toBe(200);
     expect(res.body.advancementSlots).toEqual({ total: 0, used: 0 });
     expect(res.body.advancements).toHaveLength(2);
-    // Alert: +PB initiative (level 1 → PB 2) over the DEX-0 base.
+
     expect(res.body.initiativeBonus).toBe(2);
-    // Tough: +2 × applied level (1) over base max 10.
+
     expect(res.body.hitPoints.max).toBe(12);
   });
 
@@ -125,7 +123,7 @@ describe("Origin feats exempt from ASI slot cap (#1130)", () => {
   });
 
   it("never reverses origin entries on level-down but still LIFO-trims slot feats", async () => {
-    // Level 8 (XP 34000, 2 slots): origin + 2 ASIs. Drop to level 1 (0 slots).
+
     await createChar("of-reconcile", 34000, [originEntry("Alert", [{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }]), asiEntry(), asiEntry()], {
       classEntries: { create: [{ name: CLASS_NAME, classId, position: 0, level: 8 }] },
     });
@@ -138,7 +136,6 @@ describe("Origin feats exempt from ASI slot cap (#1130)", () => {
     expect(res.body.advancements).toHaveLength(1);
     expect(res.body.advancements[0].featName).toBe("Alert");
     expect(res.body.advancementSlots).toEqual({ total: 0, used: 0 });
-    // Origin improvement still applied after reconcile.
     expect(res.body.initiativeBonus).toBe(2);
   });
 

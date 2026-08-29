@@ -2,12 +2,7 @@ import type { Request, Response } from "express";
 
 import { config } from "@/lib/core/config.js";
 
-// Method-agnostic cookie handling. No cookie-parser dependency — cookies are
-// parsed and serialized by hand so the only client state is opaque, HttpOnly
-// tokens. Any auth method (OAuth today, password/magic-link later) reuses these.
-
-// Parse a raw Cookie header into a name→value map. Tolerates missing header,
-// stray whitespace, empty segments, and values containing "=".
+// No cookie-parser dependency — cookies are parsed and serialized by hand so the only client state is opaque, HttpOnly tokens.
 export function parseCookies(header: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   if (!header) return out;
@@ -18,8 +13,7 @@ export function parseCookies(header: string | undefined): Record<string, string>
     const name = segment.slice(0, eq).trim();
     if (!name) continue;
     const value = segment.slice(eq + 1).trim();
-    // decodeURIComponent throws on malformed percent-encoding (e.g. "%GG"). One
-    // malformed cookie must not 500 every auth endpoint — fall back to the raw value.
+    // One malformed cookie must not 500 every auth endpoint — fall back to the raw value.
     try {
       out[name] = decodeURIComponent(value);
     } catch {
@@ -39,8 +33,7 @@ export interface CookieOptions {
   secure?: boolean;
 }
 
-// Serialize a Set-Cookie value. Always HttpOnly + SameSite=Lax + Path=/. Secure
-// follows config unless overridden. A maxAge of 0 expires the cookie (clear).
+// Always HttpOnly + SameSite=Lax + Path=/. Secure follows config unless overridden.
 export function serializeCookie(
   name: string,
   value: string,
@@ -60,7 +53,6 @@ export function serializeCookie(
   return parts.join("; ");
 }
 
-// Append a Set-Cookie header on a response.
 export function setCookie(
   res: Response,
   name: string,
@@ -70,7 +62,6 @@ export function setCookie(
   res.append("Set-Cookie", serializeCookie(name, value, { maxAgeSeconds }));
 }
 
-// Expire a cookie (Max-Age=0).
 export function clearCookie(res: Response, name: string): void {
   res.append("Set-Cookie", serializeCookie(name, "", { maxAgeSeconds: 0 }));
 }

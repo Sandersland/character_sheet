@@ -1,7 +1,3 @@
-// POST /api/characters — 2014 species/subrace ability increases baked at
-// creation (#1681). Exercises the seeded catalog (real Species/SpeciesVariant
-// rows from seedSpecies), same pattern as species-create.test.ts and the
-// background ability-spread suite in characters.test.ts.
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -55,16 +51,12 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
     expect(res.status).toBe(201);
     createdCharacterIds.push(res.body.id);
 
-    // CON 12 → 14 (species +2), WIS 10 → 11 (variant +1); everything else untouched.
     expect(res.body.abilityScores).toEqual({ ...BASE_SCORES, constitution: 14, wisdom: 11 });
 
-    // CON 14 → +2 mod, Fighter d10 → 12 base; the Hill Dwarf's Dwarven Toughness
-    // trait (#1682) adds +1/level → 13 at level 1.
+    // Hill Dwarf's Dwarven Toughness trait (#1682) adds +1 HP/level on top of the CON mod.
     expect(res.body.hitPoints.max).toBe(13);
-    // DEX 12 (unaffected by Dwarf's increases) → +1 mod, no other init bonus.
     expect(res.body.initiativeBonus).toBe(1);
 
-    // Provenance snapshot: exactly what was applied, fixed + variant, nothing else.
     const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
     expect(raceRow.abilityBonuses).toEqual(
       expect.arrayContaining([
@@ -91,8 +83,7 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
     });
 
     expect(res.status).toBe(400);
-    // Fixed +2 CON overflow — server-applied, so the error names "species", not
-    // the speciesAbilities field the client never submitted here (#1681 review).
+    // The +2 CON is server-applied, not client-submitted, so the error names "species", not speciesAbilities.
     expect(res.body.error).toBe("species: constitution would exceed 20");
   });
 });
@@ -102,12 +93,7 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
     return prisma.species.findFirstOrThrow({ where: { slug: "half-elf", edition: "EDITION_2014" } });
   }
 
-  // Half-Elf ALSO carries a #1689 skill choice (Skill Versatility) as of this
-  // slice — every request below must satisfy it too, or the skill-choice gate
-  // (which resolves before ability increases, resolveSelections vs. the later
-  // resolveSpeciesGrants phase) 400s before reaching the ability check this
-  // file exists to exercise. Not overlapping with anything: baseBody sends no
-  // skillProficiencies of its own.
+  // Half-Elf also carries a #1689 skill choice (Skill Versatility) — resolveSelections gates on it before the later resolveSpeciesGrants phase, so every request below must satisfy it or 400 before reaching the ability check.
   const SPECIES_SKILLS = ["stealth", "perception"];
 
   it("applies the fixed +2 CHA and the chosen +1/+1 to two distinct non-CHA abilities", async () => {
@@ -223,11 +209,7 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
   });
 });
 
-// #1751: Astral Elf is a variant that REPLACES its base species' ability
-// increase rather than adding to it. Every other Elf subrace (High/Wood/Drow)
-// stacks its +1 on top of the base Elf's +2 DEX; Astral Elf does not — its
-// Tasha's-era floating spread IS the whole increase. Guards fetchMergedAbility-
-// Increases' abilityIncreasesReplace branch behaviorally, both directions.
+// Astral Elf's floating spread REPLACES the base Elf's +2 DEX rather than stacking with it, unlike every other Elf subrace — guards fetchMergedAbilityIncreases' abilityIncreasesReplace branch both directions (#1751).
 describe("POST /api/characters — Astral Elf replaces the base Elf's +2 DEX; real subraces still stack (#1751)", () => {
   async function elf2014() {
     return prisma.species.findFirstOrThrow({
@@ -239,10 +221,7 @@ describe("POST /api/characters — Astral Elf replaces the base Elf's +2 DEX; re
   it("an Astral Elf gets ONLY the floating +2/+1 — the base Elf's +2 DEX is NOT applied", async () => {
     const elf = await elf2014();
     const astral = elf.variants.find((v) => v.slug === "astral")!;
-    // #1756: Astral Fire is now a wired chooseCantrip choice, so creation
-    // requires a cantrip + casting ability — supplied here (unrelated to the
-    // ability-increase behavior under test), same reason the Wood Elf
-    // regression below picks a variant without a choice-bearing trait.
+    // Astral Fire is a wired chooseCantrip choice (#1756), so creation requires a cantrip + casting ability — unrelated to the ability-increase behavior under test.
     const light = await prisma.spell.findFirstOrThrow({ where: { name: "Light", edition: "EDITION_2014" } });
 
     const res = await post({
@@ -257,8 +236,6 @@ describe("POST /api/characters — Astral Elf replaces the base Elf's +2 DEX; re
 
     expect(res.status).toBe(201);
     createdCharacterIds.push(res.body.id);
-    // STR 12→14, WIS 10→11 (the chosen floating spread); DEX stays 12 — the base
-    // Elf's +2 DEX is replaced, not added.
     expect(res.body.abilityScores).toEqual({ ...BASE_SCORES, strength: 14, wisdom: 11 });
 
     const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
@@ -272,9 +249,7 @@ describe("POST /api/characters — Astral Elf replaces the base Elf's +2 DEX; re
   });
 
   it("regression: a Wood Elf still stacks +1 WIS on the base Elf's +2 DEX (additive, not replaced)", async () => {
-    // Wood Elf (not High Elf) because it carries no choice-bearing trait — High
-    // Elf's Cantrip is a wired #1689 choice that would 400 for a missing
-    // speciesCantripId, unrelated to the additive-vs-replace behavior under test.
+    // Wood Elf, not High Elf — High Elf's Cantrip is a wired #1689 choice that would 400 for a missing speciesCantripId, unrelated to the behavior under test.
     const elf = await elf2014();
     const woodElf = elf.variants.find((v) => v.slug === "wood")!;
 
@@ -287,7 +262,6 @@ describe("POST /api/characters — Astral Elf replaces the base Elf's +2 DEX; re
 
     expect(res.status).toBe(201);
     createdCharacterIds.push(res.body.id);
-    // DEX 12→14 (base Elf +2) AND WIS 10→11 (Wood Elf variant +1) — both applied.
     expect(res.body.abilityScores).toEqual({ ...BASE_SCORES, dexterity: 14, wisdom: 11 });
 
     const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
@@ -327,13 +301,7 @@ describe("POST /api/characters — 2024 gets nothing from species, both directio
   });
 });
 
-// #1681 AC: the floating-spread shape (Astral Elf's "+2/+1-or-+1/+1/+1", seeded
-// only as a #1679 test fixture — no real PHB'14 roster row uses it yet) must
-// validate through the SAME shared function #1572's background spread uses.
-// background-grants.test.ts asserts that by symbol (one import, two callers);
-// this proves it behaviorally end-to-end through the real creation endpoint,
-// including the identical rejection message text validateBackgroundSpread
-// produces for an illegal shape.
+// The floating-spread shape ("+2/+1" or "+1/+1/+1") validates through the same validateBackgroundSpread the background ability spread uses (#1572) — this proves it end-to-end through the real creation endpoint, including the shared rejection message text (#1681 AC3).
 describe("POST /api/characters — floating-spread species fixture (#1681 AC3)", () => {
   const FIXTURE_SLUG = "zzz-floating-fixture-1681";
 

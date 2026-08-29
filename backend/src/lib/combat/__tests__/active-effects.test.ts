@@ -20,8 +20,8 @@ describe("normalizeActiveEffectsMutable", () => {
     const state = normalizeActiveEffectsMutable({
       buffs: [
         { id: "a", key: "guidance", target: "athletics", modifier: 4, source: "Guidance", sourceEntryId: "e1" },
-        { key: "bad", modifier: 2 }, // missing target
-        { key: "nan", target: "arcana", modifier: "x" }, // non-numeric
+        { key: "bad", modifier: 2 },
+        { key: "nan", target: "arcana", modifier: "x" },
         { key: "floaty", target: "insight", modifier: 2.9, source: "X" },
       ],
     });
@@ -85,7 +85,6 @@ describe("normalizeActiveEffectsMutable", () => {
     };
     const serialized = JSON.parse(JSON.stringify(serializeActiveEffectsState(state)));
     expect(normalizeActiveEffectsMutable(serialized)).toEqual(state);
-    // Malformed entries are filtered; an empty list is omitted entirely.
     const cleaned = normalizeActiveEffectsMutable({
       buffs: [{ id: "r", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active", resistDamageTypes: ["fire", 5, null] }],
     });

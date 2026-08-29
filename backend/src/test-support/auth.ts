@@ -1,13 +1,7 @@
 import { prisma } from "@/lib/core/prisma.js";
 import { SESSION_COOKIE } from "@/lib/auth/session.js";
 
-// Test-only helper. Once requireAuth gates every protected /api route, route
-// tests must present a valid session cookie. This upserts the owning User and a
-// deterministic, long-lived AuthSession for it, then returns the Cookie header
-// value (`cs_session=<token>`) tests attach to their requests.
-//
-// Deterministic token id per owner + upsert = idempotent across reruns, so a
-// file's repeated beforeEach doesn't accumulate session rows.
+// Deterministic token id per owner + upsert = idempotent across reruns, so a file's repeated beforeEach doesn't accumulate session rows.
 export async function authCookie(ownerId: string): Promise<string> {
   await prisma.user.upsert({ where: { id: ownerId }, create: { id: ownerId }, update: {} });
 

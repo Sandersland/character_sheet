@@ -3,13 +3,7 @@ import { describe, expect, it } from "vitest";
 import { deriveFeatBonuses, featOfferedForAsiSlot } from "@/lib/srd/feats.js";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
 
-// Edition-invariant (#1310): PHB'24 pp. 87-88 draws origin/general/fighting_style
-// /epic_boon; PHB'14's own rule (p.165, no per-feat level gate, earliest ASI at
-// level 4) is what the "general" branch's `?? 4` default already encodes, so
-// featOfferedForAsiSlot takes no `edition` parameter — every 2014 Feat row is
-// `category: "general"` with a NULL levelPrerequisite, and origin/fighting_style
-// /epic_boon rows are all EDITION_2024-tagged so a 2014 character never reaches
-// those branches at all.
+// PHB'24 pp. 87-88; PHB'14 p.165 — edition-invariant, no `edition` param (#1310).
 describe("featOfferedForAsiSlot", () => {
   it("never offers Origin feats", () => {
     expect(featOfferedForAsiSlot({ category: "origin", levelPrerequisite: null }, 1)).toBe(false);
@@ -41,8 +35,7 @@ describe("featOfferedForAsiSlot", () => {
   });
 });
 
-// PHB'24: Alert's initiative bonus scales with Proficiency Bonus rather than a
-// flat +5 — modeled via FeatImprovement.scaling = "proficiencyBonus".
+// PHB'24: Alert's initiative bonus scales with Proficiency Bonus, not a flat +5.
 describe("deriveFeatBonuses — proficiencyBonus scaling", () => {
   const entry = (): AdvancementEntry => ({
     id: "e1",
@@ -55,8 +48,8 @@ describe("deriveFeatBonuses — proficiencyBonus scaling", () => {
   });
 
   it("multiplies the amount by the proficiency bonus at the applied level", () => {
-    expect(deriveFeatBonuses([entry()], 4).initiative).toBe(2); // PB +2 at level 4
-    expect(deriveFeatBonuses([entry()], 5).initiative).toBe(3); // PB +3 at level 5
-    expect(deriveFeatBonuses([entry()], 17).initiative).toBe(6); // PB +6 at level 17
+    expect(deriveFeatBonuses([entry()], 4).initiative).toBe(2);
+    expect(deriveFeatBonuses([entry()], 5).initiative).toBe(3);
+    expect(deriveFeatBonuses([entry()], 17).initiative).toBe(6);
   });
 });

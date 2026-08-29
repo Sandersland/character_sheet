@@ -1,34 +1,12 @@
 /**
- * resolveAction op schema (#1829) — the wire shape for
- * POST /api/characters/:id/resolve-action/transactions. Backend-local (not
- * `@character-sheet/contracts`) even now that a real frontend caller exists
- * (#1832, `frontend/src/api/combat.ts`) — mirrors `castSpellOpSchema` staying
- * local to routes/character/spellcasting.ts while its own frontend caller
- * imports a structurally-matching plain type (`ResolveActionEventData`,
- * shared-types, #1830) rather than the validating schema itself. The
- * frontend's `ResolveActionOperation` = that shared type + the op's literal
- * `type` discriminant.
+ * resolveAction op schema (#1829) — wire shape for POST /api/characters/:id/resolve-action/transactions.
+ * Backend-local, not `@character-sheet/contracts`, mirroring `castSpellOpSchema` staying local to its own route.
  *
- * Shape settled in the epic's design note (2026-08-08, per #1828 review): ONE
- * `effect` roll per resolution — no `instances[]` array. Magic Missile's three
- * darts are one `count: 3` spec; the persisted roll's `faces` breakdown is
- * what a future drill-in reads, not a per-dart entry.
- *
- * `riders` (#1843) is the additive exception: a weapon's typed elemental
- * rider (Flame Tongue +2d6 fire, Divine Smite radiant, Hunter's Mark, sneak
- * attack) is a genuinely different SECOND damage type on top of `effect`, not
- * another same-type instance — reuses `resolveActionEffectSchema` per element,
- * so a rider is validated exactly like the primary effect.
- *
- * `entryId`/`apply` (#1833, spell adapter): present only for a spell
- * resolution — a weapon swing has no spellcasting entry and omits both. When
- * `entryId` is set, the handler routes the op's `slotLevel`/`apply` through
- * the SAME `castAbilityInTx` sequence the old `castSpell` op uses (via
- * `castSpellForResolutionInTx`), so concentration (set + displaced-prior
- * drop), a buff spell's self-buff (Mage Armor), and a self/ally heal apply
- * all still happen — not just the slot spend the pre-#1833 handler paid.
- * `apply` mirrors `castSpellOpSchema`'s own shape exactly (routes/character/
- * spellcasting.ts) so the two never drift on what a cast can apply.
+ * ONE `effect` roll per resolution, never an `instances[]` array — Magic Missile's three darts are one `count: 3` spec.
+ * `riders` (#1843) are additive typed damage riders on top of `effect`, each validated via `resolveActionEffectSchema`.
+ * `entryId`/`apply` are present only for a spell resolution, routing through `castSpellForResolutionInTx`'s
+ * `castAbilityInTx` sequence so concentration/buff/apply side effects still run. `apply` mirrors
+ * `castSpellOpSchema`'s own shape exactly so the two never drift.
  */
 import { z } from "zod";
 
@@ -43,19 +21,15 @@ const resolveActionCostSchema = z.object({
 // A d20 roll already resolved client-side (trusted-roll contract #406 — the
 // frontend rolls, the server records and validates ranges, never re-rolls).
 // `faces` is every die actually rolled (2 entries under advantage/
-// disadvantage), `kept` the one that counts. `components` is the decomposed
-// to-hit math (RollEventAttackComponents) — optional/nullable like every
-// other resolveAction sub-object; the adapter slices (#1832/#1833) populate
-// it from the served weapon/spell attack bonus, echoed through unchanged
-// (server-provided, not client-derived — CLAUDE.md's rules-are-backend-owned
-// still holds, this is just the log's addend breakdown for the drill-in).
+// disadvantage), `kept` the one that counts. `components` (RollEventAttackComponents)
+// is optional/nullable like every other resolveAction sub-object, echoed
+// through unchanged from the served attack bonus.
 //
 // The three checks below reject internally-inconsistent client input the
-// server CAN verify without a target/AC (self-or-announce, CLAUDE.md): a
-// nat20 flag that doesn't match the kept die, a kept die that isn't even
-// among the rolled faces, and a nat20 not called as a crit. The converse
-// (verdict === "crit" ⇒ nat20) is NOT enforced — a crit can be a DM-ruled
-// non-nat20 hit the engine has no target/AC to verify against.
+// server can verify without a target/AC (self-or-announce): a nat20 flag
+// that doesn't match the kept die, a kept die not among the rolled faces,
+// and a nat20 not called as a crit. The converse (crit ⇒ nat20) is NOT
+// enforced — a crit can be a DM-ruled non-nat20 hit.
 const resolveActionToHitSchema = z
   .object({
     faces: z.array(z.number().int().min(1).max(20)).min(1),
@@ -96,10 +70,9 @@ const resolveActionSaveSchema = z.object({
 });
 
 // One damage/heal roll. `spec` is the served dice spec text (e.g. "3d4+3");
-// `faces` is every die rolled, `count(faces) >= 1` covers a multi-die spec
-// (Magic Missile) without a dedicated instances array — see the module banner.
-// `components` is the decomposed damage math (RollEventDamageComponents) —
-// same optional/nullable, server-provided-echo treatment as toHit.components.
+// `faces` is every die rolled — count(faces) >= 1 covers a multi-die spec
+// (Magic Missile) without a dedicated instances array. `components`
+// (RollEventDamageComponents) is optional/nullable, echoed through like toHit.components.
 const resolveActionEffectSchema = z.object({
   spec: z.string().min(1),
   faces: z.array(z.number().int().positive()).min(1),
@@ -140,9 +113,8 @@ const resolveActionOperationSchema = z
     entryId: z.string().min(1).optional(),
     // Where a cast's rolled effect lands: the caster's own HP, or a consenting
     // ally's sheet (heal only, #462) — mirrors castSpellOpSchema's own `apply`
-    // (routes/character/spellcasting.ts) exactly. Never set for a damage
-    // resolution: there is no target/enemy model (self-or-announce, CLAUDE.md),
-    // so a damage spell's effect is announced only, never auto-applied.
+    // exactly. Never set for a damage resolution: there is no target/enemy
+    // model (self-or-announce), so a damage spell's effect is announced only, never auto-applied.
     apply: z
       .object({
         target: z.union([z.literal("self"), z.object({ characterId: z.string().min(1) })]),
@@ -150,11 +122,10 @@ const resolveActionOperationSchema = z
         amount: z.number().int().positive(),
       })
       .optional(),
-    // 2014 Assassin Assassinate (#1526) — see ResolveActionEventData.assassinate
-    // (shared-types) for the full contract. Wire-shape consistency only here
-    // (assassinate ⇒ verdict crit); ELIGIBILITY (is this character even a 2014
-    // Assassin L3+) needs the character row, so that check lives in
-    // resolve-action.ts's applyOp, not this schema.
+    // 2014 Assassin Assassinate (#1526) — see ResolveActionEventData.assassinate for the full contract.
+    // Wire-shape consistency only here (assassinate ⇒ verdict crit); ELIGIBILITY (is this character
+    // even a 2014 Assassin L3+) needs the character row, so that check lives in
+    // applyResolveActionOperations' applyOp, not this schema.
     assassinate: z.boolean().optional(),
   })
   .superRefine((val, ctx) => {

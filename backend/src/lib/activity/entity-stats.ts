@@ -1,4 +1,4 @@
-// Derived mention stats for campaign entities (#839); recency = date → loggedAt → createdAt (backlinks parity).
+// Recency = date → loggedAt → createdAt (backlinks parity).
 
 import type { Prisma } from "@/generated/prisma/client.js";
 
@@ -9,7 +9,7 @@ import {
 } from "./entity-merges.js";
 import { normalizeForMatch } from "./journal-refs.js";
 
-// The #838 sharing rule: own entries + CAMPAIGN ones from characters still in the campaign.
+// The #838 sharing rule: own entries plus CAMPAIGN-visibility ones from characters still in the campaign.
 export function visibleEntryWhere(
   userId: string,
   campaignId: string,
@@ -90,7 +90,7 @@ function foldRef(acc: StatsAccumulator, ref: StatRef): void {
   }
 }
 
-// Fold refs into per-survivor stats; entries counted once even when dual-tagged.
+// Entries counted once per survivor even when dual-tagged.
 export function aggregateEntityStats(
   refs: StatRef[],
   opts: { survivorOf?: ReadonlyMap<string, string> } = {},
@@ -106,7 +106,7 @@ export function aggregateEntityStats(
   return stats;
 }
 
-// Per-survivor EXECUTED merge union; non-owners never see a HIDDEN identity's refs.
+// Non-owners only see merges into identities already revealed to them.
 export function resolveVisibleMergeUnion(
   edges: MergeEdge[],
   targetIds: string[],
@@ -130,7 +130,6 @@ function visibleEntity<E extends { visibility: string }>(
   return entity && (isOwner || entity.visibility !== "HIDDEN") ? entity : null;
 }
 
-// Co-mention tally (#839): distinct entries per ultimate EXECUTED survivor, desc.
 export function tallyCoMentions<E extends { id: string; name: string; visibility: string }>(
   refs: { entryId: string; entityId: string }[],
   opts: {
@@ -160,7 +159,6 @@ export function tallyCoMentions<E extends { id: string; name: string; visibility
 
 export type EntityMatchField = "name" | "alias" | "notes";
 
-// Precedence name → alias → notes, all via normalizeForMatch.
 export function matchEntityQuery(
   entity: { name: string; aliases: string[]; notes: string | null },
   q: string,

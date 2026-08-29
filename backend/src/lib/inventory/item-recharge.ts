@@ -1,6 +1,4 @@
-// Rest-triggered recharge of activated-item uses. Lives outside lib/inventory/inventory.ts
-// so the rest handler (lib/combat/hitpoints.ts) can import it without creating a cycle
-// (inventory.ts imports applyHealInTx from hitpoints.ts for consumable healing).
+// Lives outside inventory.ts so the rest handler can import it without a cycle — inventory.ts imports applyHealInTx from the hitpoints rest handler for consumable healing.
 import type { Prisma } from "@/generated/prisma/client.js";
 import {
   activatedRechargeRest,
@@ -11,10 +9,7 @@ import {
 import { readInventorySnapshot } from "./inventory-snapshot-read.js";
 import { logEvent } from "@/lib/activity/events.js";
 
-// Resets activatedUsesSpent to 0 for items whose activatedEffect recharges on the
-// given rest (#543). perRest(short) recharges on short|long; everything else on
-// long only. The seeded buff is cleared separately by the rest's buff sweep.
-// Called from the HP rest handler so item uses recharge alongside class resources.
+// #543: perRest(short) recharges on short|long; everything else on long only. The seeded buff is cleared separately by the rest's buff sweep.
 export async function resetActivatedUsesForRestInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -32,9 +27,7 @@ export async function resetActivatedUsesForRestInTx(
     const capabilities = readInventorySnapshot(item).capabilities.map((c) =>
       capabilityColumnsFromSnapshot(c, usedByKey.get(c.key) ?? 0),
     );
-    // Type-predicate filter (not a bare cast): an opaque row with kind="activatedEffect"
-    // but no activation must not slip through as a malformed ActivatedEffectCapability
-    // — activatedRechargeRest would read resourceKind=undefined and spuriously recharge.
+    // Type-predicate filter, not a bare cast: an opaque row with kind="activatedEffect" but no activation must not slip through, or activatedRechargeRest would spuriously recharge it.
     const cap = capabilities
       .map(readCapability)
       .find((c): c is ActivatedEffectCapability => c.kind === "activatedEffect" && "activation" in c);

@@ -53,7 +53,6 @@ describe("aggregateEntityStats", () => {
       ["jenkins", "vecna"],
       ["vecna", "vecna"],
     ]);
-    // Entry e-1 dual-tags both identities: must count once for the survivor.
     const stats = aggregateEntityStats(
       [
         ref({ entityId: "vecna", entryId: "e-1" }),
@@ -80,7 +79,6 @@ describe("aggregateEntityStats", () => {
       entryId: "e-early",
       date: new Date("2026-06-01T00:00:00Z"),
     });
-    // Same date as e-tie-late; loggedAt breaks the tie.
     const tieEarly = ref({
       entityId: "npc",
       entryId: "e-tie-early",

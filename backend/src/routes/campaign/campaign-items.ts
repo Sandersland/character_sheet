@@ -25,18 +25,9 @@ import {
 } from "@/lib/campaign/campaign-items.js";
 import { prisma } from "@/lib/core/prisma.js";
 
-// DM-authored campaign items (#380). Owner-only CRUD (list/create/update/delete)
-// under /api/campaigns/:id/items; a member-readable by-entity GET feeds the Codex
-// item card. Every write auto-manages a fronting ITEM CampaignEntity via
-// CampaignItemLink (created HIDDEN, renamed in lockstep, deleted with the item —
-// the documented cleanup rule below). dmNotes is DM-private and is scrubbed from
-// every player-facing payload (the by-entity GET for a non-owner).
-
 export const campaignItemsRouter = Router();
 
-// Shared by PATCH and DELETE: findFirst with the full predicate, not
-// findUnique(id) + an in-code campaign check — the latter leaks existence
-// through timing and is easy to forget on a new endpoint (#1646).
+// findFirst with the full predicate, not findUnique(id) + an in-code campaign check — the latter leaks existence through timing (#1646).
 function findOwnedCampaignItem(itemId: string, campaignId: string) {
   return prisma.item.findFirst({
     where: { id: itemId, scope: "CAMPAIGN", campaignId },
@@ -44,10 +35,7 @@ function findOwnedCampaignItem(itemId: string, campaignId: string) {
   });
 }
 
-/**
- * GET /api/campaigns/:id/items
- * Owner-only full list (Manage tab) — includes dmNotes. Players get 403.
- */
+// Includes dmNotes — owner-only.
 campaignItemsRouter.get("/campaigns/:id/items", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -58,8 +46,6 @@ campaignItemsRouter.get("/campaigns/:id/items", async (req, res) => {
   );
 
   const items = await prisma.item.findMany({
-    // Campaign items only: a GLOBAL catalog row has no campaignId, but filtering
-    // on scope states the intent rather than relying on that (#1646).
     where: { scope: "CAMPAIGN", campaignId: req.params.id },
     include: itemInclude,
     orderBy: { name: "asc" },
@@ -68,11 +54,7 @@ campaignItemsRouter.get("/campaigns/:id/items", async (req, res) => {
   res.json(items.map((row) => serializeCampaignItem(row, true, holders.get(row.id) ?? [])));
 });
 
-/**
- * GET /api/campaigns/:id/items/by-entity/:entityId
- * Member-readable single item for the Codex card, keyed by the fronting entity.
- * Non-owners only see it when that entity is REVEALED, and never see dmNotes.
- */
+// Non-owners only see this when the fronting entity is REVEALED, and never see dmNotes.
 campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
   const isOwner = role === "OWNER";
@@ -98,10 +80,6 @@ campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, 
   res.json(serializeCampaignItem(link.item, isOwner, holders.get(link.item.id) ?? []));
 });
 
-/**
- * POST /api/campaigns/:id/items
- * Owner-only create. Auto-registers a HIDDEN ITEM entity + link in one txn.
- */
 campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -140,10 +118,6 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
   res.status(201).json(serializeCampaignItem(created, true));
 });
 
-/**
- * PATCH /api/campaigns/:id/items/:itemId
- * Owner-only update. A rename is mirrored onto the fronting entity in the txn.
- */
 campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -162,9 +136,7 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
     return;
   }
 
-  // Same wielder-mode guard as the create path (#528). A PATCH may omit
-  // attunementPrereqKind while replacing capabilities, so resolve it against the
-  // existing row rather than treating an unsent field as "not a spellcaster item".
+  // Resolve against the existing row: a PATCH may omit attunementPrereqKind while replacing capabilities (#528).
   const wielderError = assertWielderModeAllowed({
     attunementPrereqKind:
       data.attunementPrereqKind !== undefined ? data.attunementPrereqKind : existing.attunementPrereqKind,
@@ -175,9 +147,7 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
     return;
   }
 
-  // A PATCH may set { slot } without resending category; refineSlotCategory can't see
-  // the existing row, so guard slot-on-non-gear against the effective category here —
-  // else `{ slot: "NECK" }` on an existing weapon would corrupt paper-doll data on award.
+  // Guard against the effective category, not just data.category: a PATCH may set slot without resending category, and slot on a non-gear item would corrupt paper-doll data on award.
   const effectiveCategory = data.category ?? existing.category;
   if (data.slot != null && effectiveCategory !== "gear") {
     res.status(400).json({
@@ -199,8 +169,7 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
         ]),
         ...slotUpdate(data),
         ...detailUpsert(data),
-        // Capabilities REPLACE on any send (including []): clear then recreate, so
-        // an edit that drops a bonus removes its row rather than merging.
+        // Capabilities REPLACE on any send (including []): clear then recreate, not merge.
         ...(data.capabilities !== undefined
           ? { capabilities: { deleteMany: {}, create: data.capabilities.map(capabilityCreate) } }
           : {}),
@@ -212,13 +181,7 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
   res.json(serializeCampaignItem(updated, true));
 });
 
-/**
- * DELETE /api/campaigns/:id/items/:itemId
- * Owner-only. CLEANUP RULE (mirrors the CampaignCharacterLink precedent): the
- * fronting ITEM entity has no life without its item, so deleting the item also
- * deletes its linked entity in the same transaction (which cascades the link +
- * any journal refs). The item delete cascades its detail rows.
- */
+// The fronting ITEM entity has no life without its item — deleted in the same transaction, cascading its link and any journal refs.
 campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -244,12 +207,7 @@ campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
   res.status(204).end();
 });
 
-/**
- * POST /api/campaigns/:id/items/:campaignItemId/award
- * Owner-only intent-bearing transaction (#381): snapshots the item into a member
- * character's inventory, reveals the fronting entity, and writes an undoable
- * audit event on the TARGET character. Unique-item conflicts 409 with the holder.
- */
+// A unique-item conflict 409s with the current holder.
 campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -262,8 +220,7 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (re
   const data = parseBodyOr400(awardSchema, req.body, res);
   if (data === undefined) return;
 
-  // CampaignItemAwardError carries its own status (400/404/409), so it flows to
-  // the central `errorHandler` — no route-local mapping needed.
+  // CampaignItemAwardError carries its own status, so it flows to the central errorHandler.
   await awardCampaignItem({
     campaignId: req.params.id,
     campaignItemId: req.params.campaignItemId,
@@ -276,14 +233,7 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (re
   res.status(200).json({ holders: holders.get(req.params.campaignItemId) ?? [] });
 });
 
-/**
- * POST /api/campaigns/:id/items/:campaignItemId/revoke
- * Owner-only counterpart: removes the provenance-matched inventory row (undoable
- * audit event on the target character). A player-modified snapshot is still
- * revocable — the match is by the item's id, not by field equality. The URL
- * param keeps its pre-#1646 name so existing clients keep working; the column
- * it resolves against is InventoryItem.itemId.
- */
+// A player-modified snapshot is still revocable — matched by item id, not field equality.
 campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/revoke", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -296,8 +246,7 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/revoke", async (r
   const data = parseBodyOr400(revokeSchema, req.body, res);
   if (data === undefined) return;
 
-  // CampaignItemAwardError carries its own status, so it flows to the central
-  // `errorHandler` — no route-local mapping needed.
+  // CampaignItemAwardError carries its own status, so it flows to the central errorHandler.
   await revokeCampaignItem({
     campaignId: req.params.id,
     campaignItemId: req.params.campaignItemId,

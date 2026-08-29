@@ -1,18 +1,5 @@
-// Hand of Harm (Warrior of Mercy L3, PHB'24 p.92 — not in SRD 5.2, gap-fill
-// content, #1248) — a rider on an Unarmed Strike hit, mirroring Stunning
-// Strike's once-per-turn shape but with NO save (per the subclass's header
-// note: none of its features call for one). Once per turn, after hitting
-// with an Unarmed Strike and dealing damage, expend 1 Focus (or, at L11+, a
-// free use from Flurry of Healing and Harm) to deal extra Necrotic damage
-// equal to one Martial Arts die + Wisdom modifier. Physician's Touch (L6)
-// adds the Poisoned condition until the end of the monk's next turn.
-//
-// Target-rider modeling + roll ownership (mirrors Quivering Palm / Stunning
-// Strike): this app tracks no NPC/monster combatant, so the necrotic bonus
-// and the Poisoned rider are narrated only — no HP/condition column exists
-// for the target. The bonus is the monk's own supernatural effect, so the
-// client rolls the Martial Arts die + Wis mod total and sends it; the server
-// only validates positivity and narrates it, same as Quivering Palm's 10d12.
+// Hand of Harm, PHB'24 p.92 — not in SRD 5.2 (gap-fill content, #1248).
+// No target/condition model: the necrotic bonus and Poisoned rider are narrated only. The client rolls the Martial Arts die + Wis mod total; the server only validates positivity (mirrors Quivering Palm's 10d12).
 
 import type { DealHandOfHarmOperation, HandOfHarmOperation } from "@character-sheet/contracts";
 
@@ -30,7 +17,6 @@ export interface HandOfHarmResult {
   summary: string;
 }
 
-/** Once-per-turn guard — pure so the red/green test can exercise it directly. */
 export function canDealHandOfHarm(input: { usedThisTurn: boolean }): boolean {
   return !input.usedThisTurn;
 }
@@ -53,17 +39,12 @@ function monkEntry(row: HandOfHarmRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
-// Resolved via slug (#1277: FK preferred, exact normalized name as
-// fallback), like Open Hand Technique's isWarriorOfTheOpenHand / Quivering
-// Palm's own copy. Was substring-matched on the word "mercy".
+// Resolved via slug (FK preferred, exact normalized name as fallback) — mirrors Open Hand Technique's isWarriorOfTheOpenHand and Quivering Palm's own copy.
 function isWarriorOfMercy(row: HandOfHarmRow): boolean {
   const monk = monkEntry(row);
   return !!monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-mercy";
 }
 
-// Every guard for one dealHandOfHarm op, pulled out of the handler so its own
-// branching stays under the complexity gate. Throws on the first violation;
-// returns the monk entry (level is needed below for Physician's Touch).
 function assertDealHandOfHarmValid(row: HandOfHarmRow, op: DealHandOfHarmOperation) {
   const monk = monkEntry(row);
   if (!monk || monk.level < 3 || !isWarriorOfMercy(row)) {
@@ -106,10 +87,7 @@ async function dealHandOfHarm(
   return { necroticDamage: op.roll, poisoned, summary };
 }
 
-/**
- * Applies a batch of Hand of Harm operations atomically. Mirrors
- * applyStunningStrikeOperations: one batchId, state re-read per op.
- */
+// Mirrors applyStunningStrikeOperations: one batchId, state re-read per op.
 export async function applyHandOfHarmOperations(
   characterId: string,
   operations: HandOfHarmOperation[],

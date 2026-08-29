@@ -21,12 +21,8 @@ const UUID_RE = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 let ownerCookie: string;
 let intruderCookie: string;
 
-// All fixture images are generated with sharp at runtime — no binary fixtures
-// in the repo.
 async function jpegFixture(): Promise<Buffer> {
-  // 800x600 with EXIF orientation 6 (90° CW): the pipeline's .rotate() must
-  // bake the orientation in (600x800 → fit-inside-512 → 384x512) and sharp's
-  // default metadata strip must drop the EXIF block.
+  // EXIF orientation 6 (90° CW): .rotate() bakes it in (600x800 → fit-inside-512 → 384x512); sharp's metadata strip drops the EXIF block.
   return sharp({ create: { width: 800, height: 600, channels: 3, background: "#8b1a1a" } })
     .jpeg()
     .withMetadata({ orientation: 6 })
@@ -62,10 +58,7 @@ async function storedKey(): Promise<string | null> {
 
 describe("portrait endpoints (#1615)", () => {
   beforeEach(async () => {
-    // Fresh fs blob root per test: the routes go through getBlobStore's memo,
-    // so the reset makes the next call re-read the stubbed env — without it
-    // every test would keep writing into the first test's tmpdir. Stubbing
-    // also isolates the suite from any ambient BLOB_* configuration.
+    // __resetBlobStoreForTests clears getBlobStore's memo so each test re-reads the stubbed env — otherwise every test would write into the first test's tmpdir.
     vi.stubEnv("BLOB_STORE_DRIVER", "fs");
     vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "portrait-route-test-")));
     __resetBlobStoreForTests();
@@ -147,8 +140,6 @@ describe("portrait endpoints (#1615)", () => {
 
       const metadata = await sharp(served.body as Buffer).metadata();
       expect(metadata.format).toBe("webp");
-      // .rotate() applied EXIF orientation 6 before resizing: 800x600 → 600x800
-      // → fit inside 512 → 384x512.
       expect(metadata.width).toBe(384);
       expect(metadata.height).toBe(512);
       expect(metadata.exif).toBeUndefined();

@@ -1,12 +1,4 @@
-/**
- * Journal CRUD route integration tests. Plain REST (no transaction/audit
- * pattern) — each mutation returns the full serialized character, with
- * journal entries surfaced under `character.journal` (newest-first).
- *
- * Mirrors sessions.test.ts: real Postgres in beforeEach, supertest against
- * the shared `app`. JournalEntry rows cascade-delete with the character, so
- * afterEach only deletes the character row.
- */
+// JournalEntry rows cascade-delete with the character, so afterEach only deletes the character row.
 
 import { randomUUID } from "node:crypto";
 
@@ -61,8 +53,6 @@ afterEach(async () => {
   await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
 });
 
-// ── Create ─────────────────────────────────────────────────────────────────
-
 describe("POST /api/characters/:id/journal — create entry", () => {
   it("creates an entry and returns the updated character with it under journal", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
@@ -73,7 +63,6 @@ describe("POST /api/characters/:id/journal — create entry", () => {
     expect(res.body.id).toBe(FIXTURE_ID);
     expect(res.body.journal).toHaveLength(1);
     expect(res.body.journal[0].body).toBe("Found three tomes.");
-    // date is round-tripped as an ISO string.
     expect(res.body.journal[0].date).toMatch(/^2026-06-22T/);
     expect(typeof res.body.journal[0].id).toBe("string");
   });
@@ -130,8 +119,6 @@ describe("POST /api/characters/:id/journal — create entry", () => {
   });
 });
 
-// ── Capture notes ─────────────────────────────────────────────────────────────
-
 describe("POST /api/characters/:id/journal — capture NOTE rows", () => {
   it("creates a NOTE with no date → 201 (server fills today)", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
@@ -183,8 +170,6 @@ describe("POST /api/characters/:id/journal — capture NOTE rows", () => {
     expect(res.body.journal[0].sessionId).toBeUndefined();
   });
 });
-
-// ── Visibility (#838) ─────────────────────────────────────────────────────────
 
 describe("journal entry visibility", () => {
   async function attachToCampaign() {
@@ -304,15 +289,12 @@ describe("journal entry visibility", () => {
       .send({ visibility: "PRIVATE" });
     expect(res.status).toBe(403);
 
-    // A body-only edit by the character owner is still allowed.
     const bodyOnly = await supertest.agent(app).set("Cookie", COOKIE)
       .patch(journalUrl(`/${entry.id}`))
       .send({ body: "owner edited the text" });
     expect(bodyOnly.status).toBe(200);
   });
 });
-
-// ── visibleEntries (own-entries read path) ────────────────────────────────────
 
 describe("visibleEntries", () => {
   it("returns only the author's own entries", async () => {
@@ -345,8 +327,6 @@ describe("visibleEntries", () => {
   });
 });
 
-// ── Update ─────────────────────────────────────────────────────────────────
-
 describe("PATCH /api/characters/:id/journal/:entryId — update entry", () => {
   async function seedEntry() {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
@@ -363,7 +343,7 @@ describe("PATCH /api/characters/:id/journal/:entryId — update entry", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.journal).toHaveLength(1);
-    expect(res.body.journal[0].date).toMatch(/^2026-06-22T/); // unchanged
+    expect(res.body.journal[0].date).toMatch(/^2026-06-22T/);
     expect(res.body.journal[0].body).toBe("Edited body.");
   });
 
@@ -385,8 +365,6 @@ describe("PATCH /api/characters/:id/journal/:entryId — update entry", () => {
     expect(res.body.error).toBe("Journal entry not found");
   });
 });
-
-// ── Delete ─────────────────────────────────────────────────────────────────
 
 describe("DELETE /api/characters/:id/journal/:entryId — delete entry", () => {
   async function seedEntry() {
@@ -421,8 +399,6 @@ describe("DELETE /api/characters/:id/journal/:entryId — delete entry", () => {
     expect(res.body.error).toBe("Journal entry not found");
   });
 });
-
-// ── Entity ref derivation (#248) ──────────────────────────────────────────────
 
 describe("JournalEntryRef derivation from @[uuid] tokens", () => {
   async function attachToFreshCampaign() {
@@ -550,11 +526,8 @@ describe("JournalEntryRef derivation from @[uuid] tokens", () => {
   });
 });
 
-// ── syncEntryRefs fast path (#489) ────────────────────────────────────────────
-
 describe("syncEntryRefs — mention-less fast path", () => {
-  // A tx double: reconcileEntryRefs still runs (findMany → []), but the fast
-  // path must never touch character or campaignMembership when there are no tokens.
+  // reconcileEntryRefs still runs (findMany → []); the fast path must never touch character or campaignMembership when there are no tokens.
   function fakeTx() {
     return {
       character: { findUnique: vi.fn() },
@@ -575,7 +548,6 @@ describe("syncEntryRefs — mention-less fast path", () => {
     expect(tx.character.findUnique).not.toHaveBeenCalled();
     expect(tx.campaignMembership.findUnique).not.toHaveBeenCalled();
     expect(tx.campaignEntity.findMany).not.toHaveBeenCalled();
-    // It still reconciles to an empty set (clears any stale refs).
     expect(tx.journalEntryRef.findMany).toHaveBeenCalledWith({
       where: { entryId: "entry-1" },
       select: { entityId: true },
@@ -597,8 +569,6 @@ describe("syncEntryRefs — mention-less fast path", () => {
   });
 });
 
-// ── Ordering ─────────────────────────────────────────────────────────────────
-
 describe("journal ordering", () => {
   it("returns entries newest-first by the user-entered date", async () => {
     await supertest.agent(app).set("Cookie", COOKIE)
@@ -614,11 +584,9 @@ describe("journal ordering", () => {
   });
 
   it("orders by the entered date, not creation order (a back-dated entry sorts by its date)", async () => {
-    // Created first, but with the LATEST date → must sort to the top.
     await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ date: "2026-07-01", body: "written first, dated latest" });
-    // Created second, but back-dated → must sort to the bottom.
     await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ date: "2026-01-01", body: "written second, dated earliest" });

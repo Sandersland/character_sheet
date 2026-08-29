@@ -1,9 +1,3 @@
-/**
- * Expertise transaction ops (#1588): learnExpertise/forgetExpertise on
- * POST /api/characters/:id/resources/transactions. Uses the REAL seeded
- * Rogue class (EDITION_2014) so expertiseChoiceCount resolves from the
- * actual grantor row (rogue-features.ts), not a bespoke test catalog.
- */
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -18,9 +12,6 @@ let COOKIE: string;
 const FIXTURE_ID = "test-resources-expertise-character-1";
 
 let rogueClassId: string;
-
-// Level-1 Rogue (2014). Proficient in stealth/perception/acrobatics; not in
-// arcana. Cap at L1 is 2 (rogue-features.ts's Expertise row, minLevel 1).
 const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Resources Expertise Test Rogue",
@@ -38,10 +29,8 @@ const FIXTURE_BASE = {
     { name: "perception", ability: "wisdom", proficient: true },
     { name: "acrobatics", ability: "dexterity", proficient: true },
     { name: "arcana", ability: "intelligence", proficient: false },
-    // Not base-proficient — the feat-/item-granted proficiency tests below
-    // grant these via an advancement/item instead, so they must still appear
-    // in the served skills[] array (a real character's skills[] always lists
-    // all 18 canonical skills) for expertSkillNames to see the result.
+    // skills[] always lists all 18 canonical skills, even non-proficient ones — expertSkillNames needs them present for the feat-/item-granted tests below.
+
     { name: "history", ability: "intelligence", proficient: false },
     { name: "insight", ability: "wisdom", proficient: false },
   ],
@@ -135,11 +124,8 @@ describe("POST /api/characters/:id/resources/transactions — learnExpertise/for
     expect(res.status).toBe(400);
   });
 
-  // Fighter has no expertiseChoiceCount grant at all (undefined, not 0) — the
-  // learn cap must still reject rather than skip the check on `undefined`
-  // (Opus review: a non-grantor class could otherwise inject Expertise via a
-  // crafted API call, since the UI never offers the step but the endpoint
-  // must not trust reachability, CLAUDE.md).
+  // Fighter has no expertiseChoiceCount grant (undefined, not 0) — the learn cap must reject rather than skip the check on undefined, since the endpoint cannot trust UI reachability.
+
   it("400s learnExpertise for a class that grants no Expertise at all (undefined cap treated as 0, not skipped)", async () => {
     const fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
     const fighterId = "test-resources-expertise-fighter-1";
@@ -163,11 +149,8 @@ describe("POST /api/characters/:id/resources/transactions — learnExpertise/for
   });
 });
 
-// #1588 perf review regression net: applyLearnExpertiseOp's proficient-skill
-// check moved from a value threaded in via RESOURCES_SELECT (every op) to its
-// OWN scoped follow-on read (EXPERTISE_PROFICIENCY_SELECT, resources.ts) —
-// these prove that rescoping preserved feat- and item-granted proficiency
-// detection exactly, not just the base skills[] row already covered above.
+// applyLearnExpertiseOp's proficiency check reads via its own scoped EXPERTISE_PROFICIENCY_SELECT (resources.ts), not RESOURCES_SELECT — must still see feat-/item-granted proficiency, not just the base skills[] row.
+
 describe("POST /api/characters/:id/resources/transactions — learnExpertise honors feat/item-granted proficiency (#1588)", () => {
   it("allows Expertise in a skill granted only by a feat (not the base skills row)", async () => {
     await prisma.character.update({
@@ -215,15 +198,8 @@ describe("POST /api/characters/:id/resources/transactions — learnExpertise hon
   });
 });
 
-// Opus review regression (#1588): expertiseChoiceCount must SUM across
-// grantor entries in a multiclass, never overlay defined-wins (registry.ts's
-// overlayExtrasFields) — a 2014 Rogue 6 / Bard 3 grants 4 + 2 = 6, not
-// whichever entry's own count happened to apply last. Exercises the full
-// stack the pure derive-entry-scoped-resources.test.ts unit test can't: the
-// learn cap (applyLearnExpertiseOp) and the clamp-on-read
-// (buildResourcesPayload) both read the same summed field, so a real
-// multiclass character must actually be ABLE to learn all 6 and see all 6
-// survive a re-read, not just derive the number 6 in isolation.
+// expertiseChoiceCount must SUM across multiclass grantor entries, never overlay-defined-wins (registry.ts's overlayExtrasFields) — Rogue 6/Bard 3 grants 4+2=6, not whichever entry applied last.
+
 describe("POST /api/characters/:id/resources/transactions — multiclass expertiseChoiceCount sums, never clobbers (#1588)", () => {
   const MULTI_FIXTURE_ID = "test-resources-expertise-multiclass-1";
   const multiUrl = `/api/characters/${MULTI_FIXTURE_ID}/resources/transactions`;
@@ -241,9 +217,8 @@ describe("POST /api/characters/:id/resources/transactions — multiclass experti
         name: "Resources Expertise Test Rogue6/Bard3",
         experiencePoints: 23000, // total level 9 (rogue 6 + bard 3)
         hitDice: { total: 9, die: "d8" },
-        // Proficient in 7 skills — the full summed cap (4 + 2) plus one spare
-        // (insight) so the "beyond cap" assertion below tests the CAP, not
-        // proficiency — a non-proficient pick would 400 for the wrong reason.
+        // 7 proficient skills = the summed cap (4+2) plus one spare, so the "beyond cap" test below fails on the CAP, not on proficiency.
+
         skills: [
           { name: "stealth", ability: "dexterity", proficient: true },
           { name: "perception", ability: "wisdom", proficient: true },
@@ -275,8 +250,6 @@ describe("POST /api/characters/:id/resources/transactions — multiclass experti
     expect((res.body.resources as { expertiseChoiceCount?: number }).expertiseChoiceCount).toBe(6);
     expect(expertSkillNames(res)).toEqual(skills);
 
-    // A 7th pick — "insight", proficient but beyond the summed cap of 6 — is
-    // rejected on the CAP, not on proficiency (which would pass for the wrong reason).
     const seventh = await postMulti([{ type: "learnExpertise", skill: "insight" }]);
     expect(seventh.status).toBe(400);
   });

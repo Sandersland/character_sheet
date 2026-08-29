@@ -1,15 +1,3 @@
-/**
- * DB-level proof for #1306's two load-bearing claims that a pure unit test
- * can't make (see catalog-edition.test.ts for resolveEditionRow's pure logic):
- *
- * 1. NULLS NOT DISTINCT actually rejects two NULL-edition rows sharing a name
- *    at the Postgres constraint level, not just in application code.
- * 2. The worked example (Alert forks by edition; Grappler stays one shared
- *    row) resolves correctly against the REAL seeded catalog, not a fixture.
- *
- * #1415 widened GrantedAbility to the same (name, edition) shape, so its block
- * lives here rather than in a second file — one constraint, one proof surface.
- */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -26,10 +14,6 @@ describe("NULLS NOT DISTINCT — Feat(name, edition) rejects a duplicate NULL ro
   it("a second NULL-edition row sharing the first's name is rejected by the database", async () => {
     await prisma.feat.create({ data: { name: NAME, description: "first", edition: null } });
 
-    // Assert BOTH that it throws Prisma's known-request-error type AND that
-    // its code is P2002 (unique violation) — proving this is Postgres's
-    // NULLS NOT DISTINCT constraint rejecting the row, not a coincidental
-    // application-level throw.
     let error: unknown;
     try {
       await prisma.feat.create({ data: { name: NAME, description: "second", edition: null } });
@@ -76,11 +60,7 @@ describe("NULLS NOT DISTINCT — GrantedAbility(name, edition) admits one row pe
     expect((error as Prisma.PrismaClientKnownRequestError).code).toBe("P2002");
   });
 
-  // Green both before and after #1415 (`name` was singly @unique before), so
-  // this is a REGRESSION GUARD on the hand-written ` NULLS NOT DISTINCT` in
-  // 20260728…_widen_granted_ability_name_edition: a plain compound index would
-  // admit unboundedly many (name, NULL) rows and make resolveEditionRow's
-  // shared-row fallback pick a nondeterministic one.
+  // A plain compound index would let resolveEditionRow's shared-row fallback pick a nondeterministic row.
   it("two NULL-edition rows sharing a name are still rejected", async () => {
     await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "first", edition: null } });
 
@@ -95,10 +75,7 @@ describe("NULLS NOT DISTINCT — GrantedAbility(name, edition) admits one row pe
   });
 });
 
-// #1625 widened SubclassGrantedSpell to (subclassId, spellId, edition), the
-// same NULLS NOT DISTINCT shape as the blocks above but on an FK-pair identity
-// instead of a name. The 2014/2024-pair case is what lets #1626 fork one
-// spell's gateLevel per edition without forking the Subclass row itself.
+// The 2014/2024-pair case is what lets a spell's gateLevel fork per edition without forking the Subclass row itself.
 describe("NULLS NOT DISTINCT — SubclassGrantedSpell(subclassId, spellId, edition) admits one row per edition (#1625)", () => {
   const SUBCLASS_NAME = "Zzz GrantedSpell Edition Probe (#1625)";
   const SLUG = "zzz-granted-spell-edition-probe-1625";
@@ -121,7 +98,6 @@ describe("NULLS NOT DISTINCT — SubclassGrantedSpell(subclassId, spellId, editi
     await prisma.subclassGrantedSpell.deleteMany({ where: { subclassId } });
   });
 
-  // Cascades the grant rows too (Subclass onDelete: Cascade).
   afterAll(async () => {
     await prisma.subclass.deleteMany({ where: { slug: SLUG } });
   });

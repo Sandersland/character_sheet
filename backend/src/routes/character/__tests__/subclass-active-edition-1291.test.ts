@@ -1,14 +1,4 @@
-/**
- * #1291: isSubclassActive (lib/classes/registry.ts) used the code-side
- * grantLevel table edition-blind, independent of subclassGateLevel (the
- * catalog-column gate #1285/#1308 made edition-aware). Live bug on seeded data:
- * a 2014 Cleric at level 1 shows its subclass NAME (buildClassesView, via
- * subclassActiveAt) but none of its derived FEATURES/pools (deriveResources,
- * via isSubclassActive) — the two gates disagreed the moment #1308 seeded real
- * 2014 subclassLevel values. Exercised against seeded Cleric/Life Domain, per
- * the issue's acceptance criteria (never a fixture class).
- */
-
+// isSubclassActive (registry.ts) must resolve the SAME per-edition gate as subclassGateLevel — they disagreed once (#1291), showing a subclass NAME with none of its features/pools.
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -35,8 +25,7 @@ beforeAll(async () => {
 
   const cleric = await prisma.characterClass.findUnique({ where: { name: "Cleric" }, select: { id: true } });
   if (!cleric) throw new Error("Cleric class not seeded — run `prisma db seed` before tests");
-  // findFirst, not findUnique: the classId_name compound-key shorthand can't
-  // express a null edition (#1306).
+  // findFirst, not findUnique: the classId_name compound-key shorthand can't express a null edition (#1306).
   const life = await prisma.subclass.findFirst({
     where: { classId: cleric.id, name: "Life Domain", edition: null },
     select: { id: true },
@@ -86,9 +75,7 @@ describe("isSubclassActive agrees with subclassGateLevel per edition (#1291)", (
     const res = await get(id);
     expect(res.status).toBe(200);
     expect(res.body.classes[0].subclass).toBe("Life Domain");
-    // The bug: deriveResources (registry.ts isSubclassActive) stayed gated at 3
-    // (edition-blind) while buildClassesView (subclassActiveAt) correctly opened
-    // at 1 for 2014 — so this array was empty even though the name showed above.
+    // Previously: deriveResources (isSubclassActive) stayed gated at 3 (edition-blind) while buildClassesView opened at 1 for 2014, so this array was empty despite the name showing above.
     const featureNames = (res.body.resources.features as { name: string }[]).map((f) => f.name);
     expect(featureNames).toContain("Domain Spells");
     expect(featureNames).toContain("Bonus Proficiency");
@@ -106,9 +93,7 @@ describe("isSubclassActive agrees with subclassGateLevel per edition (#1291)", (
     await prisma.character.update({ where: { id }, data: { experiencePoints: XP_LVL_3 } });
     const atL3 = await get(id);
     expect(atL3.body.classes[0].subclass).toBe("Life Domain");
-    // #1225: the 2024 row's real SRD 5.2 name is "Life Domain Spells", not
-    // "Domain Spells" (that name/text was a fabricated placeholder retired
-    // this issue — see cleric-features.ts's own header).
+    // SRD 5.2's real name is "Life Domain Spells", not "Domain Spells" (#1225).
     expect((atL3.body.resources.features as { name: string }[]).map((f) => f.name)).toContain("Life Domain Spells");
   });
 });

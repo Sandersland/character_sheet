@@ -1,8 +1,4 @@
-/**
- * castManeuver where Battle Master is a SECONDARY class entry (#1072).
- * MANEUVER_SELECT used take: 1 on classEntries, so a non-primary Battle
- * Master's maneuvers/save DC/superiority pool were invisible to the op.
- */
+
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -17,14 +13,12 @@ const OWNER_ID = "owner-maneuvers-multiclass-1072";
 let COOKIE: string;
 const FIXTURE_ID = "test-maneuvers-multiclass-1072";
 
-// Rogue 2 / Fighter (Battle Master) 3 — total level 5, prof +3.
-// Fighter's OWN effective level (3, entry-scoped) drives the superiority pool
-// (4 x d8) and maneuver save DC (8 + prof 3 + max(Str +2, Dex +3) = 14).
+// Fighter's OWN entry-scoped level (3) drives the superiority pool and maneuver save DC, not the total character level (5).
 const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Maneuvers Multiclass Test",
   alignment: "Chaotic Neutral",
-  experiencePoints: 6500, // level 5 total
+  experiencePoints: 6500,
   initiativeBonus: 2,
   speed: 30,
   hitPoints: { current: 30, max: 30, temp: 0 },
@@ -49,10 +43,7 @@ describe("castManeuver — Battle Master as a SECONDARY class entry (#1072)", ()
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
     tripId = (await prisma.grantedAbility.findFirst({ where: { name: "Trip Attack" } }))!.id;
-    // #1524: production always sets classId/subclassId alongside the
-    // subclass string (routes/character/class.ts, level-up.ts); resolved
-    // here from the real seeded catalog rows so this fixture matches that
-    // shape.
+    // #1524: production always pairs classId/subclassId with the subclass string; resolved here from the real seeded catalog rows so the fixture matches that shape.
     const rogueId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Rogue" } })).id;
     const fighterId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
     const battleMasterId = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighterId, name: "Battle Master" } })).id;
@@ -88,7 +79,7 @@ describe("castManeuver — Battle Master as a SECONDARY class entry (#1072)", ()
     expect(result.roll).toBeLessThanOrEqual(8);
 
     const pool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "superiorityDice");
-    expect(pool.total).toBe(4); // fighter's own effective level 3 -> 4 dice
+    expect(pool.total).toBe(4);
     expect(pool.remaining).toBe(3);
   });
 });

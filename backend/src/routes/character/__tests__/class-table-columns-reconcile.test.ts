@@ -1,11 +1,4 @@
-// #1529: characterAdvancementSlots/characterFightingStyleFeatSlots now read
-// CharacterClass.extraAsiLevels/fightingStyleFeatLevel through the class FK
-// relation at BOTH of their call sites — reconcileAdvancements
-// (level-reconciliation.ts, write-side) and applyAdvancementClamp
-// (serialize/classes.ts, read-side, via GET). This suite proves those two
-// sites still agree: an over-cap Fighter's clamp-on-read view (what GET shows
-// BEFORE any reconcile has run) is byte-identical to what the reconciler
-// actually persists once an XP operation forces it to run.
+// reconcileAdvancements (write-side) and applyAdvancementClamp (read-side) must agree on CharacterClass.extraAsiLevels/fightingStyleFeatLevel (#1529).
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -17,7 +10,7 @@ import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-class-columns-reconcile";
 const CHAR_ID = "test-1529-overcap-fighter";
-const XP_LVL_14 = 140000; // Fighter cap: base (4,8,12) + extra (6,14) = 5
+const XP_LVL_14 = 140000;
 
 let COOKIE: string;
 let fighterClassId: string;
@@ -37,9 +30,7 @@ const BASE = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-// Six ASI advancements on a class whose real cap is 5 — one over. Array order
-// is insertion order (id-asi-1 first), matching splitAdvancementsBySlotCap's
-// keep-the-first-N / drop-the-tail rule.
+// Insertion order matters — splitAdvancementsBySlotCap keeps the first N and drops the tail.
 function sixAsiAdvancements() {
   return Array.from({ length: 6 }, (_, i) => ({
     id: `id-asi-${i + 1}`,
@@ -70,11 +61,8 @@ describe("reconciler == clamp-on-read for an over-cap Fighter (#1529)", () => {
     await prisma.character.create({
       data: {
         ...BASE,
-        // All six deltas already applied to the persisted column — matching
-        // how the real accrual flow leaves it (applyAdvancementOpInTx writes
-        // resources.advancements and abilityScores together); the clamp
-        // REVERSES only the excess one(s) off this already-inflated base.
-        abilityScores: { ...BASE.abilityScores, strength: 22 }, // 10 + 6*2
+        // applyAdvancementOpInTx writes resources.advancements and abilityScores together; the clamp reverses only the excess delta(s) off this already-inflated base.
+        abilityScores: { ...BASE.abilityScores, strength: 22 },
         ownerId: OWNER_ID,
         experiencePoints: XP_LVL_14,
         spellcasting: Prisma.JsonNull,
@@ -83,31 +71,26 @@ describe("reconciler == clamp-on-read for an over-cap Fighter (#1529)", () => {
       },
     });
 
-    // Clamp-on-read: GET before any reconcile has touched this row. The DB
-    // still holds 6 advancements; serializeCharacter must clamp to 5 for display.
+    // GET before any reconcile touches this row; serializeCharacter must clamp to 5 for display.
     const beforeReconcile = await get();
     expect(beforeReconcile.status).toBe(200);
     expect(beforeReconcile.body.advancementSlots).toEqual({ total: 5, used: 5 });
     expect(beforeReconcile.body.advancements.map((a: { id: string }) => a.id)).toEqual([
       "id-asi-1", "id-asi-2", "id-asi-3", "id-asi-4", "id-asi-5",
     ]);
-    expect(beforeReconcile.body.abilityScores.strength).toBe(20); // 22 minus the 6th's reversed +2
+    expect(beforeReconcile.body.abilityScores.strength).toBe(20);
 
-    // Confirm the write side hasn't trimmed anything yet — clamp-on-read is
-    // non-destructive by design.
+    // Clamp-on-read is non-destructive by design — the write side hasn't trimmed anything yet.
     const rawBefore = await prisma.character.findUniqueOrThrow({ where: { id: CHAR_ID }, select: { resources: true } });
     expect((rawBefore.resources as { advancements: unknown[] }).advancements).toHaveLength(6);
 
-    // Force reconcileLevelGatedState to run without changing the derived
-    // level (still 14) — reconcileAdvancements trims independent of whether
-    // XP actually changed value.
+    // reconcileAdvancements trims independent of whether XP actually changed value.
     const setRes = await supertest(app)
       .post(`/api/characters/${CHAR_ID}/experience`)
       .set("Cookie", COOKIE)
       .send({ operations: [{ type: "set", value: XP_LVL_14 }] });
     expect(setRes.status).toBe(200);
 
-    // The write side now holds exactly what the read side already showed.
     const rawAfter = await prisma.character.findUniqueOrThrow({ where: { id: CHAR_ID }, select: { resources: true, abilityScores: true } });
     const persistedIds = (rawAfter.resources as { advancements: { id: string }[] }).advancements.map((a) => a.id);
     expect(persistedIds).toEqual(["id-asi-1", "id-asi-2", "id-asi-3", "id-asi-4", "id-asi-5"]);
@@ -126,7 +109,7 @@ describe("homebrew entry named exactly like a catalog class (#1529) — resoluti
       data: {
         ...BASE,
         ownerId: OWNER_ID,
-        experiencePoints: XP_LVL_14, // level 14 — a REAL Fighter would have 5 ASI slots and an FS slot
+        experiencePoints: XP_LVL_14,
         spellcasting: Prisma.JsonNull,
         classEntries: { create: [{ name: "Fighter", classId: null, level: 14, position: 0 }] },
       },
@@ -134,12 +117,9 @@ describe("homebrew entry named exactly like a catalog class (#1529) — resoluti
 
     const res = await get();
     expect(res.status).toBe(200);
-    // Base schedule (4/8/12/16/19) at level 14 = 3 slots (4, 8, 12) — NOT
-    // Fighter's 5 (the extra 6/14 levels never apply without the class relation).
     expect(res.body.advancementSlots.total).toBe(3);
-    // No Fighting Style slot at all (fightingStyleFeatLevel unreachable).
+    // fightingStyleFeatLevel is unreachable without the class relation.
     expect(res.body.fightingStyleSlots.total).toBe(0);
-    // No armor/weapon proficiency grants from "class".
     expect(res.body.armorProficiencies).toEqual([]);
     expect(res.body.weaponProficiencies).toEqual([]);
   });

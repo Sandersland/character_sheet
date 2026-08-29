@@ -33,22 +33,11 @@ import type {
 } from "./proficiencies.js";
 
 interface InventoryItemContext {
-  /** The character's effective ability scores (post-advancement-clamp). */
   effectiveScores: Record<string, number>;
-  /** The character's proficiency bonus (derived from level). */
   proficiencyBonus: number;
-  /** The character's merged weapon proficiency grants (class + race + feat). */
   weaponGrants: ReadonlyArray<{ name: string }>;
-  /**
-   * `weaponGrants` PLUS item-granted weapon proficiencies (#529) — i.e. exactly
-   * the wire `weaponProficiencies` array. The per-row `proficient` flag reads
-   * this and never `weaponGrants`, so the flag can't contradict the list
-   * rendered beside it: an item granting "Martial Weapons" must silence the
-   * sheet's warning. `deriveWeaponAttackComponents` deliberately keeps the
-   * un-merged list, so the two must stay separate fields (#1433).
-   */
+  // weaponGrants PLUS item-granted weapon proficiencies (#529) — proficient (below) reads this, never weaponGrants, so it can't contradict the list beside it. deriveWeaponAttackComponents deliberately keeps the un-merged list — the two must stay separate fields (#1433).
   itemMergedWeaponGrants: ReadonlyArray<{ name: string }>;
-  /** The character's merged armor proficiency grants (class + race + feat). */
   armorGrants: ReadonlyArray<{ category: string }>;
   /** Shield equipped or ≥2 weapons equipped — picks the versatile-weapon die (2H when off-hand free). */
   offHandBusy: boolean;
@@ -62,9 +51,6 @@ interface InventoryItemContext {
   activeItemBuffKeys: Set<string>;
 }
 
-// Catalog/description identity fields — the item-facts an inventory row
-// snapshots regardless of category (weapon/armor/consumable/gear all have
-// these; the category-specific detail block nests in separately below).
 function buildInventoryItemIdentity(row: CharacterWithRelations["inventoryItems"][number]) {
   return {
     id: row.id,
@@ -78,8 +64,7 @@ function buildInventoryItemIdentity(row: CharacterWithRelations["inventoryItems"
   };
 }
 
-// Paper-doll placement (#565) + attunement (#545) state. `equipped` is
-// DERIVED from placement — equippedSlot is the source of truth.
+// equipped is DERIVED from placement — equippedSlot is the source of truth.
 function buildInventoryItemPlacement(row: CharacterWithRelations["inventoryItems"][number]) {
   return {
     equipped: row.equippedSlot != null,
@@ -93,18 +78,12 @@ function buildInventoryItemPlacement(row: CharacterWithRelations["inventoryItems
     attunementPrereqText: row.attunementPrereqKind
       ? describeAttunementPrereq({ kind: row.attunementPrereqKind, value: row.attunementPrereqValue })
       : undefined,
-    // Eldritch Knight Weapon Bond (2014, #1854) — raw persisted flag, NOT
-    // clamped here (a per-item builder has no class/level/edition context).
-    // The pool-driven Summon Bonded Weapon action IS clamped, in
-    // character-serialize.ts's bondedWeaponCount — see that computation's
-    // own comment for why this row can still show a stale `true`.
+    // Eldritch Knight Weapon Bond (2014, #1854) — raw persisted flag, NOT clamped here (a per-item builder has no class/level/edition context) — the pool-driven Summon Bonded Weapon action is clamped in bondedWeaponCount.
     weaponBonded: row.weaponBonded,
     notes: row.notes ?? undefined,
   };
 }
 
-// The weapon sub-object (detail snapshot + derived attackBonus/damage), or
-// undefined for a non-weapon row.
 function buildInventoryWeaponView(
   row: CharacterWithRelations["inventoryItems"][number],
   context: InventoryItemContext,
@@ -157,12 +136,7 @@ function buildInventoryWeaponView(
   };
 }
 
-// Placement/proficiency flags the client used to re-derive from the row's
-// category + detail snapshot (#1433). `equippable` and `allowedSlots` are NOT
-// the same rule and must not be collapsed: worn gear declaring a slot is
-// placeable (`allowedSlots: ["RING"]`) but not `equippable`, which is what keeps
-// the inventory row's equip toggle off a ring while the loadout's RING picker
-// still offers it.
+// equippable and allowedSlots are NOT the same rule and must not be collapsed: worn gear declaring a slot is placeable (allowedSlots: ["RING"]) but not equippable — that's what keeps the row's equip toggle off a ring while the loadout's RING picker still offers it.
 function buildInventoryItemFlags(
   row: CharacterWithRelations["inventoryItems"][number],
   context: InventoryItemContext,
@@ -200,9 +174,6 @@ export function serializeInventoryItem(
   };
 }
 
-// Derives the item's shared charge-pool state (#555): max, remaining (derived,
-// never stored), and the human recharge text for the pill's tooltip. Absent when
-// the item has no well-formed charges capability.
 function serializeChargePool(row: CharacterWithRelations["inventoryItems"][number]) {
   const pool = chargePoolOf(row.capabilities);
   if (!pool) return undefined;
@@ -213,23 +184,15 @@ function serializeChargePool(row: CharacterWithRelations["inventoryItems"][numbe
   };
 }
 
-// Derives the activate/deactivate control state for an item's activatedEffect
-// capability (#543): remaining uses, active flag, and the reminder text. Absent
-// when the item has no activatedEffect capability.
 function serializeActivatedEffect(
   row: CharacterWithRelations["inventoryItems"][number],
   context: InventoryItemContext,
 ) {
   const cap = row.capabilities
     .map(readCapability)
-    // Type-predicate (not a cast): an opaque row with kind "activatedEffect" but no
-    // `activation` (readCapability's fallthrough) must NOT match — else the reminder
-    // string would drop the DM's label. Require the field to be present.
+    // Type-predicate, not a cast: a row with kind "activatedEffect" but no activation (readCapability's fallthrough) must NOT match, or the reminder string would drop the DM's label.
     .find((c): c is ActivatedEffectCapability => c.kind === "activatedEffect" && "activation" in c);
   if (!cap) return undefined;
-  // A charges-costed effect (#555) is bounded by the item's shared pool: "uses"
-  // = how many activations the remaining charges afford (floor division), so
-  // ActivateControl's readout and out-of-uses gating work unchanged.
   if (cap.resourceKind === "charges") {
     const pool = chargePoolOf(row.capabilities);
     const cost = Math.max(1, cap.chargeCost);
@@ -254,10 +217,7 @@ function serializeActivatedEffect(
   };
 }
 
-// Off-hand state is computed once for the whole inventory so versatile weapons
-// know whether to use their two-handed die. Off-hand is "busy" when any equipped
-// item is a shield OR when 2+ weapons are equipped (two-weapon fighting) — the
-// lightweight approach that avoids a full main-hand/off-hand slot model.
+// Off-hand is "busy" when any equipped item is a shield OR 2+ weapons are equipped — a lightweight heuristic that avoids a full main-hand/off-hand slot model.
 export function buildInventoryContext(
   row: CharacterWithRelations,
   effectiveScores: Record<string, number>,
@@ -275,24 +235,15 @@ export function buildInventoryContext(
   const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
   const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
 
-  // Sum "meleeDamage" contributions (Rage buff + item passiveBonus) — added to
-  // melee weapon damage in deriveWeaponDamage, the same read path skills use (#455/#545).
   const meleeDamageBonus = (buffTargets.meleeDamage ?? []).reduce((sum, b) => sum + b.modifier, 0);
-  // Sum "attackRoll" contributions (Sacred Weapon buff + item passiveBonus) — added
-  // to weapon attack bonus (#419/#545).
   const attackRollBonus = (buffTargets.attackRoll ?? []).reduce((sum, b) => sum + b.modifier, 0);
 
-  // Active-item buff keys — an activatedEffect item is "active" when its item:<id> buff is present.
   const activeItemBuffKeys = new Set(normalizeActiveEffectsMutable(row.activeEffects).buffs.map((b) => b.key));
 
   return { effectiveScores, proficiencyBonus, weaponGrants, itemMergedWeaponGrants, armorGrants, offHandBusy, rangedAttackRollBonus, meleeDamageBonus, attackRollBonus, activeItemBuffKeys };
 }
 
-// Item-granted traits (#529): resistances/immunities/conditionImmunities/
-// advantages/proficiencies from active (equipped or attuned-when-required)
-// items. Derived on read — nothing here is persisted. resistances also feed
-// the #456 halve flow at damage-apply time (lib/combat/hitpoints.ts). The skill/save
-// name Sets are pre-split for the proficiency merges below.
+// resistances also feed the halve-damage flow at damage-apply time (#456).
 export function buildItemGrantsView(row: CharacterWithRelations): {
   itemGrants: ReturnType<typeof deriveItemGrants>;
   itemSkillProfs: Set<string>;

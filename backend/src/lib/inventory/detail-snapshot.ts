@@ -1,13 +1,6 @@
 import type { ArmorCategory, WeaponClass, WeaponRange } from "@/generated/prisma/client.js";
 
-// Every *Detail table (Item and InventoryItem tiers — see schema.prisma;
-// CAMPAIGN-scoped Item rows share Item's own tables since #1646) carries this
-// exact mechanical column shape. This module is the one field-copy builder
-// shared by every "snapshot one detail row into another" call site: the
-// catalog-acquire path and campaign-award path build a nested Prisma create
-// block (snapshotDetailCreate); the undo-delete restore path
-// (snapshotInventoryItemForUndo in inventory.ts) uses the flat per-detail
-// builders directly, unwrapped.
+// The one field-copy builder shared by every "snapshot one detail row into another" call site: catalog-acquire and campaign-award use snapshotDetailCreate's nested Prisma create block; snapshotInventoryItemForUndo uses the flat per-detail builders directly, unwrapped.
 
 export interface WeaponDetailFields {
   damageDiceCount: number;
@@ -80,10 +73,7 @@ export function armorDetailFields(detail: ArmorDetailFields): ArmorDetailFields 
   };
 }
 
-// freshCopy defaults usesRemaining to maxUses when unset — the "a newly
-// gained copy starts full" rule (#121) shared by the catalog-acquire and
-// campaign-award paths. Undo-restore wants the verbatim value instead, so it
-// omits opts (freshCopy defaults false).
+// #121: freshCopy defaults usesRemaining to maxUses ("a newly gained copy starts full"); undo-restore omits opts to get the verbatim value instead.
 export function consumableDetailFields(
   detail: ConsumableDetailFields,
   opts: { freshCopy?: boolean } = {},
@@ -104,11 +94,7 @@ export interface DetailSnapshotSource {
   consumableDetail: ConsumableDetailFields | null;
 }
 
-// Builds the nested weapon/armor/consumable detail-create block for a new
-// item row from an already-included source's detail rows. Shared by the
-// catalog-acquire path (inventory.ts) and the campaign-award path
-// (campaign-item-award.ts) — both are "gain a fresh copy" semantics, so the
-// consumable detail always tops up to maxUses.
+// Shared by the catalog-acquire and campaign-award paths — both are "gain a fresh copy" semantics, so the consumable detail always tops up to maxUses.
 export function snapshotDetailCreate(source: DetailSnapshotSource) {
   return {
     weaponDetail: source.weaponDetail ? { create: weaponDetailFields(source.weaponDetail) } : undefined,

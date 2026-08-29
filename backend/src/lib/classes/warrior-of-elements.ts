@@ -1,13 +1,5 @@
-// Warrior of the Elements (2024, PHB'24 p.90) — Elemental Burst plus the
-// Elemental Strikes rider. Elemental Attunement's own activate/end toggle is
-// row-driven, dispatched through the generic toggle handler; attunementActive()
-// below still checks the shared "while-active" activeEffects buff registry
-// (same key Rage uses) since Elemental Strike gates on it and Stride of the
-// Elements/Elemental Epitome narrate off it.
-//
-// This app has no NPC combatant model: the Dex/Str save is a flat d20 (DC
-// exact, roll is a simplification); Elemental Burst's damage is client-rolled
-// and the server only resolves full vs half from its own save roll.
+// Warrior of the Elements, PHB'24 p.90 — Elemental Burst plus the Elemental Strikes rider. Elemental Attunement's own activate/end toggle is row-driven; attunementActive() below still checks the shared "while-active" activeEffects buff registry (same key Rage uses) since Elemental Strike gates on it.
+// No NPC combatant model: the Dex/Str save is a flat d20 (DC exact, roll is a simplification); Elemental Burst's damage is client-rolled, the server only resolves full vs half from its own save roll.
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
@@ -34,8 +26,7 @@ export class InvalidWarriorOfElementsOperationError extends Error {}
 export const ELEMENTAL_ATTUNEMENT_BUFF_KEY = "elementalAttunement";
 const ELEMENTAL_BURST_FOCUS_COST = 2;
 
-// PHB'24 p.90. Kept here because the route's z.enum consumes it; shared-types'
-// union mirror is latched by resource-wire-contract.test.ts.
+// PHB'24 p.90. Kept here because the route's z.enum consumes it; shared-types' union mirror is latched by its own wire-contract characterization test.
 export const ELEMENTAL_DAMAGE_TYPES = ["acid", "cold", "fire", "lightning", "thunder"] as const;
 
 /** Fail (roll < DC) takes full damage; success halves it, rounded down (SRD 5.2 "half as much"). */
@@ -74,13 +65,7 @@ function monkEntry(row: WarriorOfElementsRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
-/**
- * Throws unless `actionKey` is granted to this row's monk entry (via
- * deriveEntryScopedActions, the same gate availableActions[] uses); returns
- * the monk entry's own level. Passes pools:[] deliberately — only `.key`
- * presence is read here, never `.enabled`; the actual focus spend is
- * validated separately by applySpendResourceInTx.
- */
+// Same gate deriveEntryScopedActions/availableActions[] uses. Passes pools:[] deliberately — only `.key` presence is read here, never `.enabled`; the actual focus spend is validated separately by applySpendResourceInTx.
 function assertWarriorOfElements(row: WarriorOfElementsRow, actionKey: string, feature: string): number {
   const monk = monkEntry(row);
   const totalLevel = levelForExperience(row.experiencePoints);

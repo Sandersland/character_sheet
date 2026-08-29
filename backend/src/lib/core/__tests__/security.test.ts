@@ -7,8 +7,6 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 import { securityHeaders } from "@/lib/core/security.js";
 
-// A fake served SPA dir with one inline script, standing in for the built
-// index.html (whose real inline snippet is the pre-paint theme apply).
 const INLINE_BODY = "console.log('theme');";
 const INLINE_HASH = createHash("sha256").update(INLINE_BODY).digest("base64");
 const fixtureStaticDir = mkdtempSync(join(tmpdir(), "csp-static-"));
@@ -19,11 +17,6 @@ writeFileSync(
 );
 afterAll(() => rmSync(fixtureStaticDir, { recursive: true, force: true }));
 
-// Pure middleware test — no Postgres. Runs the helmet handler against a fake
-// res and reads back the Content-Security-Policy header it sets. Guards the
-// single-origin CSP allowances (#149 avatars, #150 dice worker, #151 CF beacon)
-// that only bite in SERVE_STATIC_DIR mode and so never surface in local dev.
-// Pass a static dir (the fixture) for single-origin mode, undefined for API-only.
 function cspFor(staticDir: string | undefined): string {
   const handler = securityHeaders(staticDir);
   const headers: Record<string, string> = {};
@@ -86,7 +79,6 @@ describe("securityHeaders single-origin CSP", () => {
   });
 
   it("does not emit hash sources for src-carrying script tags", () => {
-    // Exactly one sha256 source: the fixture's single inline body.
     expect(csp.match(/'sha256-/g)).toHaveLength(1);
   });
 
@@ -119,9 +111,7 @@ describe("securityHeaders API-only mode", () => {
   });
 });
 
-// Re-imports security.ts with a controlled env so we can exercise both the
-// enabled and disabled rate-limiter branches. In-suite VITEST=true would
-// otherwise always short-circuit to the no-op, so this clears the test flags.
+// In-suite VITEST=true would otherwise always short-circuit to the no-op, so this clears the test flags before re-importing security.ts.
 async function loadLimiters(env: Record<string, string | undefined>) {
   const prev = { ...process.env };
   vi.resetModules();
@@ -134,9 +124,7 @@ async function loadLimiters(env: Record<string, string | undefined>) {
   return mod;
 }
 
-// The real express-rate-limit middleware emits RateLimit headers; the no-op
-// passthrough does not. That header is the observable difference between an
-// active limiter and a disabled one.
+// RateLimit headers are the observable difference between an active limiter and the no-op passthrough.
 async function runOnce(handler: RequestHandler) {
   const headers: Record<string, string> = {};
   const res = {

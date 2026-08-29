@@ -1,19 +1,5 @@
-/**
- * Mindless Rage (Berserker L6, #1121) — the full package through the real
- * routes (POST …/actions/transactions for the rage toggle, POST
- * …/conditions/transactions for apply/remove), mirroring actions-rage.test.ts's
- * shape.
- *
- * PHB'14 p.49: "you can't be charmed or frightened while raging. If you are
- * charmed or frightened when you enter your rage, the effect is suspended for
- * the duration of the rage" — 2014 SUSPENDS and RESTORES.
- * SRD 5.2 (verified against PHB'24, per #1223 research finding + #1121's own
- * refinement): outright Immunity while raging, and entering Rage ENDS an
- * existing Charmed/Frightened outright — 2024 CLEARS and does NOT restore.
- *
- * Real Postgres in each test; supertest against the shared `app`.
- */
-
+// PHB'14 p.49: charmed/frightened while raging is suspended, then restored when rage ends.
+// SRD 5.2: outright immunity while raging; entering Rage clears (does not restore) an existing Charmed/Frightened.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -34,7 +20,7 @@ const BARB_BASE = {
   id: BARB_ID,
   name: "Mindless Rage Test Barbarian",
   alignment: "Chaotic Neutral",
-  experiencePoints: 14000, // level 6 — Mindless Rage's own grant level
+  experiencePoints: 14000,
   initiativeBonus: 2,
   speed: 40,
   hitPoints: { current: 60, max: 60, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -147,8 +133,7 @@ describe("Mindless Rage (Berserker L6, #1121)", () => {
 
       const ended = await executeAction("endRage");
       expect(ended.status).toBe(200);
-      // Mutation proof: swapping this row's conditionImmunitiesOnBuffStart
-      // from "clear" to "suspend" would restore Charmed here — it must not.
+      // Proves conditionImmunitiesOnBuffStart is "clear", not "suspend".
       expect(activeKeys(ended.body)).toEqual([]);
     });
   });
@@ -172,7 +157,6 @@ describe("Mindless Rage (Berserker L6, #1121)", () => {
 
       const raged = await executeAction("rage");
       expect(raged.status).toBe(200);
-      // Inactive while raging — suspended, not merely hidden.
       expect(activeKeys(raged.body)).toEqual([]);
       expect(raged.body.conditions.suspended).toEqual([
         expect.objectContaining({ key: "frightened", gatingBuffKey: "rage" }),
@@ -180,17 +164,12 @@ describe("Mindless Rage (Berserker L6, #1121)", () => {
 
       const ended = await executeAction("endRage");
       expect(ended.status).toBe(200);
-      // Mutation proof: swapping this row's conditionImmunitiesOnBuffStart
-      // from "suspend" to "clear" (the 2024 behavior) would leave this []
-      // instead of restoring Frightened — this assertion is what catches it.
+      // Proves conditionImmunitiesOnBuffStart is "suspend", not "clear" (the 2024 behavior).
       expect(activeKeys(ended.body)).toEqual(["frightened"]);
       expect(ended.body.conditions.suspended).toEqual([]);
     });
 
-    // #1121 review finding 1 (HIGH): Rage can also end INVOLUNTARILY —
-    // falling unconscious or a long rest — never routed through the
-    // player-initiated endRage toggle. A suspended condition must still come
-    // back, or it is stranded in `suspended` forever.
+    // Rage can end involuntarily (0 HP, long rest), bypassing endRage — a suspended condition must still restore (#1121).
     it("dropping to 0 HP mid-rage restores the suspended condition (involuntary rage end)", async () => {
       await createBerserker("EDITION_2014");
       const applied = await applyCondition("frightened");
@@ -202,7 +181,6 @@ describe("Mindless Rage (Berserker L6, #1121)", () => {
         expect.objectContaining({ key: "frightened", gatingBuffKey: "rage" }),
       ]);
 
-      // BARB_BASE.hitPoints.current is 60 — this drops it to (clamped) 0.
       const dropped = await damage(100);
       expect(dropped.status).toBe(200);
       expect(dropped.body.hitPoints.current).toBe(0);
@@ -225,22 +203,10 @@ describe("Mindless Rage (Berserker L6, #1121)", () => {
       expect(rested.status).toBe(200);
       expect(activeKeys(rested.body)).toEqual(["charmed"]);
       expect(rested.body.conditions.suspended).toEqual([]);
-      // Rage itself is gone too — the long rest ended it same as endRage would.
       expect(rested.body.activeEffects.buffs.find((b: { key: string }) => b.key === "rage")).toBeUndefined();
     });
 
-    // #1121 review finding 3 (MEDIUM): a restore must never create a
-    // duplicate `active` entry, defensively, regardless of how a stray copy
-    // got there — applyConditionInTx's own suspended-dedup (finding 2) is
-    // meant to make this unreachable through any real caller, but the restore
-    // path itself must not assume that held. Simulated here by writing a
-    // duplicate directly to the DB (bypassing every application-level guard),
-    // since no real caller can reach this state once finding 2 is fixed.
-    // Asserts against the RAW `conditions` column (not the serialized wire
-    // response): the wire path re-derives through normalizeConditionsMutable,
-    // which dedupes `active` by key on every READ regardless of what got
-    // WRITTEN — so a wire-response assertion could never observe a duplicate
-    // that the restore path itself failed to prevent.
+    // Asserts the raw `conditions` column — normalizeConditionsMutable dedupes `active` by key on every read, so a wire response could never show a duplicate the write path failed to prevent.
     it("restoring a suspended condition never duplicates one that is already active by the time the buff ends", async () => {
       await createBerserker("EDITION_2014");
       await applyCondition("frightened");
@@ -267,13 +233,7 @@ describe("Mindless Rage (Berserker L6, #1121)", () => {
       expect(rawActive.filter((e) => e.key === "frightened")).toHaveLength(1);
     });
 
-    // #1121 re-review: the apply write-guard must also reject a key sitting
-    // in `suspended`, and the immune guard alone does NOT cover it — the
-    // immunity gate can lapse while the suspension persists (XP dropped
-    // below Mindless Rage's L6 grant mid-rage: deriveImmuneConditions goes
-    // empty, `active` is empty, so both older guards pass). A second active
-    // copy would make the rage-end restore's dedup silently discard the
-    // suspended entry — or resurrect it after a remove.
+    // The apply guard must also reject a key in `suspended` — the immunity gate alone can lapse (level-down mid-rage) while the suspension persists.
     it("re-applying a SUSPENDED condition is rejected even after the immunity gate lapses (level-down mid-rage), and rage end restores exactly one copy", async () => {
       await createBerserker("EDITION_2014");
       await applyCondition("frightened");
@@ -282,9 +242,7 @@ describe("Mindless Rage (Berserker L6, #1121)", () => {
         expect.objectContaining({ key: "frightened", gatingBuffKey: "rage" }),
       ]);
 
-      // Level-down below the Mindless Rage gate while the rage buff (and the
-      // suspension) persists — direct write, the same state an XP correction
-      // reaches through the real endpoint's reconcilers.
+      // Direct write reaches the same state an XP correction reaches through the real reconcilers.
       await prisma.character.update({ where: { id: BARB_ID }, data: { experiencePoints: 0 } });
 
       const reapplied = await applyCondition("frightened");
@@ -294,19 +252,13 @@ describe("Mindless Rage (Berserker L6, #1121)", () => {
       expect(ended.status).toBe(200);
       expect(ended.body.conditions.suspended).toEqual([]);
 
-      // Raw column, not the wire (normalizeConditionsMutable dedupes on read,
-      // so only the persisted JSON can prove no duplicate was written).
+      // Raw column — normalizeConditionsMutable dedupes `active` on every read.
       const raw = await prisma.character.findUniqueOrThrow({ where: { id: BARB_ID }, select: { conditions: true } });
       const rawActive = (raw.conditions as { active: { key: string }[] }).active;
       expect(rawActive.filter((e) => e.key === "frightened")).toHaveLength(1);
     });
 
-    // #1121 round-4: LIFO undo replays each event's `before` blob in reverse
-    // order, so every restore event must snapshot the state AT ITS OWN STEP.
-    // The round-3 batching hoisted the suspended[] shrink above the restore
-    // loop, which stamped an already-emptied suspended[] into every restore
-    // event's `before` — undoing an endRage then dropped both conditions
-    // from active AND suspended instead of re-suspending them.
+    // LIFO undo replays each event's `before` blob in reverse order — every restore event must snapshot state at its own step.
     it("undoing an endRage batch re-suspends every restored condition (per-step event snapshots)", async () => {
       await createBerserker("EDITION_2014");
       await applyCondition("charmed");
@@ -327,7 +279,6 @@ describe("Mindless Rage (Berserker L6, #1121)", () => {
         .send({});
       expect(rev.status).toBe(200);
 
-      // Back to the mid-rage state: nothing active, BOTH suspended, rage on.
       expect(activeKeys(rev.body as ConditionsBody)).toEqual([]);
       const suspendedKeys = ((rev.body as ConditionsBody).conditions.suspended ?? []).map((s) => s.key).sort();
       expect(suspendedKeys).toEqual(["charmed", "frightened"]);
@@ -336,16 +287,11 @@ describe("Mindless Rage (Berserker L6, #1121)", () => {
       ).toBe(true);
     });
 
-    // #1121 review finding 4 (LOW): the restore/clear events log the SAME
-    // `data` shape resolveApplyCondition/resolveRemoveCondition already use
-    // for every other `conditionApplied`/`conditionRemoved` event — a plural
-    // `restoredKeys`/`clearedKeys` array (the pre-fix shape) is a `data`
-    // schema no other event of these types has ever carried.
     it("logs the restore/suspend events with the same {key} / {key, source} data shape every other conditionApplied/conditionRemoved event uses", async () => {
       await createBerserker("EDITION_2014");
       await applyCondition("frightened");
-      await executeAction("rage"); // suspends Frightened — a conditionRemoved event
-      await executeAction("endRage"); // restores it — a conditionApplied event
+      await executeAction("rage");
+      await executeAction("endRage");
 
       const events = await activity();
       const suspendEvent = events.find((e) => e.type === "conditionRemoved" && e.summary.includes("started"));

@@ -1,11 +1,5 @@
-/**
- * Latch for the campaign/entity/arc request schemas migrated into
- * @character-sheet/contracts (#1394, epic #1369). None of these have
- * `.default()`/`.transform()`, so z.input and z.output coincide — asserted,
- * not assumed, per the same reasoning as the other `*-op-contract.test.ts`
- * files (expectTypeOf is erased at runtime; `npm run typecheck` is what
- * actually gates this half).
- */
+// z.input/z.output equality is asserted since none of these schemas use .default()/.transform().
+// expectTypeOf is erased at runtime — npm run typecheck is what actually gates this file (#1394).
 import {
   ENTITY_TYPES,
   VISIBILITIES,
@@ -67,14 +61,7 @@ describe("campaign/entity/arc op wire contract", () => {
     expect(updateArcSchema.safeParse({ position: 2 }).success).toBe(true);
   });
 
-  // Exhaustiveness latch (#1527): createCampaignSchema's rulesEdition can't
-  // derive from RulesEdition/ALL_RULES_EDITIONS directly — the package
-  // boundary forbids `contracts` from importing anything zoned, not even
-  // `shared-types` type-only (see campaign-ops.ts's why-comment on this
-  // field). This is the compile-time check that stands in for that import: a
-  // RulesEdition member added without updating createCampaignSchema's z.enum
-  // fails HERE, at `npm run typecheck`, not silently. expectTypeOf is erased
-  // at runtime — the assertion only does its job under `npm run typecheck`.
+  // Exhaustiveness latch (#1527): adding a RulesEdition member without updating createCampaignSchema's z.enum fails at typecheck, not silently.
   it("keeps rulesEdition's enum in lockstep with RulesEdition", () => {
     expectTypeOf<CreateCampaignInput["rulesEdition"]>().toEqualTypeOf<RulesEdition | undefined>();
   });

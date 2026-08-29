@@ -4,14 +4,8 @@ import { InvalidHitPointOperationError, normalizeHitPoints, normalizeHitDice, ty
 import { effectiveMaxHitPointsForRow } from "./conditions.js";
 import { applyConcentrationCheckInTx, type ConcentrationCheckResult } from "./concentration.js";
 
-/**
- * Applies a single heal op inside a caller-supplied Prisma transaction.
- *
- * Exported so the actions orchestrator (actionsRouter) can compose a
- * "consume potion + heal" pair into one atomic $transaction without opening a
- * nested transaction. Keep the heal logic in sync with the `case "heal"` in
- * dispatchHpOp (hp-transaction.ts).
- */
+// Exported so actionsRouter can compose "consume potion + heal" into one atomic $transaction. Keep in
+// sync with dispatchHpOp's case "heal".
 export async function applyHealInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -32,19 +26,12 @@ export async function applyHealInTx(
       abilityScores: true,
       experiencePoints: true,
       resources: true,
-      // conditions + rulesEdition (#1321): effectiveMaxHitPoints' exhaustion
-      // inputs — buildHpOpContext already selects both.
+      // effectiveMaxHitPoints' exhaustion inputs; buildHpOpContext already selects both.
       conditions: true,
       rulesEdition: true,
-      // All entries — the feat-slot cap sums entitlement per class level (#1073),
-      // not just the primary (position 0). `class` (#1529): characterAdvancementSlots'
-      // extraAsiLevels read — this is one of the reconciler/clamp-on-read pair's
-      // seven query sites CLAUDE.md governs; it must resolve the SAME column as
-      // reconcileAdvancements' select. `fightingStyleFeatLevel` (#1321):
-      // effectiveMaxHitPointsForRow's fs-cap arg. subclassRef.slug/
-      // class.subclassLevel (#1123): draconicResilienceMaxHpTerm's identity
-      // inputs — the heal cap must include the Draconic term or a Draconic
-      // sorcerer's top HP is unreachable by healing.
+      // All entries: the feat-slot cap sums entitlement per class level, not just the primary.
+      // The heal cap must include the Draconic Resilience term or a Draconic sorcerer's top HP is
+      // unreachable by healing.
       classEntries: {
         orderBy: { position: "asc" as const },
         select: {
@@ -53,8 +40,6 @@ export async function applyHealInTx(
           name: true,
           subclass: true,
           subclassRef: { select: { slug: true } },
-          // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
-          // input — the CANONICAL class name, same #1495 rationale as elsewhere.
           class: { select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
         },
       },
@@ -95,8 +80,6 @@ export async function applyHealInTx(
   });
 }
 
-// Validate + fetch + apply an in-place HP mutation, persisting it; shared by the
-// exported in-tx appliers. `amountLabel` shapes the positive-amount error message.
 async function mutateHitPointsInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -130,15 +113,9 @@ async function mutateHitPointsInTx(
   return { hp, hd, beforeHp };
 }
 
-/**
- * Apply damage to a character's HP inside an existing transaction, mirroring
- * the `case "damage"` in dispatchHpOp (hp-transaction.ts).
- *
- * Exported so the spellcasting orchestrator (lib/spellcasting/spellcasting.ts) can compose a
- * "cast self-targeted damage spell + take damage" pair into one atomic
- * $transaction without nesting. Keep the damage logic in sync with the
- * `case "damage"` branch in hp-transaction.ts (temp-HP absorption, floor at 0).
- */
+// Exported so the spellcasting orchestrator can compose "cast self-targeted damage spell + take
+// damage" into one atomic $transaction. Keep in sync with dispatchHpOp's case "damage" (temp-HP
+// absorption, floor at 0).
 export async function applyDamageInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -165,15 +142,11 @@ export async function applyDamageInTx(
     sessionId,
   });
 
-  // Resolve concentration on this damage instance (issue #41), mirroring the
-  // `case "damage"` in dispatchHpOp (hp-transaction.ts).
+  // Mirrors dispatchHpOp's case "damage" concentration check.
   return applyConcentrationCheckInTx(tx, characterId, amount, hp.current, batchId, sessionId);
 }
 
-/**
- * Grant self temporary HP inside an existing transaction (Rally maneuver).
- * Mirrors applySetTempOp: 5e temp HP doesn't stack — take the higher value.
- */
+// Mirrors applySetTempOp: 5e temp HP doesn't stack — take the higher value.
 export async function applyTempHpInTx(
   tx: Prisma.TransactionClient,
   characterId: string,

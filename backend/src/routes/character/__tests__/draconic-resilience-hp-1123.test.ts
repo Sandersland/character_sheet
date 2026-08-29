@@ -1,16 +1,3 @@
-/**
- * Draconic Resilience max-HP + Dragon Wings fly speed (#1123). Both derived
- * at read time: effectiveMaxHp extends the existing feat-bonus seam
- * (serialize/classes.ts's applyFeatLayer) with a subclass term; flySpeed is
- * new on the wire (serialize/combat.ts's buildSpeedView). Real Postgres,
- * supertest against the shared app. Fixtures are built directly via
- * prisma.character.create (mirrors hitpoints-multiclass.test.ts) so exact
- * stored-max/level/subclass combinations are controllable without driving a
- * real level-up transaction — same shortcut armor-class.test.ts's sibling
- * #1122 suite uses (`subclass` name alone, no catalog subclassId FK, since
- * resolveSubclassSlug's exact-name fallback resolves it).
- */
-
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -75,10 +62,7 @@ async function createFixture(opts: {
   currentHp?: number;
   speed?: number;
   entries: ClassEntrySpec[];
-  // Defaults to the sum of entries' levels (the "fully leveled up" state).
-  // Override to simulate a pending level-up ceremony — XP already crossed a
-  // threshold but the per-class level/HP-die roll hasn't been applied yet —
-  // WITHOUT also lying about pendingLevelUps (progress.level - hitDice.total).
+  // Defaults to the sum of entries' levels; override to simulate a pending level-up without lying about pendingLevelUps.
   hitDiceTotal?: number;
 }): Promise<string> {
   const { name, rulesEdition, experiencePoints, storedMaxHp, currentHp, speed = 30, entries, hitDiceTotal } = opts;
@@ -113,7 +97,6 @@ async function createFixture(opts: {
   return char.id;
 }
 
-// XP thresholds (lib/leveling/experience.ts): L2=300, L3=900, L5=6500.
 const XP_FOR_LEVEL: Record<number, number> = { 1: 0, 2: 300, 3: 900, 5: 6500 };
 
 describe("Draconic Resilience max-HP (#1123)", () => {
@@ -185,7 +168,8 @@ describe("Draconic Resilience max-HP (#1123)", () => {
 
     const after = (await get(id)).body;
     expect(after.hitPoints.max).toBe(30);
-    expect(after.hitPoints.current).toBe(30); // clamped, not left at the stale 35
+    // Clamped, not left at the stale 35.
+    expect(after.hitPoints.current).toBe(30);
   });
 
   it("2014: a Draconic sorcerer at exhaustion 4 halves AFTER the subclass bonus is added (composition order)", async () => {
@@ -210,7 +194,7 @@ describe("Draconic Resilience max-HP (#1123)", () => {
     const id = await createFixture({
       name: `${NAME_PREFIX} multiclass`,
       rulesEdition: "EDITION_2014",
-      experiencePoints: XP_FOR_LEVEL[5], // total level 5 (3 sorcerer + 2 fighter)
+      experiencePoints: XP_FOR_LEVEL[5],
       storedMaxHp: 40,
       entries: [
         { name: "Sorcerer", classId: sorcererClassId, level: 3, subclass: "Draconic Bloodline" },
@@ -223,17 +207,13 @@ describe("Draconic Resilience max-HP (#1123)", () => {
   });
 });
 
-// FORKS: 2014's Dragon Wings is a passive "fly speed equal to your current
-// speed" — exactly the derived value here. 2024's is a flat 60ft/1hr/
-// resource-gated ability (the seeded `dragonWings` pool) — an activated buff
-// #1123 explicitly scopes OUT, so a 2024 Draconic sorcerer gets NO derived
-// flySpeed from this path.
+// 2014 Dragon Wings is passive (fly speed = current speed); 2024's is a flat 60ft/1hr resource-gated ability (dragonWings pool) that #1123 scopes out — no derived flySpeed for 2024.
 describe("Dragon Wings fly speed (#1123) — 2014 passive derive, 2024 withheld (resource-gated, out of scope)", () => {
   it("2014: unarmored Draconic L14 exposes flySpeed equal to walking speed", async () => {
     const id = await createFixture({
       name: `${NAME_PREFIX} wings 2014`,
       rulesEdition: "EDITION_2014",
-      experiencePoints: 355000, // well past L14 (max table entry, L20)
+      experiencePoints: 355000,
       storedMaxHp: 80,
       speed: 30,
       entries: [{ name: "Sorcerer", classId: sorcererClassId, level: 14, subclass: "Draconic Bloodline" }],
@@ -243,17 +223,12 @@ describe("Dragon Wings fly speed (#1123) — 2014 passive derive, 2024 withheld 
     expect(res.body.flySpeed).toBe(30);
   });
 
-  // The classEntry.level COLUMN can lag the XP-derived level during the
-  // window between crossing a level threshold and finishing the HP level-up
-  // ceremony (the level-up transaction rolls HP separately from the XP
-  // write). flySpeed must key off the SAME draconicBloodlineLevel seam the HP
-  // bonus already does (draconicResilienceMaxHpTerm), not the stale column —
-  // otherwise the two L14 gates could disagree.
+  // flySpeed must key off the same draconicBloodlineLevel seam as the HP bonus (draconicResilienceMaxHpTerm), not the classEntry.level column, which can lag during a pending level-up.
   it("2014: flySpeed keys off the XP-derived level, not a stale classEntry.level column (pending level-up)", async () => {
     const id = await createFixture({
       name: `${NAME_PREFIX} wings pending levelup`,
       rulesEdition: "EDITION_2014",
-      experiencePoints: 140000, // XP-derived level 14
+      experiencePoints: 140000,
       storedMaxHp: 80,
       speed: 30,
       hitDiceTotal: 13, // HP roll not yet applied for the 14th level
@@ -264,9 +239,7 @@ describe("Dragon Wings fly speed (#1123) — 2014 passive derive, 2024 withheld 
     expect(res.body.flySpeed).toBe(30);
   });
 
-  // Mutation-proof case: without the edition gate, this would silently regress
-  // to the 2014 walking-speed derivation — the wrong number for 2024 RAW
-  // (flat 60ft) AND a double-representation of the already-seeded resource.
+  // Without the edition gate, this would silently regress to the 2014 walking-speed derivation.
   it("2024: unarmored Draconic L14 gets NO derived flySpeed", async () => {
     const id = await createFixture({
       name: `${NAME_PREFIX} wings 2024`,
@@ -319,12 +292,7 @@ describe("Dragon Wings fly speed (#1123) — 2014 passive derive, 2024 withheld 
   });
 });
 
-// The WRITE seam (#1123 review finding 1): every stored-HP clamp/fill must
-// compose the Draconic term through the SAME shared function
-// (draconicResilienceMaxHpTerm) as the read-side max, or writes cap/clamp
-// `current` against a max up to the bonus too low — long rest never fills the
-// character, healing can't reach the top HP, and setExhaustion/XP-level-down/
-// advancement-trim silently corrupt stored current.
+// Every stored-HP clamp/fill must compose the Draconic term through the same draconicResilienceMaxHpTerm as the read-side max, or writes clamp against a too-low max.
 describe("Draconic Resilience — write-seam clamps include the subclass term (#1123)", () => {
   const postHp = (id: string, body: object) =>
     supertest(app).post(`/api/characters/${id}/hp`).set("Cookie", COOKIE).send(body);
@@ -335,7 +303,6 @@ describe("Draconic Resilience — write-seam clamps include the subclass term (#
   const postAdvancement = (id: string, body: object) =>
     supertest(app).post(`/api/characters/${id}/advancement/transactions`).set("Cookie", COOKIE).send(body);
 
-  // 2014 L5 Draconic sorcerer, stored max 30 → Draconic-inclusive max 35.
   const draconicL5 = (name: string, currentHp?: number) =>
     createFixture({
       name,
@@ -374,8 +341,7 @@ describe("Draconic Resilience — write-seam clamps include the subclass term (#
     });
     await postConditions(id, { operations: [{ type: "setExhaustion", level: 4 }] });
     const after = (await get(id)).body;
-    // floor((28 + 5) / 2) = 16 — the one-way WRITE must not clamp to
-    // floor(28 / 2) = 14 (the composition missing the subclass term).
+    // floor((28 + 5) / 2) = 16 — the one-way WRITE must not clamp to floor(28 / 2) = 14 (missing the subclass term).
     expect(after.hitPoints.max).toBe(16);
     expect(after.hitPoints.current).toBe(16);
   });
@@ -385,23 +351,17 @@ describe("Draconic Resilience — write-seam clamps include the subclass term (#
     const res = await postXp(id, { operations: [{ type: "set", value: XP_FOR_LEVEL[3] }] });
     expect(res.status).toBe(200);
     const after = (await get(id)).body;
-    // No levelUp events → avg fallback per reversed level: d6 avg 4 + Con 2 =
-    // 6; stored max 30 → 24 → 18. Draconic at L3 = +3 → effective max 21.
+    // avg-fallback (d6+Con=6) per reversed level: 30 → 24 → 18; Draconic at L3 (+3) → 21.
     expect(after.hitPoints.max).toBe(21);
     expect(after.hitPoints.current).toBe(21); // NOT 18 (the term-less clamp)
   });
 
-  // Multiclass XP decrease: computeLevelDownState's clamp runs BEFORE
-  // reconcileClassEntryLevels, so the rows still hold PRE-down per-entry
-  // levels — the term must be computed over the PROJECTED post-down entries
-  // (levelDownEntryLevels), not the stale sorcerer.level column. The stored
-  // corruption is MASKED on read (serialize clamps to the true max), so this
-  // asserts the persisted row directly.
+  // computeLevelDownState's clamp runs before reconcileClassEntryLevels — the term must use the PROJECTED post-down entries (levelDownEntryLevels), not the stale column; the corruption is masked on read, so this asserts the persisted row.
   it("multiclass XP decrease clamps against the PROJECTED post-down sorcerer level, not the stale column", async () => {
     const id = await createFixture({
       name: `${NAME_PREFIX} seam multiclass down`,
       rulesEdition: "EDITION_2014",
-      experiencePoints: 85000, // L11 (10 sorcerer + 1 fighter)
+      experiencePoints: 85000,
       storedMaxHp: 78,
       currentHp: 88, // full at the Draconic effective max (78 + 10)
       entries: [
@@ -420,9 +380,7 @@ describe("Draconic Resilience — write-seam clamps include the subclass term (#
     });
     expect(entries).toEqual([{ name: "Sorcerer", level: 3 }]);
 
-    // 8 reversed levels x avg-fallback 6 -> stored max 78 - 48 = 30; term at
-    // the PROJECTED sorcerer level 3 -> ceiling 33. The stale column (10)
-    // would leave stored current at 40 — 7 above the true effective max.
+    // avg-fallback (6/level) over 8 reversed levels: 78 → 30; term at the PROJECTED level 3 → 33. The stale column (10) would give 40.
     const stored = await prisma.character.findUniqueOrThrow({ where: { id }, select: { hitPoints: true } });
     expect((stored.hitPoints as { current: number }).current).toBe(33);
 
@@ -432,9 +390,7 @@ describe("Draconic Resilience — write-seam clamps include the subclass term (#
   });
 
   it("advancement-trim on level-down (reconcileAdvancements) clamps against the Draconic-inclusive max", async () => {
-    // Entry level 3 with hitDice 3 at XP L5 isolates reconcileAdvancements:
-    // levelsToReverse = hitDice.total − targetLevel = 0, so the XP op's only
-    // stored-HP write is the reconciler's own clamp after trimming the ASI.
+    // levelsToReverse = hitDice.total − targetLevel = 0 here, isolating reconcileAdvancements' own clamp as the XP op's only stored-HP write.
     const id = await createFixture({
       name: `${NAME_PREFIX} seam reconciler`,
       rulesEdition: "EDITION_2014",
@@ -457,8 +413,7 @@ describe("Draconic Resilience — write-seam clamps include the subclass term (#
     expect(after.hitPoints.current).toBe(21); // NOT 18 (the term-less clamp)
   });
 
-  // Safety proof for touching the shared HP seam: a non-Draconic character's
-  // write-path numbers are byte-for-byte the pre-#1123 ones (term = 0).
+  // Control: a non-Draconic character's write-path numbers are unchanged (term = 0).
   it("non-Draconic control: long rest, heal cap, exhaustion, and level-down are unchanged", async () => {
     const wildMagic = (name: string, storedMaxHp: number, currentHp: number) =>
       createFixture({

@@ -1,28 +1,4 @@
-/**
- * Bladesinger route tests (#1676, TCoE p. 76) — the full package exercised
- * through the real HTTP stack, against the REAL seeded `wizard-bladesinging`
- * Subclass row and its real ClassFeature rows (wizard-features.ts's
- * BLADESINGING_RAW), mirroring actions-rage.test.ts's shape — the pattern
- * Bladesinger's own toggle (#1686) and slot-cost reaction (#1687) are meant
- * to prove work identically to Rage's, with ZERO new
- * ACTION_EFFECT_FN/resourceFn/hand-written gate:
- *   - Bladesong is a row-driven "toggle": activating spends 1 use of the
- *     proficiency-bonus/long-rest pool (#1685) and applies three while-active
- *     buffs (AC/speed/melee-damage, #1686) — the melee-damage entry is
- *     level-gated (Song of Victory, L14).
- *   - The armor/shield activation gate (#1688) rejects activation while
- *     wearing medium/heavy armor or a shield; equipping any of the three
- *     while active true-ends the buffs (light armor does NOT).
- *   - Song of Defense is a row-driven slot-cost reaction (#1687) gated on
- *     Bladesong being active (#1688's requiresActiveBuff).
- *   - crossEditionRejection: a 2024 wizard can't pick this EDITION_2014-only
- *     subclass; a 2014 wizard can.
- *
- * Real Postgres via the shared template DB; supertest against the shared
- * `app`. Reads (never writes to) the real seeded Wizard class + Bladesinging
- * subclass catalog rows.
- */
-
+// TCoE p. 76 (#1676)
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -40,28 +16,14 @@ let COOKIE: string;
 let wizardClassId: string;
 let bladesingerId: string;
 
-// XP thresholds (src/lib/leveling/experience.ts): L2=300 (PB +2), L6=14000
-// (PB +3), L10=64000 (PB +4), L14=140000 (PB +5). Single-class Wizard: MOST
-// derivations (effectiveEntryLevel — resources.pools, the toggle/activation
-// dispatcher's own entryLevel, ...) resolve from the XP-derived TOTAL level,
-// ignoring the creation-fixed classEntries[0].level column (always created
-// at 1). `deriveAttacksPerAction` is the one exception (character-serialize.ts
-// passes `row.classEntries` straight through, reading each entry's raw,
-// possibly-stale `level` column, never effectiveEntryLevel) — pre-existing
-// shape, not something this issue owns fixing — so any fixture exercising
-// attacksPerAction must sync the column itself via syncEntryLevel below.
 const XP_L2 = 300;
 const XP_L6 = 14000;
 const XP_L10 = 64000;
 const XP_L14 = 140000;
 
-// Intelligence 10 → modifier 0, which floors to the TCoE "minimum +1" — the
-// case that actually proves the floor, not just "some bonus applied".
 const ABILITY_SCORES_INT_FLOOR = {
   strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 12, charisma: 10,
 };
-// Intelligence 18 → modifier +4, proving the buff carries the REAL modifier
-// once it exceeds the floor, not merely a hardcoded 1.
 const ABILITY_SCORES_INT_BONUS = {
   strength: 10, dexterity: 12, constitution: 14, intelligence: 18, wisdom: 12, charisma: 10,
 };
@@ -183,9 +145,7 @@ function buffKeys(body: CharBody): string[] {
   return body.activeEffects.buffs.map((b) => b.key);
 }
 
-// See XP_L14's own comment — deriveAttacksPerAction reads classEntries[0]'s
-// raw `level` column directly, never effectiveEntryLevel, so a single-class
-// fixture exercising it must sync that column to the XP-implied level itself.
+// deriveAttacksPerAction reads classEntries[0]'s raw `level` column, never effectiveEntryLevel — sync it here for fixtures that exercise it.
 async function syncEntryLevel(characterId: string, level: number): Promise<void> {
   await prisma.characterClassEntry.updateMany({ where: { characterId }, data: { level } });
 }
@@ -224,7 +184,6 @@ describe("Bladesong toggle (#1686) — L2 activation applies AC/speed buffs and 
     expect(body.armorClass).toBe(baselineAc + 1);
     expect(body.speed).toBe(baselineSpeed + 10);
 
-    // Level 2 → proficiency bonus +2 → the pool's own total.
     expect(pool(body, "bladesong")).toMatchObject({ total: 2, used: 1, remaining: 1 });
   });
 
@@ -256,7 +215,6 @@ describe("Bladesong toggle (#1686) — L2 activation applies AC/speed buffs and 
     expect(buffKeys(body)).toEqual([]);
     expect(body.armorClass).toBe(baselineAc);
     expect(body.speed).toBe(baselineSpeed);
-    // Early end never refunds the use (mirrors endRage's own shape).
     expect(pool(body, "bladesong")).toMatchObject({ used: 1, remaining: 1 });
   });
 
@@ -301,8 +259,7 @@ describe("Bladesong toggle (#1686) — L2 activation applies AC/speed buffs and 
         armor: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true },
       }),
     });
-    // A body slot rejects a second occupant outright (no silent
-    // displacement) — unequip the light armor before donning the medium.
+    // A body slot rejects a second occupant outright — unequip light armor before donning medium.
     await applyInventoryOperations(id, [{ type: "setEquipped", inventoryItemId: light.id, equipped: false }]);
     await applyInventoryOperations(id, [{ type: "equip", inventoryItemId: medium.id, slot: "BODY" }]);
     const afterMedium = await get(id);
@@ -357,9 +314,7 @@ describe("Song of Victory (#1676) — L14, rides Bladesong's toggle", () => {
         weapon: {
           damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "piercing",
           finesse: true, light: false, heavy: false, twoHanded: false, reach: false, thrown: false, ammunition: false,
-          // meleeDamage buffs (deriveWeaponDamage, weapon-damage.ts) apply
-          // only when weaponRange === "melee" — omitting it silently zeroes
-          // Song of Victory's bonus even though the buff itself is present.
+          // deriveWeaponDamage applies meleeDamage buffs only when weaponRange === "melee".
           weaponRange: "melee",
         },
       }),

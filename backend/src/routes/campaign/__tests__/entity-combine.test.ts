@@ -43,8 +43,7 @@ describe("entity combine-duplicates (#1942)", () => {
     return res.body.id as string;
   }
 
-  // A note authored by CHAR_OWNER tagging entityIds by hand-built @[<id>] tokens
-  // — combine must find these by scanning body text, not by trusting refs alone.
+  // Body and entityIds are set independently: combine must find tokens by scanning body text, not by trusting refs alone.
   async function seedEntry(opts: {
     characterId?: string;
     authorUserId?: string;
@@ -68,9 +67,6 @@ describe("entity combine-duplicates (#1942)", () => {
     return entry.id;
   }
 
-  // The atomic batch endpoint (#1942 round 3): POST /entities/combine with
-  // { survivorEntityId, loserEntityIds }. `combine` is the 1-length-array
-  // convenience wrapper every pre-existing single-duplicate test still uses.
   async function combineBatch(loserEntityIds: string[], survivorEntityId: string, cookie = cookieOwner) {
     return supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/combine`)
@@ -140,9 +136,7 @@ describe("entity combine-duplicates (#1942)", () => {
   });
 
   it("400s a non-uuid survivorEntityId or loserEntityIds element", async () => {
-    // uuid() at the schema boundary (#1942) makes CampaignEntity.id's
-    // "plain String column" hazard unreachable from a real request — the
-    // pattern-escaping in mentionTokenPattern is defense in depth beyond this.
+    // uuid() at the schema boundary makes the id column's "plain String" hazard unreachable; mentionTokenPattern's pattern-escaping is defense in depth beyond this.
     const dup = await makeEntity(campaignId, "lili Boundary");
     const badSurvivor = await combineBatch([dup], "not-a-uuid");
     expect(badSurvivor.status).toBe(400);
@@ -166,13 +160,11 @@ describe("entity combine-duplicates (#1942)", () => {
     const dup = await makeEntity(campaignId, "lili A");
     const surv = await makeEntity(campaignId, "Lili A");
 
-    // Owner-authored CAMPAIGN note.
     const campaignEntry = await seedEntry({
       body: `We met @[${dup}] at the inn.`,
       visibility: "CAMPAIGN",
       entityIds: [dup],
     });
-    // A different player's PRIVATE note — combine must reach this too.
     const privateEntry = await seedEntry({
       characterId: CHAR_PLAYER,
       authorUserId: PLAYER,
@@ -197,10 +189,7 @@ describe("entity combine-duplicates (#1942)", () => {
     expect(refs.every((r) => r.entityId === surv)).toBe(true);
     expect(refs.some((r) => r.entityId === dup)).toBe(false);
 
-    // The duplicate is gone from the list. The survivor's mention count unions
-    // the distinct entries from both prior ref sets — the player can see both
-    // (the CAMPAIGN note as a member, their own PRIVATE note as its author);
-    // PRIVATE notes have no DM bypass, so this reads as the player, not owner.
+    // mentionCount unions both entries because the player can see both: the CAMPAIGN note as a member, their own PRIVATE note as its author.
     const list = await supertest(app)
       .get(`/api/campaigns/${campaignId}/entities?include=stats`)
       .set("Cookie", cookiePlayer);
@@ -269,10 +258,7 @@ describe("entity combine-duplicates (#1942)", () => {
   it("does not 500 on a stale token in the same body and leaves it untouched", async () => {
     const dup = await makeEntity(campaignId, "lili Stale");
     const surv = await makeEntity(campaignId, "Lili Stale");
-    // No CampaignEntity backs this id — text left behind by, e.g., an entity
-    // deleted outright rather than combined. Re-deriving refs from the whole
-    // rewritten body (extractEntityIds) would try to insert a ref for it and
-    // hit the entityId foreign key; combine must never do that.
+    // No CampaignEntity backs this id; re-deriving refs from the rewritten body would violate the entityId foreign key, so combine must never do that.
     const staleId = randomUUID();
     const entryId = await seedEntry({
       body: `@[${staleId}] warned us about @[${dup}].`,
@@ -294,9 +280,7 @@ describe("entity combine-duplicates (#1942)", () => {
     const dup = await makeEntity(campaignId, "lili Hidden");
     const surv = await makeEntity(campaignId, "Lili Hidden");
 
-    // A real journal write, through the actual route, as a non-owner — the
-    // hidden-entity guard in syncEntryRefs (#379) suppresses the hidden ref
-    // here, leaving the token as unbacked text.
+    // syncEntryRefs's hidden-entity guard (#379) suppresses the hidden ref here, leaving the token as unbacked text.
     const created = await supertest(app)
       .post(`/api/characters/${CHAR_PLAYER}/journal`)
       .set("Cookie", cookiePlayer)
@@ -311,7 +295,6 @@ describe("entity combine-duplicates (#1942)", () => {
     expect(res.status).toBe(200);
 
     const after = await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryId } });
-    // The dup token rewrites; the hidden token, untouched by this combine, stays.
     expect(after.body).toBe(`@[${hidden}] and @[${surv}] both showed up.`);
 
     const postRefs = await prisma.journalEntryRef.findMany({ where: { entryId } });
@@ -332,13 +315,7 @@ describe("entity combine-duplicates (#1942)", () => {
       entityIds: [dup],
     });
 
-    // The character leaves the campaign (campaignId nulled). A prior version
-    // scoped the body rewrite by the AUTHOR's current character.campaignId —
-    // this entry's join would then miss it while the ref move (unscoped,
-    // keyed only on entityId) still repointed the ref, leaving a dangling
-    // @[dupId] token behind a moved ref. The fix scopes by the token itself
-    // (duplicateId is a globally-unique CampaignEntity id), so leaving the
-    // campaign can't desync body from ref.
+    // Scoped by the token itself, not the author's current campaignId — leaving the campaign can't desync body from ref.
     await prisma.character.update({ where: { id: "combine-leaver-char" }, data: { campaignId: null } });
 
     const res = await combine(dup, surv);
@@ -373,13 +350,7 @@ describe("entity combine-duplicates (#1942)", () => {
     expect(after.survivorEntityId).toBe(surv);
   });
 
-  // The realistic concurrent-combine race: the survivor row a caller-visible
-  // read confirmed present gets deleted by someone else before the write that
-  // references it lands, raising a Postgres foreign-key violation (P2003) —
-  // e.g. journalEntryRef.updateMany's FK to CampaignEntity. wouldCreateCycle
-  // only runs mid-transaction when a merge chain needs re-pointing, so it's a
-  // convenient, already-exported hook to force a real PrismaClientKnownRequestError
-  // out of the SAME transaction combineEntities runs, without mocking Prisma itself.
+  // Spies on wouldCreateCycle to throw a real P2003 mid-transaction, simulating a caller-checked row deleted before the write referencing it lands.
   it("409s (not 500) on a mid-transaction foreign-key race (P2003)", async () => {
     const a = await makeEntity(campaignId, "A P2003");
     const dup = await makeEntity(campaignId, "lili P2003");
@@ -405,26 +376,12 @@ describe("entity combine-duplicates (#1942)", () => {
       spy.mockRestore();
     }
 
-    // The transaction rolled back — the merge row's original shape survives.
     const after = await prisma.campaignEntityMerge.findUniqueOrThrow({ where: { id: mergeId } });
     expect(after.mergedEntityId).toBe(a);
     expect(after.survivorEntityId).toBe(dup);
   });
 
-  // The mechanism, proven deterministically. Hold a row lock on ONLY the
-  // SURVIVOR — not the loser — then fire a real combine(loser, survivor).
-  // This isolates exactly what lockCombineTargets adds: the loser's own
-  // eventual DELETE would naturally contend with a lock held on the LOSER
-  // (any transaction's delete does that, fix or no fix — not a useful
-  // discriminator), but nothing else in the combine ever writes the
-  // SURVIVOR row. Only an explicit up-front SELECT ... FOR UPDATE on the
-  // survivor too makes this block; a naive findMany-based guard reads
-  // straight past another transaction's row lock under READ COMMITTED and
-  // completes unaffected. Timing-luck tests (two Promise.all'd combine()
-  // calls with no controlled hold) turned out NOT to discriminate reliably
-  // in this environment — fast local Postgres often finishes one request's
-  // whole transaction before the other's guard read even starts, passing
-  // either way — so this test controls the interleaving directly instead.
+  // Holds a row lock on only the survivor, then fires a real combine — isolates what lockCombineTargets adds over a naive read-based guard, which wouldn't block under READ COMMITTED.
   it("blocks a combine on a row lock already held for its survivor alone (lockCombineTargets)", async () => {
     const loser = await makeEntity(campaignId, "Lock Hold Loser");
     const survivor = await makeEntity(campaignId, "Lock Hold Survivor");
@@ -451,8 +408,7 @@ describe("entity combine-duplicates (#1942)", () => {
         combinePromise.then(() => "resolved" as const),
         new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 200)),
       ]);
-      // Still blocked on the held survivor-only row lock 200ms later — not
-      // raced past it, even though nothing else in combine writes that row.
+      // Still blocked on the held survivor-only row lock 200ms later, even though nothing else in combine writes that row.
       expect(raceResult).toBe("pending");
     } finally {
       releaseLock();
@@ -463,13 +419,7 @@ describe("entity combine-duplicates (#1942)", () => {
     expect(res.status).toBe(200);
   });
 
-  // Supplementary real-usage-shape check (kept alongside the deterministic
-  // test above, which is what actually proves the lock blocks): two genuinely
-  // concurrent requests, neither entity carrying a ref or link (so under the
-  // pre-fix code no Prisma error code would ever fire either way). Asserts
-  // the INVARIANT the lock exists to protect — never both succeeding, never
-  // both entities gone — even though this shape alone can't be trusted to
-  // discriminate the fix on every environment/timing.
+  // Asserts the invariant the lock protects — never both succeed, never both entities gone.
   it("never lets two concurrent inverse combines (A absorbs B; B absorbs A) both commit and delete both entities", async () => {
     const a = await makeEntity(campaignId, "Inverse Race A");
     const b = await makeEntity(campaignId, "Inverse Race B");
@@ -479,8 +429,7 @@ describe("entity combine-duplicates (#1942)", () => {
     const stillA = await prisma.campaignEntity.findUnique({ where: { id: a } });
     const stillB = await prisma.campaignEntity.findUnique({ where: { id: b } });
     const survivingCount = [stillA, stillB].filter((row) => row !== null).length;
-    // Never both gone (the bug this guards against) and never both present
-    // (combine did nothing) — exactly one direction's outcome held.
+    // Exactly one direction's outcome held — never both gone, never both present.
     expect(survivingCount).toBe(1);
     expect([resAintoB.status, resBintoA.status].sort()).toEqual([200, 404]);
   });
@@ -489,8 +438,7 @@ describe("entity combine-duplicates (#1942)", () => {
     const dup = await makeEntity(campaignId, "lili F");
     const surv = await makeEntity(campaignId, "Lili F");
 
-    // "Lili F is secretly lili F" — survivor merged into the duplicate. Still
-    // PREPARED (never executed), so it's still secret DM prep — dies silently.
+    // Survivor merged into the duplicate, still PREPARED — dies silently since it's still secret DM prep.
     const prep = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
@@ -509,8 +457,7 @@ describe("entity combine-duplicates (#1942)", () => {
     const dup = await makeEntity(campaignId, "lili F Exec");
     const surv = await makeEntity(campaignId, "Lili F Exec");
 
-    // Same shape as the PREPARED case above, but EXECUTED: a public reveal
-    // players may already know, so it can't just vanish under a 200.
+    // Same shape as the PREPARED case above, but EXECUTED: a public reveal players may already know.
     const prep = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
@@ -525,7 +472,6 @@ describe("entity combine-duplicates (#1942)", () => {
     const res = await combine(dup, surv);
     expect(res.status).toBe(409);
 
-    // Nothing touched: the reveal survives, and the duplicate isn't deleted.
     const stillMerge = await prisma.campaignEntityMerge.findUnique({ where: { id: mergeId } });
     expect(stillMerge).not.toBeNull();
     const stillDup = await prisma.campaignEntity.findUnique({ where: { id: dup } });
@@ -537,15 +483,13 @@ describe("entity combine-duplicates (#1942)", () => {
     const dup = await makeEntity(campaignId, "lili G");
     const surv = await makeEntity(campaignId, "Lili G");
 
-    // Survivor is already secretly `chained` (S -> chained)…
+    // Survivor is already secretly `chained` (S -> chained), and `chained` is separately prepared as the duplicate (chained -> dup); re-pointing to (chained -> S) would close the cycle.
     const survChain = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
       .send({ mergedEntityId: surv, survivorEntityId: chained });
     expect(survChain.status).toBe(201);
 
-    // …and separately `chained` was prepared as secretly the duplicate
-    // (chained -> dup). Re-pointing to (chained -> S) would close S -> chained -> S.
     const cyclic = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
@@ -558,7 +502,6 @@ describe("entity combine-duplicates (#1942)", () => {
 
     const after = await prisma.campaignEntityMerge.findUnique({ where: { id: cyclicMergeId } });
     expect(after).toBeNull();
-    // The unrelated S -> chained row survives untouched.
     const survivingChain = await prisma.campaignEntityMerge.findUniqueOrThrow({
       where: { id: survChain.body.id as string },
     });
@@ -615,9 +558,7 @@ describe("entity combine-duplicates (#1942)", () => {
     const surv = await makeEntity(campaignId, "Lili Revealed");
     const trueName = await makeEntity(campaignId, "True Name Revealed");
 
-    // "lili Revealed is publicly revealed to be True Name Revealed" — dup is
-    // the MERGED (non-survivor) side of an EXECUTED row: a fact players may
-    // already know, so combining it away can't just cascade-delete the row.
+    // dup is the MERGED (non-survivor) side of an EXECUTED row, a fact players may already know, so combining it away can't just cascade-delete the row.
     const prep = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
@@ -632,7 +573,6 @@ describe("entity combine-duplicates (#1942)", () => {
     const res = await combine(dup, surv);
     expect(res.status).toBe(409);
 
-    // Nothing was touched.
     const stillDup = await prisma.campaignEntity.findUnique({ where: { id: dup } });
     expect(stillDup).not.toBeNull();
     const stillMerge = await prisma.campaignEntityMerge.findUnique({ where: { id: mergeId } });
@@ -742,10 +682,6 @@ describe("entity combine-duplicates (#1942)", () => {
     });
     const dupPcId = linkRow.campaignEntityId;
 
-    // A PC-typed survivor that ALSO fronts a campaign item — not something the
-    // UI would normally construct, but the guard must hold regardless: a
-    // later item delete cascades away this entity, taking the character link
-    // (and the player's own codex row) with it.
     const survEntity = await prisma.campaignEntity.create({
       data: { campaignId, type: "PC", name: "PC Fronting An Item" },
     });
@@ -794,8 +730,6 @@ describe("entity combine-duplicates (#1942)", () => {
 
     const res = await combine(dupItem, surv);
     expect(res.status).toBe(200);
-    // itemId on the combine response (#1942): the codex/dialog can't warn
-    // truthfully about an item-link transfer it can't observe on the wire.
     expect(res.body.itemId).toBe(itemId);
 
     const link = await prisma.campaignItemLink.findUniqueOrThrow({ where: { campaignEntityId: surv } });
@@ -830,7 +764,6 @@ describe("entity combine-duplicates (#1942)", () => {
     const res = await combine(dupItem, surv);
     expect(res.status).toBe(409);
 
-    // Nothing moved: the item's link still fronts the duplicate entity.
     const link = await prisma.campaignItemLink.findUniqueOrThrow({ where: { itemId } });
     expect(link.campaignEntityId).toBe(dupItem);
     const stillDup = await prisma.campaignEntity.findUnique({ where: { id: dupItem } });
@@ -909,8 +842,7 @@ describe("entity combine-duplicates (#1942)", () => {
       });
 
       const surv = await makeEntity(campaignId, "Batch Conflict Survivor", "PC");
-      // A third, unrelated loser with its own mention — proves the guard
-      // fires BEFORE any loser's own writes apply, not partway through.
+      // A third, unrelated loser proves the guard fires BEFORE any loser's own writes apply.
       const dupC = await makeEntity(campaignId, "lili Batch C");
       const entryC = await seedEntry({ body: `@[${dupC}] noted.`, entityIds: [dupC] });
 
@@ -1008,8 +940,6 @@ describe("entity combine-duplicates (#1942)", () => {
 
   describe("portrait cleanup (#1942)", () => {
     beforeAll(async () => {
-      // Isolated fs-driven blob store, the same __resetBlobStoreForTests/
-      // createBlobStore setup the other entity-portrait tests use.
       vi.stubEnv("BLOB_STORE_DRIVER", "fs");
       vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "entity-combine-portrait-test-")));
       __resetBlobStoreForTests();

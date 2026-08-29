@@ -1,17 +1,4 @@
-/**
- * #1431 route-level drift gate. `regrants` is a list of KEYS, and the client
- * joins each against the universal action GET /api/reference serves for the
- * character's own edition — so the two payloads must agree on the wire, not
- * just in the source arrays seed-data.test.ts checks. A key the reference
- * response omits renders an unnamed grant; a key whose served row is not
- * `cost: "action"` makes "re-costs this action" a false claim.
- *
- * Both editions, because `regrants` takes no edition parameter (the mapping is
- * invariant) while the row it resolves to does — SRD 5.1 serves "Use an Object"
- * where SRD 5.2 serves "Utilize" under the same key, which is exactly why the
- * class row stores the key and never the name.
- */
-
+// SRD 5.1 serves "Use an Object" where SRD 5.2 serves "Utilize" under the same key — why the class row stores the key, never the name.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -51,12 +38,7 @@ async function makeCharacter(
   const id = res.body.id as string;
   createdIds.push(id);
 
-  // Fast Hands (Thief) is row-driven now (#1912) — its guard reads
-  // subclassRef.features, a real subclassId FK relation, so a raw `subclass`
-  // display-name update (the pre-#1912 shape here, sufficient when the
-  // subclass gate resolved off the name string alone) is no longer enough;
-  // resolveSubclassSlug + a real Subclass lookup is what production's own
-  // subclass-selection path does.
+  // Fast Hands (Thief) is row-driven (#1912) and reads subclassRef.features via a real subclassId FK — resolveSubclassSlug + a Subclass lookup, not a raw `subclass` string, matches production's own subclass-selection path.
   const subclassId = subclass
     ? (await prisma.subclass.findFirstOrThrow({ where: { slug: resolveSubclassSlug(className, { subclass }) ?? "" } })).id
     : undefined;
@@ -97,14 +79,7 @@ describe("GET /api/characters/:id — availableActions[].regrants", () => {
     it(`${edition}: every regranted key is served as a universal action still costing an action`, async () => {
       const rogueL2 = await makeCharacter(edition, "Rogue", `Regrants Rogue L2 ${edition}`, 2);
       const thiefL3 = await makeCharacter(edition, "Rogue", `Regrants Thief L3 ${edition}`, 3, "Thief");
-      // The monk is here for `dodge` on EDITION_2024: patientDefenseFocus is the
-      // only row that regrants it, so without a monk the loop below would never
-      // reach that key and the route gate would be narrower than
-      // REGRANTED_UNIVERSAL_KEYS. #1499 tags patientDefenseFocus (and its three
-      // Patient Defense / Step of the Wind siblings) EDITION_2024 — SRD 5.1's
-      // versions cost a flat 1 ki with no free/paid split, so a 2014 monk no
-      // longer sees this row at all (matchesActionGate filters it before
-      // `regrants` is ever read), and "dodge" drops out of the 2014 seen set.
+      // The monk exists for `dodge` on 2024: patientDefenseFocus is the only row that regrants it, and SRD 5.1's version (#1499, no free/paid split) means a 2014 monk never sees this row, so `dodge` drops from the 2014 seen set.
       const monkL2 = await makeCharacter(edition, "Monk", `Regrants Monk L2 ${edition}`, 2);
       const served = await servedUniversals(edition);
 
@@ -120,19 +95,11 @@ describe("GET /api/characters/:id — availableActions[].regrants", () => {
         }
       }
 
-      // Without this the loop above passes vacuously on an empty payload. The
-      // set is every key any DERIVED_ACTIONS row regrants today FOR THIS
-      // edition, so a new row regranting something else has to widen this
-      // deliberately. #1500 authors the ki-costed 2014 patientDefenseKi row
-      // (SRD 5.1 PHB'14 p.78: "You can spend 1 ki point to take the Dodge
-      // action as a bonus action on your turn") — both editions now regrant
-      // the identical five-key set, just via different rows/keys
-      // (patientDefenseFocus for 2024, patientDefenseKi for 2014).
+      // Without this, the loop above passes vacuously on an empty payload.
+      // SRD 5.1 PHB'14 p.78: patientDefenseKi lets you spend 1 ki to take Dodge as a bonus action.
       const expectedKeys = ["dash", "disengage", "dodge", "hide", "useObject"];
       expect([...seen].sort()).toEqual(expectedKeys);
 
-      // The reason the class row stores keys: this ONE key resolves to two
-      // different names, and only the served row knows which one applies.
       expect(served.get("useObject")!.name).toBe(edition === "EDITION_2024" ? "Utilize" : "Use an Object");
     });
   }

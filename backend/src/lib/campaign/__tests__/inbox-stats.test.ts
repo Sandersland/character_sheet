@@ -60,7 +60,6 @@ describe("foldMentionStats", () => {
       ],
       survivorOf,
     );
-    // All three refs accumulate at the survivor — none stranded on the old id.
     expect(stats.has("oldSergeant")).toBe(false);
     expect(stats.get("guardCaptain")).toEqual({
       mentionCount: 3,

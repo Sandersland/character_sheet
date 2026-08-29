@@ -1,9 +1,3 @@
-// POST /api/characters — 2024 species-granted creation choices (#1690): 2024
-// Human's Skillful (choose 1 skill, unrestricted) + Versatile (choose 1
-// Origin feat), and 2024 Elf's Keen Senses (choose 1 of Insight/Perception/
-// Survival). Mirrors species-creation-choices.test.ts's (#1689) structure —
-// same real-seeded-catalog exercise, same both-direction no-spec pins, this
-// slice's own content instead of the 2014 wave-1 rows.
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -31,19 +25,13 @@ async function post(body: object) {
 
 const BASE_SCORES = { strength: 12, dexterity: 12, constitution: 12, intelligence: 14, wisdom: 10, charisma: 10 };
 
-// Fighter's own skill picks (2 of skillChoiceCount) + Soldier's fixed grant
-// (athletics, intimidation) — the FULL class+background pool the create body
-// sends (frontend's buildCreatePayload shape, mirrored here).
+// Fighter's 2 skill picks + Soldier's fixed grant (athletics, intimidation) — the full class+background pool, mirroring frontend's buildCreatePayload shape.
 const CLASS_BACKGROUND_SKILLS = ["history", "insight", "athletics", "intimidation"];
 
 async function human2024() {
   return prisma.species.findFirstOrThrow({ where: { slug: "human", edition: "EDITION_2024" } });
 }
-// #1683 landed the Elf lineage variants (Drow/High Elf/Wood Elf) alongside
-// this slice — every 2024 Elf lineage grants a spell (species-granted-spells-
-// data.ts), so a 2024 Elf create always needs BOTH variantId+castingAbility
-// (#1683) AND speciesSkills (Keen Senses, this slice) — Wood Elf here purely
-// to keep the fixture simple, not because the other two behave differently.
+// Every 2024 Elf lineage grants a spell, so create needs BOTH variantId+castingAbility (#1683) AND speciesSkills (Keen Senses) — Wood Elf here just to keep the fixture simple.
 async function elf2024() {
   const elf = await prisma.species.findFirstOrThrow({
     where: { slug: "elf", edition: "EDITION_2024" },
@@ -53,15 +41,11 @@ async function elf2024() {
   return { elf, woodElf };
 }
 async function featByName(name: string) {
-  // This whole file exercises 2024 characters only — pinned to EDITION_2024
-  // since #1310 gave every General/Origin feat a 2014 sibling (a bare-name
-  // lookup would resolve non-deterministically between the two rows).
+  // Pinned to EDITION_2024 — #1310 gave every General/Origin feat a 2014 sibling, so a bare-name lookup would resolve non-deterministically.
   return prisma.feat.findFirstOrThrow({ where: { name, edition: "EDITION_2024" } });
 }
 
-// Soldier's own Origin feat is Savage Attacker (catalog-data.ts) — a DIFFERENT
-// feat from every species pick below unless a test says otherwise, so the
-// happy-path cases never accidentally collide with the background's own grant.
+// Soldier's own Origin feat is Savage Attacker — different from every species pick below, so happy-path cases never collide with the background's own grant.
 const baseBody = {
   name: "2024 Species Choice Tester",
   alignment: "True Neutral",
@@ -93,9 +77,7 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
       .sort();
     expect(proficient).toEqual([...CLASS_BACKGROUND_SKILLS, "stealth"].sort());
 
-    // Tough: +2 maxHp per level (feats.ts) — active through the SAME feat
-    // layer the background's own Origin feat rides (advancements[].improvements),
-    // zero new derivation. Fighter d10 + CON mod(1) = 11 base, +2 Tough = 13.
+    // Tough is active through the SAME feat layer as the background's own Origin feat (advancements[].improvements) — Fighter d10 + CON(1) = 11 base, +2 Tough = 13.
     expect(res.body.hitPoints.max).toBe(13);
 
     const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
@@ -105,10 +87,6 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
 
   it("400s with a distinct message for a non-Origin-category feat", async () => {
     const human = await human2024();
-    // Great Weapon Fighting is a fighting_style feat, never an Origin one.
-    // Pinned to EDITION_2024 (#1311): featByName's bare name lookup became
-    // ambiguous once a 2014 "Great Weapon Fighting" row existed alongside it,
-    // and this create is itself a 2024 character (human2024).
     const style = await prisma.feat.findFirstOrThrow({ where: { name: "Great Weapon Fighting", edition: "EDITION_2024" } });
     const res = await post({
       ...baseBody,
@@ -122,7 +100,6 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
 
   it("400s with a distinct message when the species feat duplicates the background's own Origin feat and it is NOT repeatable", async () => {
     const human = await human2024();
-    // Soldier's own Origin feat (baseBody's background) is Savage Attacker — not repeatable.
     const savageAttacker = await featByName("Savage Attacker");
     const res = await post({
       ...baseBody,
@@ -139,10 +116,9 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
     const magicInitiate = await featByName("Magic Initiate");
     const res = await post({
       ...baseBody,
-      background: "Sage", // Sage's own Origin feat (catalog-data.ts) is also Magic Initiate.
+      background: "Sage", // Sage's own Origin feat is also Magic Initiate.
       skillProficiencies: ["history", "arcana", "athletics", "intimidation"],
-      // Sage's own abilityChoices are constitution/intelligence/wisdom — baseBody's
-      // strength/dexterity spread is Soldier's own, invalid here.
+      // Sage's own abilityChoices are constitution/intelligence/wisdom — baseBody's strength/dexterity spread is Soldier's own, invalid here.
       backgroundAbilities: { constitution: 2, intelligence: 1 },
       speciesId: human.id,
       speciesSkills: ["stealth"],

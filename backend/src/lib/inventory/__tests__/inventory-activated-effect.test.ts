@@ -26,7 +26,6 @@ const BASE_CHAR = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-// Boots of Speed: bonus action, +30 speed, once per long rest, until a long rest.
 const bootsCapability = {
   kind: "activatedEffect" as const,
   activation: "bonus" as const,
@@ -134,7 +133,6 @@ describe("item activatedEffect activate/deactivate (#543)", () => {
     const row = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
     expect(row.activatedUsesSpent).toBe(0);
     expect(await buffCount(characterId, itemId)).toBe(0);
-    // Use is restored — can activate again.
     await applyInventoryOperations(characterId, [{ type: "activate", inventoryItemId: itemId }]);
     expect((await serialize(characterId)).speed).toBe(60);
   });
@@ -184,7 +182,6 @@ describe("item activatedEffect activate/deactivate (#543)", () => {
     await expect(
       applyInventoryOperations(characterId, [{ type: "activate", inventoryItemId: itemId }]),
     ).rejects.toThrow(/already active/i);
-    // Uses not double-spent: still 1 spent, not 2.
     const row = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
     expect(row.activatedUsesSpent).toBe(1);
   });

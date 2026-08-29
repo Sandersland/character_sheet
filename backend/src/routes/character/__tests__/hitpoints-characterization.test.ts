@@ -1,20 +1,5 @@
-/**
- * Characterization lock for the HP transaction event stream (#614).
- *
- * The ~280-line dispatcher in lib/combat/hitpoints.ts (applyHitPointOperations) is the
- * sole emitter of HP audit events: per op it writes ONE `hitPoints` event whose
- * before/after sub-state is assembled by a chain of conditional blocks, then may
- * append follow-on events (rest buff-clears, while-active clears, a
- * concentration check) sharing the batchId. This oracle pins the EXACT emitted
- * stream — per-op event count, ordered types, category, summary, before/after,
- * and data — so the phase-helper decomposition is provably byte-identical. It
- * must be green now and stay green UNEDITED after the refactor.
- *
- * The load-bearing risks it guards:
- *  - the before/after key assembly (hitPoints/hitDice always; spellcasting +
- *    resources on longRest; classEntryLevel on levelUp);
- *  - the follow-on ordering: main hitPoints event THEN concentration event.
- */
+// Characterization lock for applyHitPointOperations's HP event stream (#614) — must stay green, unedited, through the phase-helper decomposition.
+// Guards: before/after key assembly (hitPoints/hitDice always; spellcasting+resources on longRest; classEntryLevel on levelUp) and follow-on ordering (main hitPoints event before a concentration event, sharing batchId).
 
 import { randomUUID } from "node:crypto";
 
@@ -66,11 +51,7 @@ beforeAll(async () => {
     update: {},
   });
   fighterClassId = fighter.id;
-  // #1546 Part B-ii: Battle Master's short-or-long resource pool is ROW-driven
-  // now (fighter.ts's resourceFn is gone) — a bespoke Subclass row with no
-  // ClassFeature children would silently lose it, same failure mode
-  // fighterResourceRowsData's own header describes for the base class (#1546
-  // Part B-i, Ruling 2). Shared helper, not a per-file copy.
+  // battleMasterResourceRowsData is a shared helper — a bespoke Subclass row with no ClassFeature children would silently lose its resource pool (#1546).
   const bm = await upsertEditionRow(
     prisma.subclass,
     { classId: fighter.id, name: BM_SUBCLASS_NAME, edition: null },
@@ -88,7 +69,6 @@ afterEach(async () => {
   await prisma.character.deleteMany({ where: { name: { startsWith: "HPChar" } } });
 });
 
-// Level-5 fighter (XP 6500), 10/44 HP, 3 of 5 hit dice spent.
 async function createPlain(id: string, overrides: Record<string, unknown> = {}) {
   return prisma.character.create({
     data: {
@@ -188,7 +168,6 @@ describe("HP transaction event-stream characterization (#614)", () => {
     expect(ev.type).toBe("longRest");
     expect(ev.summary).toBe("Long rest — +34 HP");
     expect(ev.data).toEqual({ recovered: 3, hpRestored: 34, slotsRestored: 0, resourcesRestored: 0, itemSpellsRestored: 0 });
-    // before/after assemble hitPoints + hitDice + spellcasting + resources.
     expect(ev.before).toEqual({
       hitPoints: { current: 10, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
       hitDice: { total: 5, die: "d10", spent: 3 },
@@ -212,14 +191,12 @@ describe("HP transaction event-stream characterization (#614)", () => {
     expect(evs).toHaveLength(1);
     const [ev] = evs;
     expect(ev.type).toBe("shortRest");
-    // current 10 + roll 6 + conMod 2 = 18; one hit die spent (3→4).
     expect((ev.after as { hitPoints: { current: number }; hitDice: { spent: number } }).hitPoints.current).toBe(18);
     expect((ev.after as { hitDice: { spent: number } }).hitDice.spent).toBe(4);
     expect(ev.summary).toBe("Short rest — spent 1 hit die: +8 HP");
   });
 
   it("levelUp: single hitPoints event, captures classEntryLevel diff", async () => {
-    // Class entry + hitDice at level 4, but XP derives level 5 → a pending level-up.
     await createPlain("hp-levelup", {
       hitDice: { total: 4, die: "d10", spent: 0 },
       hitPoints: { current: 34, max: 34, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -237,9 +214,7 @@ describe("HP transaction event-stream characterization (#614)", () => {
     expect(ev.summary).toBe("Leveled up to 5 (+8 HP)");
   });
 
-  // The follow-on ordering the phase decomposition most endangers: the main
-  // hitPoints event is emitted BEFORE the concentration event, sharing batchId.
-  // Damage to exactly 0 HP drops concentration deterministically (no random save).
+  // Damage to exactly 0 HP drops concentration deterministically — no random save, so the ordering is provable.
   it("damage to 0 HP while concentrating: [damage, concentrationDropped] in order", async () => {
     await createPlain("hp-conc", {
       hitPoints: { current: 6, max: 20, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -255,7 +230,7 @@ describe("HP transaction event-stream characterization (#614)", () => {
     const evs = await events("hp-conc");
     expect(evs.map((e) => e.type)).toEqual(["damage", "concentrationDropped"]);
     expect(evs.map((e) => e.category)).toEqual(["hitPoints", "spellcasting"]);
-    // Same batch → LIFO undo reverses HP + concentration together.
+    // Same batch → LIFO undo reverses HP and concentration together.
     expect(evs[0].batchId).toBe(evs[1].batchId);
     expect(evs[0].batchId).toBeTruthy();
 
@@ -268,25 +243,11 @@ describe("HP transaction event-stream characterization (#614)", () => {
   });
 });
 
-/**
- * Rest/level-up branch pins (#684) — the branches the shortRest/longRest/
- * levelUp/snapshot decomposition most endangers, unpinned by the block above:
- * Warlock Pact-slot restore, subclass resource resets, item castSpell resets
- * (+ attunement gating), deterministic charge-pool recharge, consumable
- * recharge, the shortRest before-only resources asymmetry, and the three
- * levelUp target payloads. Deliberately deterministic: no rechargeDice pools,
- * one item per test (DB row order is unordered), client-supplied rolls.
- * Same contract as the block above: green now, UNEDITED through the refactor.
- */
+// Rest/level-up branch pins (#684): Warlock Pact-slot restore, subclass resource resets, item castSpell resets, charge-pool/consumable recharge, shortRest's before-only resources asymmetry, and the three levelUp target payloads — green now, unedited through the refactor.
 describe("rest/level-up branch pins (#684)", () => {
   const WIZ_CLASS = "Test Wizard (HP684 Suite)";
   let wizClassId: string;
-  // A real Warlock CharacterClass fixture so the shortRest Warlock entry carries
-  // a classId (mirroring production data), not just a bare name string. The
-  // fixture NAME is test-scoped to avoid clobbering the seeded "Warlock" class;
-  // the class *entry* keeps name "Warlock" so restoreWarlockPactSlots' current
-  // name-string detection still fires — and a future relation-based detection
-  // now has a class relation to read instead of silently skipping the branch.
+  // The class entry keeps name "Warlock" so restoreWarlockPactSlots' name-string detection fires; WARLOCK_CLASS is only the test-scoped CharacterClass row name, to avoid clobbering the seeded Warlock class.
   const WARLOCK_CLASS = "Test Warlock (HP684 Suite)";
   let warlockClassId: string;
 
@@ -308,11 +269,7 @@ describe("rest/level-up branch pins (#684)", () => {
       update: {},
     });
     wizClassId = wiz.id;
-    // #1234 commit 3: Arcane Recovery's pool moved off wizard.ts's resourceFn
-    // onto its ClassFeature row (wizard-features.ts) — this bespoke test
-    // class needs its own row now, or the longRest-reset test below finds no
-    // arcaneRecovery pool at all (poolsFromRows reads a real relation, not
-    // the old name-keyed TS registry).
+    // poolsFromRows reads a real relation, not a name-keyed registry — this fixture class needs its own Arcane Recovery row (#1234).
     await prisma.classFeature.deleteMany({ where: { classId: wiz.id, name: "Arcane Recovery" } });
     await prisma.classFeature.createMany({
       data: (["EDITION_2014", "EDITION_2024"] as const).map((edition) => ({
@@ -371,8 +328,7 @@ describe("rest/level-up branch pins (#684)", () => {
         concentratingOn: { entryId: "conc-684", spellName: "Test Hex" },
       },
     });
-    // The asymmetry: shortRest lifts resources into before ONLY — after has no
-    // resources key. Slots cleared; arcanum and concentration preserved.
+    // shortRest lifts resources into before only — after has no resources key.
     expect(ev.after).toEqual({
       hitPoints: { ...BASE_HP, current: 18 },
       hitDice: { ...BASE_HD, spent: 4 },
@@ -406,7 +362,6 @@ describe("rest/level-up branch pins (#684)", () => {
       hitDice: BASE_HD,
       resources: { ...EMPTY_RESOURCES, used: { superiorityDice: 3 } },
     });
-    // Non-Warlock: no spellcasting key either — hitPoints + hitDice only.
     expect(ev.after).toEqual({
       hitPoints: { ...BASE_HP, current: 18 },
       hitDice: { ...BASE_HD, spent: 4 },
@@ -418,8 +373,6 @@ describe("rest/level-up branch pins (#684)", () => {
 
   it("longRest with used slots + arcanum + concentration: all restored, concentration dropped", async () => {
     await createPlain("hp684-lr", {
-      // #1234 commit 3: classId now required — see this describe's beforeAll
-      // for why (poolsFromRows needs the real relation, not a bare name match).
       classEntries: { create: [{ name: "Wizard", classId: wizClassId, position: 0, level: 5 }] },
       spellcasting: {
         slotsUsed: { "1": 2, "2": 1 },
@@ -447,9 +400,7 @@ describe("rest/level-up branch pins (#684)", () => {
         concentratingOn: { entryId: "conc-684-lr", spellName: "Test Haste" },
       },
     });
-    // longRest (unlike shortRest) carries resources in BOTH before and after.
-    // The Wizard's Arcane Recovery pool (recharge longRest, #904) resets here,
-    // so its use counter appears zeroed in the after snapshot.
+    // longRest carries resources in both before and after (unlike shortRest); Arcane Recovery resets here (#904).
     expect(ev.after).toEqual({
       hitPoints: { ...BASE_HP, current: 44 },
       hitDice: { ...BASE_HD, spent: 0 },
@@ -521,10 +472,7 @@ describe("rest/level-up branch pins (#684)", () => {
   });
 
   it("longRest recharges a dawn-trigger charge pool (#555), lifted into before/after", async () => {
-    // The short-rest pin above covers rechargeTrigger "short"; this pins the
-    // long-rest arm with a "dawn" trigger (chargeTriggerRechargesOn fires it on
-    // "long" but NOT on "short"), so a long rest recharges it through the full
-    // transaction path.
+    // chargeTriggerRechargesOn fires "dawn" triggers on long rest, not short — this pins that arm.
     await createPlain("hp684-dawn");
     const capId = randomUUID();
     await prisma.inventoryItem.create({
@@ -600,7 +548,6 @@ describe("rest/level-up branch pins (#684)", () => {
 
     const attunedUse = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: attunedCapId } });
     expect(attunedUse.used).toBe(0);
-    // Neither equipped nor attuned → the gate skips it.
     const stowedUse = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: stowedCapId } });
     expect(stowedUse.used).toBe(2);
   });
@@ -682,14 +629,12 @@ describe("rest/level-up branch pins (#684)", () => {
       expect(res.body).toEqual({ error: message });
     }
 
-    // Base fixture: 5 total hit dice, 3 spent → 2 available; d10; no pending level-up.
     await createPlain("hp684-err");
     await expect400("hp684-err", { type: "shortRest", rolls: [5, 5, 5] }, "Cannot spend 3 hit dice; only 2 available");
     await expect400("hp684-err", { type: "shortRest", rolls: [11] }, "Hit die rolls must be between 1 and 10 (die: d10)");
     await expect400("hp684-err", { type: "levelUp", method: "average" }, "No pending level-up: already at level 5 (XP derives level 5)");
     expect(await events("hp684-err")).toHaveLength(0); // failed ops roll back without logging
 
-    // Pending level-up (4 of 5) single-class: roll bounds; multiclass: target required.
     await createPlain("hp684-err2", {
       hitDice: { total: 4, die: "d10", spent: 0 },
       classEntries: { create: [{ name: CLASS_NAME, classId: fighterClassId, position: 0, level: 4 }] },
@@ -718,18 +663,7 @@ describe("rest/level-up branch pins (#684)", () => {
   });
 });
 
-/**
- * revertHitPointsEvent + rechargeItemChargePoolsOnRest branch pins (#706).
- *
- * Both functions are decomposition targets (#690 wave 1A). The forward-path
- * chargePools/consumableCharges snapshots are already pinned above (the
- * "rest/level-up branch pins" block), but nothing exercised: (a) the
- * full-refill charge-pool formula (no rechargeDice, no rechargeBonus), or
- * (b) revertHitPointsEvent's consumableCharges/chargePools undo branches at
- * the DB level (only the event before/after JSON was pinned, not the actual
- * re-expend on revert). These three tests close those gaps so the
- * decomposition of both functions is provably byte-identical.
- */
+// revertHitPointsEvent + rechargeItemChargePoolsOnRest branch pins (#706) — closes gaps the forward-path pins above miss: the full-refill charge-pool formula, and revertHitPointsEvent's DB-level undo of chargePools/consumableCharges.
 describe("revertHitPointsEvent + rechargeItemChargePoolsOnRest branch pins (#706)", () => {
   async function revertBatch(id: string, batchId: string) {
     return supertest(app).post(`/api/characters/${id}/events/${batchId}/revert`).set("Cookie", COOKIE).send();
@@ -777,14 +711,14 @@ describe("revertHitPointsEvent + rechargeItemChargePoolsOnRest branch pins (#706
     expect(res.status).toBe(200);
 
     const afterRest = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: capId } });
-    expect(afterRest.used).toBe(2); // 4 - 2 (fixed bonus)
+    expect(afterRest.used).toBe(2);
 
     const [ev] = await events("hp706-revert-pool");
     const rev = await revertBatch("hp706-revert-pool", ev.batchId!);
     expect(rev.status).toBe(200);
 
     const afterRevert = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: capId } });
-    expect(afterRevert.used).toBe(4); // re-expended to the pre-rest value
+    expect(afterRevert.used).toBe(4);
   });
 
   it("revert of a longRest that recharged consumables re-expends them (revertHitPointsEvent consumableCharges branch)", async () => {
@@ -808,6 +742,6 @@ describe("revertHitPointsEvent + rechargeItemChargePoolsOnRest branch pins (#706
     expect(rev.status).toBe(200);
 
     const afterRevert = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
-    expect(afterRevert.usesRemaining).toBe(1); // re-expended to the pre-rest value
+    expect(afterRevert.usesRemaining).toBe(1);
   });
 });

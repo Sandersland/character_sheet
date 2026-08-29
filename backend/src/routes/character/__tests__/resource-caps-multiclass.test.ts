@@ -1,12 +1,4 @@
-/**
- * Entry-scoped resource-op caps for multiclass characters (#1177). Before the
- * fix, applyResourceOpInTx derived every choice cap (e.g. maneuverChoiceCount)
- * from classEntries[0] (the PRIMARY entry) at TOTAL level — so a non-primary
- * Battle Master's maneuver cap was silently derived from the wrong class at the
- * wrong level. A spellcaster primary (no maneuverChoiceCount of its own) made
- * the cap check `undefined` → skipped entirely → unbounded learns.
- */
-
+// applyResourceOpInTx must derive each choice cap (e.g. maneuverChoiceCount) from the entry that grants it, not classEntries[0] (the primary) at total level (#1177).
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -47,9 +39,7 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
     beforeEach(async () => {
       const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
       const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-      // #1524: production always sets subclassId alongside the subclass
-      // string (routes/character/class.ts, level-up.ts); resolved here so
-      // this fixture matches that shape.
+      // Production always sets subclassId alongside the subclass string; resolved here so this fixture matches that shape (#1524).
       const evocation = await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } });
       const battleMaster = await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Battle Master" } });
       await prisma.character.create({
@@ -58,7 +48,7 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
           id: CHAR_ID,
           name: "Res Caps MC Maneuvers",
           ownerId: OWNER_ID,
-          experiencePoints: 64000, // total level 10 (wizard 7 + fighter 3), no pending level-up
+          experiencePoints: 64000,
           hitDice: { total: 10, die: "d8", spent: 0 },
           abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 16, wisdom: 10, charisma: 10 },
           spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
@@ -81,19 +71,14 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
       const maneuvers = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 4, select: { id: true } });
       expect(maneuvers).toHaveLength(4);
 
-      // First 3 (the fighter-3 Battle Master cap) succeed.
       for (const m of maneuvers.slice(0, 3)) {
         const res = await agent().post(resourcesUrl).send({ operations: [{ type: "learnManeuver", maneuverId: m.id }] });
         expect(res.status).toBe(200);
       }
       const afterThree = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(afterThree.body.resources.maneuversKnown).toHaveLength(3);
-      // maneuverChoiceCount on the read side is clamp-on-read territory (#1177
-      // chunk 3 — buildResourcesView); this test only pins the write-side cap.
+      // maneuverChoiceCount read-side clamp is buildResourcesView's job (#1177) — this test only pins the write-side cap.
 
-      // A 4th learn is beyond the fighter-3 cap — must be rejected. Before the
-      // fix, the wizard primary carries no maneuverChoiceCount at all, so the
-      // cap check was skipped entirely and this 4th learn silently succeeded.
       const fourth = await agent().post(resourcesUrl).send({ operations: [{ type: "learnManeuver", maneuverId: maneuvers[3].id }] });
       expect(fourth.status).toBe(400);
 
@@ -109,9 +94,7 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
     beforeEach(async () => {
       const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
       const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-      // #1524: production always sets subclassId alongside the subclass
-      // string (routes/character/class.ts, level-up.ts); resolved here so
-      // this fixture matches that shape.
+      // Production always sets subclassId alongside the subclass string; resolved here so this fixture matches that shape (#1524).
       const evocation = await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } });
       const battleMaster = await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Battle Master" } });
       await prisma.character.create({
@@ -120,7 +103,7 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
           id: CHAR_ID,
           name: "Res Caps MC ToolProf",
           ownerId: OWNER_ID,
-          experiencePoints: 64000, // total level 10 (wizard 7 + fighter 3), no pending level-up
+          experiencePoints: 64000,
           hitDice: { total: 10, die: "d8", spent: 0 },
           abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 16, wisdom: 10, charisma: 10 },
           spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
@@ -139,9 +122,7 @@ describe("entry-scoped resource-op caps — multiclass (#1177)", () => {
       await prisma.character.deleteMany({ where: { id: CHAR_ID } });
     });
 
-    // Closes a coverage gap (not a red-first case: the write-side cap check
-    // already goes through the same deriveEntryScopedResources/overlayExtrasFields
-    // path the maneuver test above exercises, so this passes on the current fix).
+    // This goes through the same deriveEntryScopedResources/overlayExtrasFields path the maneuver test above exercises.
     it("caps learnToolProficiency at the SECONDARY fighter entry's Student of War count (1)", async () => {
       const first = await agent()
         .post(resourcesUrl)

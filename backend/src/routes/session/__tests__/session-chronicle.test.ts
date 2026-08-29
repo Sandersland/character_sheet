@@ -7,9 +7,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 
-// Chronicle read model + participant-editable session titles (#863). Real
-// Postgres, supertest against the shared `app`. Sessions are created directly via
-// prisma with explicit startedAt so the derived sessionNumber is deterministic.
+// Sessions are created directly via prisma with explicit startedAt so the derived sessionNumber is deterministic.
 
 const OWNER = "owner-chronicle-owner";
 const PLAYER = "owner-chronicle-player";
@@ -90,7 +88,6 @@ describe("chronicle payload — GET /api/campaigns/:id/sessions", () => {
       data: { campaignId, startedAt: new Date("2026-01-03T00:00:00Z") },
     });
 
-    // CHAR_PLAYER: 2 entries in A, 1 in C, none in B.
     for (const [sessionId, count] of [[a.id, 2], [c.id, 1]] as const) {
       for (let i = 0; i < count; i++) {
         await prisma.journalEntry.create({
@@ -110,21 +107,17 @@ describe("chronicle payload — GET /api/campaigns/:id/sessions", () => {
       .query({ characterId: CHAR_PLAYER });
     expect(res.status).toBe(200);
 
-    // Newest-first ordering (unchanged): C, B, A.
     expect(res.body.map((s: { id: string }) => s.id)).toEqual([c.id, b.id, a.id]);
 
     const byId = Object.fromEntries(
       res.body.map((s: { id: string; sessionNumber: number; noteCount: number; arcId: string | null }) => [s.id, s]),
     );
-    // sessionNumber derived 1-based by startedAt ASCENDING.
     expect(byId[a.id].sessionNumber).toBe(1);
     expect(byId[b.id].sessionNumber).toBe(2);
     expect(byId[c.id].sessionNumber).toBe(3);
-    // note counts for the passed character.
     expect(byId[a.id].noteCount).toBe(2);
     expect(byId[b.id].noteCount).toBe(0);
     expect(byId[c.id].noteCount).toBe(1);
-    // arcId surfaced.
     expect(byId[a.id].arcId).toBe(arcId);
     expect(byId[b.id].arcId).toBeNull();
   });
@@ -169,20 +162,17 @@ describe("session title editing — PATCH { title }", () => {
       data: { sessionId: session.id, characterId: CHAR_PLAYER },
     });
 
-    // Participant (PLAYER owns CHAR_PLAYER, joined to the session).
     const ok = await agent(cookiePlayer)
       .patch(`/api/campaigns/${campaignId}/sessions/${session.id}`)
       .send({ title: "The Sunless Citadel" });
     expect(ok.status).toBe(200);
     expect(ok.body.title).toBe("The Sunless Citadel");
 
-    // Member with no character in the session.
     const forbidden = await agent(cookieNonpart)
       .patch(`/api/campaigns/${campaignId}/sessions/${session.id}`)
       .send({ title: "Nope" });
     expect(forbidden.status).toBe(403);
 
-    // Non-member.
     const outsider = await agent(cookieOutsider)
       .patch(`/api/campaigns/${campaignId}/sessions/${session.id}`)
       .send({ title: "Also nope" });

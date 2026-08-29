@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
 
-// Mirrors the backfill CASE in migrations/…_campaign_item_rarity_enum. Exercising
-// the same expression in Postgres guards the case-insensitive mapping: known
-// values map to their tier, blank/unrecognized text → NULL.
 function mapRaritySql(input: string | null) {
   return prisma.$queryRaw<{ mapped: string | null }[]>`
     SELECT (

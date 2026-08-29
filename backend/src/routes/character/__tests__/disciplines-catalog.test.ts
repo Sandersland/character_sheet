@@ -1,11 +1,3 @@
-/**
- * GET /api/disciplines route tests (#1505) — mirrors maneuvers.test.ts's
- * edition-gate coverage plus the new `effect`/`steps` fields this route adds
- * over the generic /api/subclass-choices/discipline picker: the Way of the
- * Four Elements cast UI needs a resolved roll per selectable ki amount
- * (mirrors decorateSpellEffects' `effectRolls[]`), not just the base cost.
- */
-
 import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 

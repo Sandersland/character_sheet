@@ -1,10 +1,3 @@
-/**
- * The shared ability endpoint (#1275): POST /api/characters/:id/abilities/:abilityKey/transactions.
- * Covers the dispatch contract (unknown key, auth, missing character) plus a
- * registry-driven table, so an ability added to ABILITY_REGISTRY is gated here
- * automatically instead of via a hand-maintained list of URLs.
- */
-
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -27,7 +20,7 @@ let COOKIE: string;
 const FIXTURE_BASE = {
   name: "Abilities Test Rogue",
   alignment: "Chaotic Neutral",
-  experiencePoints: 23000, // level 7
+  experiencePoints: 23000,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 44, max: 44, temp: 0 },
@@ -83,9 +76,7 @@ describe("POST /api/characters/:id/abilities/:abilityKey/transactions", () => {
     expect(res.body).toEqual({ error: "Unknown ability" });
   });
 
-  // Key resolution deliberately precedes assertCharacterAccess, so an unknown key
-  // on someone else's sheet is 404 not 403 — matching what an unknown URL already
-  // did via the /api catch-all. Ability keys are not secret.
+  // Key resolution precedes assertCharacterAccess: unknown key is 404, not 403 — ability keys are not secret.
   it("404s an unknown ability key even on a character the caller can't edit", async () => {
     const res = await agent().post(abilityUrl(OTHER_ID, "not-a-real-ability")).send({ operations: [] });
     expect(res.status).toBe(404);
@@ -99,8 +90,6 @@ describe("POST /api/characters/:id/abilities/:abilityKey/transactions", () => {
     expect(res.status).toBe(401);
   });
 
-  // A schema-valid op on the wrong class proves dispatch reaches the handler's
-  // apply (past zod), not just the envelope validation the matrix below covers.
   it("dispatches a valid op batch through to the ability's own handler", async () => {
     const res = await agent()
       .post(abilityUrl(FIXTURE_ID, "stunning-strike"))
@@ -110,8 +99,7 @@ describe("POST /api/characters/:id/abilities/:abilityKey/transactions", () => {
   });
 });
 
-// Registry-driven so a newly registered ability inherits the whole gate matrix
-// instead of needing a row added to a list someone has to remember (#1275).
+// An ability added to ABILITY_REGISTRY inherits this whole gate matrix automatically (#1275).
 describe.each(Object.keys(ABILITY_REGISTRY))("ability %s", (key) => {
   it("404s a missing character", async () => {
     const res = await agent().post(abilityUrl(MISSING_ID, key)).send({ operations: [] });

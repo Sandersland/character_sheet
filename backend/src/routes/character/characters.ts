@@ -19,8 +19,6 @@ import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 
 export const charactersRouter = Router();
 
-// Owner-scoped listing: a caller only ever sees their own characters. The
-// authenticated user is attached by requireAuth (app.ts).
 charactersRouter.get("/characters", async (req, res) => {
   const characters = await prisma.character.findMany({
     where: { ownerId: req.user!.id },
@@ -51,9 +49,6 @@ charactersRouter.get("/characters/:id", async (req, res) => {
   res.json(await serializeCharacter(character));
 });
 
-// Thin controller: parse the HTTP contract, delegate domain work to
-// createCharacter (lib/character/character-create.ts), then re-fetch + serialize with the
-// same persist-then-reserialize idiom the mutation routes use.
 charactersRouter.post("/characters", async (req, res) => {
   const parseResult = createCharacterSchema.safeParse(req.body);
 
@@ -78,11 +73,7 @@ charactersRouter.post("/characters", async (req, res) => {
   res.status(201).json(await serializeCharacter(character));
 });
 
-/**
- * One-line delta summary for a currencyAdjust event, e.g.
- * "Currency adjusted (+5 gp, −2 sp)" — or a bare "Currency adjusted" when the
- * patch left every denomination unchanged.
- */
+// e.g. "Currency adjusted (+5 gp, −2 sp)", or bare "Currency adjusted" when no denomination changed.
 export function currencyAdjustSummary(
   oldCurrency: Record<string, number>,
   newCurrency: Record<string, number>,
@@ -112,8 +103,7 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
     select: { id: true, currency: true },
   });
 
-  // If currency is changing, log a currencyAdjust event in the same
-  // transaction so the activity timeline records bare DM-handed-over amounts.
+  // Logs a currencyAdjust event only when currency changed, so DM-handed-over amounts show in the timeline.
   let updated: Awaited<ReturnType<typeof prisma.character.findUnique>> & object;
   const patchData = parseResult.data as Prisma.CharacterUpdateInput;
 
@@ -150,10 +140,7 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
   res.json(await serializeCharacter(updated as Parameters<typeof serializeCharacter>[0]));
 });
 
-// Campaign-scoped play preferences (#537). Thin owner-only upsert of the prefs
-// row for (character, its current campaignId). No audit event / EventCategory —
-// these are cosmetic play settings, not a domain mutation. 400 when the
-// character isn't attached to a campaign (there's no scope to write to).
+// No audit event: cosmetic play settings, not a domain mutation.
 charactersRouter.patch("/characters/:id/campaign-preferences", async (req, res) => {
   const parseResult = campaignPreferencesSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -192,13 +179,9 @@ charactersRouter.delete("/characters/:id", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const portraitKey = await storedPortraitKey(req.params.id);
-  // All child relations (CharacterRace, CharacterBackground, CharacterClassEntry,
-  // InventoryItem, CharacterEvent/CharacterEventField, and their grandchildren)
-  // are onDelete: Cascade in the schema, so a single delete is fully atomic.
+  // Every child relation is onDelete: Cascade in the schema, so this single delete is fully atomic.
   await prisma.character.delete({ where: { id: req.params.id } });
-  // Portrait blob cleanup AFTER the row delete (#1615): the blob store isn't
-  // part of the DB transaction, and best-effort failure only orphans a blob —
-  // never a half-deleted character.
+  // After the row delete: the blob store isn't part of the DB transaction, so a failure here only orphans a blob, never leaves a half-deleted character.
   await deletePortraitBlobBestEffort(portraitKey);
   res.status(204).end();
 });

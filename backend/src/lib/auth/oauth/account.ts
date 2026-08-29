@@ -2,13 +2,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import type { TokenColumns } from "./flow.js";
 import type { AuthProvider, NormalizedProfile } from "./types.js";
 
-// Resolve the user a callback should authenticate, and persist the account.
-//   - Signed in: link the provider account to the current user, but only when
-//     the email is verified (mapProfile already nulled an unverified email).
-//     The session stays on the current user either way.
-//   - Not signed in: upsert by (provider, providerAccountId) ONLY — never merge
-//     by email — minting a fresh User on first sight.
-// Tokens are refreshed on every callback.
+// Signed in: link the provider account to the current user, but only when the email is verified (mapProfile already nulled an unverified email) — the session stays on the current user either way. Not signed in: upsert by (provider, providerAccountId) ONLY, never merge by email, minting a fresh User on first sight.
 export async function resolveUserId(
   provider: AuthProvider,
   profile: NormalizedProfile,
@@ -30,9 +24,7 @@ export async function resolveUserId(
           providerAccountId: profile.providerAccountId,
           ...tokens,
         },
-        // Never reassign userId on an existing link: if this (provider,
-        // providerAccountId) already belongs to another user, refresh only the
-        // tokens — silently transferring ownership would be account-link theft.
+        // Never reassign userId on an existing link — silently transferring ownership to another user would be account-link theft.
         update: tokens,
       });
     }

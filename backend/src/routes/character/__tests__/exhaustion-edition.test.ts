@@ -1,11 +1,3 @@
-/**
- * #1307 acceptance test: a persisted exhaustion level's *meaning* forks on
- * Character.rulesEdition. Same stored number (e.g. 3), different rules —
- * 2014 tiered disadvantage + Speed-halved vs. 2024's flat −2×level/−5 ft×level
- * (SRD 5.2). Both editions asserted here side by side, end to end through
- * GET /api/characters/:id, mirroring rules-edition-seam.test.ts's pattern.
- */
-
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -19,8 +11,6 @@ import { seededSpeciesAnchor } from "@/test-support/species.js";
 const OWNER_ID = "owner-exhaustion-edition";
 let COOKIE: string;
 
-// Hill Dwarf (speed 25, seeded catalog) keeps the Speed math simple and
-// matches the fixture already used by rules-edition.test.ts / rules-edition-seam.test.ts.
 const BASE = {
   alignment: "True Neutral",
   background: "Sage",
@@ -80,17 +70,13 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
         { mode: "disadvantage", kind: "save", source: "Exhaustion" },
       ]),
     );
-    // #1322 — the display sentence beside the Speed value and roll chips above:
-    // must agree with both, never contradict them (the bug this issue fixes).
+
     expect(char2014.exhaustionEffectText).toBe(
       "Disadvantage on attack rolls, ability checks, saving throws, and initiative; Speed halved.",
     );
 
-    // #1684: 2024 Dwarf is 30 ft (PHB'24 p. 22), NOT 2014's 25 ft — the two
-    // editions' Dwarf rows genuinely differ, unlike the pre-#1684 legacy
-    // `race`-name path, which resolved "Hill Dwarf" by name regardless of
-    // the character's own rulesEdition.
-    expect(char2024.speed).toBe(15); // 30 − 15 (−5 ft×level)
+    // 2024 Dwarf is 30 ft (PHB'24 p. 22), not 2014's 25 ft.
+    expect(char2024.speed).toBe(15);
     expect(char2024.rollModifiers).toEqual(
       expect.arrayContaining([
         { mode: "flat", modifier: -6, kind: "attack", source: "Exhaustion" },
@@ -106,7 +92,7 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
     const id = await createAt("EDITION_2014", "ExhEdition 2014-Human-L2", "Human");
     await setExhaustion(id, 2);
     const char = (await get(id)).body;
-    expect(char.speed).toBe(15); // 30 halved exactly — floor and ceil agree here
+    expect(char.speed).toBe(15);
   });
 
   it("2014 exhaustion 5: Speed is exactly 0 — not negative, not 25 less than base", async () => {
@@ -123,7 +109,7 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
     const id = await createAt("EDITION_2014", "ExhEdition 2014-L1");
     await setExhaustion(id, 1);
     const char = (await get(id)).body;
-    expect(char.speed).toBe(25); // Hill Dwarf base, untouched
+    expect(char.speed).toBe(25);
     expect(char.rollModifiers).toEqual([
       { mode: "disadvantage", kind: "check", source: "Exhaustion" },
       { mode: "disadvantage", kind: "initiative", source: "Exhaustion" },
@@ -152,11 +138,6 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
   });
 });
 
-// #1321: PHB'14 p. 291 level-4 tier — "Hit point maximum halved" — plus the
-// one-way current-HP clamp it forces (decisions 1/4/5). Direct prisma.character.create
-// fixtures (not the species-anchored creation route above) so the stored
-// hitPoints/hitDice/rulesEdition are exact and hand-authored, matching
-// backend/src/routes/character/__tests__/hitpoints.test.ts's FIXTURE pattern.
 const HP_FIXTURE_BASE = {
   alignment: "True Neutral",
   initiativeBonus: 0,
@@ -216,8 +197,7 @@ describe("exhaustion max-HP halving — PHB'14 p. 291 tier 4 (#1321)", () => {
     expect(res.body.hitPoints.current).toBe(15);
     expect(res.body.hitPoints.max).toBe(15);
 
-    // Persisted, not just a read-time overlay on the response: re-read the raw
-    // DB row's hitPoints.current directly.
+    // Re-reads the raw DB row directly, not just the response, to confirm persistence.
     const row = await prisma.character.findUniqueOrThrow({ where: { id }, select: { hitPoints: true } });
     expect((row.hitPoints as { current: number }).current).toBe(15);
   });

@@ -1,14 +1,8 @@
-// Pure mapper unit tests (#1534) — no database. mapStartingEquipmentPackage's
-// three omission rules are the whole content of the wire-equivalence AC, so
-// each is pinned directly here rather than relying on the route fixture alone
-// to exercise every branch (no seeded row exercises a null-null open pick yet).
+// #1534: mapStartingEquipmentPackage's three omission rules are the whole content of the wire-equivalence AC, pinned here since no seeded row exercises a null-null open pick.
 import { describe, expect, it } from "vitest";
 
 import { mapStartingEquipmentPackage, type StartingEquipmentPackageRow } from "../starting-equipment-package.js";
 
-// Builds a minimally-valid StartingEquipmentPackageRow — every field the type
-// requires is present (even ones the mapper ignores, e.g. id/classId/position)
-// so this compiles against the real Prisma payload shape, not a loosened stand-in.
 function packageRow(overrides: {
   groups: StartingEquipmentPackageRow["groups"];
   goldDiceCount?: number | null;
@@ -18,8 +12,7 @@ function packageRow(overrides: {
   return {
     id: "pkg-1",
     classId: "class-1",
-    // Nullable since #1565 (background reuse) — this fixture always
-    // represents a CLASS row, so backgroundId is always null.
+    // #1565: backgroundId is nullable for background reuse; this fixture always represents a CLASS row.
     backgroundId: null,
     name: "Fixture Class",
     edition: "EDITION_2014",
@@ -43,8 +36,7 @@ function optionRow(overrides: Partial<StartingEquipmentPackageRow["groups"][numb
   };
 }
 
-// #1564: every existing weapon open pick fixture defaults toolCategory: null,
-// boundToToolChoice: false — the pre-#1564 shape, unaffected by the new axes.
+// #1564: every existing weapon open pick fixture defaults toolCategory: null, boundToToolChoice: false — the pre-#1564 shape.
 function openPickRow(
   overrides: Partial<StartingEquipmentPackageRow["groups"][number]["options"][number]["openPicks"][number]>,
 ) {
@@ -92,9 +84,7 @@ describe("mapStartingEquipmentPackage", () => {
     });
   });
 
-  // [R7] — the load-bearing rule. StartingEquipmentEditor.tsx reads
-  // pick.filter.weaponClass unguarded; every seeded row today has a non-null
-  // weaponClass, so this is the one case no seeded row exercises.
+  // [R7]: StartingEquipmentEditor.tsx reads pick.filter.weaponClass unguarded; no seeded row exercises this null-null case.
   it("maps an open pick with both weaponClass and weaponRange null to filter: {} (present, empty)", () => {
     const row = packageRow({
       groups: [
@@ -218,9 +208,7 @@ describe("mapStartingEquipmentPackage", () => {
     ]);
   });
 
-  // #1564: every PHB'24 option carries GP (4-28 for a non-final option, 50-155
-  // for the flat final option); omitted on the wire when 0 (every 2014 option,
-  // and the PHB'24 non-gold options), same discipline as quantity/items/openPicks.
+  // #1564: option gold is omitted on the wire when 0, same discipline as quantity/items/openPicks.
   it("maps a nonzero option gold onto the wire's gold field", () => {
     const row = packageRow({
       groups: [
@@ -242,9 +230,7 @@ describe("mapStartingEquipmentPackage", () => {
     expect(mapped.groups[0].options[1].gold).toBe(20);
   });
 
-  // #1564 commit 3: PHB'24 has no roll-for-gold rule at all — NULL states
-  // that truthfully (0/0/0 would read as "roll zero gold", the same class of
-  // lie as encoding a flat 155 GP as {1,1,155}).
+  // #1564: PHB'24 has no roll-for-gold rule at all; NULL states that truthfully rather than 0/0/0 reading as "roll zero gold".
   it("maps jointly-null gold dice columns to gold: null on the wire", () => {
     const row = packageRow({
       goldDiceCount: null,
@@ -286,9 +272,7 @@ describe("mapStartingEquipmentPackage", () => {
     expect(mapped.groups[0].options[0].openPicks?.[0].filter).toEqual({ weaponClass: "simple", range: "melee" });
   });
 
-  // #1564 commit 4: the non-weapon filter axis — a genuine "musical
-  // instrument of your choice" pick (Bard) filters on toolCategory instead of
-  // weaponClass/range.
+  // #1564: the non-weapon filter axis — a "musical instrument of your choice" pick filters on toolCategory instead of weaponClass/range.
   it("maps toolCategory onto the wire's filter.toolCategory", () => {
     const row = packageRow({
       groups: [
@@ -311,8 +295,7 @@ describe("mapStartingEquipmentPackage", () => {
     expect(mapped.groups[0].options[0].openPicks?.[0].filter).toEqual({ toolCategory: "musicalInstrument" });
   });
 
-  // boundToToolChoice omitted when false (every existing weapon pick),
-  // present when true (Monk's tool-bound pick, #1564).
+  // #1564: boundToToolChoice is omitted when false, present when true.
   it("omits boundToToolChoice when false, keeps it when true", () => {
     const row = packageRow({
       groups: [

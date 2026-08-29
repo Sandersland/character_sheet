@@ -17,7 +17,7 @@ const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Open Hand Technique Test Monk",
   alignment: "Lawful Neutral",
-  experiencePoints: 900, // level 3 → proficiency +2
+  experiencePoints: 900,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 24, max: 24, temp: 0 },
@@ -219,7 +219,6 @@ describe("Open Hand Technique for a 2014 Way of the Open Hand monk (#1501)", () 
   });
 });
 
-// resolveSubclassSlug prefers the catalog FK over the freeform display name.
 describe("Open Hand Technique prefers the subclass catalog FK over a misleading display name (#1277)", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
@@ -256,10 +255,7 @@ describe("Open Hand Technique prefers the subclass catalog FK over a misleading 
   });
 });
 
-// hasOpenHandTechnique is the single source of the L3 gate — both the
-// serialized rider and this route's cast guard read it. The fixtures below
-// hold TOTAL character level constant and move only the monk entry's own
-// level, so the assertion cannot pass on `character.level`.
+// hasOpenHandTechnique is the single source of the L3 gate; the fixtures below hold TOTAL character level constant and move only the monk entry's own level, so the assertion cannot pass on character.level.
 describe("Open Hand Technique multiclass entry-scoping (#1337)", () => {
   const MULTICLASS_ID = "test-open-hand-technique-multiclass-1";
   const multiclassUrl = `/api/characters/${MULTICLASS_ID}/abilities/open-hand-technique/transactions`;

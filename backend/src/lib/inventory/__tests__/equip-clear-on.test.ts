@@ -1,15 +1,4 @@
-/**
- * The equip hook's generalized `clearOn` metadata path (#1688) —
- * inventory-placement.ts's equipClearTriggers/clearBuffsOnEquipInTx,
- * replacing the old hardcoded "BODY slot -> clear the acUnarmoredBase
- * target" call. A Bladesong-shaped buff (clearOn: medium/heavy/shield only)
- * is the proving case: it must survive donning LIGHT armor, unlike Mage
- * Armor's own "any body armor" shape (covered byte-identically by
- * lib/__tests__/ac-spells.test.ts's unmodified "donning body armor
- * true-ends Mage Armor" test — this file adds the axis that test doesn't
- * cover). Requires DATABASE_URL.
- */
-
+// #1688: exercises equipClearTriggers/clearBuffsOnEquipInTx's generalized clearOn metadata — a Bladesong-shaped buff (clearOn: medium/heavy/shield only) must survive donning LIGHT armor, unlike Mage Armor's "any body armor" shape.
 import { randomUUID } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

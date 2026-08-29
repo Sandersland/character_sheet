@@ -1,28 +1,6 @@
-// Behavior lock for the #1003 serializer split: full-object snapshots of
-// serializeCharacter over two deterministic fixtures. Must stay green UNEDITED
-// while the builders move into lib/character/serialize/*.
-//
-// #1341 audit: every class-entry `name` here must match the rule registries
-// that gate mechanical derivation off it. DERIVED_ACTIONS (matchesActionGate)
-// and CLASSES (deriveResources) lowercase before lookup, so both fixtures'
-// lowercase entry names ("fighter"/"wizard") match them correctly.
-// Armor/weapon proficiencies AND the ASI-extra/Fighting-Style-feat schedule
-// resolve through the class FK relation now (#1529, fixing #1388's class
-// half — case no longer matters at all), so this fixture's CharacterClass
-// rows carry Fighter's real extraAsiLevels/fightingStyleFeatLevel values
-// explicitly (see the `characterClass.create` call below) to stay
-// byte-identical with pre-#1529 behavior; armorProficiencies/
-// weaponProficiencies are left at their column default ([]) since neither
-// fixture exercises a proficiency-gated assertion.
-//
-// #1322 audit: both fixtures are EDITION_2024 (the default), so
-// `exhaustionEffectText`'s +1-line-per-fixture delta never exercises the 2014
-// fork — that coverage lives in exhaustion-edition.test.ts, which asserts both
-// editions end to end. Don't add a 2014 fixture here to compensate: per #1341,
-// the conditions/rollModifiers/speed fields these fixtures already lock would
-// become byte-identical copies with a forked exhaustion string bolted on,
-// diluting this file's signal for no new information.
-
+// Must stay green UNEDITED while serializeCharacter's builders are refactored (#1003).
+// Class-entry name here must be lowercase to match DERIVED_ACTIONS/CLASSES' lookup (#1341).
+// Both fixtures are EDITION_2024 — the 2014 fork is covered by exhaustion-edition.test.ts; don't duplicate this file's locked fields there for no new signal (#1322/#1341).
 import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -53,12 +31,7 @@ beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   await prisma.character.deleteMany({ where: { id: { in: CHAR_IDS } } });
   await prisma.characterClass.deleteMany({ where: { name: { in: [FIGHTER_CLASS_NAME, WIZARD_CLASS_NAME] } } });
-  // Fixed id so the classes view's classId snapshots deterministically.
-  // extraAsiLevels/fightingStyleFeatLevel (#1529) are set to Fighter's real
-  // values — this fixture's entry `name` is lowercase "fighter", which used to
-  // match EXTRA_ASI_LEVELS/fightingStyleFeatSlots' className lookup by
-  // coincidence; the FK-only resolution needs the SAME values on the row
-  // itself to stay byte-identical (a `mistyped value`, not a fix, per #1529).
+  // Fixed id so classId snapshots deterministically; extraAsiLevels/fightingStyleFeatLevel are Fighter's real values so the FK-only resolution (#1529) stays byte-identical with the fixture's pre-#1529 behavior.
   const fighter = await prisma.characterClass.create({
     data: {
       id: "class-snap-fighter", name: FIGHTER_CLASS_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"],
@@ -72,17 +45,7 @@ beforeAll(async () => {
   });
   wizardClassId = wizard.id;
 
-  // #1524: this fixture deliberately uses bespoke CharacterClass rows (fixed
-  // ids, for classId snapshot determinism) instead of the real seeded Fighter/
-  // Wizard rows, whose ids are fresh UUIDs per reseed. Now that feature TEXT
-  // is DB-linked via classId/subclassId (ClassFeature), these bespoke classes
-  // need their own ClassFeature rows too — Fighter/Wizard's own rows below
-  // are hand-copied verbatim from the real seeded EDITION_2024 rows (both
-  // fixtures below are EDITION_2024, the default); Battle Master's rows come
-  // from the shared battleMasterResourceRowsData helper instead (#1546 Part
-  // B-i, Ruling 2) rather than a third hand-copy of the same descriptor text
-  // — so the snapshot's pinned feature content still reflects production
-  // text, not a fixture-only string.
+  // Bespoke CharacterClass rows need their own ClassFeature rows — Battle Master's come from the shared battleMasterResourceRowsData helper so the pinned feature text still reflects production content, not a fixture-only string (#1524/#1546).
   const battleMaster = await prisma.subclass.create({
     data: { id: "subclass-snap-battle-master", classId: fighterClassId, name: "Test Battle Master (Snapshot Suite)", description: "Test fixture subclass.", slug: "battle-master" },
   });
@@ -91,11 +54,7 @@ beforeAll(async () => {
   await prisma.classFeature.createMany({
     data: [
       { classId: fighterClassId, subclassId: null, name: "Fighting Style", level: 1, edition: "EDITION_2024", description: "Choose a fighting style specialty: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage when only wielding one weapon), Great Weapon Fighting (reroll 1s and 2s on damage with two-handed weapons), Protection (impose disadvantage on attacks against adjacent allies), or Two-Weapon Fighting (add ability modifier to off-hand damage)." },
-      // Second Wind/Action Surge (#1528): resource + activation + cost columns
-      // populated too, mirroring prisma/seed/fighter-features.ts's real values
-      // — Second Wind is a selectable action this suite's own snapshot pins
-      // (see the availableActions assertion below), so an empty descriptor
-      // set would silently drop it from the wire again.
+      // resource/activation/cost columns mirror fighter-features.ts's real seeded values — an empty descriptor set would silently drop Second Wind from the wire (#1528).
       {
         classId: fighterClassId, subclassId: null, name: "Second Wind", level: 1, edition: "EDITION_2024",
         description: "As a bonus action, regain 1d10 + your fighter level HP. Regain use on a short or long rest.",
@@ -113,37 +72,16 @@ beforeAll(async () => {
         activationCost: "special", resolverKind: "simple-confirm",
         costKind: "pool", costPoolKey: "actionSurge", costBase: 1,
       },
-      // #1530: derivedStat/derivedStatTiers mirror the real seeded Fighter
-      // row (fighter-features.ts) — without these two fields, this fixture's
-      // hand-built row would go through with attacksPerAction=1 (floor),
-      // silently re-baselining the snapshot below instead of proving zero
-      // behaviour change.
+      // derivedStat/derivedStatTiers mirror the real seeded Fighter row — without them attacksPerAction defaults to 1 (floor), silently re-baselining the snapshot (#1530).
       {
         classId: fighterClassId, subclassId: null, name: "Extra Attack", level: 5, edition: "EDITION_2024",
         description: "You can attack twice when taking the Attack action. Three times at level 11; four times at level 20.",
         derivedStat: "attacksPerAction",
         derivedStatTiers: [{ minLevel: 5, value: 2 }, { minLevel: 11, value: 3 }, { minLevel: 20, value: 4 }],
       },
-      // #1546 Part B-i (Ruling 2): Battle Master's own rows, from the shared
-      // helper rather than a hand-copied pair — this also FIXES a stale
-      // mismatch the hand-copy had: the row below was tagged EDITION_2024 but
-      // carried the 2014 TEXT (no save-DC sentence). The 2024 text is longer,
-      // but this fixture's fighter entry is level 5 (< 7/10/15/18), so no
-      // higher-level Battle Master feature enters the snapshot — only the
-      // corrected Combat Superiority/Student of War text is new output.
+      // Battle Master rows come from the shared helper (not hand-copied) — fighter entry is level 5 (< 7/10/15/18), so no higher-level Battle Master feature enters this snapshot.
       ...battleMasterResourceRowsData(fighterClassId, battleMasterSubclassId),
-      // #1234: hand-copied verbatim from the real seeded EDITION_2024 rows
-      // (wizard-features.ts) — the earlier version of this fixture was
-      // tagged EDITION_2024 but carried the 2014 TEXT, the exact stale-copy
-      // shape this issue's own guard (EDITIONS_STILL_IDENTICAL) exists to
-      // close. This bespoke "Test Wizard" class authors only these two rows
-      // (never Ritual Adept/Scholar/Memorize Spell/etc.), so only the
-      // corrected Spellcasting/Arcane Recovery TEXT is new snapshot output —
-      // no new feature enters it. Arcane Recovery's resource columns (#1234
-      // commit 3) are also mirrored here — wizard.ts's resourceFn that used
-      // to supply this pool regardless of any DB row is deleted, so this
-      // bespoke class needs its own row descriptor or the pool vanishes from
-      // the snapshot entirely instead of just changing its description.
+      // wizard.ts's resourceFn (which used to supply Arcane Recovery's pool regardless of any DB row) is deleted — this bespoke class needs its own row descriptor or the pool vanishes from the snapshot.
       { classId: wizardClassId, subclassId: null, name: "Spellcasting", level: 1, edition: "EDITION_2024", description: "You cast spells using Intelligence. Full-caster progression. You know three Wizard cantrips (one more at levels 4 and 10), replacing one on a Long Rest. Your spellbook holds your level 1+ spells: it starts with six 1st-level spells, and you add two spells of your choice whenever you gain a Wizard level after 1st. You regain all expended spell slots on a Long Rest, and you change your list of prepared spells whenever you finish a Long Rest." },
       {
         classId: wizardClassId, subclassId: null, name: "Arcane Recovery", level: 1, edition: "EDITION_2024",
@@ -160,9 +98,6 @@ afterAll(async () => {
   await prisma.characterClass.deleteMany({ where: { name: { in: [FIGHTER_CLASS_NAME, WIZARD_CLASS_NAME] } } });
 });
 
-// Fixture 1 — wizard 5 / fighter 1 multiclass caster: used slots + stale slot
-// counts, concentration, mixed equipped inventory, an activatedEffect+passiveBonus
-// item, conditions + exhaustion, buffs, over-cap advancements, journal entries.
 async function createMulticlassCaster() {
   await prisma.character.create({
     data: {
@@ -170,7 +105,7 @@ async function createMulticlassCaster() {
       name: "Snapshot Multiclass Caster",
       ownerId: OWNER_ID,
       alignment: "Neutral Good",
-      experiencePoints: 14000, // level 6, proficiency +3
+      experiencePoints: 14000,
       initiativeBonus: 2,
       speed: 30,
       abilityScores: { strength: 10, dexterity: 14, constitution: 12, intelligence: 16, wisdom: 10, charisma: 8 },
@@ -183,7 +118,7 @@ async function createMulticlassCaster() {
       toolProficiencies: [{ name: "Herbalism Kit", source: "background" }],
       currency: { cp: 1, sp: 2, gp: 3, pp: 4 },
       hitPoints: { current: 30, max: 28, temp: 3, deathSaves: { successes: 0, failures: 0 } },
-      hitDice: { total: 5, die: "d6", spent: 1 }, // pendingLevelUps 1
+      hitDice: { total: 5, die: "d6", spent: 1 },
       raceSelection: { create: { name: "Elf" } },
       spellcasting: {
         slotsUsed: { "1": 2, "2": 1, "3": 5 }, // "3": 5 is stale, clamps to total
@@ -206,10 +141,7 @@ async function createMulticlassCaster() {
       },
       resources: {
         used: {},
-        // Stored but never serialized: the wire expresses the choice through
-        // fightingStyleSlots + advancements (#1137), so this legacy scalar is
-        // ignored rather than clamped — no fightingStyle key appears in the
-        // snapshot at all. Kept to prove a stale stored value stays invisible.
+        // Stored but never serialized — the wire expresses the fighting-style choice through fightingStyleSlots + advancements (#1137); kept here to prove a stale value stays invisible.
         fightingStyle: "defense",
         advancements: [
           { id: "adv-tough", level: 4, kind: "feat", abilityDeltas: {}, hpDelta: 0, initDelta: 0, featName: "Tough", featDescription: "Sturdy.", improvements: [{ target: "maxHp", amount: 2, perLevel: true }] },
@@ -219,11 +151,7 @@ async function createMulticlassCaster() {
       classEntries: {
         create: [
           { id: "ce-snap-wiz", name: "wizard", classId: wizardClassId, position: 0, level: 5 },
-          // name must match a DERIVED_ACTIONS grantClass ("fighter") or
-          // availableActions[] is structurally empty and this snapshot can't
-          // regress — #1315's entry-scoping fix shipped with zero snapshot
-          // coverage because of that (#1341). The CATALOG row keeps its
-          // distinctive name: it's @unique and deleteMany'd by it for isolation.
+          // name must match a DERIVED_ACTIONS grantClass ("fighter") or availableActions[] is structurally empty and this snapshot can't catch a regression (#1315/#1341).
           { id: "ce-snap-ftr", name: "fighter", classId: fighterClassId, position: 1, level: 1 },
         ],
       },
@@ -313,9 +241,7 @@ async function createMulticlassCaster() {
               category: "consumable" as const,
               quantity: 2,
               position: 4,
-              // Promoted out of InventoryConsumableDetail (#1648) — must be set
-              // on the column too, or the resolver's glued-on usesRemaining
-              // reads null and the wire regresses.
+              // Must be set on the column too, or the resolver's glued-on usesRemaining reads null (#1648).
               usesRemaining: consumable.usesRemaining,
               snapshot: buildInventorySnapshot({
                 name: "Potion of Snapshots", category: "consumable", weight: null, cost: null, description: null,
@@ -336,8 +262,6 @@ async function createMulticlassCaster() {
   });
 }
 
-// Fixture 2 — single-class non-caster control: battle master fighter L5 with
-// over-cap resource lists (all four resource clamps) and an entitled fighting style.
 async function createSimpleFighter() {
   await prisma.character.create({
     data: {
@@ -345,7 +269,7 @@ async function createSimpleFighter() {
       name: "Snapshot Simple Fighter",
       ownerId: OWNER_ID,
       alignment: "Lawful Good",
-      experiencePoints: 6500, // level 5, proficiency +3
+      experiencePoints: 6500,
       initiativeBonus: 0,
       speed: 30,
       abilityScores: { strength: 16, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 12, charisma: 8 },
@@ -384,21 +308,13 @@ describe("serializeCharacter snapshot lock (#1003)", () => {
   it("multiclass caster with inventory, conditions, buffs and over-cap advancements", async () => {
     await createMulticlassCaster();
     const serialized = await serialize("snap-char-multi");
-    // #1341: pinned outside the snapshot too, so a primary-entry-only regression
-    // (#1315's widest behavioural change) fails with a readable diff instead of
-    // one line inside a 500-line blob. Fighter is the SECONDARY entry at its own
-    // level 1 — Second Wind is the only row fighter 1 grants. `reminder`/
-    // `resolverKind` (#1528) are the row-driven descriptor's own contribution
-    // — reminder is server-computed from the row's effect columns (never a
-    // second hand-authored string), and resolverKind names the client's
-    // inline tool without a hand-authored ACTION_RESOLVERS entry.
+    // Pinned outside the snapshot too, for a readable diff on regression; the reminder text is server-computed from the row's effect columns, never hand-authored (#1341/#1528).
     expect(serialized.availableActions).toEqual([
       {
         key: "secondWind", name: "Second Wind", cost: "bonusAction", enabled: true,
         reminder: "Regain 1d10 + 1 HP", resolverKind: "heal-roll",
       },
-      // Off-hand eligibility (#1435) — served for every character; this caster
-      // holds no two-Light-weapon pair, so it's disabled.
+      // Off-hand eligibility is served for every character (#1435); this caster holds no two-Light-weapon pair, so it's disabled.
       {
         key: "offHandAttack", name: "Off-Hand Attack", cost: "bonusAction", enabled: false,
         disabledReason: "Off-hand attack needs two Light weapons equipped.",

@@ -6,9 +6,8 @@ import { rollDie } from "@/lib/core/dice.js";
 import { deriveEntryScopedResources, type DerivedClassInfo, type DerivedResource } from "@/lib/classes/class-features.js";
 import type { RechargeOn } from "@/lib/classes/types.js";
 import { editionOf } from "@/lib/rules/edition.js";
-// Leaf module (no back-imports), NOT classes/resources.ts (#1243) — that file
-// now also composes applyHealInTx (Uncanny Metabolism's bonus heal), which
-// would close an import cycle back through combat/hitpoints.ts.
+// Leaf module (no back-imports) — not the module composing applyHealInTx (#1243, Uncanny
+// Metabolism's bonus heal), which would close an import cycle back into this file.
 import {
   snapshotResources,
   normalizeResourcesMutable,
@@ -226,10 +225,7 @@ function deriveRestPools(row: HpOpContext["row"]): DerivedClassInfo | null {
  * `beforeResourceState` is snapshotted BEFORE this loop runs, so undo always
  * restores the exact prior `used` map regardless of whether the rest fully
  * reset a pool or only partially topped it up — partial and full restore are
- * structurally indistinguishable to undo. No class declares `shortRestRegain`
- * yet (#1221 ships the mechanism only), so the end-to-end *partial*-restore
- * undo case has no pool to assert against here; it lands with the first
- * consuming class issue (#1227, Fighter Second Wind).
+ * structurally indistinguishable to undo.
  */
 function resetRestResources(
   row: HpOpContext["row"],
@@ -257,7 +253,6 @@ function resetRestResources(
   return { state, beforeResourceState, resourcesRestored };
 }
 
-/** Deep-clone of the mutable spellcasting state for a rest event's before snapshot. */
 function cloneSpellStateForRest(spellState: ReturnType<typeof normalizeSpellcastingMutable>): Record<string, unknown> {
   return {
     slotsUsed: { ...spellState.slotsUsed },
@@ -324,7 +319,7 @@ async function runItemRestResets(
   return { itemSpellsRestored, chargePools };
 }
 
-/** The `...(cond ? {} : {})` charge-pool eventData fragment shared by both rests. */
+/** Charge-pool eventData fragment shared by both rests. */
 function chargePoolEventData(
   chargePools: Awaited<ReturnType<typeof rechargeItemChargePoolsOnRest>>,
 ): Record<string, unknown> {
@@ -337,7 +332,6 @@ function chargePoolEventData(
     : {};
 }
 
-/** Validate a short rest's hit-die spend against availability and die size. */
 function validateHitDiceSpend(op: ShortRestOperation, hd: HitDice, faces: number): void {
   const available = hd.total - hd.spent;
   const spending = op.rolls.length;
@@ -441,7 +435,7 @@ function resetLongRestSpellcasting(row: HpOpContext["row"]): {
 /**
  * Recharge limited-use consumables (#121): charged items (maxUses set) reset
  * to full. Lives in the combat domain (with the rest phases that trigger it)
- * rather than lib/inventory, avoiding an inventory↔combat import cycle.
+ * rather than the inventory domain, avoiding an inventory↔combat import cycle.
  */
 async function rechargeConsumables(
   tx: Prisma.TransactionClient,
@@ -453,8 +447,8 @@ async function rechargeConsumables(
 }> {
   // maxUses now lives only in the snapshot (#1649), but a charged item's
   // usesRemaining column is non-null iff maxUses is set (buildInventorySnapshot's
-  // narrowConsumable pairing — see InventoryItem.usesRemaining's own comment), so
-  // filtering on the column here is equivalent to the old maxUses-not-null filter.
+  // narrowConsumable pairing), so filtering on the column here is equivalent to
+  // the old maxUses-not-null filter.
   const chargedRows = await tx.inventoryItem.findMany({
     where: { characterId, usesRemaining: { not: null } },
     select: { id: true, usesRemaining: true, snapshot: true },

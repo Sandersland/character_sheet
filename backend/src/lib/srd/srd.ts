@@ -1,15 +1,4 @@
-// Small SRD-derived rules tables + pure derivation helpers used by character
-// creation. This is the backend's only home for this data — mirrors how
-// src/lib/leveling/experience.ts is the only place the XP table lives. The frontend
-// must not duplicate these tables; it gets the catalog data it needs (race
-// speed, class hit die, etc.) from GET /api/reference and the 18-skill
-// ability mapping from its own existing frontend/src/lib/abilities.ts
-// SKILL_LABELS (display-only, no rules logic).
-//
-// This file is a barrel: the rules tables themselves live in the topical files
-// re-exported below. Import from those files directly for new same-domain code;
-// this barrel exists so the ~30 existing importers keep working unchanged.
-// (The former inline file list is gone — it had already gone stale twice.)
+// Barrel: rules tables live in the topical files re-exported below — import from those directly for new code; this barrel only exists so existing importers keep working.
 
 export * from "@/lib/srd/alignments.js";
 export * from "@/lib/srd/tools.js";

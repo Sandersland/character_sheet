@@ -28,7 +28,7 @@ const TEST_SPELL = {
 const BASE_CHAR = {
   name: "Spellcasting In-Tx Fixture",
   alignment: "Neutral Good",
-  experiencePoints: 0, // level 1 wizard
+  experiencePoints: 0,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 8, max: 8, temp: 0 },
@@ -60,8 +60,7 @@ describe("applySpellcastingOpInTx (#885 seam)", () => {
       update: {},
     });
     wizardClassId = cls.id;
-    // upsertEditionRow, not .upsert(): Spell's business key is now (name,
-    // edition) (#1710), and this fixture spell is edition-neutral.
+    // upsertEditionRow, not .upsert(): Spell's business key is now (name, edition) (#1710), and this fixture spell is edition-neutral.
     // catalogEntryId (#1796) is resolved first — required, no default.
     const catalogEntryId = await makeCatalogEntry({ name: TEST_SPELL.name });
     const spell = await upsertEditionRow(
@@ -82,9 +81,7 @@ describe("applySpellcastingOpInTx (#885 seam)", () => {
   });
 
   afterAll(async () => {
-    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
-    // #1796) — the reverse cascade doesn't exist (the supertype stays
-    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE, #1796); the reverse cascade doesn't exist, so a plain spell.deleteMany alone would orphan the entry.
     await prisma.catalogEntry.deleteMany({ where: { name: SPELL_NAME, kind: "SPELL" } });
     await prisma.characterClass.deleteMany({ where: { name: WIZARD_CATALOG_NAME } });
   });
@@ -129,10 +126,8 @@ describe("applySpellcastingOpInTx (#885 seam)", () => {
   });
 });
 
-// #1507 D7: a 2014 Bard is a "known" caster (SRD 5.1) — a learned spell is
-// castable immediately, no separate preparation step. A 2024 Bard is
-// "prepared" (SRD 5.2) — the born-`prepared: false` behavior every other
-// learnSpell case in this file already exercises.
+// #1507 D7: a 2014 Bard is a "known" caster (SRD 5.1) — a learned spell is castable immediately, no separate preparation step.
+// A 2024 Bard is "prepared" (SRD 5.2) — the born-prepared:false behavior every other learnSpell case in this file already exercises.
 describe("applySpellcastingOpInTx — learnSpell born-prepared (#1507 D7)", () => {
   const created: string[] = [];
   const BARD_CATALOG_NAME = "Spellcasting In-Tx Bard";
@@ -155,8 +150,7 @@ describe("applySpellcastingOpInTx — learnSpell born-prepared (#1507 D7)", () =
       update: {},
     });
     bardClassId = cls.id;
-    // upsertEditionRow, not .upsert(): Spell's business key is now (name,
-    // edition) (#1710), and this fixture spell is edition-neutral.
+    // upsertEditionRow, not .upsert(): Spell's business key is now (name, edition) (#1710), and this fixture spell is edition-neutral.
     const bardSpellData = {
       name: BARD_SPELL_NAME,
       level: 1,
@@ -193,7 +187,7 @@ describe("applySpellcastingOpInTx — learnSpell born-prepared (#1507 D7)", () =
         name: `Spellcasting In-Tx Bard Fixture (${rulesEdition})`,
         rulesEdition,
         ownerId: OWNER_ID,
-        experiencePoints: 6500, // level 5
+        experiencePoints: 6500,
         abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 10, wisdom: 10, charisma: 16 },
         spellcasting: Prisma.JsonNull,
         classEntries: { create: { name: "bard", classId: bardClassId, level: 5, position: 0 } },

@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { serializeCharacterSummary } from "../character-serialize.js";
 
-// Pure-unit lock on the derived portrait wire field (#1615): the persisted
-// blob key never appears on the wire — only the relative /api path derived
-// from it, cache-busted by the key's uuid filename segment.
+// The persisted blob key never appears on the wire — only the relative /api path derived from it, cache-busted by the key's uuid filename segment.
 describe("serializeCharacterSummary portraitUrl derivation (#1615)", () => {
   const base = {
     id: "char-portrait-unit",

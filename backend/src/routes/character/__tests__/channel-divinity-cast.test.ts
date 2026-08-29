@@ -1,12 +1,3 @@
-/**
- * Channel Divinity cast endpoint (#419): POST /abilities/channel-divinity/transactions and
- * GET /characters/:id/channel-divinity. Real Postgres + supertest. Most fixtures are
- * single-class clerics/paladins whose XP sets the level; CD options are read from
- * the seeded catalog by name. One multiclass fixture (#1340) proves the "spending
- * decrements the single shared pool" AC end-to-end: both classes' options draw on
- * ONE pool, not two.
- */
-
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -23,7 +14,6 @@ let COOKIE: string;
 
 const FIXTURE_ID = "test-cd-cast-1";
 
-// XP thresholds → level: L2=300, L3=900, L6=14000, L8=34000, L9=48000, L10=64000.
 const XP_L2 = 300;
 const XP_L3 = 900;
 const XP_L6 = 14000;
@@ -71,32 +61,17 @@ async function activity(): Promise<ActivityEvent[]> {
 
 const optionId: Record<string, string> = {};
 
-// `edition: null` is load-bearing, not defensive: the #1412 test below forks
-// "Channel Divinity: Turn Undead" into a same-name EDITION_2014 row, and a bare
-// findFirst({ where: { name } }) would then be ambiguous — every cast test
-// reading optionId would silently pick whichever row Postgres returned first.
+// `edition: null` is load-bearing — without it, the #1412 fork test's same-name row makes findFirst ambiguous.
 async function loadOption(name: string) {
   optionId[name] = (await prisma.grantedAbility.findFirst({ where: { name, edition: null } }))!.id;
 }
 
-// #1229: Turn the Unholy/Turn the Faithless/Abjure Enemy retagged
-// EDITION_2014 (no longer shared), and Divine Sense/Abjure Foes are NEW
-// EDITION_2024-only rows — `loadOption`'s `edition: null` filter finds
-// neither, so this edition-aware sibling loads them explicitly instead.
+// loadOption's `edition: null` filter finds neither 2014-retagged nor 2024-only rows — loadEditionOption loads those explicitly (#1229).
 async function loadEditionOption(name: string, edition: "EDITION_2014" | "EDITION_2024") {
   optionId[`${name}::${edition}`] = (await prisma.grantedAbility.findFirst({ where: { name, edition } }))!.id;
 }
 
-// #1225: classEntries.classId used to point at one shared test-only
-// CharacterClass row regardless of the entry's own `name` — harmless while
-// Cleric's Channel Divinity pool lived in lib/classes/cleric.ts's resourceFn
-// (unaffected by the `class.features` relation), but NOT once Cleric's pool
-// moved onto its ClassFeature rows: featureRowsOf reads `entry.class?.features`
-// through classId, so a fake class with zero attached ClassFeature rows
-// silently starved the Cleric side of its pool (a real cast 400'd). Resolves
-// the REAL seeded CharacterClass per entry name instead — this suite only
-// ever uses "cleric"/"paladin", both real seeded classes, so no synthetic
-// scaffold class is needed anymore.
+// Resolves the REAL seeded CharacterClass — featureRowsOf reads entry.class?.features through classId, so a fake class starves the pool.
 const classIdByName: Record<string, string> = {};
 async function resolveClassId(name: string): Promise<string> {
   const cached = classIdByName[name];
@@ -126,10 +101,6 @@ async function createCharacter(
   });
 }
 
-// Multiclass fixture (#1340): each entry resolves its OWN real classId (see
-// resolveClassId's comment above) so both classes' row-driven pools/features
-// load correctly, one per granting class, same shape as the single-class
-// helper above but with two classEntries.
 async function createMulticlass(
   experiencePoints: number,
   entries: { name: string; subclass: string | null; level: number }[],
@@ -160,17 +131,6 @@ describe("Channel Divinity cast endpoint", () => {
       "Channel Divinity: Invoke Duplicity",
       "Channel Divinity: Sacred Weapon",
       "Channel Divinity: Vow of Enmity",
-      // "Channel Divinity: Abjure Enemy" removed (#1229): no longer a shared
-      // (edition: null) row — it retagged EDITION_2014, so loadOption's
-      // `edition: null` filter would find nothing and throw. Nothing in this
-      // file reads optionId for it (the one test that names it checks the GET
-      // response body's own `name` field, not this map) — the edition-scoped
-      // Paladin describe block below loads it explicitly where it's needed.
-      //
-      // "Channel Divinity: Cloak of Shadows" removed (#1590): same reasoning
-      // — it retagged EDITION_2014 (no 2024 successor, replaced outright by
-      // Trickster's Transposition), so it now loads below with the other
-      // edition-scoped rows.
     ].map(loadOption));
     await Promise.all([
       loadEditionOption("Channel Divinity: Turn the Unholy", "EDITION_2014"),
@@ -199,18 +159,12 @@ describe("Channel Divinity cast endpoint", () => {
     const events = await activity();
     const cd = events.find((e) => e.type === "castChannelDivinity")!;
     expect(cd).toBeDefined();
-    // Wisdom-based DC: 8 + prof(2) + wisMod(+3) = 13.
     expect(cd.data).toMatchObject({ abilityName: "Channel Divinity: Turn Undead", saveDc: 13, kind: "announce" });
     expect(cd.summary).toMatch(/DC 13/);
     expect(events.some((e) => e.type === "spendResource")).toBe(true);
   });
 
-  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
-  // the shared ability endpoint, so a green run afterwards is evidence the audit
-  // trail is unchanged. #1590 updated the reminder string on purpose: Turn
-  // Undead's default announce text used to be the generic "turned/affected"
-  // line even for a 2024 character, which is wrong — SRD 5.2 p.37 grants
-  // Frightened AND Incapacitated, not a plain "turned" state.
+  // SRD 5.2 p.37: Turn Undead grants Frightened and Incapacitated, not a plain "turned" state.
   it("pins the audit trail of one Turn Undead channel", async () => {
     await createCharacter(XP_L2, "cleric", null);
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
@@ -240,8 +194,7 @@ describe("Channel Divinity cast endpoint", () => {
       {
         category: "resources",
         type: "spendResource",
-        // #1225: a level-2 2024 Cleric's pool is 2, not 1 (SRD 5.2's own
-        // progression) — one spend leaves 1/2, not 0/1.
+        // A level-2 2024 Cleric's Channel Divinity pool is 2 (SRD 5.2), so one spend leaves 1/2, not 0/1.
         summary: "Spent 1 Channel Divinity — 1/2 remaining",
         before: noResourcesUsed,
         after: { resources: { ...noResourcesUsed.resources, used: { channelDivinity: 1 } } },
@@ -259,7 +212,6 @@ describe("Channel Divinity cast endpoint", () => {
     const buffs = (withBuff!.activeEffects as { buffs: { target: string; modifier: number; duration: string }[] }).buffs;
     expect(buffs).toContainEqual(expect.objectContaining({ target: "attackRoll", modifier: 3, duration: "while-active" }));
 
-    // Undo the batch → CD refunded + buff cleared (create/cleanup symmetry).
     const batchId = (await activity()).find((e) => e.type === "castChannelDivinity")!.batchId!;
     const undo = await agent().post(`/api/characters/${FIXTURE_ID}/events/${batchId}/revert`);
     expect(undo.status).toBe(200);
@@ -269,8 +221,7 @@ describe("Channel Divinity cast endpoint", () => {
   });
 
   it("Trickery Cloak of Shadows (L6) self-applies the invisible condition", async () => {
-    // #1590: Cloak of Shadows is EDITION_2014-only (no 2024 successor), so
-    // this fixture must be a 2014 character or the row would not resolve.
+    // Cloak of Shadows is EDITION_2014-only (no 2024 successor) — this fixture must be 2014 (#1590).
     await createCharacter(XP_L6, "cleric", "trickery domain", "EDITION_2014");
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Cloak of Shadows::EDITION_2014"] }]);
     expect(res.status).toBe(200);
@@ -293,7 +244,6 @@ describe("Channel Divinity cast endpoint", () => {
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Preserve Life"] }]);
     expect(res.status).toBe(200);
     const cd = (await activity()).find((e) => e.type === "castChannelDivinity")!;
-    // Level 3 (first grant level, #1128) → 15 HP pool.
     expect(cd.data!.reminder).toMatch(/15 HP/);
   });
 
@@ -319,18 +269,12 @@ describe("Channel Divinity cast endpoint", () => {
     expect(res.body.error).toMatch(/level 3/);
   });
 
-  // ── #1590: the gate table had no edition axis, so a 2014 Cleric was held to
-  // the 2024 grant level (3) for both domain options. PHB'14 p.59 (Preserve
-  // Life) and p.63 (Invoke Duplicity) both grant at Cleric level 2, alongside
-  // Channel Divinity itself; SRD 5.2 p.40 shifts both to level 3, alongside
-  // the subclass grant.
-
+  // PHB'14 p.59 (Preserve Life) and p.63 (Invoke Duplicity): both grant at Cleric level 2. SRD 5.2 p.40: both shift to level 3.
   it("(#1590) a 2014 Life Domain Cleric IS entitled to Preserve Life at level 2", async () => {
     await createCharacter(XP_L2, "cleric", "life domain", "EDITION_2014");
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Preserve Life"] }]);
     expect(res.status).toBe(200);
     const cd = (await activity()).find((e) => e.type === "castChannelDivinity")!;
-    // Level 2 → 10 HP pool (5x cleric level).
     expect(cd.data!.reminder).toMatch(/10 HP/);
   });
 
@@ -354,9 +298,7 @@ describe("Channel Divinity cast endpoint", () => {
     expect(res.body.error).toMatch(/level 3/);
   });
 
-  // ── #1590 follow-on: Invoke Duplicity/Turn Undead reminder text differs by
-  // edition (PHB'14 p.63 vs PHB'24 pp.75-76; PHB'14 p.57 vs SRD 5.2 p.37).
-
+  // Reminder text differs by edition: Invoke Duplicity PHB'14 p.63 vs PHB'24 pp.75-76; Turn Undead PHB'14 p.57 vs SRD 5.2 p.37.
   it("(#1590) a 2014 Invoke Duplicity reminder still names Concentration", async () => {
     await createCharacter(XP_L3, "cleric", "trickery domain", "EDITION_2014");
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Invoke Duplicity"] }]);
@@ -393,12 +335,7 @@ describe("Channel Divinity cast endpoint", () => {
     expect(cd.data!.reminder).toMatch(/incapacitated/i);
   });
 
-  // ── #1590 follow-on: Cloak of Shadows (Trickery) has no 2024 successor
-  // (SRD 5.2/mirror sources replace it outright with Trickster's
-  // Transposition, cleric-features.ts) — its catalog row retags EDITION_2014
-  // so a 2024 character never sees or can cast it, same pattern as the
-  // Paladin oath options #1229 already retagged.
-
+  // Cloak of Shadows has no 2024 successor — replaced by Trickster's Transposition; its row retags EDITION_2014 (#1590).
   it("(#1590) a 2024 Trickery Cleric no longer sees Cloak of Shadows on the GET list", async () => {
     await createCharacter(XP_L6, "cleric", "trickery domain", "EDITION_2024");
     const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
@@ -415,8 +352,6 @@ describe("Channel Divinity cast endpoint", () => {
     expect(names).toContain("Channel Divinity: Cloak of Shadows");
   });
 
-  // ── Gating (the non-happy paths) ────────────────────────────────────────────
-
   it("rejects a domain option the cleric's subclass doesn't grant", async () => {
     await createCharacter(XP_L3, "cleric", "trickery domain");
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Preserve Life"] }]);
@@ -425,7 +360,6 @@ describe("Channel Divinity cast endpoint", () => {
   });
 
   it("rejects a domain option below the granting level (Cloak of Shadows needs L6)", async () => {
-    // #1590: Cloak of Shadows is EDITION_2014-only — see the fixture above.
     await createCharacter(XP_L3, "cleric", "trickery domain", "EDITION_2014");
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Cloak of Shadows::EDITION_2014"] }]);
     expect(res.status).toBe(400);
@@ -439,8 +373,6 @@ describe("Channel Divinity cast endpoint", () => {
     expect(res.body.error).toMatch(/cleric/i);
   });
 
-  // ── Multiclass: one shared pool, effect menu is the union (#1340) ──────────
-
   it("Cleric 6 / Paladin 4 (Devotion): both classes' options draw on the ONE shared pool", async () => {
     await createMulticlass(XP_L10, [
       { name: "cleric", subclass: null, level: 6 },
@@ -452,10 +384,8 @@ describe("Channel Divinity cast endpoint", () => {
     const initialPool = (initial.body.resources.pools as { key: string; total: number }[]).find(
       (p) => p.key === "channelDivinity",
     );
-    // #1225: Cleric's 2024 pool (this fixture's default edition) is the real
-    // SRD 5.2 progression, 3 at L6 — Paladin's own 2024 pool is 2 from L3 on,
-    // so the merged (max-wins) total is Cleric's 3.
-    expect(initialPool?.total).toBe(3); // max(cleric@6→3, paladin@4→2)
+    // Merged Channel Divinity pool is max-wins: Cleric's SRD 5.2 progression (3 at L6) beats Paladin's (2 from L3).
+    expect(initialPool?.total).toBe(3);
 
     const turnUndead = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
     expect(turnUndead.status).toBe(200);
@@ -463,7 +393,7 @@ describe("Channel Divinity cast endpoint", () => {
 
     const sacredWeapon = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Sacred Weapon"] }]);
     expect(sacredWeapon.status).toBe(200);
-    expect(cdUsed(sacredWeapon.body)).toBe(2); // same pool — both classes' options spent from it
+    expect(cdUsed(sacredWeapon.body)).toBe(2);
 
     const third = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
     expect(third.status).toBe(200);
@@ -474,13 +404,7 @@ describe("Channel Divinity cast endpoint", () => {
     expect(fourth.body.error).toMatch(/only 0 remaining/);
   });
 
-  // ── GET picker ──────────────────────────────────────────────────────────────
-
-  // #1229: "Channel Divinity: Abjure Enemy" is EDITION_2014-only now (its
-  // 2024 role is the base class's own Abjure Foes) — pinned to EDITION_2014
-  // explicitly so this test still exercises what it always meant to (a 2014
-  // Vengeance paladin's own option list), rather than silently start
-  // asserting against an edition the row no longer serves.
+  // Abjure Enemy is EDITION_2014-only now (2024's role is the base class's own Abjure Foes) — pinned explicitly so this test keeps exercising a 2014 Vengeance paladin (#1229).
   it("GET /channel-divinity returns only the entitled options with DCs (2014 Vengeance Paladin)", async () => {
     await createCharacter(XP_L3, "paladin", "oath of vengeance", "EDITION_2014");
     const res = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
@@ -488,16 +412,13 @@ describe("Channel Divinity cast endpoint", () => {
     const names = (res.body as { name: string }[]).map((o) => o.name);
     expect(names).toContain("Channel Divinity: Abjure Enemy");
     expect(names).toContain("Channel Divinity: Vow of Enmity");
-    expect(names).not.toContain("Channel Divinity: Turn Undead"); // cleric-only
-    expect(names).not.toContain("Channel Divinity: Sacred Weapon"); // devotion-only
+    expect(names).not.toContain("Channel Divinity: Turn Undead");
+    expect(names).not.toContain("Channel Divinity: Sacred Weapon");
     const abjure = (res.body as { name: string; saveDc: number | null; kind: string }[]).find(
       (o) => o.name === "Channel Divinity: Abjure Enemy",
     )!;
-    // Charisma-based DC: 8 + prof(2) + chaMod(+3) = 13.
     expect(abjure).toMatchObject({ kind: "announce", saveDc: 13 });
   });
-
-  // ── #1229: Paladin edition fork — both directions ──────────────────────────
 
   describe("Paladin edition fork (#1229)", () => {
     it("2014 Paladin 3 (Devotion) can cast Turn the Unholy", async () => {
@@ -539,8 +460,7 @@ describe("Channel Divinity cast endpoint", () => {
         (o) => o.name === "Abjure Foes",
       )!;
       expect(abjureFoes).toBeDefined();
-      // Wisdom save (not Charisma — the issue's own draft says Cha); the DC
-      // itself IS Charisma-derived: 8 + prof(4) + chaMod(+3) = 15.
+      // Abjure Foes' save is Wisdom, but its DC is still Charisma-derived: 8 + prof(4) + chaMod(+3) = 15.
       expect(abjureFoes).toMatchObject({ saveAbility: "wisdom", saveDc: 15 });
 
       const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Abjure Foes::EDITION_2024"] }]);
@@ -556,16 +476,9 @@ describe("Channel Divinity cast endpoint", () => {
     });
   });
 
-  // #1412: the route derives the edition from the character row (editionOf), so
-  // there is no query param here. The fixture shares Turn Undead's EXACT name on
-  // purpose — CHANNEL_DIVINITY_OPTIONS is a literal-name map, so a distinctly
-  // named row is dropped by the pre-existing `o.gate &&` guard regardless of
-  // edition, and the test would be green before and after the change. Cleric,
-  // not the paladin fixture: Turn Undead is cleric-gated.
-  //
-  // Built inside the test with try/finally rather than in beforeAll — a beforeAll
-  // fixture races loadOption's own beforeAll and would corrupt the cast tests'
-  // optionId map.
+  // The route derives the edition from the character row (editionOf) — there is no query param here.
+  // The fixture shares Turn Undead's exact name on purpose — CHANNEL_DIVINITY_OPTIONS is a literal-name map, so a distinctly named row would pass trivially regardless of edition.
+  // try/finally, not beforeAll — a beforeAll fixture here would race loadOption's beforeAll and corrupt optionId.
   it("(#1412) GET /channel-divinity resolves a same-name 2014/NULL Turn Undead fork per the character's edition", async () => {
     const fork = await upsertEditionRow(
       prisma.grantedAbility,
@@ -614,12 +527,7 @@ describe("Channel Divinity cast endpoint", () => {
     expect(res.body.error).toMatch(/not found in catalog/);
   });
 
-  // #1345 (Chunk 5, plan audit — not named in the issue as filed): a
-  // transient cast, not a permanent snapshot, but still a wrong-edition rule
-  // applied to one cast and recorded in the audit event. The fixture's name
-  // is deliberately NOT one of CHANNEL_DIVINITY_OPTIONS' keys — the guard
-  // sits BEFORE that gate lookup (resolveChannelDivinityCast), so this must
-  // 400 on the edition mismatch, never on "Unknown Channel Divinity option".
+  // The fixture's name is deliberately not a CHANNEL_DIVINITY_OPTIONS key — the edition guard in resolveChannelDivinityCast runs before the name-gate lookup, so this must 400 on edition mismatch, never "Unknown Channel Divinity option".
   it("(#1345) rejects a 2014-tagged Channel Divinity option before the option-name gate lookup", async () => {
     const row = await upsertEditionRow(
       prisma.grantedAbility,

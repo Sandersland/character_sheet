@@ -7,11 +7,6 @@ import {
 } from "@/lib/srd/proficiencies.js";
 import * as barrel from "@/lib/srd/srd.js";
 
-// Pure unit tests — no DB. Pins the proficiency rules now that they are exported
-// for reuse (#1432) and served per inventory row as `proficient` (#1433): these
-// assertions decide whether the sheet shows a "Not proficient" warning, so a
-// divergence here is a visible regression, not just a refactor.
-
 const simpleWeapon = { category: "weapon", name: "Club", weaponClass: "simple" } as const;
 const martialWeapon = { category: "weapon", name: "Longsword", weaponClass: "martial" } as const;
 const bodyArmor = { category: "armor", name: "Chain Shirt", armorCategory: "medium" } as const;
@@ -57,11 +52,7 @@ describe("isProficientWithItem (#554)", () => {
     expect(isProficientWithItem({ category: "armor", name: "Odd Plate" }, [], [])).toBe(true);
   });
 
-  // The one place the two rules deliberately disagree, and the reason
-  // `isProficientWithItem` is a wrapper instead of an edit to
-  // `isProficientWithWeapon`: the no-warn default is a UI policy, while the
-  // attack-bonus rule must keep denying the proficiency bonus to a weapon whose
-  // class is unknown. Collapsing them would move `attackBonusComponents`.
+  // isProficientWithItem is a wrapper, not an edit to isProficientWithWeapon: the no-warn default is UI policy, while the attack-bonus rule must keep denying the proficiency bonus for an unknown weapon class.
   it("defaults a class-less weapon to proficient where the attack rule does not", () => {
     const homebrew = { category: "weapon", name: "Odd Blade" } as const;
     expect(isProficientWithItem(homebrew, [], [])).toBe(true);

@@ -5,68 +5,32 @@ import type { RequestHandler } from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 
-// Security hardening middleware: standard security headers (helmet) + request
-// rate limiting. Both are env-tunable so local dev and tests aren't throttled
-// and the CSP can be relaxed if a single-origin deployment needs it.
-
 const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 
-// The SPA's index.html deliberately keeps inline scripts (the pre-paint theme
-// apply that prevents a dark-mode FOUC) — a strict CSP blocks them unless each
-// is allowlisted by hash. Hash whatever the SERVED file actually contains at
-// boot, so the allowance can never drift from the deployed markup (this bit us
-// on staging: the theme snippet's stable sha256 violation was misattributed to
-// Cloudflare injections for an afternoon). Scripts WITH src are excluded —
-// hash sources only cover inline bodies.
+// Hashes the served index.html's inline scripts at boot so the CSP allowance tracks deployed markup rather than drifting from it.
 function inlineScriptHashes(staticDir: string): string[] {
   try {
     const html = readFileSync(join(staticDir, "index.html"), "utf8");
     const hashes: string[] = [];
-    // Non-greedy body match ends at the FIRST </script> — a script body that
-    // contains that token as a literal would hash truncated content.
+    // Non-greedy match ends at the first </script>; a literal "</script>" inside a script body would truncate the hashed content.
     for (const match of html.matchAll(/<script(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)) {
       if (!match[1]) continue;
       hashes.push(`'sha256-${createHash("sha256").update(match[1]).digest("base64")}'`);
     }
     return hashes;
   } catch {
-    // No readable index.html (misconfigured dir, tests) — no inline allowances.
     return [];
   }
 }
 
-// helmet sets HSTS, X-Content-Type-Options, X-Frame-Options, a restrictive CSP,
-// etc. When the SPA is served from this same origin (SERVE_STATIC_DIR set), the
-// default CSP would block the Vite-built assets, so we tune the directives to
-// allow self-hosted scripts/styles (Tailwind injects a stylesheet; some inline
-// styles exist, hence 'unsafe-inline' for style only) plus data: URIs for
-// fonts/images. Beyond self-hosting we also allow a few specific third parties
-// surfaced by the live single-origin deployment: Google-hosted profile avatars
-// (img), the 3D dice roller's blob: Web Worker (worker), and Cloudflare Web
-// Analytics' beacon (script + connect). In API-only mode the responses are JSON,
-// so CSP is moot — but a tuned policy is harmless and keeps one code path.
 export function securityHeaders(staticDir: string | undefined): RequestHandler {
   return helmet({
     contentSecurityPolicy: staticDir
       ? {
           directives: {
             defaultSrc: ["'self'"],
-            // Cloudflare Web Analytics injects its beacon script from
-            // static.cloudflareinsights.com; allow it here. Workers are NOT
-            // covered by scriptSrc — they get their own workerSrc below so we
-            // don't have to loosen script execution to permit the dice worker.
-            // Cloudflare Speed Brain additionally injects an inline
-            // <script type="speculationrules"> into HTML responses; the CSP3
-            // 'inline-speculation-rules' keyword permits ONLY that script type
-            // (declarative prefetch JSON — it cannot execute code), so this is
-            // not an 'unsafe-inline' loosening. Browsers that don't know the
-            // keyword ignore it.
-            // Cloudflare's edge (JS Detections, the auto-injected beacon)
-            // stamps ITS injected scripts with the nonce below by parsing this
-            // response header — verified live. First-party inline scripts (the
-            // theme pre-paint snippet) are static HTML and can't carry a
-            // per-request nonce, so they're allowlisted by served-content hash
-            // instead. Host sources stay honored (no 'strict-dynamic').
+            // 'inline-speculation-rules' permits only Cloudflare's declarative prefetch script tag, not arbitrary inline JS, and is ignored by browsers that don't recognize it.
+            // First-party inline scripts (the theme pre-paint snippet) can't carry a per-request nonce since they're static HTML, so they're allowlisted by content hash instead.
             scriptSrc: [
               "'self'",
               "https://static.cloudflareinsights.com",
@@ -74,23 +38,11 @@ export function securityHeaders(staticDir: string | undefined): RequestHandler {
               ...inlineScriptHashes(staticDir),
               () => `'nonce-${randomBytes(16).toString("base64")}'`,
             ],
-            // The 3D dice roller (@react-three) spawns a Web Worker from a
-            // blob: URL; without an explicit workerSrc it falls back to
-            // scriptSrc and gets blocked in single-origin mode.
+            // Workers fall back to scriptSrc without an explicit workerSrc.
             workerSrc: ["'self'", "blob:"],
-            // Vite/Tailwind emit a real stylesheet, but inline styles slip in
-            // (e.g. dynamic widths on the HP bar) — allow them for style only.
-            // The SPA also pulls Source Sans/Serif from Google Fonts: the
-            // stylesheet from fonts.googleapis.com, the font files from
-            // fonts.gstatic.com (see frontend/index.html). Both must be allowed
-            // or the app falls back to system fonts in single-origin mode.
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            // lh3.googleusercontent.com serves Google sign-in profile avatars
-            // rendered in the app header (AppHeader.tsx).
             imgSrc: ["'self'", "data:", "https://lh3.googleusercontent.com"],
             fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-            // Cloudflare Web Analytics' beacon POSTs metrics to
-            // cloudflareinsights.com.
             connectSrc: ["'self'", "https://cloudflareinsights.com"],
             objectSrc: ["'none'"],
           },
@@ -106,13 +58,10 @@ function intFromEnv(name: string, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-const windowMs = intFromEnv("RATE_LIMIT_WINDOW_MS", 15 * 60 * 1000); // 15 min
-const globalMax = intFromEnv("RATE_LIMIT_MAX", 600); // generous for normal play
-const createMax = intFromEnv("RATE_LIMIT_CREATE_MAX", 30); // tighter on creation
+const windowMs = intFromEnv("RATE_LIMIT_WINDOW_MS", 15 * 60 * 1000);
+const globalMax = intFromEnv("RATE_LIMIT_MAX", 600);
+const createMax = intFromEnv("RATE_LIMIT_CREATE_MAX", 30);
 
-// A no-op when limiting is disabled (tests, or RATE_LIMIT_DISABLED=true) so the
-// suite and local dev aren't throttled. Returns an array so callers can spread
-// it into app.use without conditionals at the call site.
 const disabled = isTest || process.env.RATE_LIMIT_DISABLED === "true";
 
 const sharedOptions = {
@@ -122,14 +71,10 @@ const sharedOptions = {
   message: { error: "Too many requests, please try again later." },
 };
 
-// Global limiter across all routes — a coarse backstop against hammering.
 export const globalRateLimiter: RequestHandler = disabled
   ? (_req, _res, next) => next()
   : rateLimit({ ...sharedOptions, limit: globalMax });
 
-// Tighter limiter scoped to character creation (POST /api/characters), which
-// writes a new row + audit history and is the cheapest endpoint to abuse.
-// Mounted at the app level, so it skips everything except that exact request.
 export const creationRateLimiter: RequestHandler = disabled
   ? (_req, _res, next) => next()
   : rateLimit({

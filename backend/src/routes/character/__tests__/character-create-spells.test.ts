@@ -9,9 +9,7 @@ import { seededSpeciesAnchor } from "@/test-support/species.js";
 import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
-// #1131: the creation spell/cantrip picker. A level-1 caster (Warlock: 2 cantrips
-// + 2 prepared spells per SRD 5.2) finishes with a prepared spellbook; a
-// non-caster sending picks is a 400. Real seeded catalog (Warlock + real spells).
+// A level-1 Warlock: 2 cantrips + 2 prepared spells (SRD 5.2).
 const OWNER_ID = "owner-create-spells";
 let COOKIE: string;
 
@@ -21,24 +19,12 @@ const BASE = {
   abilityScores: { strength: 8, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
 };
 
-// #1684: the species anchor is resolved per the REQUESTED edition (a missing
-// rulesEdition defaults to 2024, same default the create route itself uses).
+// The species anchor resolves per the requested edition; a missing rulesEdition defaults to 2024, matching the create route's own default (#1684).
 async function create(body: { rulesEdition?: string } & Record<string, unknown>) {
   const anchor = await seededSpeciesAnchor((body.rulesEdition as "EDITION_2014" | "EDITION_2024") ?? "EDITION_2024");
   return supertest(app).post("/api/characters").set("Cookie", COOKIE).send({ ...anchor, ...body });
 }
 
-// #1713 landed genuine 2014/2024 forks for many real class-list spells (the
-// shared/3+-list bucket: Mage Hand, Charm Person, Cure Wounds, ...), and the
-// per-class 2014 content slices (#1714-#1721) will land more over time — a
-// raw classMembership+level Prisma query can no longer tell which rows a
-// GIVEN edition would actually resolve to (a name might have a real 2014
-// fork, or gracefully fall back to its only EDITION_2024-tagged row — see
-// resolveSpellCatalogForEdition's own comment). Rather than re-implement that
-// resolution here (and drift from it as more slices land), these pickers hit
-// the real `GET /api/spells` route and take whatever IT resolves for the
-// requested class+edition — the same source of truth `create()` validates
-// against.
 async function catalogSpellIds(className: string, level: number, edition: "EDITION_2014" | "EDITION_2024", count: number): Promise<string[]> {
   const res = await supertest(app).get(`/api/spells?class=${className}&edition=${edition}`).set("Cookie", COOKIE);
   const matches = (res.body as Array<{ id: string; level: number }>).filter((s) => s.level === level);
@@ -52,8 +38,6 @@ async function warlockPicks(edition: "EDITION_2014" | "EDITION_2024" = "EDITION_
   };
 }
 
-// #1510: picks a class's spell-list catalog rows for a 2014 creation body —
-// cantripCount cantrips + spellCount level-1 spells, from the real seeded catalog.
 async function picksFor(className: string, cantripCount: number, spellCount: number, edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2014") {
   return {
     cantripIds: await catalogSpellIds(className, 0, edition, cantripCount),
@@ -86,8 +70,6 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
     expect(res.body.spellcasting.preparedSpellCount).toBe(2);
   });
 
-  // #1131 × #1130: the two creation features must compose in one create body — a
-  // caster with BOTH a background ability spread AND spell picks gets both applied.
   it("applies a background ability spread AND spell picks in one create body", async () => {
     const picks = await warlockPicks();
     const res = await create({
@@ -99,13 +81,10 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
     });
 
     expect(res.status).toBe(201);
-    // Background spread baked into the effective scores (base int 10→12, con 14→15).
     expect(res.body.abilityScores.intelligence).toBe(12);
     expect(res.body.abilityScores.constitution).toBe(15);
-    // Origin feat rides the advancements array, separate from the spell blob.
     expect(res.body.advancements).toHaveLength(1);
     expect(res.body.advancements[0]).toMatchObject({ origin: true, kind: "feat" });
-    // Spell picks land in the book unperturbed by the background grant.
     expect(res.body.spellcasting.spells).toHaveLength(4);
   });
 
@@ -136,14 +115,7 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
 
   it("rejects a leveled spell placed in cantripIds", async () => {
     const picks = await warlockPicks();
-    // A third, distinct leveled warlock spell so the level check (not the dup
-    // check) fires. `picks.spellIds` now comes from the real /api/spells
-    // route (level asc, then name asc — see catalogSpellIds), a DIFFERENT
-    // order than this raw Prisma query's own (unordered) row scan — with the
-    // 2014 shared bucket enlarging the underlying candidate pool, the two
-    // orderings are no longer guaranteed to agree on "first N", so `extra`
-    // must explicitly exclude `picks.spellIds` rather than relying on a
-    // `take: 3` position never colliding with a `take: 2` from elsewhere.
+    // picks.spellIds comes from /api/spells (ordered); this raw Prisma scan is unordered, so `extra` must explicitly exclude picks.spellIds.
     const [extra] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 1, edition: "EDITION_2024", id: { notIn: picks.spellIds } }, take: 1, select: { id: true } });
     const res = await create({
       ...BASE,
@@ -198,10 +170,7 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
   });
 });
 
-// #1631: The Fiend's PHB'14 "Expanded Spell List" is list-EXPANSION, not a
-// free grant — a 2014 Warlock picks its patron at creation (subclassLevel 1),
-// so a Fiend Warlock's level-1 known-spell picks may already include a patron
-// spell that is NOT on the base Warlock list (Burning Hands/Command).
+// The Fiend's PHB'14 Expanded Spell List is list-expansion, not a free grant.
 describe("POST /api/characters — subclass spell-list expansion at creation (#1631)", () => {
   async function requireSubclassId(className: string, subclassName: string, edition: "EDITION_2014" | "EDITION_2024" | null): Promise<string> {
     const cls = await prisma.characterClass.findUniqueOrThrow({ where: { name: className }, select: { id: true } });
@@ -252,9 +221,6 @@ describe("POST /api/characters — subclass spell-list expansion at creation (#1
   });
 });
 
-// #1510: the SRD 5.1 creation-pick counts, enforced by creationSpellCountError
-// via level1SpellPicksFor — same catalog, same route, edition threaded on the
-// create body. All default-edition (2024) tests above stay unchanged/untouched.
 describe("POST /api/characters — 2014 creation spell picks (#1510)", () => {
   it("rejects a 2014 Ranger sending spells (no Spellcasting until level 2, PHB'14 p. 92)", async () => {
     const res = await create({
@@ -355,10 +321,7 @@ describe("POST /api/characters — 2014 creation spell picks (#1510)", () => {
     { name: "Warlock", cantrips: 2, spells: 2 },
   ] as const;
 
-  // #1131 AC-6 pin, carried into 2014: creationSpellEntry sets `prepared: true`
-  // unconditionally regardless of the class's known/prepared caster model
-  // (#1507's casterModelFor) — the known-vs-prepared sheet bookkeeping split
-  // is #1507 D5/D7's concern, not #1510's.
+  // creationSpellEntry sets prepared: true unconditionally, regardless of the class's known/prepared caster model.
   it("a 2014 known caster (Bard/Sorcerer/Warlock) still finishes with every entry prepared: true", async () => {
     for (const { name, cantrips, spells } of KNOWN_CASTERS_2014) {
       const picks = await picksFor(name.toLowerCase(), cantrips, spells);
@@ -376,11 +339,7 @@ describe("POST /api/characters — 2014 creation spell picks (#1510)", () => {
   });
 });
 
-// #1513: the wizard scribes its full 6-spell spellbook at creation, but only
-// preparedSpellLimit of those leveled picks stay prepared — both editions, and
-// proven at the write side (the raw stored blob), not just the served view,
-// since buildSpellcastingView's read-side clamp (#1127) would otherwise mask a
-// missing write-time clamp.
+// Proven at the write side (the raw stored blob), not just the served view — buildSpellcastingView's read-side clamp (#1127) would otherwise mask a missing write-time clamp.
 describe("POST /api/characters — wizard spellbook vs. prepared cap (#1513)", () => {
   it("a Wizard scribes 6 level-1 spells and has exactly 4 prepared (INT 16) — both editions", async () => {
     for (const rulesEdition of ["EDITION_2014", "EDITION_2024"] as const) {
@@ -399,16 +358,12 @@ describe("POST /api/characters — wizard spellbook vs. prepared cap (#1513)", (
       expect(book, rulesEdition).toHaveLength(9);
       const leveled = book.filter((s) => s.level > 0);
       expect(leveled, rulesEdition).toHaveLength(6);
-      // The FIRST 4 picks (pick order) stay prepared; the last 2 do not —
-      // deterministic, matching clampPreparedToLimit's read-side "first N" rule.
+      // The first 4 picks (pick order) stay prepared, matching clampPreparedToLimit's read-side "first N" rule.
       expect(leveled.slice(0, 4).every((s) => s.prepared), rulesEdition).toBe(true);
       expect(leveled.slice(4).every((s) => !s.prepared), rulesEdition).toBe(true);
       expect(res.body.spellcasting.preparedSpellCount, rulesEdition).toBe(4);
       expect(res.body.spellcasting.preparedSpellLimit, rulesEdition).toBe(4);
 
-      // Write-side proof: the RAW stored blob already has the clamp applied
-      // (trimmedCount 0 on read) rather than storing 6 prepared:true entries
-      // and relying on the read-side clamp to trim them on every future read.
       const character = await prisma.character.findFirstOrThrow({
         where: { name: `CreateSpells1513 Wizard ${rulesEdition}` },
         select: { spellcasting: true },
@@ -443,13 +398,7 @@ describe("POST /api/characters — wizard spellbook vs. prepared cap (#1513)", (
   });
 });
 
-// #1712: cross-edition admission — resolveCreationSpells rejects a submitted
-// spell id that is provably the WRONG edition's fork of a name (a same-named
-// row the requesting edition actually resolves to exists). A dedicated
-// fixture fork (rather than a real catalog name) keeps this mechanism proof
-// independent of which real spells #1713+'s content slices happen to fork —
-// the two existing describe blocks above already prove a 2014/2024 creation
-// accepts today's real catalog (forked or not) unchanged.
+// resolveCreationSpells rejects a submitted spell id that is provably the wrong edition's fork of a name.
 describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", () => {
   const FORK_NAME = "CreateSpells1712 Fork Cantrip";
 
@@ -459,9 +408,7 @@ describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", 
       duration: "Instantaneous", description: "The PHB'14 text.", concentration: false, ritual: false, cantripScaling: true,
     };
     const row2024 = { ...row2014, description: "The SRD 5.2 text." };
-    // catalogEntryId (#1796) is resolved first, per edition fork — required,
-    // no default, and each fork is its own distinct CatalogEntry (business
-    // key includes edition).
+    // catalogEntryId (#1796) is required, no default — each fork is its own distinct CatalogEntry (business key includes edition).
     const catalogEntryId2014 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2014" });
     const catalogEntryId2024 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2024" });
     const fork2014 = await upsertEditionRow(
@@ -486,11 +433,7 @@ describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", 
     return { fork2014, fork2024 };
   }
 
-  // A second warlock cantrip id, explicitly excluding FORK_NAME — warlockPicks()
-  // takes an unordered `take: 2` off the live catalog, and once the fork rows
-  // exist as warlock-tagged level-0 spells they're eligible to be picked BY
-  // that query too, which would silently duplicate the fork id in a two-cantrip
-  // submission (a "chosen only once" 400 masking the assertion under test).
+  // warlockPicks() takes an unordered `take: 2`; once the fork rows exist as warlock-tagged level-0 spells they're eligible to be picked by it too, which would silently duplicate the fork id.
   async function otherWarlockCantripId(edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024"): Promise<string> {
     const row = await prisma.spell.findFirstOrThrow({
       where: { classMemberships: { some: { className: "warlock" } }, level: 0, edition, name: { not: FORK_NAME } },
@@ -500,9 +443,7 @@ describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", 
   }
 
   afterAll(async () => {
-    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
-    // #1796) — the reverse cascade doesn't exist (the supertype stays
-    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE, #1796); the reverse cascade doesn't exist, so a plain spell.deleteMany would orphan the entry.
     await prisma.catalogEntry.deleteMany({ where: { name: FORK_NAME, kind: "SPELL" } });
   });
 
@@ -522,11 +463,7 @@ describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", 
 
   it("rejects a 2014 creation submitting the 2024 fork's id, naming the spell", async () => {
     const { fork2024 } = await seedFork();
-    // #1713 gave Warlock a real 2014-tagged cantrip/L1 catalog (the shared/3+-
-    // list bucket: Mage Hand, Minor Illusion, ... are genuine 2014 rows now) —
-    // pair the wrong-fork id with the requesting edition's OWN real rows, or
-    // the 400 this test targets gets masked by an unrelated cross-edition
-    // rejection on `otherCantrip`/`picks` themselves.
+    // Pair the wrong-fork id with the requesting edition's own real rows, or the 400 under test gets masked by an unrelated cross-edition rejection on otherCantrip/picks.
     const otherCantrip = await otherWarlockCantripId("EDITION_2014");
     const picks = await warlockPicks("EDITION_2014");
     const res = await create({

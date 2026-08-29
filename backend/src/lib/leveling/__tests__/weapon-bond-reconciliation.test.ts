@@ -1,9 +1,3 @@
-/**
- * Level-down reconciliation for Eldritch Knight Weapon Bond (2014, #1854):
- * dropping below level 3 clears every bonded weapon (the legal cap steps
- * from WEAPON_BOND_LIMIT to 0), logs one `weaponUnbonded` event per item, and
- * both are undoable via the XP batch's revert.
- */
 import { afterEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -83,8 +77,7 @@ describe("Level-down reconciliation clears bonded weapons (#1854)", () => {
     expect(events).toHaveLength(2);
     expect(new Set(events.map((e) => e.entityId))).toEqual(new Set([a, b]));
 
-    // Every weaponUnbonded row shares ONE batchId with the XP-set op — LIFO undo
-    // reverts the whole batch, restoring both.
+    // Every weaponUnbonded row shares ONE batchId with the XP-set op — LIFO undo reverts the whole batch, restoring both.
     const batchId = events[0].batchId;
     const undo = await supertest(app).post(`/api/characters/${FIXTURE_ID}/events/${batchId}/revert`).set("Cookie", COOKIE);
     expect(undo.status).toBe(200);

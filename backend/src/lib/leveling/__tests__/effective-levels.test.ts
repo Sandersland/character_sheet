@@ -5,7 +5,7 @@ import { effectiveEntryLevel, levelDownEntryLevels, subclassActiveAt, subclassGa
 describe("effectiveEntryLevel", () => {
   it("uses the XP-derived level for a single-class character (stale entry.level ignored)", () => {
     expect(effectiveEntryLevel(2, 1, 5)).toBe(5);
-    expect(effectiveEntryLevel(0, 0, 3)).toBe(3); // no entries → still derived
+    expect(effectiveEntryLevel(0, 0, 3)).toBe(3);
   });
 
   it("uses the per-entry level for a multiclass character", () => {
@@ -16,8 +16,8 @@ describe("effectiveEntryLevel", () => {
 
 describe("levelDownEntryLevels", () => {
   it("trims LIFO from the highest position first", () => {
-    expect(levelDownEntryLevels([10, 1], 3)).toEqual([3, 0]); // fighter deleted, then sorcerer 10→3
-    expect(levelDownEntryLevels([2, 3], 3)).toEqual([2, 1]); // tail entry absorbs all of it
+    expect(levelDownEntryLevels([10, 1], 3)).toEqual([3, 0]);
+    expect(levelDownEntryLevels([2, 3], 3)).toEqual([2, 1]);
   });
 
   it("floors the position-0 base class at 1, later entries at 0", () => {
@@ -29,9 +29,7 @@ describe("levelDownEntryLevels", () => {
     expect(levelDownEntryLevels([3, 2], 6)).toEqual([3, 2]);
   });
 
-  // A per-entry `min(level, target)` would give [1, 3] here — the LIFO trim
-  // takes the tail entry below the target-level bound instead. This is why
-  // computeLevelDownState projects through THIS function, not a min().
+  // A per-entry `min(level, target)` would give [1, 3] here — the LIFO trim takes the tail entry below the target-level bound instead, which is why computeLevelDownState projects through THIS function, not a min().
   it("can trim a tail entry below min(level, target) — LIFO, not a per-entry cap", () => {
     expect(levelDownEntryLevels([1, 4], 3)).toEqual([1, 2]);
   });
@@ -43,8 +41,7 @@ describe("subclassGateLevel", () => {
     expect(subclassGateLevel(6, "EDITION_2014")).toBe(6);
   });
 
-  // SRD 5.2: every class gains its subclass at level 3, so the catalog column
-  // is ignored under 2024 rules (#1128).
+  // SRD 5.2: every class gains its subclass at level 3, so the catalog column is ignored under 2024 rules (#1128).
   it("is always 3 under 2024 rules, whatever the catalog says", () => {
     expect(subclassGateLevel(1, "EDITION_2024")).toBe(3);
     expect(subclassGateLevel(2, "EDITION_2024")).toBe(3);

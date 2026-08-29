@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The config module reads env once at import time and freezes the result, so
-// every test re-imports it fresh (vi.resetModules + dynamic import) after
-// stubbing the env it wants to observe. No Postgres needed — this is pure env
-// validation.
-
+// config.ts reads env once at import time and freezes the result, so every test re-imports it fresh after stubbing the env it wants to observe.
 async function loadConfig() {
   vi.resetModules();
   return import("@/lib/core/config.js");
@@ -12,8 +8,6 @@ async function loadConfig() {
 
 describe("config", () => {
   beforeEach(() => {
-    // Start from a clean slate so a real ambient env (DATABASE_URL etc.) can't
-    // leak provider creds into a "no creds" assertion.
     vi.stubEnv("GOOGLE_CLIENT_ID", "");
     vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
     vi.stubEnv("APP_BASE_URL", "");

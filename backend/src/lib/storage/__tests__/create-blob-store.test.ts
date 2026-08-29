@@ -13,8 +13,6 @@ import {
 
 describe("createBlobStore", () => {
   beforeEach(() => {
-    // Clean slate: an ambient BLOB_STORE_DRIVER or S3_* var must not leak into
-    // a "missing config" assertion.
     for (const name of [
       "BLOB_STORE_DRIVER",
       "BLOB_FS_DIR",
@@ -110,8 +108,7 @@ describe("getBlobStore", () => {
     const first = getBlobStore();
     expect(getBlobStore()).toBe(first);
 
-    // The memo pins the first store; a later env change alone must not
-    // rebuild it — that is exactly why __resetBlobStoreForTests exists.
+    // A later env change alone must not rebuild the memoized store.
     vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "blob-memo-test-")));
     expect(getBlobStore()).toBe(first);
   });

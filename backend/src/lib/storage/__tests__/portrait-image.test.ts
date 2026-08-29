@@ -7,9 +7,6 @@ import {
   reencodePortrait,
 } from "../portrait-image.js";
 
-// Fixture images are generated with sharp at runtime — no binary fixtures in
-// the repo. The route-level pipeline is covered in portrait.test.ts; this file
-// pins the helper's own contract for its other consumer (#1617).
 describe("reencodePortrait", () => {
   it("re-encodes every whitelisted format to webp, accepting its declared type", async () => {
     const base = sharp({ create: { width: 32, height: 32, channels: 3, background: "#123456" } });

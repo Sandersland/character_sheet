@@ -1,23 +1,7 @@
-// Quivering Palm (Open Hand L17) — a two-step feature: SET on an Unarmed
-// Strike hit, then later TRIGGER the vibrations to force a Constitution
-// save. 2024 (Warrior of the Open Hand, SRD 5.2 / PHB'24 p.90): spend 4 focus
-// to SET; a Magic action to TRIGGER, forcing a Constitution save (focus DC)
-// for 10d12 Force damage, half as much on a success. 2014 (Way of the Open
-// Hand, SRD 5.1 / PHB'14 p.79): spend 3 ki to SET; an action to TRIGGER, and
-// the outcome mapping is INVERTED — a failed save drops the target to 0 hit
-// points outright, a successful one takes the full 10d10 necrotic (never
-// halved). Cost forks via quiveringPalmCost/monkPoolKey; the damage-outcome
-// fork lives in resolveQuiveringPalmDamage/quiveringPalmSummary below.
-//
-// No NPC combatant or calendar/downtime tracker exists, so "only one creature
-// at a time" and the day-count duration aren't modeled as real state — only
-// the active/inactive flag persists, as an inert activeEffects buff (exactly
-// like Rage's "while-active" buff). The day countdown itself is narrated.
-//
-// Roll ownership: the Con save is a flat d20 with no modifier — DC is exact,
-// the roll is a deliberate simplification pending an NPC stat-block model.
-// The damage is the monk's own effect, so the client rolls it and sends the
-// total; the server only decides the outcome from its own save roll.
+// Quivering Palm, Open Hand L17. 2024 (SRD 5.2 / PHB'24 p.90): 4 focus to SET; Magic action to TRIGGER, Con save (focus DC) for 10d12 Force, half on success.
+// 2014 (SRD 5.1 / PHB'14 p.79): 3 ki to SET; action to TRIGGER — outcome mapping is INVERTED: a failed save drops the target to 0 HP outright, a success takes the full 10d10 necrotic (never halved).
+// No NPC/calendar model: only the active/inactive flag persists (an inert activeEffects buff, like Rage's while-active buff) — the day-count duration is narrated only.
+// The Con save is a flat d20 with no modifier (simplification pending an NPC stat-block model); the client rolls the damage and sends the total, the server only decides the outcome from its own save roll.
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { QuiveringPalmOperation, TriggerQuiveringPalmOperation } from "@character-sheet/contracts";
@@ -40,7 +24,7 @@ export const QUIVERING_PALM_BUFF_KEY = "quiveringPalm";
 // SRD 5.2 / PHB'24 p.90; SRD 5.1 / PHB'14 p.79 — edition-invariant grant level.
 export const QUIVERING_PALM_LEVEL = 17;
 
-/** Whether an Open Hand monk entry (its own level, never `character.level`) has Quivering Palm. */
+// monkLevel is the entry's own level, never character.level.
 export function hasQuiveringPalm(monkLevel: number): boolean {
   return monkLevel >= QUIVERING_PALM_LEVEL;
 }
@@ -70,13 +54,8 @@ export interface TriggerQuiveringPalmResult {
 
 export type QuiveringPalmResult = SetQuiveringPalmResult | TriggerQuiveringPalmResult;
 
-/**
- * 2024 (SRD 5.2, "half as much"): fail takes full rolled damage, success
- * halves it, rounded down. 2014 (SRD 5.1): INVERTED — a failed save drops the
- * target to 0 hit points outright, a successful save takes the full rolled
- * damage, never halved. Transcribed as SRD 5.1 actually states it — do not
- * normalize this to 2024's shape.
- */
+// 2024 (SRD 5.2): fail takes full rolled damage, success halves it (rounded down). 2014 (SRD 5.1): INVERTED — a failed save drops the target to 0 HP outright, a success takes the full rolled damage, never halved.
+// Transcribed as SRD 5.1 actually states it — do not normalize this to 2024's shape.
 export function resolveQuiveringPalmDamage(
   roll: number,
   dc: number,
@@ -126,9 +105,7 @@ function monkEntry(row: QuiveringPalmRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
-// The two editions' Open Hand subclasses are SEPARATE subclass rows, not one
-// row forked across editions — a character resolves to at most one, so
-// matching either slug is safe.
+// The two editions' Open Hand subclasses are SEPARATE subclass rows, not one row forked across editions — a character resolves to at most one, so matching either slug is safe.
 const OPEN_HAND_SLUGS: readonly SubclassSlug[] = ["monk-warrior-of-the-open-hand", "monk-way-of-the-open-hand"];
 
 function isOpenHandFamily(row: QuiveringPalmRow): boolean {
@@ -137,7 +114,6 @@ function isOpenHandFamily(row: QuiveringPalmRow): boolean {
   return !!slug && OPEN_HAND_SLUGS.includes(slug);
 }
 
-/** Throws unless this is a level-17+ Open Hand monk (either edition); returns the monk level. */
 function assertQuiveringPalmAvailable(row: QuiveringPalmRow): number {
   const monk = monkEntry(row);
   if (!monk || !hasQuiveringPalm(monk.level) || !isOpenHandFamily(row)) {

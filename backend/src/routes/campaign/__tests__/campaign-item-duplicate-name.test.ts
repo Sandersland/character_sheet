@@ -1,16 +1,5 @@
-// #1646: merging CampaignItem into Item put every item in a campaign under one
-// scopeKey, so Item's @@unique([scopeKey, name]) now forbids two same-named
-// items in a campaign — CampaignItem had no such constraint. That rule is
-// intentional (two identically-named items are indistinguishable in the DM's
-// list), but it has to surface as a 409 the UI can render.
-//
-// The raw Prisma error must never reach the client: it embeds the absolute
-// server path and the failing query text, which is why these assert on the
-// message body and not only the status.
-//
-// The mapping lives in the central errorHandler beside its P2025 -> 404 twin,
-// so it covers every route rather than these two — which is also why the
-// message is generic and these tests do not assert the item's name.
+// #1646: Item's @@unique([scopeKey, name]) forbids two same-named items per campaign; surfaces as 409.
+// The raw Prisma error must never reach the client (server path + query text) — assert on the message body, not just status.
 import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

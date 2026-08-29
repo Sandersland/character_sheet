@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { createCharacter } from "@/lib/character/character-create.js";
 import type { CreateCharacterBody } from "@/lib/character/character-schemas.js";
 
-// The empty-classes guard returns before any DB access, so this needs no Postgres.
 describe("createCharacter defensive guards", () => {
   it("returns a 400 result when classes is empty (no classes[0] deref)", async () => {
     const input = {
@@ -23,7 +22,6 @@ describe("createCharacter defensive guards", () => {
     }
   });
 
-  // The alignment guard also short-circuits before any DB access.
   it("returns a 400 result for an unknown alignment (no DB access)", async () => {
     const input = {
       name: "Nameless",

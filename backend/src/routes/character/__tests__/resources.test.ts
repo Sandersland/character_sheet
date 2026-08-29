@@ -1,12 +1,3 @@
-/**
- * Resources route characterization tests (issue #289).
- * Mirrors spellcasting.test.ts: real Postgres in beforeEach, supertest against
- * the shared `app`. The fixture is a level-3 Battle Master Fighter (Str 16) so the
- * superiority-die pool, maneuver choice count (3), and Student-of-War tool
- * choice count (1) are all deterministic. Locks the CURRENT behavior of
- * applyResourceOperations across all six op branches before any refactor.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -26,8 +17,6 @@ const FIGHTER_CATALOG_NAME = "Resources Route Test Fighter";
 const MANEUVER_CATALOG_NAME = "Resources Route Test Trip Attack";
 const BM_SUBCLASS_NAME = "battle master"; // exact lowercase key deriveResources reads
 
-// Level-3 Battle Master Fighter. XP 900 → level 3 → prof bonus +2.
-// Str 16 (+3). Superiority dice: 4 × d8. Maneuvers known cap: 3. Tool cap: 1.
 const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Resources Test Battle Master",
@@ -62,7 +51,6 @@ async function post(operations: unknown[]) {
   return agent().post(url).send({ operations });
 }
 
-// Serialized resource sub-state helpers (all read from the mutation response).
 interface Pool { key: string; used: number; remaining: number; total: number }
 interface Entry {
   id: string;
@@ -107,9 +95,7 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
 
-    // fightingStyleFeatLevel (#1529): the fs-slot cap resolves via this
-    // column through the class FK relation now — needed for the fs feat
-    // "a resource op → undo preserves a previously taken Fighting Style feat" asserts on.
+    // fightingStyleFeatLevel resolves the fs-slot cap through the class FK relation (#1529) — needed for the Fighting Style feat test below.
     const cls = await prisma.characterClass.upsert({
       where: { name: FIGHTER_CATALOG_NAME },
       create: {
@@ -125,12 +111,7 @@ describe("POST /api/characters/:id/resources/transactions", () => {
       update: { fightingStyleFeatLevel: 1, subclassLevel: 3 },
     });
 
-    // #1546 Part B-ii: Battle Master's superiority-dice pool + maneuver/tool
-    // choice counts are ROW-driven now (fighter.ts's resourceFn/deriveExtras
-    // are gone) — a bespoke Subclass row with no ClassFeature children would
-    // silently lose all three, same failure mode fighterResourceRowsData's
-    // own header describes for the base class (#1546 Part B-i, Ruling 2).
-    // Shared helper, not a per-file copy.
+    // battleMasterResourceRowsData is a shared helper — a bespoke Subclass row with no ClassFeature children would silently lose the superiority-dice pool and maneuver/tool choice counts (#1546).
     const bm = await upsertEditionRow(
       prisma.subclass,
       { classId: cls.id, name: BM_SUBCLASS_NAME, edition: null },
@@ -175,8 +156,6 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
   });
 
-  // ── Fixture derivation guard ──────────────────────────────────────────────
-
   it("derives a 4×d8 superiority pool, maneuver cap 3 and tool cap 1", async () => {
     const res = await agent().get(`/api/characters/${FIXTURE_ID}`);
     expect(res.status).toBe(200);
@@ -185,13 +164,9 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(res.body.resources.pools.find((p: Pool & { die?: string }) => p.key === "superiorityDice").die).toBe("d8");
     expect(res.body.resources.maneuverChoiceCount).toBe(3);
     expect(res.body.resources.toolProfChoiceCount).toBe(1);
-    // Str 16 (+3), prof +2 → maneuver save DC 13. Folded into the rider
-    // contract (#1316) — top-level, not nested in resources; named for the
-    // feature (`maneuvers`), like every other rider.
+    // maneuvers rider is top-level, not nested in resources — named for the feature, per the rider contract (#1316).
     expect(res.body.maneuvers).toEqual({ saveDC: 13 });
   });
-
-  // ── spendResource ─────────────────────────────────────────────────────────
 
   it("spendResource with a roll spends one die and logs the roll", async () => {
     const res = await post([{ type: "spendResource", key: "superiorityDice", roll: 5 }]);
@@ -233,8 +208,6 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── restoreResource ─────────────────────────────────────────────────────────
-
   it("restoreResource returns a spent die to the pool", async () => {
     await post([{ type: "spendResource", key: "superiorityDice" }]);
     const res = await post([{ type: "restoreResource", key: "superiorityDice" }]);
@@ -251,8 +224,6 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     const res = await post([{ type: "restoreResource", key: "superiorityDice" }]);
     expect(res.status).toBe(400);
   });
-
-  // ── learnManeuver ─────────────────────────────────────────────────────────
 
   it("learnManeuver from catalog snapshots the maneuver and records provenance", async () => {
     const res = await post([{ type: "learnManeuver", maneuverId: catalogManeuverId }]);
@@ -313,14 +284,7 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(fourth.status).toBe(400);
   });
 
-  // ── forgetManeuver (#1516: learn-time only, unreachable from this route) ────
-
-  // PHB'14 Battle Master p.73 / SRD 5.2 equivalent bounds a maneuver
-  // replacement to learn-time — this generic route is never a validated
-  // level-up step, so forgetManeuver 400s here unconditionally regardless of
-  // whether the entry actually exists (the cadence guard is checked before
-  // entry lookup). Only POST …/level-up/transactions (a canSwap-carrying
-  // "maneuvers" step) can forget a maneuver — see level-up-transaction.test.ts.
+  // PHB'14 Battle Master p.73 / SRD 5.2: maneuver replacement is learn-time only — this generic route always 400s here, cadence-gated before entry lookup, regardless of whether the entry exists. Only a level-up ceremony's "maneuvers" step can forget one (#1516).
   it("400s forgetManeuver — only reachable through a level-up ceremony step", async () => {
     const learn = await post([{ type: "learnManeuver", custom: { name: "Disarm", description: "d" } }]);
     const entryId = maneuvers(learn)[0].id;
@@ -328,7 +292,7 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     const res = await post([{ type: "forgetManeuver", entryId }]);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/level-up ceremony/i);
-    // The learn is untouched — the op never reached applyForgetManeuverOp's mutation.
+    // applyForgetManeuverOp's mutation never ran — the learn is untouched.
     const char = await agent().get(`/api/characters/${FIXTURE_ID}`);
     expect(maneuvers(char).find((m) => m.id === entryId)).toBeDefined();
   });
@@ -337,8 +301,6 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     const res = await post([{ type: "forgetManeuver", entryId: "does-not-exist" }]);
     expect(res.status).toBe(400);
   });
-
-  // ── learnToolProficiency ────────────────────────────────────────────────────
 
   it("learnToolProficiency adds an artisan tool via Student of War", async () => {
     const res = await post([{ type: "learnToolProficiency", name: "Carpenter's Tools" }]);
@@ -358,8 +320,6 @@ describe("POST /api/characters/:id/resources/transactions", () => {
   });
 
   it("400s on duplicate learnToolProficiency", async () => {
-    // Bump the tool choice cap isn't possible; duplicate must be caught before cap.
-    // A single artisan tool is the cap (1), so re-learning the same one 400s.
     await post([{ type: "learnToolProficiency", name: "Smith's Tools" }]);
     const dup = await post([{ type: "learnToolProficiency", name: "Smith's Tools" }]);
     expect(dup.status).toBe(400);
@@ -370,8 +330,6 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     const second = await post([{ type: "learnToolProficiency", name: "Carpenter's Tools" }]);
     expect(second.status).toBe(400);
   });
-
-  // ── forgetToolProficiency ───────────────────────────────────────────────────
 
   it("forgetToolProficiency removes a tool proficiency by entry id", async () => {
     const learn = await post([{ type: "learnToolProficiency", name: "Smith's Tools" }]);
@@ -392,8 +350,6 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── Request-level guards ────────────────────────────────────────────────────
-
   it("404s for an unknown character", async () => {
     const res = await agent()
       .post("/api/characters/does-not-exist/resources/transactions")
@@ -405,8 +361,6 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     const res = await post([]);
     expect(res.status).toBe(400);
   });
-
-  // ── Cross-cutting invariants ────────────────────────────────────────────────
 
   it("is atomic: a later failing op rolls back an earlier valid spend and writes no events", async () => {
     const res = await post([
@@ -456,8 +410,6 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(toolProfs(char).some((t) => t.name === "Smith's Tools")).toBe(true);
   });
 
-  // ── undo preserves a Fighting Style feat advancement (issue #319 / #1137) ────
-
   it("a resource op → undo preserves a previously taken Fighting Style feat", async () => {
     const fsFeat = {
       id: "adv-fs", level: 1, kind: "feat", slot: "fightingStyle",
@@ -485,10 +437,7 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(pool(undo, "superiorityDice").used).toBe(0);
   });
 
-  // #1381: a maneuver's dice were previously unreachable to the client (the
-  // catalog row carries effectDieSource but no fixed effectDiceFaces) — this
-  // proves deriveManeuverEffect resolves them from the character's OWN
-  // superiority die, and that the resolution re-derives after a level-up.
+  // deriveManeuverEffect resolves a maneuver's dice from the character's own superiority die (the catalog row has no fixed effectDiceFaces) and re-derives after a level-up (#1381).
   it("serves a known maneuver's resolved effect, dice tracking the derived superiority die", async () => {
     const learned = await post([{ type: "learnManeuver", maneuverId: catalogManeuverId }]);
     expect(maneuvers(learned)[0].effect?.dice?.faces).toBe(8);

@@ -1,10 +1,6 @@
 import { prisma } from "@/lib/core/prisma.js";
 
-/**
- * The subset of a homebrew spell submission validateCustomSpellCoherence
- * checks — matches customSpellSchema's (contracts) shape closely enough that
- * a route can pass its parsed body straight through.
- */
+// Matches customSpellSchema's (contracts) shape closely enough that a route can pass its parsed body straight through.
 export interface CustomSpellCoherenceInput {
   level: number;
   effectKind?: "damage" | "heal";
@@ -15,14 +11,8 @@ export interface CustomSpellCoherenceInput {
   saveEffect?: string;
 }
 
-/**
- * Pure structured-effect coherence checks for a homebrew spell (#1785, epic
- * #1782 2/5) — the SAME rules for both create and edit (custom-spells.ts's
- * POST and PATCH both call this one function on the full submitted record,
- * never two hand-rolled copies). Returns the first violation's message, or
- * null when the record is internally consistent. DB-dependent checks
- * (class-name validity) are NOT here — see validateCustomSpellClasses below.
- */
+// The same rules for both create and edit — POST and PATCH both call this one function, never two hand-rolled copies (#1785).
+// DB-dependent checks (class-name validity) live in validateCustomSpellClasses, not here.
 export function validateCustomSpellCoherence(input: CustomSpellCoherenceInput): string | null {
   if (input.level < 0 || input.level > 9) {
     return "level must be between 0 and 9";
@@ -45,15 +35,7 @@ export function validateCustomSpellCoherence(input: CustomSpellCoherenceInput): 
   return null;
 }
 
-/**
- * Rejects a homebrew spell submission naming a class outside the
- * CharacterClass catalog. Case-insensitive: CharacterClass.name is
- * Capitalized ("Wizard"), SpellClass.className is stored lowercase
- * ("wizard", #1711) — this checks against the catalog regardless of the
- * caller's casing. Empty `classes` is valid (a spell with no class access
- * yet); returns the first unmatched name(s) in one message rather than
- * throwing per-name.
- */
+// CharacterClass.name is Capitalized ("Wizard"); SpellClass.className is stored lowercase ("wizard", #1711) — this checks match regardless of caller casing.
 export async function validateCustomSpellClasses(classes: string[]): Promise<string | null> {
   if (classes.length === 0) return null;
 

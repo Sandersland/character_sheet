@@ -1,17 +1,5 @@
-/**
- * Latch for the condition op schemas migrated into @character-sheet/contracts
- * (#1390). This is the one family that could NOT reach a single declaration:
- * `conditionKeySchema`'s keys and `setExhaustionOpSchema`'s upper bound are
- * literal copies of `CONDITIONS` and `EXHAUSTION_MAX`, because the contracts
- * zone may not import backend (`.fallowrc.jsonc`). A backend test may import
- * both sides, so this file is the machine latch that makes the copy safe — it is
- * the reason the copy is acceptable, and deleting it silently re-opens the drift.
- *
- * The runtime assertions matter independently of the type ones:
- * `resolveSetExhaustion` re-range-checks the level and answers 400 exactly as a
- * schema rejection does, so `conditions.test.ts` and `exhaustion-edition.test.ts`
- * — which assert `res.status` — stay green if `.max(6)` is dropped here.
- */
+// conditionKeySchema/setExhaustionOpSchema duplicate CONDITIONS/EXHAUSTION_MAX because the contracts zone can't import backend (#1390) — this file is the latch keeping that copy safe; deleting it re-opens the drift.
+// resolveSetExhaustion re-range-checks the level and 400s exactly like a schema rejection, so conditions.test.ts and exhaustion-edition.test.ts stay green if .max(6) is dropped here.
 import {
   applyConditionOpSchema,
   conditionKeySchema,

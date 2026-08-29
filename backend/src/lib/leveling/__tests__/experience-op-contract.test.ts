@@ -1,17 +1,4 @@
-/**
- * Latch for the XP op schemas migrated into @character-sheet/contracts (#1390).
- *
- * Two independent failure modes, and they need different gates:
- *  1. z.infer aliases z.output, but the frontend must construct z.input — they
- *     diverge on `.transform()`/`.default()`/`.catch()`/`z.coerce.*`/`.pipe()`.
- *     The assertions below ASSERT that equality rather than assume it, so
- *     adding any of those to one of these schemas goes red. `expectTypeOf` is
- *     erased at runtime (there is no vitest `typecheck` block), so this half is
- *     gated by `npm run typecheck`, NOT by `vitest run`.
- *  2. Range/sign drift. `applyExperienceOperations` re-checks XP >= 0 and both
- *     paths answer 400, so a route test asserting only `res.status` cannot see
- *     `.nonnegative()` disappear from the schema. The safeParse assertions can.
- */
+// #1390: latch for the XP op schemas in @character-sheet/contracts. expectTypeOf is erased at runtime, so the z.input/z.output equality is gated by `npm run typecheck`, not `vitest run`.
 import { experienceOperationSchema, awardXpOpSchema, setXpOpSchema } from "@character-sheet/contracts";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { z } from "zod";

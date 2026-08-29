@@ -14,8 +14,7 @@ import {
   snapshotInventoryItemForUndo,
 } from "./inventory-snapshot.js";
 
-// A consumable auto-applies its effect only when it heals (#121). Non-heal
-// effects are rolled + recorded but never applied server-side.
+// #121: a consumable auto-applies its effect only when it heals; non-heal effects are rolled + recorded but never applied server-side.
 export function isHealingConsumable(effectDescription: string | null | undefined): boolean {
   if (!effectDescription) return false;
   return /hit point|\bheal/i.test(effectDescription);
@@ -23,7 +22,6 @@ export function isHealingConsumable(effectDescription: string | null | undefined
 
 type ConsumableDetail = InventoryItemWithDetails["consumableDetail"];
 
-// A consumable's effect-dice metadata (0 count/faces ⇒ no roll).
 function consumableEffectDice(detail: ConsumableDetail): { diceCount: number; faces: number; modifier: number } {
   return {
     diceCount: detail?.effectDiceCount ?? 0,
@@ -32,8 +30,7 @@ function consumableEffectDice(detail: ConsumableDetail): { diceCount: number; fa
   };
 }
 
-// Rolls a consumable's effect dice — client-supplied for the 3D animation, else
-// server-rolled — validating any supplied rolls. total is null when it has no dice.
+// Rolls are client-supplied for the 3D animation when present, else server-rolled; total is null when the consumable has no dice.
 function rollConsumableEffect(
   op: UseOperation,
   item: InventoryItemWithDetails,
@@ -55,8 +52,6 @@ function rollConsumableEffect(
   return { rolls, modifier, total: rolls.reduce((sum, r) => sum + r, 0) + modifier };
 }
 
-// The event before/after snapshots + row-effect of consuming one use. Decrements
-// usesRemaining (charged) or quantity (stackable); throws when nothing is left.
 interface UseDecrement {
   before: Record<string, unknown>;
   after: Record<string, unknown> | null;
@@ -97,8 +92,6 @@ function computeUseDecrement(
   };
 }
 
-// Writes the computed decrement to the row: charged updates usesRemaining, a
-// depleted stackable deletes the row, otherwise the quantity drops by one.
 async function persistUseDecrement(
   tx: Prisma.TransactionClient,
   item: InventoryItemWithDetails,
@@ -118,8 +111,6 @@ async function persistUseDecrement(
   }
 }
 
-// Auto-applies a consumable's healing only — non-heal effects are rolled and
-// recorded but never applied server-side (#121). Returns "heal" when it applied.
 async function applyConsumableHeal(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -134,9 +125,7 @@ async function applyConsumableHeal(
   return "heal";
 }
 
-// Consumes one use of a consumable (#121). Ammo is gear, not consumable, so it
-// is excluded here without any ammoKind dependency. Rolls the effect dice, logs
-// a `consumed` event with the roll in `data`, and auto-applies ONLY healing.
+// Ammo is gear, not consumable, so it is excluded here without any ammoKind dependency.
 export async function applyUse(
   tx: Prisma.TransactionClient,
   characterId: string,

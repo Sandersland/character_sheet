@@ -25,8 +25,7 @@ function char(
   return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], spellEntries, edition: "EDITION_2024" };
 }
 
-// hitDie is required (#1380) but arbitrary here — HP-number assertions belong
-// in level-up-plan.test.ts instead.
+// hitDie is required (#1380) but arbitrary here — HP-number assertions belong in level-up-plan.test.ts instead.
 const ANY_DIE = "d10";
 
 function target(name: string, newLevel: number, subclass: string | null = null, subclassLevel?: number): TargetClassEntry {
@@ -58,17 +57,14 @@ describe("resolveLevelUpPlan — submission-free plan resolution (#886)", () => 
   });
 
   it("Fighter 2→3 with Battle Master chosen re-plans and splices the subclass step", () => {
-    // maneuverChoiceCount/toolProfChoiceCount are row-driven — BATTLE_MASTER_ROWS
-    // mirrors what resolveLevelUpContext resolves via resolvePickedSubclass.
+    // maneuverChoiceCount/toolProfChoiceCount are row-driven — BATTLE_MASTER_ROWS mirrors what resolveLevelUpContext resolves via resolvePickedSubclass.
     const steps = resolveLevelUpPlan(char("fighter", 2), target("fighter", 3, null), "battle master", BATTLE_MASTER_ROWS);
     expect(steps.map((s) => s.kind)).toEqual(["hitPoints", "subclass", "maneuvers", "toolProficiency", "review"]);
     const replan = buildLevelUpPlan(char("fighter", 2), { ...target("fighter", 3, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });
     expect(steps.filter((s) => s.kind !== "subclass")).toEqual(replan);
   });
 
-  // resolveLevelUpPlan's chosenSubclassCasterRef param must be threaded into
-  // the replanned target, or newSpellsStep's early-return
-  // (count<=0 && cantrips<=0 && !canSwap) silently drops this step.
+  // resolveLevelUpPlan's chosenSubclassCasterRef param must be threaded into the replanned target, or newSpellsStep's early-return (count<=0 && cantrips<=0 && !canSwap) silently drops this step.
   it("Fighter 2→3 picking Eldritch Knight for the FIRST time re-plans and emits a newSpells step via chosenSubclassCasterRef", () => {
     const steps = resolveLevelUpPlan(
       char("fighter", 2),
@@ -321,9 +317,7 @@ describe("validateLevelUpSubmission — choose-N swap (#1503, Way of the Four El
     ).toThrow(/at most one/i);
   });
 
-  // Monk 6→7 is neither an ASI level (4/8/12/16/19) nor a discipline-growth
-  // level (next threshold 11) — no subclassChoice step exists at all, so this
-  // pins assertSubclassChoiceForgets specifically, not assertCounts.
+  // Monk 6→7 is neither an ASI level (4/8/12/16/19) nor a discipline-growth level (next threshold 11) — no subclassChoice step exists at all, so this pins assertSubclassChoiceForgets specifically, not assertCounts.
   it("rejects a forget on a level with no subclassChoice step for that key at all (no new discipline this level)", () => {
     expect(() =>
       validateLevelUpSubmission(char4e(6), t4e(7), null, {
@@ -341,8 +335,7 @@ describe("validateLevelUpSubmission — choose-N swap (#1503, Way of the Four El
         null,
         {
           ...base,
-          // net 1 matches the step's expected count, so assertCounts passes
-          // and the swap-cadence guard is what actually rejects this.
+          // net 1 matches the step's expected count, so assertCounts passes and the swap-cadence guard is what actually rejects this.
           subclassChoices: [
             { type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "opt-1" },
             { type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "opt-2" },
@@ -364,8 +357,7 @@ describe("validateLevelUpSubmission — choose-N swap (#1503, Way of the Four El
   });
 });
 
-// PHB'14 Battle Master p.73 maneuver swap; SRD 5.2 carries the equivalent
-// grant (#1516).
+// PHB'14 Battle Master p.73 maneuver swap; SRD 5.2 carries the equivalent grant (#1516).
 describe("validateLevelUpSubmission — maneuver swap (#1516, Battle Master)", () => {
   // maneuverChoiceCount thresholds (BATTLE_MASTER_ROWS): 3@3, 5@7, 7@10, 9@15.
   const bmTarget = (newLevel: number): TargetClassEntry => ({
@@ -396,9 +388,7 @@ describe("validateLevelUpSubmission — maneuver swap (#1516, Battle Master)", (
     ).toThrow(/at most one/i);
   });
 
-  // Fighter 3→4 grants no new maneuvers (3 stays 3) — no "maneuvers" step
-  // exists. Fighter 4 is also an ASI level, so `advancement` isolates the
-  // forget rejection.
+  // Fighter 3→4 grants no new maneuvers (3 stays 3) — no "maneuvers" step exists. Fighter 4 is also an ASI level, so `advancement` isolates the forget rejection.
   it("rejects a forget on a level granting no new maneuvers (3→4)", () => {
     expect(() =>
       validateLevelUpSubmission(charBM(3), bmTarget(4), null, {
@@ -419,8 +409,7 @@ describe("validateLevelUpSubmission — maneuver swap (#1516, Battle Master)", (
     ).toThrow(/expected 2 maneuvers/i);
   });
 
-  // swapUnitNoun keys the error message off the step kind, not a hardcoded
-  // "spell" — a Battle Master forget-with-no-learns must say "maneuver".
+  // swapUnitNoun keys the error message off the step kind, not a hardcoded "spell" — a Battle Master forget-with-no-learns must say "maneuver".
   it("names the maneuver (not 'spell') when a forget has no replacement learn at all", () => {
     expect(() =>
       validateLevelUpSubmission(charBM(6), bmTarget(7), null, {
@@ -430,9 +419,7 @@ describe("validateLevelUpSubmission — maneuver swap (#1516, Battle Master)", (
     ).toThrow(/replacement maneuver for every maneuver you swap out/i);
   });
 
-  // assertManeuverForgets checks canSwap before the length>1 guard — on a
-  // no-growth level, 2 forgets must say "does not allow swapping", not
-  // "at most one" (which would wrongly imply one forget is legal there).
+  // assertManeuverForgets checks canSwap before the length>1 guard — on a no-growth level, 2 forgets must say "does not allow swapping", not "at most one" (which would wrongly imply one forget is legal there).
   it("rejects two forgets on a level granting no new maneuvers with the cadence message, not 'at most one'", () => {
     expect(() =>
       validateLevelUpSubmission(charBM(3), bmTarget(4), null, {

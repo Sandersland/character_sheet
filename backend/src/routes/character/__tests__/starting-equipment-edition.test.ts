@@ -1,18 +1,5 @@
-// Edition independence at the WRITE path (#1534, [R4]/[R5]). The real seeded
-// EDITION_2024 packages now carry genuine SRD 5.2 content (#1535), but that
-// content's gold is per-option (StartingEquipmentOption.gold) with the
-// package-level dice columns NULL — unsuited to this file's dice-range probe,
-// which needs BOTH editions to expose a roll-for-gold range. A fixture class
-// with two StartingEquipmentPackage rows whose content genuinely DIFFERS
-// between editions is what proves character-create.ts resolves (classId,
-// edition) rather than classId alone; starting-equipment-2024-content.test.ts
-// proves the same resolution against the real seeded Barbarian rows.
-//
-// The fixture class name is safe from assertEveryClassEditionHasPackage
-// (seed-starting-equipment.ts) — that guard only checks names drawn from the
-// two real seed literals (CLASSES and the seeded starting-equipment package
-// list), and this test never calls the seeder, so the guard never runs
-// against this row at all.
+// A fixture class with two StartingEquipmentPackage rows whose content genuinely differs between editions proves character-create.ts resolves (classId, edition), not classId alone (#1534).
+// This fixture class name is safe from assertEveryClassEditionHasPackage — that guard only checks the real seed literals, and this test never calls the seeder.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -33,10 +20,7 @@ const FIXTURE_CLASS = {
   isSpellcaster: false,
 };
 
-// Deliberately non-overlapping gold ranges (10-40 vs 90-360) and distinct
-// fixed items (Dagger vs Handaxe, both real catalog Items already exercised
-// by the Fighter/Wizard package tests) so a cross-edition mixup is impossible
-// to mistake for a coincidence.
+// Deliberately non-overlapping gold ranges and distinct fixed items so a cross-edition mixup is impossible to mistake for a coincidence.
 const PACKAGE_2014 = {
   gold: { diceCount: 1, diceFaces: 4, multiplier: 10 }, // 10-40
   itemName: "2014 fixture gear",
@@ -120,7 +104,7 @@ describe("character creation resolves StartingEquipmentPackage by (classId, edit
 
   afterAll(async () => {
     await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
-    // Cascades to the package's groups/options/items (schema onDelete: Cascade).
+    // Cascades to the package's groups/options/items (onDelete: Cascade).
     await prisma.characterClass.deleteMany({ where: { name: FIXTURE_CLASS.name } });
   });
 

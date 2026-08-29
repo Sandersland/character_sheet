@@ -10,9 +10,6 @@ import {
   type WeaponDetailFields,
 } from "@/lib/inventory/detail-snapshot.js";
 
-// Pure unit tests — no DB. Covers the field-copy builders shared by the
-// catalog-acquire, campaign-award, and undo-restore snapshot sites.
-
 const weapon: WeaponDetailFields = {
   damageDiceCount: 1,
   damageDiceFaces: 8,

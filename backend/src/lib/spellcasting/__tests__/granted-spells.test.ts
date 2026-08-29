@@ -12,8 +12,7 @@ import {
   type SpeciesGrantSourceInput,
 } from "@/lib/spellcasting/granted-spells.js";
 
-// A catalog Spell row as loaded via `subclassRef.grantedSpells.spell`. Defaults to
-// a utility cantrip (Minor Illusion shape); override for damage-grant coverage.
+// Mirrors a catalog Spell row as loaded via subclassRef.grantedSpells.spell; defaults to a utility cantrip (Minor Illusion shape).
 function catalogSpell(over: Partial<GrantedSpellCatalogSpell> = {}): GrantedSpellCatalogSpell {
   return {
     name: "Minor Illusion",
@@ -42,13 +41,11 @@ function catalogSpell(over: Partial<GrantedSpellCatalogSpell> = {}): GrantedSpel
   };
 }
 
-// Warrior of Shadow → Minor Illusion, as the loaded subclassRef would supply it.
 const warriorOfShadow: GrantedSpellSource = {
   name: "Warrior of Shadow",
   grantedSpells: [{ gateLevel: 3, castingAbility: "wisdom", edition: null, spell: catalogSpell() }],
 };
 
-// A minimal castSpell capability row (flat columns + id) for deriveItemSpells.
 function castSpellCap(id: string, spellId: string, over: Partial<ItemSpellSourceItem["capabilities"][number]> = {}) {
   return {
     id,
@@ -131,8 +128,7 @@ describe("deriveGrantedSpells", () => {
     expect(spell.effectKind).toBe("buff");
   });
 
-  // #1625: the loaded grantedSpells rows span every edition; the set filter
-  // (shared-or-own-edition) lives in this module and nowhere else.
+  // #1625: the set filter (shared-or-own-edition) lives in this module and nowhere else.
   describe("edition filter (#1625)", () => {
     const forked: GrantedSpellSource = {
       name: "Oath of Devotion",
@@ -177,7 +173,6 @@ describe("deriveGrantedSpells", () => {
 });
 
 describe("grantedSpellsGained (#1139)", () => {
-  // Gates at 1/3/5 — the Archfey shape, enough to cover crossing vs. non-crossing.
   const archfey: GrantedSpellSource = {
     name: "The Archfey",
     grantedSpells: [
@@ -231,7 +226,7 @@ describe("deriveItemSpells (#528)", () => {
     const spells = deriveItemSpells([item]);
     expect(spells).toHaveLength(2);
     const ids = spells.map((s) => s.id);
-    expect(new Set(ids).size).toBe(2); // no collision
+    expect(new Set(ids).size).toBe(2);
     expect(ids).toContain("item:inv-1:spell-witch-bolt:cap-a");
     expect(ids).toContain("item:inv-1:spell-witch-bolt:cap-b");
     expect(spells.map((s) => s.item?.capabilityId).sort()).toEqual(["cap-a", "cap-b"]);
@@ -271,7 +266,6 @@ describe("deriveGrantedCastingAbility", () => {
         { gateLevel: 3, castingAbility: "intelligence", edition: null, spell: catalogSpell({ name: "Elementalism" }) },
       ],
     };
-    // The 2014-tagged charisma row is not admitted for a 2024 character.
     expect(deriveGrantedCastingAbility(forked, "EDITION_2024")).toBe("intelligence");
     expect(deriveGrantedCastingAbility(forked, "EDITION_2014")).toBe("charisma");
   });
@@ -279,7 +273,7 @@ describe("deriveGrantedCastingAbility", () => {
   it("rejects an invalid (mis-cased / unknown) casting ability and defaults to wisdom", () => {
     const bad: GrantedSpellSource = {
       name: "Homebrew",
-      grantedSpells: [{ gateLevel: 3, castingAbility: "Wisdom", edition: null, spell: catalogSpell() }], // capital W = invalid key
+      grantedSpells: [{ gateLevel: 3, castingAbility: "Wisdom", edition: null, spell: catalogSpell() }],
     };
     expect(deriveGrantedCastingAbility(bad, "EDITION_2024")).toBe("wisdom");
     const garbage: GrantedSpellSource = {
@@ -290,9 +284,6 @@ describe("deriveGrantedCastingAbility", () => {
   });
 });
 
-// #1683: deriveGrantedSpells STAYS ONE FUNCTION serving both subclass and
-// species sources — sourceKind only changes the `source` literal it stamps
-// onto each derived SpellEntry, never a second derivation path.
 describe("deriveGrantedSpells sourceKind parameter (#1683)", () => {
   it("defaults to source: \"subclass\" when sourceKind is omitted (existing call sites unchanged)", () => {
     const [spell] = deriveGrantedSpells(warriorOfShadow, 3, "EDITION_2024");
@@ -319,8 +310,7 @@ describe("deriveGrantedSpells sourceKind parameter (#1683)", () => {
     const at5 = deriveGrantedSpells(drow, 5, "EDITION_2024", "species");
     expect(at5.map((s) => s.name)).toEqual(["Dancing Lights", "Faerie Fire", "Darkness"]);
 
-    // Level-down (5 -> 2): Faerie Fire/Darkness drop out — no persistence, the
-    // exact same re-derive-on-read the subclass path already relies on.
+    // Proves the same re-derive-on-read behavior the subclass path relies on — no persistence needed for level-down.
     const backDownAt2 = deriveGrantedSpells(drow, 2, "EDITION_2024", "species");
     expect(backDownAt2.map((s) => s.name)).toEqual(["Dancing Lights"]);
   });
@@ -353,10 +343,7 @@ describe("buildSpeciesGrantedSpellSource (#1683)", () => {
     const input: SpeciesGrantSourceInput = {
       name: "Drow",
       castingAbility: "charisma",
-      // The Species -> SpeciesGrantedSpell back-relation is UNFILTERED (same
-      // Prisma relation gotcha activeTraitRows documents) — a genuine
-      // species-level row (variantId: null) is included, a row belonging to
-      // a DIFFERENT variant is excluded.
+      // The Species -> SpeciesGrantedSpell relation is unfiltered (same gotcha activeTraitRows documents) — a genuine species-level row is included, a different variant's row is excluded here in the function.
       speciesGrantedSpells: [grantRow("Light", 1, null), grantRow("Druidcraft", 1, "variant-wood")],
       variantGrantedSpells: [grantRow("Faerie Fire", 3, "variant-drow")],
     };

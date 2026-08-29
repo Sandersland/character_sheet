@@ -23,10 +23,7 @@ export interface CustomItemInput {
   consumable?: ConsumableDetailInput;
 }
 
-// Gains a new InventoryItem row, either snapshotted from the catalog
-// (itemId) or fully homebrew (custom) — exactly one of the two. An
-// optional currencyDelta (debit) is the "Add vs Buy" merge: one op type,
-// ledger type depends on whether a nonzero amount was charged.
+// Exactly one of itemId/custom. currencyDelta is the "Add vs Buy" merge — ledger type depends on whether a nonzero amount was charged.
 export interface AcquireOperation {
   type: "acquire";
   itemId?: string;
@@ -37,19 +34,14 @@ export interface AcquireOperation {
   currencyDelta?: Currency;
 }
 
-// +/- on an existing row's quantity. Reaching 0 deletes the row. Ledger
-// type is derived from the sign: gaining more counts as "acquired",
-// losing some (used up, dropped a few, whatever) counts as "consumed".
+// Reaching 0 deletes the row. Ledger type is derived from the sign: gaining counts as "acquired", losing counts as "consumed".
 export interface AdjustQuantityOperation {
   type: "adjustQuantity";
   inventoryItemId: string;
   delta: number;
 }
 
-// Cosmetic edit — never logged. weapon/armor/consumable overrides are
-// partial (only provided fields change); this is the "Club +1" path,
-// e.g. bumping just `weapon.damageModifier`. Placement is NOT edited here —
-// equip/unequip go through the `equip`/`setEquipped` ops so they're logged.
+// Cosmetic edit — never logged. weapon/armor/consumable overrides are partial. Placement is NOT edited here — equip/unequip go through the `equip`/`setEquipped` ops so they're logged.
 export interface UpdateOperation {
   type: "update";
   inventoryItemId: string;
@@ -63,15 +55,12 @@ export interface UpdateOperation {
   consumable?: Partial<ConsumableDetailInput>;
 }
 
-// Deletes a row outright, regardless of quantity — "I'm getting rid of
-// this entirely," as distinct from adjustQuantity's "used some of it up."
+// Deletes a row outright, regardless of quantity — distinct from adjustQuantity.
 export interface RemoveOperation {
   type: "remove";
   inventoryItemId: string;
 }
 
-// Sells some or all of a stack for a player-typed amount (the frontend
-// prefills it from the catalog's cost, but always sends the final figure).
 export interface SellOperation {
   type: "sell";
   inventoryItemId: string;
@@ -79,61 +68,49 @@ export interface SellOperation {
   currencyDelta: Currency;
 }
 
-// Equips a single item into an explicit paper-doll slot (#565). Logged +
-// undoable. Validates slot-compatibility, capacity (RING 2, else 1), and the
-// two-handed off-hand lock. Rejects a full slot (no silent displacement).
+// #565: logged + undoable. Rejects a full slot — no silent displacement.
 export interface EquipOperation {
   type: "equip";
   inventoryItemId: string;
   slot: EquipSlot;
 }
 
-// Equips (auto-picking the first free compatible slot) or unequips a single
-// item. Unlike `update`, this IS logged so it appears on the activity timeline
-// and is undoable. The slot-less companion to `equip` — unequip clears
-// equippedSlot; equip=true delegates to the same placement rules as `equip`.
+// Unlike `update`, this IS logged and undoable. equip=true delegates to the same placement rules as `equip`, auto-picking the first free compatible slot.
 export interface SetEquippedOperation {
   type: "setEquipped";
   inventoryItemId: string;
   equipped: boolean;
 }
 
-// Attunes an item (#545). Logged + undoable. Enforces the derived 3-item cap
-// (409 on the 4th) and the snapshotted attunement prerequisite.
+// #545: enforces the derived 3-item cap (409 on the 4th) and the snapshotted attunement prerequisite.
 export interface AttuneOperation {
   type: "attune";
   inventoryItemId: string;
 }
 
-// Ends attunement. Logged + undoable; always legal so a stuck row can clear.
+// Always legal so a stuck row can clear.
 export interface UnattuneOperation {
   type: "unattune";
   inventoryItemId: string;
 }
 
-// Activates an item's activatedEffect capability (#543): spends a use and seeds
-// the while-active/until-rest self-buff. Logged + undoable.
+// #543: spends a use and seeds the while-active/until-rest self-buff.
 export interface ActivateOperation {
   type: "activate";
   inventoryItemId: string;
 }
 
-// Toggles off an active item effect (#543): clears the seeded buff. The spent use
-// is NOT restored (it recharges on the matching rest). Logged + undoable.
+// The spent use is NOT restored — it recharges on the matching rest.
 export interface DeactivateOperation {
   type: "deactivate";
   inventoryItemId: string;
 }
 
-// Consumes one use of a consumable (#121). Stackable (maxUses null) decrements
-// quantity; charged (maxUses set) decrements usesRemaining. Rolls the effect
-// dice (client-supplied for the 3D animation, else server-rolled) and
-// auto-applies ONLY healing through the HP domain. Logged + LIFO-undoable.
+// #121: stackable (maxUses null) decrements quantity; charged (maxUses set) decrements usesRemaining. Auto-applies ONLY healing.
 export interface UseOperation {
   type: "use";
   inventoryItemId: string;
-  // Raw effect-die values. When present, length must equal effectDiceCount and
-  // each be in 1..effectDiceFaces; when absent the server rolls.
+  // When present, length must equal effectDiceCount and each be in 1..effectDiceFaces; when absent the server rolls.
   rolls?: number[];
 }
 
@@ -156,8 +133,7 @@ export function itemBuffKey(inventoryItemId: string): string {
   return `item:${inventoryItemId}`;
 }
 
-// Per-use outcome surfaced to the client so it can play the 3D dice animation
-// and toast the result. `applied` is "heal" only when the effect auto-applied.
+// `applied` is "heal" only when the effect auto-applied.
 export interface UseResult {
   inventoryItemId: string;
   itemName: string;
@@ -170,45 +146,23 @@ export interface UseResult {
   quantity: number | null;
 }
 
-// The fan-in include for every op applier's live-row read (#1649). The
-// mirror tables (InventoryWeaponDetail/InventoryArmorDetail/
-// InventoryConsumableDetail/InventoryCapability) are gone — `capabilityUses`
-// is the only relation left to join; weapon/armor/consumable/capabilities are
-// reconstructed from `snapshot` (always fetched, being a plain column) by
-// resolveInventoryItem below.
+// #1649: the mirror detail tables are gone — `capabilityUses` is the only relation left to join; weapon/armor/consumable/capabilities are reconstructed from `snapshot` by resolveInventoryItem below.
 export const inventoryItemDetailInclude = {
   capabilityUses: true,
 } satisfies Prisma.InventoryItemInclude;
 
 type RawInventoryItemRow = Prisma.InventoryItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
 
-// The pre-#1649 shape every consumer (serializers, op appliers, the capability
-// derivations in capabilities.ts) was already written against: weaponDetail/
-// armorDetail/consumableDetail/capabilities as if they were still live-joined
-// relations. Reconstructing that exact shape from the snapshot — rather than
-// updating every one of those consumers to a new shape — is what let #1649
-// flip the read source without touching their internals.
+// #1649: reconstructs the pre-#1649 shape every consumer was already written against (weaponDetail/armorDetail/consumableDetail/capabilities as if still live-joined relations) — what let #1649 flip the read source without touching their internals.
 export type InventoryItemWithDetails = Omit<RawInventoryItemRow, "capabilityUses"> & {
   weaponDetail: WeaponDetailFields | null;
   armorDetail: ArmorDetailFields | null;
-  // usesRemaining is glued back on from the column: it's the runtime counter
-  // (promoted out of InventoryConsumableDetail by #1648) and was never part of
-  // the frozen snapshot, but every existing reader expects it alongside the
-  // rest of the consumable detail block.
+  // #1648: usesRemaining is glued back on from the column — never part of the frozen snapshot, but every existing reader expects it here.
   consumableDetail: (ConsumableDetailFields & { usesRemaining: number | null }) | null;
   capabilities: (CapabilityColumns & { id: string; used: number })[];
 };
 
-// Reconstructs the pre-#1649 InventoryItemWithDetails shape from a row fetched
-// with inventoryItemDetailInclude. The one place `snapshot` gets parsed and
-// `capabilityUses` gets joined onto it for every InventoryItem read path.
-//
-// The `as WeaponDetailFields`-style casts below are type-only: zod's
-// `.nullish()` types every optional snapshot field as `T | null | undefined`
-// so the schema can accept an omitted key, but buildInventorySnapshot always
-// writes an explicit value or `null` (never omits a key) — so a parsed
-// snapshot's fields are never actually `undefined` at runtime, only `T | null`
-// like the flat-column shape every existing reader already expects.
+// The `as WeaponDetailFields`-style casts below are type-only: zod's `.nullish()` types every optional snapshot field as `T | null | undefined`, but buildInventorySnapshot always writes an explicit value or `null`, never omits a key — so a parsed snapshot's fields are never actually `undefined` at runtime.
 export function resolveInventoryItem(row: RawInventoryItemRow): InventoryItemWithDetails {
   const snapshot = readInventorySnapshot(row);
   const usedByKey = new Map(row.capabilityUses.map((u) => [u.capabilityKey, u.used]));
@@ -225,10 +179,7 @@ export function resolveInventoryItem(row: RawInventoryItemRow): InventoryItemWit
   };
 }
 
-// The Item catalog include used when fetching a catalog Item's detail rows
-// for snapshot — same shape as inventoryItemDetailInclude above but typed
-// against Item (not InventoryItem). Exported so charactersRouter can
-// build starting-equipment inventory rows at character creation time.
+// Exported so charactersRouter can build starting-equipment inventory rows at character creation time.
 export const catalogItemDetailInclude = {
   weaponDetail: true,
   armorDetail: true,
@@ -237,9 +188,7 @@ export const catalogItemDetailInclude = {
 
 export type CatalogItemWithDetails = Prisma.ItemGetPayload<{ include: typeof catalogItemDetailInclude }>;
 
-// Every op past `acquire` operates on an existing row — this is the one
-// place ownership is checked, so a stray inventoryItemId can't touch
-// another character's inventory.
+// The one place ownership is checked, so a stray inventoryItemId can't touch another character's inventory.
 export async function getOwnedInventoryItem(
   tx: Prisma.TransactionClient,
   characterId: string,

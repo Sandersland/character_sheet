@@ -1,9 +1,3 @@
-/**
- * resolveAction route integration tests (#1829, epic #1827 slice 2).
- * Mirrors spellcasting.test.ts: real Postgres in beforeEach, supertest
- * against the shared `app`. The fixture is a level-1 Wizard (2× L1 slots).
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -24,7 +18,7 @@ const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Resolve Action Test Wizard",
   alignment: "Neutral Good",
-  experiencePoints: 0, // level 1 → 2 L1 slots
+  experiencePoints: 0,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 3, max: 8, temp: 0 },
@@ -43,9 +37,7 @@ const FIXTURE_BASE = {
   currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
 };
 
-// Concentration/apply side-effect fixture spells (#1833) — hand-built
-// SpellEntry rows (normalizeSpellcastingMutable reads the JSON blob directly,
-// no catalog join needed for a test fixture).
+// normalizeSpellcastingMutable reads the JSON blob directly — no catalog join needed for a hand-built SpellEntry fixture (#1833).
 const CONCENTRATION_SPELL_A = {
   id: "entry-conc-a",
   name: "Test Concentration A",
@@ -89,8 +81,7 @@ const HEAL_SPELL = {
   effectModifier: 0,
 };
 
-// A cantrip (level 0) — casting it spends no slot, so the interlock records it
-// as `cantrip` (#1439 finding 1: it must not downgrade a leveled block).
+// Casting a cantrip spends no slot, so the interlock records it as cantrip — it must not downgrade a leveled block (#1439).
 const CANTRIP_SPELL = {
   id: "entry-cantrip",
   name: "Test Fire Bolt",
@@ -111,8 +102,6 @@ const FIXTURE_SPELLCASTING_JSON = {
   concentratingOn: null,
 };
 
-// A cantrip/weapon resolution op — no slotLevel, so no server-side state
-// delta (only the event itself is written).
 function weaponOp(actionId = "action-1") {
   return {
     type: "resolveAction" as const,
@@ -124,7 +113,6 @@ function weaponOp(actionId = "action-1") {
   };
 }
 
-// A leveled-spell resolution op — spends one L1 slot.
 function leveledCastOp(actionId = "action-2") {
   return {
     type: "resolveAction" as const,
@@ -136,9 +124,7 @@ function leveledCastOp(actionId = "action-2") {
   };
 }
 
-// A weapon swing carrying one typed elemental rider (Flame Tongue +2d6 fire,
-// #1843) — the primary `effect` is the weapon's own slashing damage, `riders`
-// is the additive second typed term.
+// The primary `effect` is the weapon's own damage; `riders` is the additive second typed term (Flame Tongue, #1843).
 function riderSwingOp(actionId = "action-4") {
   return {
     type: "resolveAction" as const,
@@ -151,8 +137,6 @@ function riderSwingOp(actionId = "action-4") {
   };
 }
 
-// A no-roll utility cantrip (Prestidigitation) — every roll field is null and
-// there is no slotLevel, so this exercises the all-nullable resolution shape.
 function noRollOp(actionId = "action-3") {
   return {
     type: "resolveAction" as const,
@@ -165,9 +149,7 @@ function noRollOp(actionId = "action-3") {
   };
 }
 
-// A spell-cast resolution carrying `entryId` (#1833) — routes through
-// castSpellForResolutionInTx (concentration/buff/apply), not the bare
-// slot-only path a `slotLevel`-only op (leveledCastOp above) still exercises.
+// entryId routes through castSpellForResolutionInTx (concentration/buff/apply), not the bare slot-only path leveledCastOp exercises (#1833).
 function concentrationCastOp(entryId: string, actionId: string) {
   return {
     type: "resolveAction" as const,
@@ -195,8 +177,7 @@ function healCastOp(actionId = "action-heal") {
   };
 }
 
-// A leveled spell cast as a BONUS action (#1439) — entryId present so it routes
-// through the recorder, cost.kind "bonus" so it lands on spellCastAsBonus.
+// entryId + cost.kind "bonus" routes through the recorder onto spellCastAsBonus (#1439).
 function bonusLeveledCastOp(entryId: string, actionId: string) {
   return {
     type: "resolveAction" as const,
@@ -211,8 +192,7 @@ function bonusLeveledCastOp(entryId: string, actionId: string) {
   };
 }
 
-// A cantrip cast — entryId present, NO slotLevel (no slot spent). `economy` is
-// the cost kind so the recorder classifies it as a cantrip in that slot.
+// entryId with no slotLevel classifies as a cantrip cast in whichever economy slot `cost.kind` names.
 function cantripCastOp(economy: "action" | "bonus", actionId: string) {
   return {
     type: "resolveAction" as const,
@@ -278,8 +258,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     await prisma.characterClass.deleteMany({ where: { name: WIZARD_CATALOG_NAME } });
   });
 
-  // ── 404 / 400 guards ──────────────────────────────────────────────────────
-
   it("404s for an unknown character", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post("/api/characters/does-not-exist/resolve-action/transactions")
@@ -296,8 +274,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const res = await post([{ ...weaponOp(), cost: { kind: "notARealCost" } }]);
     expect(res.status).toBe(400);
   });
-
-  // ── toHit hardening (#1830 review: reject internally-inconsistent input) ──
 
   it("400s when nat20 doesn't match kept === 20", async () => {
     const op = weaponOp();
@@ -327,8 +303,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(res.status).toBe(200);
   });
 
-  // ── decomposed components (#1830 review: accept + store for the drill-in) ─
-
   it("stores toHit.components and effect.components verbatim on the event", async () => {
     const op = weaponOp();
     const res = await post([
@@ -356,8 +330,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── cantrip/weapon resolution (no state delta) ───────────────────────────
-
   it("a weapon resolution writes exactly one resolveAction event with no slots spent", async () => {
     const res = await post([weaponOp()]);
     expect(res.status).toBe(200);
@@ -372,8 +344,7 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(resolveEvents).toHaveLength(1);
     expect(resolveEvents[0].category).toBe("combat");
     expect(resolveEvents[0].data).toMatchObject({ actionId: "action-1", source: "Longbow", slotLevel: null });
-    // The response returns the batch id the client threads into turn undo (#758),
-    // and it's the batch this event was written under.
+    // res.body.batchId is what the client threads into turn undo (#758).
     expect(res.body.batchId).toBe(resolveEvents[0].batchId);
     // No companion spellcasting/resources event rides this batch — one row per resolution.
     const sameBatch = events.filter((e) => e.batchId === resolveEvents[0].batchId);
@@ -393,8 +364,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const resolveEvent = afterUndo.find((e) => e.type === "resolveAction");
     expect(resolveEvent?.reverted).toBe(true);
   });
-
-  // ── leveled spell resolution (spends a slot) ─────────────────────────────
 
   it("a leveled cast resolution spends exactly one slot and writes one resolveAction event", async () => {
     const res = await post([leveledCastOp()]);
@@ -430,12 +399,9 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
   it("400s a leveled cast beyond available slots", async () => {
     await post([leveledCastOp("a1")]);
     await post([leveledCastOp("a2")]);
-    // A level-1 wizard has exactly 2 L1 slots — the third cast must fail.
     const res = await post([leveledCastOp("a3")]);
     expect(res.status).toBe(400);
   });
-
-  // ── typed damage riders (#1843: additive riders[] sibling to effect) ────
 
   it("stores riders[] verbatim on the event, alongside the primary effect", async () => {
     const res = await post([riderSwingOp()]);
@@ -502,8 +468,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(resolveEvent?.reverted).toBe(true);
   });
 
-  // ── no-roll resolution (all-nullable path, e.g. Prestidigitation) ────────
-
   it("a no-roll resolution writes exactly one event with before/after null", async () => {
     const res = await post([noRollOp()]);
     expect(res.status).toBe(200);
@@ -538,9 +502,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const resolveEvent = afterUndo.find((e) => e.type === "resolveAction");
     expect(resolveEvent?.reverted).toBe(true);
   });
-
-  // ── spell-cast side effects via entryId (#1833: concentration/apply must
-  // survive the move off the old castSpell op onto resolveAction) ─────────
 
   it("persists entryId on the event data for a spell resolution, null for a weapon", async () => {
     await post([weaponOp("a-weapon")]);
@@ -577,7 +538,7 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(dropped).toBeTruthy();
     // Same batch: undoing the second cast undoes the displacement with it.
     expect(dropped?.batchId).toBe(secondResolve?.batchId);
-    // Still exactly ONE resolveAction row for the second cast (#1822's point).
+    // Exactly one resolveAction row for the second cast (#1822).
     expect(events.filter((e) => e.type === "resolveAction" && e.data.actionId === "a2")).toHaveLength(1);
   });
 
@@ -592,17 +553,14 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const revertRes = await revert(FIXTURE_ID, batchId);
     expect(revertRes.status).toBe(200);
     expect(revertRes.body.spellcasting.concentratingOn).toMatchObject({ entryId: CONCENTRATION_SPELL_A.id });
-    // #1849: the displacing cast's slot must also be refunded — the batch's
-    // LIFO revert order (resolveAction event first, then the older
-    // concentrationDropped event) must not let concentrationDropped's revert
-    // clobber the slot-count restore resolveAction's own revert just applied.
+    // The batch's LIFO revert order (resolveAction event first, then concentrationDropped) must not let concentrationDropped's revert clobber the slot-count restore (#1849).
     expect(revertRes.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(1);
   });
 
   it("a heal spell's self-apply lands on the caster's own HP in the same batch", async () => {
     const res = await post([healCastOp()]);
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(8); // 3 + 5
+    expect(res.body.hitPoints.current).toBe(8);
 
     const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; category: string; batchId?: string }>;
     const resolveEvent = events.find((e) => e.type === "resolveAction");
@@ -623,8 +581,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(revertRes.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(0);
   });
 
-  // ── 5e bonus-action spell interlock resolved from session state (#1439) ────
-
   const combatGet = (sid: string) =>
     supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/sessions/${sid}/combat`);
   const combatStart = (sid: string) =>
@@ -634,8 +590,7 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
   const combatEnd = (sid: string) =>
     supertest.agent(app).set("Cookie", COOKIE).post(`/api/characters/${FIXTURE_ID}/sessions/${sid}/combat/end`).send({});
 
-  // The fixture is a 2024 (default-edition) Wizard, so these assert SRD 5.2
-  // semantics: a leveled spell in one economy limits the OTHER to cantrips.
+  // SRD 5.2: a leveled spell in one economy limits the other to cantrips.
   const NONE = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
 
   it("serves no interlock when nothing has been cast this turn", async () => {
@@ -645,11 +600,7 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(res.body.spellEconomy).toEqual(NONE);
   });
 
-  // #1875 review finding 1: the interlock is a per-turn/COMBAT concept — out of
-  // combat there are no turn boundaries to clear it, so a leveled cast while
-  // combatActive=false must NOT record the interlock (else the block would
-  // linger until startCombat/round advance). A solo session starts with combat
-  // inactive.
+  // The interlock is a per-turn/combat concept; a leveled cast while combatActive=false must not record it, or the block would linger until startCombat/round advance.
   it("a leveled Action cast out of combat (combatActive=false) records no interlock", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     const cast = await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
@@ -664,11 +615,7 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
   });
 
-  // #1875 re-review (TOCTOU): the combatActive check lives INSIDE the write's
-  // WHERE (`session: { combatActive: true }`), not a separate read-then-write —
-  // so a cast that lands after combat has ended strands no interlock. Ending
-  // combat first is the deterministic stand-in for the endCombat-commits-mid-
-  // resolve race: with the atomic filter the updateMany matches zero rows.
+  // The combatActive check lives inside the write's WHERE clause, not a separate read-then-write, so a cast landing after combat ends strands no interlock (no TOCTOU race).
   it("a leveled Action cast after combat has ended strands no interlock (atomic combatActive filter)", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     await combatStart(sid);
@@ -693,7 +640,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const cast = await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
     expect(cast.status).toBe(200);
 
-    // Re-read (a fresh request = the "another client / after reload" observer).
     expect((await combatGet(sid)).body.spellEconomy).toEqual({
       bonusActionBlockedByActionSpell: false,
       bonusActionLimitedToCantrips: true,
@@ -724,7 +670,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const round = await combatRound(sid);
     expect(round.status).toBe(201);
     expect(round.body.spellEconomy).toEqual(NONE);
-    // And a subsequent poll agrees the block is gone.
     expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
   });
 
@@ -735,9 +680,7 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
   });
 
-  // #1439 review finding 1 (pass 2): a no-op re-press of Start Combat must NOT
-  // clear a valid in-progress restriction (reset gated on the real false→true
-  // transition).
+  // A no-op re-press of Start Combat must not clear an in-progress restriction — reset is gated on the real false→true transition.
   it("a redundant startCombat while already in combat does NOT clear an existing restriction", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     await combatStart(sid);
@@ -751,18 +694,15 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect((await combatGet(sid)).body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
   });
 
-  // #1439 review finding 1 (pass 3): a later cantrip Action spell must NOT
-  // downgrade an existing leveled block (Action Surge: leveled then cantrip).
+  // A later cantrip Action spell must not downgrade an existing leveled block (Action Surge: leveled then cantrip).
   it("a cantrip Action cast does not downgrade a leveled Action block", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     await combatStart(sid);
-    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-leveled")]); // leveled Action
-    await post([cantripCastOp("action", "cast-cantrip")]); // cantrip Action (Action Surge)
-    // Still limited (spellCastAsAction stayed 'leveled', not overwritten to 'cantrip').
+    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-leveled")]);
+    await post([cantripCastOp("action", "cast-cantrip")]);
     expect((await combatGet(sid)).body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
   });
 
-  // #1439 review finding 4: undoing a spell cast lifts the interlock it recorded.
   it("reverting a cast batch clears the recorded interlock (#1439)", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     await combatStart(sid);
@@ -778,22 +718,17 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
   });
 
-  // #1439 review (pass 4): the symmetric twin of the record-side downgrade guard
-  // — undoing a CANTRIP cast must NOT clear a leveled block set by an earlier
-  // leveled cast on the same economy slot (Action Surge).
+  // Undoing a cantrip cast must not clear a leveled block set by an earlier leveled cast on the same economy slot (Action Surge).
   it("reverting an Action-Surge cantrip does NOT lift a leveled Action block", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     await combatStart(sid);
-    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-leveled")]); // leveled Action
-    await post([cantripCastOp("action", "cast-cantrip")]); // cantrip Action (Action Surge)
+    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-leveled")]);
+    await post([cantripCastOp("action", "cast-cantrip")]);
 
-    // Revert ONLY the cantrip batch.
     const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; batchId?: string; data?: { actionId?: string } }>;
     const cantripBatch = events.find((e) => e.type === "resolveAction" && e.data?.actionId === "cast-cantrip")?.batchId as string;
     expect(await revert(FIXTURE_ID, cantripBatch).then((r) => r.status)).toBe(200);
 
-    // The leveled Action record survives — spellCastAsAction stays 'leveled',
-    // so the block persists (2024: bonus limited to cantrips).
     const participant = await prisma.sessionParticipant.findFirstOrThrow({
       where: { sessionId: sid, characterId: FIXTURE_ID },
       select: { spellCastAsAction: true },
@@ -802,10 +737,7 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect((await combatGet(sid)).body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
   });
 
-  // #1439 review finding 2 (edition): the interlock is edition-specific and the
-  // character's `rulesEdition` is threaded through the served combat state. A
-  // 2014 character casting a CANTRIP as a bonus action limits the Action to
-  // cantrips (SRD 5.1: any bonus spell) — the SAME cast in 2024 would not.
+  // SRD 5.1: any bonus spell limits the Action to cantrips. The interlock is edition-specific via rulesEdition; the same cast in 2024 would not.
   it("threads the character's edition: a 2014 cantrip-as-bonus limits the Action (unlike 2024)", async () => {
     const CHAR_2014 = "test-resolve-action-2014";
     await prisma.character.create({
@@ -834,10 +766,7 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     }
   });
 
-  // #1439 review finding 2: cast-kind recording is coupled to the spell
-  // resolution actually running — a weapon-shaped op carrying a spurious
-  // entryId is rejected by the spell validator (the whole tx aborts), so it can
-  // never corrupt the interlock.
+  // A weapon-shaped op carrying a spurious entryId is rejected by the spell validator (the whole tx aborts), so it can never corrupt the interlock.
   it("a weapon op carrying a spurious entryId is rejected and records no interlock", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     await combatStart(sid);

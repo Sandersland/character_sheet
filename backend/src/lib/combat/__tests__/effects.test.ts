@@ -100,10 +100,6 @@ describe("resolveEffectSpec — golden byte-parity", () => {
     expect(resolveEffectSpec(readEffectSpec(detectMagic), 0, { characterLevel: 1 })).toBeNull();
   });
 
-  // #1503: poolStep is the pool-cost analog of slotUpcast (extra ki/focus spent
-  // above a discipline's base cost adds costPerStep dice, same formula as an
-  // upcast spell slot) — the generalised successor to the pre-#1373 disciplines
-  // engine's discipline-only "focus" scaling mode.
   it("poolStep scales by the pool overspend step, identically to slotUpcast", () => {
     const spec = catalogEffectSpec(
       {
@@ -121,9 +117,6 @@ describe("resolveEffectSpec — golden byte-parity", () => {
   });
 });
 
-// #817 pins: the shared catalog-row→EffectSpec builder. Today only
-// shadowArtEffectSpec (flat) consumes it; the scaling axis is passed through
-// verbatim, so a scaled config is still exercised here to pin that passthrough.
 describe("catalogEffectSpec — shared focus-cast row→spec builder (#817)", () => {
   const scaledConfig: EffectScaling = { mode: "slotUpcast", dicePerStep: 2 };
 
@@ -212,9 +205,6 @@ describe("catalogEffectSpec — shared focus-cast row→spec builder (#817)", ()
   });
 });
 
-// #685 pins: the die-source resolution arm combined with the non-damage effect
-// kinds (class-die.test.ts covers die-source × damage only), plus a full-field
-// buff byte pin. Green before the reader decomposition; unedited through it.
 describe("readEffectSpec — die-source × heal/buff combos (#685)", () => {
   const healFromClassDie: EffectRow = {
     level: 1,
@@ -245,8 +235,6 @@ describe("readEffectSpec — die-source × heal/buff combos (#685)", () => {
   });
 
   it("die-source with a resolver that returns null falls back to fixed effectDiceFaces (#697)", () => {
-    // effectDieSource is set AND a fixed effectDiceFaces exists; the resolver
-    // resolves the source to null → dice fall back to the fixed faces.
     const withFixedFallback: EffectRow = { ...healFromClassDie, effectDiceFaces: 6 };
     const spec = readEffectSpec(withFixedFallback, () => null);
     expect(spec.dice).toEqual({ count: 2, faces: 6, modifier: 0 });
@@ -266,7 +254,7 @@ describe("readEffectSpec — die-source × heal/buff combos (#685)", () => {
       addAbilityModToHeal: false,
       buffTarget: "attackRolls",
       buffModifier: 1,
-      modifierSource: null, // #1528
+      modifierSource: null,
     });
     expect(resolveBuffSpec(spec)).toEqual({ target: "attackRolls", modifier: 1 });
   });

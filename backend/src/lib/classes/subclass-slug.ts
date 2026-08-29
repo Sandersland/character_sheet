@@ -1,9 +1,5 @@
 // ZERO IMPORTS: tsx can't resolve @/ aliases at seed time.
-//
-// Kept out of the registry to avoid an import cycle: it imports every
-// per-class module, several of which import the SRD module, which
-// re-exports extra-attack's exports — a resolver living in the registry
-// would make extra-attack -> registry -> monk -> srd -> extra-attack a real cycle.
+// Kept out of the registry to avoid an import cycle: it imports every per-class module, several of which import the SRD module, which re-exports extra-attack's exports — a resolver in the registry would make extra-attack -> registry -> monk -> srd -> extra-attack a real cycle.
 
 export const SUBCLASS_SLUGS = [
   "barbarian-berserker",

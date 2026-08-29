@@ -5,9 +5,6 @@ import { AuthorizationError, NotFoundError } from "@/lib/auth/errors.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 
-// Unit test for the single character-access chokepoint. Real Postgres (no mocks)
-// — it issues one findUnique. Two owners + one character owned by A.
-
 const OWNER_A = "owner-access-a";
 const OWNER_B = "owner-access-b";
 const CHARACTER_ID = "test-access-character-1";
@@ -141,10 +138,6 @@ describe("assertCampaignOwner", () => {
   });
 });
 
-// A DM's CAMPAIGN-scope fork (#1808, epic #1795 8/8): assertSpellOwnership
-// now accepts a second path alongside the original USER-owner check — a
-// CAMPAIGN-scope entry whose campaign the caller DMs, reusing
-// assertCampaignOwner rather than re-deriving the DM check inline.
 const SPELL_DM = "owner-spell-dm";
 const SPELL_MEMBER = "owner-spell-member";
 const SPELL_OUTSIDER = "owner-spell-outsider";
@@ -253,15 +246,7 @@ describe("assertSpellOwnership", () => {
     expect(row.id).toBe(campaignSpellId);
   });
 
-  // #1815 review finding 8: a Spell whose catalogEntryId resolves to no
-  // CatalogEntry used to fall through to the generic 403, misreporting "you
-  // can't touch this" for content that doesn't actually exist and masking
-  // the real data-integrity failure. The Spell->CatalogEntry FK is ON DELETE
-  // CASCADE (schema.prisma's own comment on that column), so a real orphan
-  // can't be produced through ordinary writes — this fakes the two lookups
-  // assertSpellOwnership itself makes (spell.findUnique then
-  // catalogEntry.findUnique) rather than fighting the FK to reproduce a
-  // state the schema itself guarantees can't occur.
+  // The Spell->CatalogEntry FK is ON DELETE CASCADE, so a real orphan can't be produced through ordinary writes; this fakes the lookups instead.
   it("throws a 404, not a 403, when the Spell's CatalogEntry is missing (data-integrity violation)", async () => {
     const fakeDb = {
       spell: { findUnique: async () => ({ id: "orphan-spell", catalogEntryId: "missing-entry" }) },

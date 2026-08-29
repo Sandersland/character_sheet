@@ -9,20 +9,11 @@ import { createTestCharacter } from "@/test-support/character.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import * as spellClassesModule from "@/lib/spellcasting/spell-classes.js";
 
-// Owned-CRUD for user homebrew spells (#1785, epic #1782 2/5): campaign-style
-// ownership-scoped plain REST, real Postgres via supertest against the shared
-// `app`. File-prefixed fixture ids keep it parallel-safe on the shared dev DB.
-
 const OWNER = "owner-custom-spells-owner";
 const OUTSIDER = "owner-custom-spells-outsider";
 const CAMPAIGN_DM = "owner-custom-spells-dm";
 const CAMPAIGN_MEMBER = "owner-custom-spells-member";
 const CAMPAIGN_ID = "test-custom-spells-campaign-1";
-// #1819: the create endpoint derives the spell's edition from the authoring
-// character (never a hardcoded default), so every create names one. OWNER owns
-// both; CHAR_2014 keeps the pre-#1819 EDITION_2014 assertions valid, CHAR_2024
-// exercises the derive-2024 path. CHAR_OUTSIDER (OUTSIDER's) drives the
-// no-access rejection.
 const CHAR_2014 = "test-custom-spells-char-2014";
 const CHAR_2024 = "test-custom-spells-char-2024";
 const CHAR_OUTSIDER = "test-custom-spells-char-outsider";
@@ -83,9 +74,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
-  // #1796) — the reverse cascade doesn't exist (the supertype stays closed),
-  // so a plain `spell.deleteMany` alone would orphan the entry.
+  // Deleting CatalogEntry cascades the Spell row (ON DELETE CASCADE) — the reverse cascade doesn't exist, so spell.deleteMany alone would orphan the entry.
   await prisma.catalogEntry.deleteMany({ where: { ownerUserId: { in: [OWNER, OUTSIDER] } } });
   await prisma.catalogEntry.deleteMany({ where: { ownerCampaignId: CAMPAIGN_ID } });
   await prisma.campaign.deleteMany({ where: { id: CAMPAIGN_ID } });
@@ -93,10 +82,6 @@ afterAll(async () => {
   await prisma.user.deleteMany({ where: { id: { in: [OWNER, OUTSIDER, CAMPAIGN_DM, CAMPAIGN_MEMBER] } } });
 });
 
-// Creates a CAMPAIGN-scope CatalogEntry + Spell directly (mirroring
-// forkContent's own shape, lib/catalog/fork.ts) rather than going through the
-// real fork route — this file is about the edit/delete ownership gate
-// (#1808), not the fork flow itself (covered by fork.ts's own tests).
 async function createCampaignForkFixture(name: string): Promise<string> {
   const entry = await prisma.catalogEntry.create({
     data: { kind: "SPELL", scope: "CAMPAIGN", ownerCampaignId: CAMPAIGN_ID, name, edition: "EDITION_2014" },
@@ -110,9 +95,6 @@ async function createCampaignForkFixture(name: string): Promise<string> {
 }
 
 describe("POST /api/spells/custom", () => {
-  // #1819: edition is server-derived from the authoring character, never a
-  // hardcoded default — a 2024 character's homebrew must be EDITION_2024 so it
-  // resolves into that character's own catalog picker/spellbook.
   it("derives EDITION_2024 from a 2024 authoring character (#1819)", async () => {
     const res = await agent(cookieOwner)
       .post(`/api/spells/custom?characterId=${CHAR_2024}`)
@@ -280,9 +262,6 @@ describe("PATCH /api/spells/custom/:id", () => {
     expect(res.status).toBe(400);
   });
 
-  // A DM's CAMPAIGN-scope fork (#1808, epic #1795 8/8): assertSpellOwnership's
-  // second admitted path, exercised through the real route rather than just
-  // the access.test.ts unit.
   it("lets a campaign's DM edit a CAMPAIGN-scope fork they own", async () => {
     const id = await createCampaignForkFixture("DM Editable Fork");
 
@@ -326,14 +305,7 @@ describe("PATCH /api/spells/custom/:id", () => {
     expect(res.status).toBe(403);
   });
 
-  // #1815 review finding 7: assertSpellOwnership used to run OUTSIDE the
-  // $transaction, leaving a TOCTOU window where a concurrent DELETE between
-  // the check and the write threw an uncaught P2025 (500). Moving the check
-  // inside the transaction closes the large part of that window; this test
-  // pins the remaining defense — a mid-transaction "record to update not
-  // found" (simulated here via reconcileSpellClasses, which runs inside the
-  // SAME transaction after the catalogEntry/spell updates) is caught and
-  // mapped to a clean 404, never an uncaught 500.
+  // assertSpellOwnership runs inside the $transaction to close a TOCTOU window; a mid-transaction not-found must map to 404, never an uncaught 500 (#1815).
   it("404s instead of 500ing on a mid-transaction record-not-found race (P2025)", async () => {
     const created = await agent(cookieOwner)
       .post(`/api/spells/custom?characterId=${CHAR_2014}`)
@@ -358,7 +330,6 @@ describe("PATCH /api/spells/custom/:id", () => {
       spy.mockRestore();
     }
 
-    // The transaction rolled back — the rename above must not have applied.
     const row = await prisma.spell.findUniqueOrThrow({ where: { id } });
     expect(row.name).toBe("Racy Patch Target");
   });
@@ -395,8 +366,6 @@ describe("DELETE /api/spells/custom/:id", () => {
     expect(await prisma.spell.findUnique({ where: { id } })).not.toBeNull();
   });
 
-  // A DM's CAMPAIGN-scope fork (#1808, epic #1795 8/8) — same second
-  // admitted path as PATCH above.
   it("lets a campaign's DM delete a CAMPAIGN-scope fork they own", async () => {
     const id = await createCampaignForkFixture("DM Deletable Fork");
 
