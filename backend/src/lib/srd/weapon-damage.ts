@@ -103,7 +103,7 @@ export function bothWeaponsLight(weapons: ReadonlyArray<{ light: boolean }>): bo
   return weapons.length >= 2 && weapons.every((w) => w.light);
 }
 
-// Default 1 (1 + STR mod, min 1); Tavern Brawler raises it to 4. Max wins across feats — never downgrade a damage die.
+// Default 1 (1 + STR mod, min 1); a granted feat can raise it. Max wins across feats — never downgrade a damage die.
 export function deriveUnarmedDamageDie(advancements: AdvancementEntry[]): number {
   let best = 1;
   for (const entry of advancements) {
@@ -138,7 +138,7 @@ export function deriveMartialArtsDie(monkLevel: number, edition: RulesEdition): 
   }
 }
 
-// Unarmed strikes are always proficient and default to STR (5e PHB). A Monk who is unarmored & unshielded uses max(Dex, Str) and the larger of the feat die and the Martial Arts die. Empowered Strikes (monk L6+) marks the strike magical.
+// Unarmed strikes are always proficient and default to STR (PHB'14, SRD 5.2 — Unarmed Strike; edition-invariant). A Monk who is unarmored & unshielded uses max(Dex, Str) and the larger of the feat die and the Martial Arts die. Empowered Strikes (monk L6+) marks the strike magical.
 export function deriveUnarmedStrike(
   effectiveScores: Record<string, number>,
   proficiencyBonus: number,
@@ -155,7 +155,7 @@ export function deriveUnarmedStrike(
   const martialArtsDie =
     monk && monk.isUnarmored && !monk.hasShield ? deriveMartialArtsDie(monk.level, edition) : 0;
   const abilityMod = martialArtsDie > 0 ? Math.max(strMod, dexMod) : strMod;
-  // Empowered Strikes: monk unarmed strikes count as magical at level 6+.
+  // PHB'14 Ki-Empowered Strikes (p.77) / SRD 5.2 Empowered Strikes (p.87) — both monk level 6, no edition fork here.
   const magical = (monk?.level ?? 0) >= 6;
   return {
     attackBonus: abilityMod + proficiencyBonus,
@@ -163,13 +163,13 @@ export function deriveUnarmedStrike(
     damage: {
       count: 1,
       faces: Math.max(unarmedDamageDie, martialArtsDie),
-      modifier: Math.max(0, abilityMod), // d1 baseline guarantees at least 1 total
+      modifier: Math.max(0, abilityMod), // never negative: a strike deals at least 1
       damageType: "bludgeoning",
     },
   };
 }
 
-// Per 5e PHB: improvised weapons deal 1d4 bludgeoning, use STR; not proficient unless Tavern Brawler grants a weaponProficiency for it.
+// PHB'14 / SRD 5.2 — improvised weapons deal 1d4 bludgeoning, use STR; edition-invariant. Not proficient unless Tavern Brawler grants a weaponProficiency for it.
 export function deriveImprovisedAttack(
   effectiveScores: Record<string, number>,
   proficiencyBonus: number,

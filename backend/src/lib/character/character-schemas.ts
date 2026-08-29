@@ -65,14 +65,17 @@ export const createCharacterSchema = z
     spells: z
       .object({ cantripIds: z.array(z.string()), spellIds: z.array(z.string()) })
       .optional(),
-    // Derives from ALL_RULES_EDITIONS (#1527), never a literal array — a third edition becomes settable here the moment it's added to RulesEdition.
+    // Never a literal array (#1527) — a third edition becomes settable the moment RulesEdition gains it.
     rulesEdition: z.enum(ALL_RULES_EDITIONS).optional(),
   })
   .strict();
 
 export type CreateCharacterBody = z.infer<typeof createCharacterSchema>;
 
-// race/class/subclass/background/level/proficiencyBonus/experiencePoints/rulesEdition/inventory/spellcasting/journal are deliberately absent: derived, relation-backed, or mutated only through their own transaction/REST endpoint (never a blind PATCH) — .strict() 400s an attempt instead of silently ignoring it. rulesEdition is write-once (#1281).
+// race/class/subclass/background/level/proficiencyBonus/experiencePoints/rulesEdition/inventory/spellcasting/journal
+// are deliberately absent: derived, relation-backed, or mutated only through their own
+// transaction/REST endpoint (never a blind PATCH) — .strict() 400s an attempt instead of silently
+// ignoring it. rulesEdition is write-once (#1281).
 // currency IS still patchable here; the handler logs a currencyAdjust event in the same transaction.
 export const updateCharacterSchema = z
   .object({
@@ -95,10 +98,10 @@ export const updateCharacterSchema = z
       die: z.string(),
       spent: z.number().int().min(0).optional(),
     }),
-    // The six named keys, not z.record(z.string(), ...) — a record accepted
-    // any key ("luck") with any int value. PATCH also declares no generation
-    // method, so the route runs validateAbilityScores(undefined, ...) — the
-    // same sanity-bound rule createCharacter's omitted-method branch uses.
+    // The six named keys, not z.record: a record admits any key with any int value.
+    // PATCH also declares no generation method, so the route runs
+    // validateAbilityScores(undefined, ...) — the same sanity-bound rule
+    // createCharacter's omitted-method branch uses.
     abilityScores: abilityScoresSchema,
     savingThrowProficiencies: z.array(z.string()),
     skills: z.array(z.unknown()),

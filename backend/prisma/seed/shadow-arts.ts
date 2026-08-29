@@ -10,9 +10,8 @@ const COST_POOL_KEY_VALUES = ["ki", "focus"] as const;
 export interface ShadowArtSeed {
   name: string;
   description: string;
-  // A mechanically diverging row forks (#1415 made this expressible); never omitted here — every row today is edition-specific.
+  // A mechanically diverging row forks per edition (#1415).
   edition: SeedEdition;
-  // The pool this art spends from and how much — genuinely differs per edition (2014's ki vs 2024's focus, 2 vs 1).
   costPoolKey: (typeof COST_POOL_KEY_VALUES)[number];
   costBase: number;
 }

@@ -1,11 +1,5 @@
 // DATA MODULE ONLY (#1277 AC 4): no direct database calls in this file.
 //
-// EDITION RULE: `edition` omitted -> expand() seeds identical text for both
-// editions (Extra Attack, Fast Movement below). `edition` set -> exactly the
-// one row named. A "removed in 2024" feature means not authoring a 2024 row,
-// never deleting the 2014 row. A level-shift is two rows with two `level`
-// values, never one row edited in place.
-//
 // RESOURCE POOL: Rage's uses-per-rest total/recharge live on both Rage rows'
 // resourceTotals. SRD 5.1 grants unlimited Rages at level 20 (encoded as 99);
 // SRD 5.2 caps at 6 from level 17 on.
@@ -29,7 +23,6 @@ interface RawBarbarianFeature {
   name: string;
   level: number;
   description: string;
-  /** Omitted -> identical text seeded for both editions. */
   edition?: SeedEdition;
   derivedStat?: DerivedStatSeed;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
@@ -436,7 +429,6 @@ const TOTEM_WARRIOR_RAW: RawBarbarianFeature[] = [
   },
 ];
 
-// Path of the Berserker
 const BERSERKER_SLUG = slug("barbarian-berserker");
 const BERSERKER_RAW: RawBarbarianFeature[] = [
   {

@@ -29,9 +29,7 @@ const FETCH_MESSAGE =
   "Don't call global fetch directly — use apiFetch/rawFetch from '@/api/http', or a domain module via the '@/api/client' barrel.";
 
 export default tseslint.config(
-  // e2e/** falls outside every rule block's "src/**" files glob already, but
-  // that's exclusion by omission — list it here so the carve-out is by name,
-  // matching this file's own "by name, not by omission" standard below.
+  // e2e/** already falls outside every files glob; listed so the carve-out is by name.
   { ignores: ["dist/**", "playwright-report/**", "test-results/**", "e2e/**"] },
   // Stale eslint-disable directives fail lint the moment they stop being needed (#1045).
   { linterOptions: { reportUnusedDisableDirectives: "error" } },
@@ -42,7 +40,6 @@ export default tseslint.config(
   // banned — closes check-edition-branching.sh's `==`/`!=` escape hatch (#1978).
   { rules: { eqeqeq: ["error", "always", { null: "ignore" }] } },
   {
-    // Comment hygiene, machine-enforcing the CLAUDE.md comment policy.
     // Suppression directives (#1045): every disable must name its rule
     // (no-unlimited-disable) and carry a `-- reason` (require-description).
     // Warning markers (#1057): the no-warning-comments terms below are banned
@@ -67,8 +64,8 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       // Static accessibility lint: catches missing labels, bad ARIA, non-semantic
-      // interactive elements, etc. at dev time. Runtime a11y is checked via jest-axe
-      // in component tests (see src/test/axe.ts).
+      // interactive elements, etc. at dev time. Runtime a11y is checked separately
+      // via jest-axe in component tests.
       ...jsxA11y.flatConfigs.recommended.rules,
       "react-refresh/only-export-components": [
         "warn",

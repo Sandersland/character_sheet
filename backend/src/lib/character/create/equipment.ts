@@ -325,7 +325,7 @@ export async function materializeStartingEquipment(
 ): Promise<PhaseResult<MaterializedEquipment>> {
   const inventoryItemCreates: InventoryCreate[] = [];
   let totalGold = 0;
-  // anyEquipmentChosen: omitting both equipment fields keeps deriveCreatedCharacter's default currency untouched.
+  // Omitting both equipment fields keeps deriveCreatedCharacter's default currency untouched.
   let anyEquipmentChosen = false;
 
   const se = input.startingEquipment;

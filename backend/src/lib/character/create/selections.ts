@@ -371,11 +371,10 @@ export async function resolveSelections(
   if (!basics.ok) return basics;
   const { primaryClassChoice } = basics;
 
-  // Sequential, not Promise.all: the pg driver's pool can warn/queue on concurrent queries from one PrismaClient; these are cheap point-lookups.
-  // Write-once (#1285): DEFAULT_RULES_EDITION is the shared constant keeping this default and the create() call's rulesEdition from drifting apart.
   // Must resolve before the background lookup below, which needs it to pick the right edition-tagged row (#1306).
   const edition: RulesEdition = input.rulesEdition ?? DEFAULT_RULES_EDITION;
 
+  // Sequential, not Promise.all: the pg driver's pool can warn/queue on concurrent queries from one PrismaClient; these are cheap point-lookups.
   const classResult = await resolveCharacterClass(primaryClassChoice);
   if (!classResult.ok) return classResult;
   const { characterClass } = classResult;

@@ -95,7 +95,6 @@ export function AbilityRow(props: AbilityRowProps) {
   return (
     <div className="contents">
       <span className="flex flex-wrap items-baseline gap-x-2 self-center text-sm font-semibold text-parchment-800">
-
         <span className="sm:hidden">{abilityAbbr(row.ability)}</span>
         <span className="hidden sm:inline">{label}</span>
         {row.recommended && (
@@ -122,10 +121,7 @@ export function AbilityRow(props: AbilityRowProps) {
   );
 }
 
-// display:contents joins these header cells to the shared grid; text utilities
-// still reach the cells since they're inherited CSS. The underline can't ride
-// the wrapper's border (contents paints nothing), so it's a full-width divider
-// row spanning every column.
+// The underline can't ride a contents wrapper's border, so it's a full-width divider row spanning every column.
 export function RowHeader({ applicable, mode }: { applicable: boolean; mode: SpreadMode }) {
   return (
     <div className="contents text-[10px] font-bold uppercase tracking-wide text-parchment-500">

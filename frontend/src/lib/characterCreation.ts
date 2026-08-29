@@ -18,7 +18,7 @@ import type {
 } from "@/types/character";
 
 export interface CreationSelections {
-  // The sole species/variant source of truth — the flat Race catalog was pruned (#1684).
+  // The sole species/variant source of truth (#1684).
   species: SpeciesOption | undefined;
   variant: SpeciesVariantOption | undefined;
   class: ClassOption | undefined;
@@ -365,7 +365,7 @@ export function buildCreatePayload(
   selections: CreationSelections,
   skills: CreationSkillChoices,
   selectedToolChoices: string[],
-  // Independent of selectedToolChoices (the class's); defaulted so pre-#1779 call sites still compile (#1779).
+  // Independent of selectedToolChoices, which is the class's own pool (#1779).
   selectedBackgroundToolChoices: string[] = []
 ): CreateCharacterInput {
   const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
@@ -379,7 +379,7 @@ export function buildCreatePayload(
   return {
     name: draft.name.trim(),
     alignment: draft.alignment,
-    // The sole mechanical anchor — the flat race field and its legacy create path are gone; always set by submit time (same guarantee rulesEdition below relies on) (#1684).
+    // Always set by submit time — the same guarantee rulesEdition below relies on (#1684).
     speciesId: draft.speciesId,
     variantId: draft.variantId || undefined,
     // Only sent when the choice is completed — a fixed-only species sends undefined; the backend 400s a speciesAbilities it didn't ask for (#1681).

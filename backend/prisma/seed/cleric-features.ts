@@ -97,7 +97,7 @@ const CLERIC_BASE_RAW: RawClericFeature[] = [
       { minLevel: 6, total: 3, shortRestRegain: 1 },
       { minLevel: 18, total: 4, shortRestRegain: 1 },
     ],
-    // PHB'14 p.164. Reminder text must stay identical to paladin-features.ts's Channel Divinity rows (one shared pool, one merged card).
+    // PHB'14 p.164. Reminder text must stay identical to the Channel Divinity rows in PALADIN_FEATURES (one shared pool, one merged card).
     activationCost: "action",
     costKind: "pool",
     costPoolKey: "channelDivinity",

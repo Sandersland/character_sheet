@@ -42,4 +42,4 @@ A level-gated grant with zero player choice (e.g. Warrior of Shadow's Minor Illu
 3. **Clamp-on-read** in `serializeCharacter`, analogous to the existing `slice`/`Math.min` clamps.
 4. **New `EventType`** (if needed): add to the `CharacterEventType` Prisma enum + the `EventType` union in `lib/activity/events.ts`; `prisma migrate dev` **and** `prisma generate` (both required).
 5. **Undo branch** (only if you introduced a new event category): add it to the revert handler in `lib/activity/activity.ts`. Reconcilers writing into `Character.resources` get undo for free via the `resources` branch.
-6. **Tests** — mirror the maneuver block in `routes/__tests__/experience.test.ts`: partial trim (oldest kept), full clear, event emitted, undo restores, and read-clamp serves the capped count without an XP op.
+6. **Tests** — mirror the maneuver block in `routes/character/__tests__/experience.test.ts`: partial trim (oldest kept), full clear, event emitted, undo restores, and read-clamp serves the capped count without an XP op.

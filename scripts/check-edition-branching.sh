@@ -20,21 +20,14 @@
 # fire on a `Record<RulesEdition, …>` literal's `"EDITION_2014": …` key (no
 # operator precedes the colon) or a `switch` branch's `case "EDITION_2014":`
 # label (no comparison operator at all) — both are the sanctioned shape this
-# gate exists to push every site onto. Self-test below proves this rather than
-# asserting it.
+# gate exists to push every site onto.
 #
-# A why-comment is allowed to quote the anti-pattern (this file's own header
-# does, and so does spellListsFor's #1527 citation) — is_comment_line skips
-# any line whose trimmed content opens with `//` or `*`, mirroring
-# check-class-ts-migration.sh's same carve-out for a class name in prose.
-# Known false positive: is_comment_line only skips a WHOLE-line comment, so a
-# trailing `// edition === "EDITION_2014"` on a code line still fires — put
-# such prose on its own line.
+# is_comment_line skips whole-line comments so a why-comment may quote the
+# anti-pattern. Known false positive: a trailing `// edition === "EDITION_2014"`
+# on a code line still fires — put such prose on its own line.
 #
-# Anti-vacuity: the self-test fails loudly if either positive probe (a real
-# violation shape, strict or loose) doesn't match, or either negative probe
-# (record key / switch case) DOES match — a broken pattern reads red, not
-# silently green.
+# Anti-vacuity: the probes below fail loudly if the pattern stops matching a
+# real violation or starts matching a sanctioned shape.
 set -eu
 
 PATTERN='(===|!==|==|!=)[[:space:]]*"EDITION_|"EDITION_[A-Za-z0-9_]*"[[:space:]]*(===|!==|==|!=)'
@@ -78,7 +71,7 @@ fi
 # throw, no compile-time `never` check. Brace-depth counting (not a fixed
 # `/^}/` range) is required because every real switch(edition) body nests
 # braces of its own (a multi-statement `case` block, PHB citation comments,
-# etc.) — see conditionDefinition (backend/src/lib/srd/condition-data.ts).
+# etc.) — see conditionDefinition.
 # Known limitation: counts `{`/`}` characters textually, so a brace inside a
 # string or comment within the switch body would miscount — no real
 # switch(edition) body does this today.
@@ -155,9 +148,8 @@ if [ "$FILE_COUNT" -lt "$MIN_SCANNED_FILES" ]; then
   exit 1
 fi
 
-# Rebuilt as positional params, one path per $FILES line, instead of an unquoted
-# $FILES word-split — a path containing a space used to be split into two
-# separate (nonexistent) "files" (#1980).
+# Paths go through positional params, not an unquoted $FILES word-split, so a
+# path containing a space stays one file (#1980).
 tmp_file_list=$(mktemp)
 trap 'rm -f "$tmp_file_list"' EXIT
 printf '%s\n' "$FILES" > "$tmp_file_list"

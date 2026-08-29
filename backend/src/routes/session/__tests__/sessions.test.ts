@@ -109,7 +109,7 @@ describe("POST /api/campaigns/:campaignId/sessions — start", () => {
   });
 
   // Two truly concurrent starts can both pass the lib-level pre-check and tx-scoped re-check before either
-  // commits (#1600 shipped the listening-server fix that makes concurrent supertest calls actually race).
+  // commits — #1600's listening-server fix is what makes concurrent supertest calls actually race.
   // Session_campaignId_active_key (see schema.prisma) closes this at the database; the loser's P2002 must map
   // to the same "already active" SessionError the sequential check raises, not a 500.
   it("two concurrent starts for the same campaign yield exactly one active session and no 500", async () => {
@@ -501,7 +501,7 @@ describe("combat state is server-authoritative", () => {
   });
 });
 
-// The logRoll op (#1861) must persist the byte-for-byte same event shape (category "roll", same type + `data`) as the retired POST .../roll route did, which these tests pin.
+// The logRoll op (#1861) persists one fixed event shape — category "roll", same type + `data` — pinned by these tests.
 describe("roll kinds log under the `roll` category", () => {
   async function activeSession(): Promise<void> {
     const campaignId = await setupCampaign();

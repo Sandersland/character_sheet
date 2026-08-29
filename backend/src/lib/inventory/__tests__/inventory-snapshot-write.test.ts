@@ -1,4 +1,4 @@
-// #1648/#1649: buildInventorySnapshot is the one construction function every creation path calls; the snapshot + InventoryCapabilityUse / InventoryItem.usesRemaining are now the SOLE write, no mirror tables left to cross-check against.
+// #1648/#1649: buildInventorySnapshot is the one construction function every creation path calls; the snapshot + InventoryCapabilityUse / InventoryItem.usesRemaining are the SOLE write, no mirror tables to cross-check against.
 import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";

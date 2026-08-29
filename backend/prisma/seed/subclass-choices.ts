@@ -17,8 +17,7 @@ export interface SubclassChoiceOptionSeed {
   description: string;
   /** Minimum character level to pick this option (the choice's grant level). */
   minLevel: number;
-  // Omitted = shared (NULL column, valid in both editions, #1306); only a
-  // mechanically diverging row forks, which #1415 made expressible.
+  // Omitted = shared (NULL column, valid in both editions, #1306); only a mechanically diverging row forks (#1415).
   edition?: SeedEdition;
 }
 

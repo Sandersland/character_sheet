@@ -58,7 +58,7 @@ referenceRouter.get("/reference", async (req, res) => {
       grantedSpells: { select: { id: true, variantId: true } },
     },
   });
-  // edition is present on the row only to drive resolveEditionCatalog's resolution; the projections below never forward it to the wire.
+  // Edition rides the nested subclasses rows, not the class row itself — same pattern as originFeatByName below, never forwarded to the wire.
   const rawClasses = await prisma.characterClass.findMany({
     orderBy: { name: "asc" },
     include: { subclasses: { where: withEditionOrShared({}, edition), orderBy: { name: "asc" } } },

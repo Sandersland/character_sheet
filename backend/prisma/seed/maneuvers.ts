@@ -1,4 +1,4 @@
-// SRD Battle Master maneuvers. Every maneuver costs 1 superiority die and rolls it; the server owns the roll on castManeuver.
+// Battle Master maneuvers — SRD 5.1 p.25 (2014); 2024 wording is mirror-sourced, not confirmed against SRD 5.2. Every maneuver costs 1 superiority die and rolls it; the server owns the roll on castManeuver.
 import { z } from "zod";
 
 import type { SeedEdition } from "./edition.js";

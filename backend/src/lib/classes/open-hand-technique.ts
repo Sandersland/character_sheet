@@ -125,7 +125,7 @@ async function imposeOpenHandRider(
     throw new InvalidOpenHandTechniqueOperationError("Open Hand Technique can only be imposed once per turn");
   }
 
-  // fallow-ignore-next-line code-duplication -- intentionally repeated per monk save-DC vertical (mirrors the same pattern in quivering-palm and stunning-strike) rather than a shared helper
+  // fallow-ignore-next-line code-duplication -- intentionally repeated per monk save-DC vertical (mirrors the same pattern in applyQuiveringPalmOperations and applyStunningStrikeOperations) rather than a shared helper
   // Proficiency bonus is total-character-level based, not monk-level — matches every DC formula in this codebase.
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);

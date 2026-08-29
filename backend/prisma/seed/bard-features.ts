@@ -1,5 +1,6 @@
 // DATA MODULE ONLY (#1277 AC 4, scripts/check-seed-data-modules.sh): no direct database calls in this file.
 // Every Bard pool is row-declared; a reintroduced resourceFn pool would shadow a same-keyed row pool in mergePoolSources.
+// EDITION_2024 rows below are transcribed from SRD 5.2.1 (Wizards' online reference) — it has no fixed pagination, so rows cite the document by name rather than a page.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
@@ -71,7 +72,6 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     name: "Spellcasting",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:864-886
     description:
       "You cast spells using Charisma. You know two Bard cantrips of your choice from the Bard spell list, replacing one whenever you gain a Bard level; you learn an additional cantrip at levels 4 and 10. You prepare a growing list of Bard spells (4 at level 1, rising to 22 by level 20, per the Bard Features table), regain all expended spell slots on a Long Rest, and can change your prepared list whenever you finish one. A Musical Instrument serves as your Spellcasting Focus.",
   },
@@ -108,7 +108,6 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     name: "Bardic Inspiration",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:852-862
     description:
       "As a Bonus Action, give one creature within 60 feet that can see or hear you a Bardic Inspiration die (d6, becoming d8 at level 5, d10 at level 10, d12 at level 15). Within the next hour, that creature can roll the die and add the number rolled to one D20 Test it makes, potentially turning the failure into a success.",
     resourceKey: "bardicInspiration",
@@ -145,7 +144,6 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     name: "Jack of All Trades",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:894-898
     description:
       "Whenever you make an ability check that doesn't already use your Proficiency Bonus and that uses a skill proficiency you lack, you can add half your Proficiency Bonus (round down) to the check.",
   },
@@ -177,7 +175,6 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     name: "Expertise",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md's Bard Features table (L2/L9 rows) + :888-892.
     description:
       "Choose two of your skill proficiencies (or one skill proficiency and your Thieves' Tools proficiency). Your Proficiency Bonus is doubled for any ability check you make with either chosen proficiency. At level 9, choose two more skill proficiencies to gain this benefit.",
     // #1588: SRD 5.2.1 — 2 skills at L2, 4 more at L9.
@@ -200,7 +197,6 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     name: "Font of Inspiration",
     level: 5,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:908-912
     description:
       "You regain all of your expended Bardic Inspiration uses when you finish a Short or Long Rest. In addition, you can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration.",
   },
@@ -217,7 +213,6 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     name: "Countercharm",
     level: 7,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:914-916
     description:
       "If you or a creature within 30 feet of you fails a saving throw against an effect that applies the Charmed or Frightened condition, you can take a Reaction to cause the save to be rerolled, and the new roll has Advantage.",
   },
@@ -234,7 +229,6 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     name: "Magical Secrets",
     level: 10,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:918-920
     description:
       "Whenever you reach a Bard level and the Prepared Spells number in the Bard Features table increases, you can choose any of your new prepared spells from the Bard, Cleric, Druid, and Wizard spell lists.",
   },
@@ -251,7 +245,6 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     name: "Superior Inspiration",
     level: 18,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:922-924
     description:
       "When you roll Initiative, you regain expended uses of Bardic Inspiration until you have two if you have fewer than that.",
   },
@@ -260,7 +253,7 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     name: "Epic Boon",
     level: 19,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md table (L19) + :926-928; feat system itself is deferred, text only.
+    // Feat system itself is deferred — text only.
     description: "You gain an Epic Boon feat of your choice (Boon of Spell Recall recommended). You can take this feat only once.",
   },
   {
@@ -268,13 +261,12 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     name: "Words of Creation",
     level: 20,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:930-932
     description:
       "You always have the Power Word Heal and Power Word Kill spells prepared. When you cast either spell, you can target a second creature within 10 feet of the first target with the same spell.",
   },
 ];
 
-// PHB'14 p.55 (2014) / SRD 5.2 lines 1723-1746 (2024)
+// PHB'14 p.55 (2014) / SRD 5.2.1 (2024)
 const LORE_SLUG = slug("bard-college-of-lore");
 const COLLEGE_OF_LORE_RAW: RawBardFeature[] = [
   {
@@ -289,7 +281,6 @@ const COLLEGE_OF_LORE_RAW: RawBardFeature[] = [
     name: "Bonus Proficiencies",
     level: 3,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:1729-1731
     description: "You gain proficiency with three skills of your choice.",
   },
   {
@@ -305,7 +296,6 @@ const COLLEGE_OF_LORE_RAW: RawBardFeature[] = [
     name: "Cutting Words",
     level: 3,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:1733-1735
     description:
       "When a creature you can see within 60 feet of yourself makes a damage roll or succeeds on an ability check or attack roll, you can take a Reaction and expend one Bardic Inspiration die, subtracting the number rolled from the creature's roll and potentially turning its success into a failure — this works supernaturally even against a creature that can't hear you.",
   },
@@ -323,7 +313,6 @@ const COLLEGE_OF_LORE_RAW: RawBardFeature[] = [
     name: "Magical Discoveries",
     level: 6,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:1737-1741
     description:
       "You always have two spells from the Cleric, Druid, or Wizard spell list prepared — a cantrip or a spell for which you have spell slots — chosen from any combination of the three. Whenever you gain a Bard level, you can replace one of these spells with another that meets this feature's criteria.",
   },
@@ -340,7 +329,6 @@ const COLLEGE_OF_LORE_RAW: RawBardFeature[] = [
     name: "Peerless Skill",
     level: 14,
     edition: "EDITION_2024",
-    // SRD 5.2.1 classes.md:1743-1745
     description:
       "When you make an ability check or attack roll and fail, you can expend one Bardic Inspiration die and add the number rolled to the roll, potentially turning the failure into a success. On a failure, the Bardic Inspiration die isn't expended.",
   },

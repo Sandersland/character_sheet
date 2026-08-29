@@ -54,10 +54,10 @@ describe("Character transactions — concurrent requests serialize on the charac
     expect((final.hitPoints as { current: number }).current).toBe(START_HP - CONCURRENT_REQUESTS);
   });
 
-  // Regression for the actions.ts transaction, which opened its own $transaction with no row lock
-  // (reads there ran before the shared lock existed at all): mixes /hp damage with /actions heal
-  // (handOfHealingFlurry — no class/resource gating, so no fixture setup is needed) on one
-  // character, concurrently, so both write paths race for the same row.
+  // Guards the actions transactions endpoint's own $transaction, which must take lockCharacterRow
+  // like runCharacterTransaction does: mixes /hp damage with /actions heal (handOfHealingFlurry —
+  // no class/resource gating, so no fixture setup is needed) on one character, concurrently, so
+  // both write paths race for the same row.
   it("applies concurrent /actions heals and /hp damage together (no lost updates across the two transaction paths)", async () => {
     const damageRequests = 5;
     const healRequests = 5;

@@ -31,8 +31,7 @@ const EMPTY_ASSIGNMENTS: Record<AbilityName, number | null> = {
 export interface CharacterDraft {
   name: string;
   alignment: string;
-  /** #1680: catalog species id — the two-step picker's first step, replacing
-   *  the flat `race` name field it superseded. Empty = not yet chosen. */
+  /** #1680: catalog species id — the two-step picker's first step. Empty = not yet chosen. */
   speciesId: string;
   /** #1680: catalog variant id — the second step, required (non-empty)
    *  whenever the chosen species has variant rows (mirrors subclassId's

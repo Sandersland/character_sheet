@@ -567,7 +567,7 @@ describe("SRD 5.2 catalog values — CHUNK 1 cantrips + L1 (#1132)", () => {
     expect(get("Bane").classes).toContain("warlock");
     expect(get("Command").classes).toContain("bard");
     expect(get("Command").duration).toBe("Instantaneous");
-    expect(get("Dissonant Whispers").classes).toEqual(["bard"]); // GOO leak fix
+    expect(get("Dissonant Whispers").classes).toEqual(["bard"]); // Bard-only; not a Great Old One grant.
     expect(get("Protection from Evil and Good").classes).toContain("druid");
     expect(get("Sanctuary").classes).toEqual(["cleric"]);
   });
@@ -576,7 +576,7 @@ describe("SRD 5.2 catalog values — CHUNK 1 cantrips + L1 (#1132)", () => {
     const sleep = get("Sleep");
     expect(sleep.concentration).toBe(true);
     expect(sleep.range).toBe("60 ft");
-    expect(sleep.effectDiceCount).toBeUndefined(); // 5d8 HP pool dropped
+    expect(sleep.effectDiceCount).toBeUndefined(); // SRD 5.2 Sleep has no HP pool.
     expect(sleep.description).toContain("Incapacitated");
     expect(get("Hunter's Mark").description).toContain("Force");
   });
@@ -710,8 +710,7 @@ describe("referential integrity", () => {
     expect([...new Set(dangling)], "pack references an item missing from ITEMS").toEqual([]);
   });
 
-  // No TS module carries a `.subclasses` map to compare a grantLevel against
-  // any more — assert every class's seeded subclassLevel directly instead.
+  // subclassLevel is asserted directly off the seeded class rows (subclassGateLevel is the only reader).
   it("Fighter's, Barbarian's, Rogue's, Ranger's and Monk's seeded subclassLevel is 3 in both editions (SRD 5.2; PHB'14 pp. 72/48/91/72 verified, Rogue's own page not re-verified)", () => {
     const fighterClass = CLASSES.find((c) => c.name === "Fighter");
     const barbarianClass = CLASSES.find((c) => c.name === "Barbarian");

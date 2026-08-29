@@ -1,6 +1,3 @@
-// Monk ClassFeature rows, authored as literal data (#1675), following the
-// fighter-features.ts pattern every other class uses.
-//
 // DATA MODULE ONLY (#1277 AC 4): no direct database calls or async writes.
 //
 // Way of the Open Hand: SRD 5.1 p.78 / PHB'14 p.78.
@@ -29,7 +26,6 @@ interface RawMonkFeature {
   name: string;
   level: number;
   description: string;
-  // Omitted seeds both editions with identical text; set to fork wording for one edition only (#1430).
   edition?: SeedEdition;
   derivedStat?: DerivedStatSeed;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
@@ -1027,8 +1023,8 @@ const WAY_OF_THE_FOUR_ELEMENTS_RAW: RawMonkFeature[] = [
   },
 ];
 
-// 33 EDITION_2014 + 37 EDITION_2024 = 70 rows total — pinned by
-// monk-2024-content.test.ts's per-partition counts.
+// 33 EDITION_2014 + 37 EDITION_2024 feature rows, plus the actionOnly rows
+// (43/46 in total) — all four counts pinned by the monk 2024 content test.
 export const MONK_FEATURES: ClassFeatureSeedRow[] = [
   ...MONK_BASE_RAW.flatMap(expand),
   ...WARRIOR_OF_THE_OPEN_HAND_RAW.flatMap(expand),

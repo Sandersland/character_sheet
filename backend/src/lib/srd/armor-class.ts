@@ -59,7 +59,7 @@ function bestUnarmoredParts(
       ...shieldPart,
     ]);
   }
-  // Monk Unarmored Defense is unusable while wielding a shield (PHB p.78).
+  // Monk Unarmored Defense is unusable while wielding a shield (PHB'14 pp.76-79 / PHB'24 pp.87-89 — Unarmored Defense is edition-invariant).
   if (ud && !hasShield && classes.includes("monk")) {
     candidates.push([
       { label: "Unarmored Defense", value: 10 },

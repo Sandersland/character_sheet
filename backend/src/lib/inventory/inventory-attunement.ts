@@ -97,7 +97,6 @@ export async function applyUnattune(
 
   await tx.inventoryItem.update({ where: { id: item.id }, data: { attuned: false } });
 
-  // Unattuning ends any active effect once the item is no longer equipped either.
   if (item.equippedSlot == null) {
     await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `unattuned ${item.name}`);
   }

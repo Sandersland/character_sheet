@@ -1,11 +1,6 @@
 // Ranger ClassFeature rows, authored as literal data (#1230).
 //
 // DATA MODULE ONLY (#1277 AC 4): no direct database calls or async writes.
-//
-// `edition` omitted seeds one row per edition with identical text (Extra
-// Attack only); set seeds exactly that edition — a "removed in 2024" feature
-// keeps its 2014 row rather than being deleted, and a rename (Ranger's
-// Companion -> Primal Companion) is a new row, never an edit in place.
 import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";

@@ -54,10 +54,14 @@ export const LITERAL_ROW_CLASSES: ReadonlySet<string> = new Set([
   "Monk",
 ]);
 
-// `edition` is REQUIRED, unlike other edition-tagged seed rows: each class's
-// own expand() has already split every row one-per-edition, mirroring the DB
-// column's non-nullability. Descriptor fields mirror ClassFeature's columns
-// 1:1 — writeResolvedRows walks DESCRIPTOR_RESET's key set.
+// `edition` is REQUIRED here, unlike other edition-tagged seed rows: each class file authors it
+// as optional on its own Raw*Feature interface, and that file's own expand() splits every row
+// one-per-edition before it reaches this type, mirroring the DB column's non-nullability. Omitted
+// on a Raw*Feature row -> expand() seeds identical text for both editions; set -> exactly the one
+// edition named. A "removed in 2024" feature means not authoring a 2024 row, never deleting the
+// 2014 row. A level-shift is two rows with two `level` values, never one row edited in place.
+// Descriptor fields mirror ClassFeature's columns 1:1 — writeResolvedRows walks DESCRIPTOR_RESET's
+// key set.
 export interface ClassFeatureSeedRow {
   // Must match a CharacterClass.name seed row — title case, not registry.ts's
   // lowercase dispatch key.
@@ -139,10 +143,6 @@ function isAscendingByMinLevel(tiers: { minLevel: number }[]): boolean {
 
 const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending by minLevel" };
 
-// classFeatureSeedSchema is the one validation surface anything outside this
-// file should parse against — the per-column tier schemas stay un-exported.
-// Mirrors ResourceTotalFormula field-for-field; evaluateResourceTotal is the
-// one interpreter.
 // The six ability score keys — this is the ONE seed-side copy (exported so spells.ts,
 // disciplines.ts, and channel-divinity.ts import it instead of each re-declaring it).
 // `satisfies` + the coverage check make this a two-way COMPILE latch against
@@ -155,6 +155,7 @@ type _AbilityValuesCoverResourceTotalAbility = ResourceTotalAbility extends (typ
 const _abilityValuesCoverResourceTotalAbility: _AbilityValuesCoverResourceTotalAbility = true;
 void _abilityValuesCoverResourceTotalAbility;
 
+// Mirrors ResourceTotalFormula field-for-field; evaluateResourceTotal is the one interpreter.
 const resourceTotalFormulaSchema = z.union([
   z.number().int().nonnegative(),
   z.literal("proficiencyBonus"),
@@ -192,7 +193,7 @@ const derivedStatTiersSchema = z
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 const choiceCountTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), count: z.number().int().positive() }))
-  .min(1) // an empty tier array is authoring garbage, same as resourceRechargeTiers
+  .min(1)
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 
 // resourceDetailTiers is ascending by minLevel PER LABEL, not globally
@@ -218,7 +219,7 @@ const PER_LABEL_ASCENDING_TIER_MESSAGE = { message: "each label's tiers must be 
 
 const resourceDetailTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), label: z.string().min(1), value: z.string().min(1) }))
-  .min(1) // an empty tier array is authoring garbage, same as resourceRechargeTiers
+  .min(1)
   .refine(isAscendingByMinLevelPerLabel, PER_LABEL_ASCENDING_TIER_MESSAGE);
 
 // Additive minLevel entries (InitiativeRegenRow) — deliberately no ascending refine, unlike the tier schemas above.
@@ -243,7 +244,7 @@ const resourceOnInitiativeSchema = z
       bonusHeal: initiativeRegenBonusHealSchema.optional(),
     }),
   )
-  .min(1) // an empty tier array is authoring garbage, same as resourceRechargeTiers/resourceDetailTiers
+  .min(1)
   .refine(hasUniqueInitiativeRegenIds, {
     message: "resourceOnInitiative ids must be unique within one row's array (the id disambiguates once-per-long-rest markers)",
   });
@@ -381,11 +382,8 @@ type _ActionCostValuesCoverActionCost = ActionCost extends (typeof ACTION_COST_V
 const _actionCostValuesCoverActionCost: _ActionCostValuesCoverActionCost = true;
 void _actionCostValuesCoverActionCost;
 
-// Mirrors ResolutionKind (shared-types) — resolverKind is served on the wire and switched on
-// there via ACTION_RESOLVERS/resolverFromRow, which `satisfies` this same shared type with its
-// own RESOLUTION_KINDS array. This validates ClassFeature.resolverKind at seed time: adding a
-// ResolutionKind member without adding it here means a seed row can never author it (rejected at
-// `prisma db seed`); adding a value here without adding it to ResolutionKind fails typecheck below.
+// Mirrors ResolutionKind (shared-types) — resolverKind is served on the wire and switched on by
+// ACTION_RESOLVERS. Two-way compile latch, same shape as ABILITY_VALUES above.
 const RESOLVER_KIND_VALUES = [
   "attack-picker",
   "twf-picker",
@@ -448,11 +446,7 @@ const EFFECT_MODIFIER_SOURCE_VALUES = ["classLevel"] as const;
 // Named aliases for the per-class-file Raw*Feature interfaces (fighter-features.ts,
 // wizard-features.ts, …) to import instead of `string` — every literal those files author is then
 // checked against the SAME vocabulary classFeatureSeedSchema validates at runtime, catching a
-// typo at compile time too. `ResourceRechargeSeed` is a plain passthrough of `RechargeOn` so a
-// per-class file needs only this one import path for every narrowed seed field. No
-// damageType/attackType/saveEffect alias: no per-class file authors those columns today (only
-// Spell/GrantedAbility rows do) — ClassFeatureSeedRow below references DAMAGE_TYPE_VALUES etc.
-// directly since it's their only consumer.
+// typo at compile time too.
 export type ResourceRechargeSeed = RechargeOn;
 export type ActionCostSeed = (typeof ACTION_COST_VALUES)[number];
 export type ResolverKindSeed = (typeof RESOLVER_KIND_VALUES)[number];
@@ -461,6 +455,8 @@ export type EffectKindSeed = (typeof EFFECT_KIND_VALUES)[number];
 export type DerivedStatSeed = (typeof DERIVED_STAT_VALUES)[number];
 export type EffectModifierSourceSeed = (typeof EFFECT_MODIFIER_SOURCE_VALUES)[number];
 
+// classFeatureSeedSchema is the one validation surface anything outside this
+// file should parse against — the per-column tier schemas stay un-exported.
 // Only the identity fields are required; descriptor fields are declared here
 // too so a population pass validates against this SAME schema, never a second one.
 // Not `.strict()`: tsconfig.seed.json type-checks every CLASS_FEATURES literal against

@@ -17,7 +17,6 @@ export type ResourceTotalFormula =
   | { abilityMod: ResourceTotalAbility; plus?: number; min?: number }
   | { levelTimes: number };
 
-// Tiers are ASCENDING by minLevel, last-match-wins.
 export interface ResourceTotalTier {
   minLevel: number;
   total: ResourceTotalFormula;
@@ -55,8 +54,6 @@ export interface ResourceDieTier {
   die: string;
 }
 
-// Tiers are ASCENDING by minLevel, last-match-wins — same invariant as
-// ResourceTotalTier/ResourceDieTier.
 export interface ResourceRechargeTier {
   minLevel: number;
   recharge: RechargeOn;
@@ -137,7 +134,6 @@ export interface ResourceColumns {
   resourceOnInitiative?: InitiativeRegenRow[] | null;
 }
 
-// Tiers are ASCENDING by minLevel, last-match-wins — same invariant as ResourceTotalTier.
 export interface ChoiceCountTier {
   minLevel: number;
   count: number;

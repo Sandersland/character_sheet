@@ -32,7 +32,7 @@ Each vitest worker runs against its own database, cloned in `globalSetup` from a
 
 **Every transaction endpoint gets:** a 404 test (unknown character), a 400 test (malformed op), one test per domain error, and a multi-op **atomicity** test (a failing second op rolls back the first).
 
-Pure domain logic gets lib-level unit tests in `backend/src/lib/__tests__/`.
+Pure domain logic gets lib-level unit tests in `backend/src/lib/[<domain>/]__tests__/`.
 
 ## Frontend tests
 

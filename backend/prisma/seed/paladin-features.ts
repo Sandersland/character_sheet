@@ -85,8 +85,7 @@ const BASE_RAW: RawPaladinFeature[] = [
     edition: "EDITION_2014",
     description:
       "As an action, sense the presence of celestials, fiends, and undead within 60 ft until the end of your next turn (they aren't hidden from this sense). You can also detect consecrated or desecrated places/objects. Uses = 1 + Charisma modifier per long rest.",
-    // PHB'14 p.84: 1 + Charisma modifier, no stated minimum. `min: 1` is NOT
-    // RAW — kept for byte-parity with the legacy Math.max(1, 1 + chaMod) floor.
+    // PHB'14 p.84: 1 + Charisma modifier, no stated minimum — `min: 1` floors it deliberately.
     resourceKey: "divineSense",
     resourceLabel: "Divine Sense",
     resourceRecharge: "longRest",

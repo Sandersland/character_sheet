@@ -195,8 +195,13 @@ export async function applyShadowArtsOperations(
     select: FOCUS_CAST_CHARACTER_SELECT,
     notFound: (id) => new InvalidShadowArtOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, row, op, batchId, sessionId }) => {
-      // Entry-scoped (keys off the MONK entry's own level, so a secondary Warrior of Shadow monk gates correctly) — resolved through the SAME deriveEntryScopedActions the wire's availableActions[] uses, never a second copy of the level gate.
-      // Passes pools:[] deliberately: this only reads `.key` presence, never `.enabled` — real focus sufficiency is enforced by castAbilityInTx below. A future `.some(a => a.key === X && a.enabled)` check would wrongly reject every cast since pools:[] always yields enabled:false; pass the real pools if that's ever needed.
+      // Entry-scoped (keys off the MONK entry's own level, so a secondary Warrior of Shadow monk
+      // gates correctly) — resolved through the SAME deriveEntryScopedActions the wire's
+      // availableActions[] uses, never a second copy of the level gate.
+      // Passes pools:[] deliberately: this only reads `.key` presence, never `.enabled` — real
+      // focus sufficiency is enforced by castAbilityInTx below. A future
+      // `.some(a => a.key === X && a.enabled)` check would wrongly reject every cast since pools:[]
+      // always yields enabled:false; pass the real pools if that's ever needed.
       const level = levelForExperience(row.experiencePoints);
       const edition = editionOf(row);
       const actions = deriveEntryScopedActions(row.classEntries, level, [], true, edition, featureRowsOf);

@@ -27,7 +27,7 @@ The seed is **catalog-only** (no users/characters); use `npm run seed:verify` fo
 
 Nothing loads `backend/.env` implicitly — Prisma 7 dropped it and `tsx` never did it. The backend `dev`/`seed:verify` scripts pass `--env-file-if-exists`, `prisma.config.ts` loads it itself, and Vite reads `frontend/.env` through `loadEnv`; drop any of them and host dev breaks while CI keeps working, because CI injects the variables directly (#1463). Vite also pins `strictPort`, so a busy port fails loudly instead of silently serving on the next one.
 
-`VITE_API_URL` lives apart from `frontend/.env`, in the mode-scoped `frontend/.env.development` / `frontend/.env.production` copied above — vitest runs as mode `test` and would otherwise inherit an absolute `VITE_API_URL`, which breaks two leveling tests that `new URL()` what the api layer builds. Without those two files the browser falls back to `http.ts`'s absolute default and can't reach the backend from inside the Playwright e2e container, which dials the host via `host.docker.internal`, not `localhost` (#1479). Worktrees get the same two files from `worktree.sh write_env`.
+`VITE_API_URL` lives apart from `frontend/.env`, in the mode-scoped `frontend/.env.development` / `frontend/.env.production` copied above — vitest runs as mode `test` and would otherwise inherit an absolute `VITE_API_URL`, which breaks leveling tests that `new URL()` what the api layer builds. Without those two files the browser falls back to `http.ts`'s absolute default and can't reach the backend from inside the Playwright e2e container, which dials the host via `host.docker.internal`, not `localhost` (#1479). Worktrees get the same two files from `worktree.sh write_env`.
 
 ## Guardrails (lefthook)
 
@@ -94,14 +94,14 @@ Run `fallow` from the repo root (it loads `.fallowrc.jsonc` there). CRAP scores 
 The repeatable pattern (inventory → HP → XP → spellcasting …):
 
 1. **Schema + migration** — models/enums in `schema.prisma`, `migrate dev`, `generate`.
-2. **Rules data** — 5e logic goes in `lib/srd/` (or `lib/leveling/experience.ts`). Level-gated? Also follow `docs/leveling.md` (reconciler + read-clamp).
+2. **Rules data** — 5e logic goes in `lib/srd/` (or `lib/leveling/experience.ts`, or a seeded `ClassFeature` row for a class/subclass feature). Level-gated? Also follow `docs/leveling.md` (reconciler + read-clamp).
 3. **`lib/<domain>/…` operation handler** — op discriminated union + domain error classes + `apply<Domain>Operations`; delegate the transaction preamble to `runCharacterTransaction`. Reference: `lib/inventory/inventory.ts`.
 4. **Route** — use `makeTransactionsEndpoint` (`lib/http/transactions-endpoint.ts`) unless the response shape is non-uniform; register the router in `routes/manifest.ts`.
 5. **`api/<domain>.ts` function** — delegate to `postTransactions`/`request<T>` (from `api/http.ts`); `api/client.ts` re-exports it via `export *`, no edit needed there.
-
-A class/subclass **ability** skips steps 4–5: add one `ABILITY_REGISTRY` entry (`lib/classes/ability-registry.ts`) keyed by its rules-module basename, and call the existing `applyAbilityTransactions` from the client. No route file, no manifest entry, no new client export (#1275).
 6. **Component(s)** — orchestrator/row pattern (see `docs/frontend.md`).
 7. **Tests** — mirror `routes/character/__tests__/inventory.test.ts`; lib unit tests for non-trivial pure logic.
+
+A class/subclass **ability** skips steps 4–5: add one `ABILITY_REGISTRY` entry (`lib/classes/ability-registry.ts`) keyed by its rules-module basename, and call the existing `applyAbilityTransactions` from the client. No route file, no manifest entry, no new client export (#1275).
 
 **Catalog-table decision:** does the feature need a baseline list players pick from? Yes → catalog table + data-only seed module under `prisma/seed/*.ts` upserted from `prisma/seed.ts`, exposed via `GET /api/<plural>` (like `Spell`, `Item`). No → skip it (like `JournalEntry`). Category-polymorphic content needs detail tables (like `Item*Detail`); flat content doesn't (like `Spell`).
 

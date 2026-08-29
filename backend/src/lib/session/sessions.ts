@@ -244,8 +244,8 @@ export async function startCampaignSession(
     return await prisma.$transaction(async (tx) => {
       // Narrows the race but does not close it: two truly concurrent starts can both pass this
       // SELECT under READ COMMITTED before either INSERT commits. Session_campaignId_active_key
-      // (see the Session model comment in schema.prisma) is what closes it at the database — the
-      // loser's create() throws P2002, caught below and mapped to the SAME error this check raises.
+      // is what closes it at the database — the loser's create() throws P2002, caught below and
+      // mapped to the SAME error this check raises.
       const conflict = await tx.session.findFirst({
         where: { campaignId, status: "active" },
         select: { id: true },
@@ -308,8 +308,8 @@ export async function startSoloSession(characterId: string, title?: string) {
   return prisma.$transaction(async (tx) => {
     // Narrows the race but does not close it: unlike startCampaignSession, there is no DB constraint
     // backing this check — a solo session's character lives on SessionParticipant, a separate table, so
-    // a partial unique index on Session can't express "one active solo session per character" (see the
-    // Session model comment in schema.prisma). Two truly concurrent starts can still both pass this SELECT.
+    // a partial unique index on Session can't express "one active solo session per character". Two
+    // truly concurrent starts can still both pass this SELECT.
     const conflict = await tx.session.findFirst({
       where: { campaignId: null, status: "active", participants: { some: { characterId } } },
       select: { id: true },
@@ -412,8 +412,6 @@ const COMBAT_SUMMARIES: Record<CombatEventType, (round?: number) => string> = {
   combatRoundAdvanced: (round) => `Round ${round ?? 2} began`,
 };
 
-// round/combatActive are the authoritative Session columns; spellEconomy is resolved via the shared rule fn spellEconomyRestrictions.
-// updatedAt is the max of the session's and the participant's own, so the client's monotonic sync guard advances on a cast-only change too.
 export type { CombatState };
 
 async function readCombatColumns(
@@ -462,6 +460,8 @@ async function readCombatColumns(
   };
 }
 
+// round/combatActive are the authoritative Session columns; spellEconomy is resolved via the shared rule fn spellEconomyRestrictions.
+// updatedAt is the max of the session's and the participant's own, so the client's monotonic sync guard advances on a cast-only change too.
 function toCombatState(cols: NonNullable<Awaited<ReturnType<typeof readCombatColumns>>>): CombatState {
   const updatedAt =
     cols.participantUpdatedAt && cols.participantUpdatedAt > cols.sessionUpdatedAt

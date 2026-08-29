@@ -89,13 +89,9 @@ function outOfIntegerRange(values: readonly number[], floor: number, ceiling: nu
 /**
  * Validates the character's PRE-bonus ability scores (before species/background
  * spreads apply — resolveBackgroundGrants/resolveSpeciesGrants check the
- * post-bonus total separately against ABILITY_CAP) against the rule implied
- * by how the player says they generated them. `standardArray`/`pointBuy` get
- * the exact PHB rule; `roll` gets the 3-18 dice-math bound; `manual` or an
- * omitted method get only the wider MANUAL_SCORE_FLOOR/CEILING sanity bound —
- * a client that mislabels (or omits) its method trades exactness for that
- * bound, it doesn't skip validation entirely. Also the rule a PATCH applies
- * (PATCH declares no method, landing in the omitted-method branch below).
+ * post-bonus total separately against ABILITY_CAP). Cap is method-aware —
+ * see postBonusAbilityCap. `roll` gets its own 3-18 dice-math bound. PATCH
+ * also runs this, landing in the omitted-method branch below.
  */
 export function validateAbilityScores(
   method: AbilityGenerationMethod | undefined,

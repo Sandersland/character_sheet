@@ -67,15 +67,10 @@ export type SpeciesGrants = {
   appliedIncreases: { ability: string; amount: number }[];
 };
 
-// PHB'14 p.13 "the highest that an ability score can normally be raised to
-// is 20" / SRD 5.2 Character Creation background-increase step, "none of
-// these increases can raise a score above 20" — the post-bonus cap for
-// standardArray/pointBuy, the two methods the rule text assumes (a fixed
-// baseline it's reasoning about). manual/roll/omitted have no such baseline
-// to reason from — manual exists to transcribe an existing or DM-fiat
-// character, and an omitted method (PATCH declares none) reuses the same
-// permissive bound — so they get the same MANUAL_SCORE_CEILING sanity
-// ceiling validateAbilityScores already applies pre-bonus, not ABILITY_CAP.
+// PHB'14 p.13 "the highest that an ability score can normally be raised to is 20" / SRD 5.2
+// background-increase step, "none of these increases can raise a score above 20" — the post-bonus
+// cap for standardArray/pointBuy. manual/roll/omitted have no fixed baseline to reason from, so
+// they fall back to MANUAL_SCORE_CEILING, the same pre-bonus sanity bound validateAbilityScores uses.
 export function postBonusAbilityCap(method: AbilityGenerationMethod | undefined): number {
   switch (method) {
     case "standardArray":

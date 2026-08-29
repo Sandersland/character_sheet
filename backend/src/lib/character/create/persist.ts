@@ -141,7 +141,6 @@ export async function persistCreatedCharacter(materials: CreationMaterials): Pro
       abilityScores: effectiveScores,
       ...derived,
       ...resourcesField(resources),
-      // ToolProficiencyEntry[] safely casts to Prisma.InputJsonValue for this Json column.
       toolProficiencies: derived.toolProficiencies as unknown as Prisma.InputJsonValue,
       ...currencyField(startingCurrency),
       spellcasting: creationSpellcasting(clampedSpellEntries),

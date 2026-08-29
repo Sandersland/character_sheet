@@ -364,7 +364,7 @@ describe("characters routes", () => {
     expect(response.status).toBe(400);
   });
 
-  // A record schema let abilityScores through unbounded (any key, any int) — tightened to the six named keys (.strict(), #1978) + validateAbilityScores(undefined, ...).
+  // abilityScores is bound to the six named keys (.strict(), #1978) plus validateAbilityScores(undefined, ...) — never an unbounded record accepting any key with any int.
   describe("PATCH abilityScores bound (#1383's ability-score wave)", () => {
     const NAMED_SCORES = {
       strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10,
@@ -643,11 +643,8 @@ describe("characters routes", () => {
         expect(res.status).toBe(400);
       });
 
-      // Post-bonus cap is method-aware (postBonusAbilityCap, shared.ts): criminalBody
-      // declares no abilityGenerationMethod, so the omitted-method sanity ceiling
-      // (30, same as validateAbilityScores' pre-bonus manual/omitted bound) applies
-      // here, not ABILITY_CAP (20) — manual/omitted exists to transcribe an existing
-      // or DM-fiat character, which can legitimately sit above the ordinary 20 cap.
+      // Cap is method-aware — see postBonusAbilityCap. criminalBody declares no
+      // abilityGenerationMethod, landing in the omitted-method branch (cap 30, not 20).
       it("accepts a spread pushing a score over 20 (but not 30) when no method is declared", async () => {
         const res = await post({
           ...criminalBody,
@@ -672,7 +669,7 @@ describe("characters routes", () => {
       // standardArray's own 8-15 base range plus this background's max +2/+1 spread
       // tops out at 17 — the API can never combine enough bonus to reach the 20
       // cap this way, so the cap ITSELF (not just this reachable slice of it) is
-      // pinned directly against postBonusAbilityCap in shared.test.ts.
+      // pinned directly against postBonusAbilityCap.
       it("still applies a legal spread on top of a standardArray assignment", async () => {
         const res = await post({
           ...criminalBody,

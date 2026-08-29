@@ -1,16 +1,13 @@
-// Mirrors the backend ACTION_EFFECT_FN dispatch table key-for-key; keep the two in sync.
+// Every serverEffect:true entry must have a matching backend ACTION_EFFECT_FN key; actionResolvers.test.ts pins it.
 
 import { abilityModifier } from "@/lib/abilities";
 import type { AvailableAction, Character } from "@/types/character";
 import type { RollSpec } from "@/lib/dice";
 import type { ResolutionKind } from "@character-sheet/shared-types";
 
-// Re-exported for existing importers (e.g. useTurnActions.ts). Mirrored on the backend by
-// RESOLVER_KIND_VALUES, which `satisfies` the same ResolutionKind — a two-way compile
-// latch, not the old prose-only mirror.
 export type { ResolutionKind };
 
-// Adding a ResolutionKind member without a matching entry here fails typecheck (mirrors registry.ts's EXTRAS_FIELDS latch), keeping the two from drifting.
+// Adding a ResolutionKind member without a matching entry here fails typecheck (mirrors EXTRAS_FIELDS' latch), keeping the two from drifting.
 const RESOLUTION_KINDS = [
   "attack-picker",
   "twf-picker",
@@ -42,7 +39,7 @@ export interface ActionResolver {
   slot: SlotCost;
   resourceKey?: string;
   resourceAmount?: number;
-  /** Every surviving healRoll scales off an ability modifier, never a level — a level-scaled heal is rolled server-side instead, since the client can't tell which class entry granted the feature for a multiclass character. */
+  /** Prefer an ability-modifier scale — the client can't tell which class entry granted a feature on a multiclass character, so a level-scaled heal is rolled server-side. wholenessOfBodyAction is the one gated exception (see below). */
   healRoll?: (character: Character) => RollSpec;
   /** Takes priority over the backend AvailableAction's `reminder` in classActionOption — this action opens a picker, so its rule text belongs on the card, not an on-click toast. */
   subtitle?: string;
@@ -79,8 +76,6 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
 
   wildShape:         { key: "wildShape",         kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "wildShape" },
 
-  // Second Wind / Action Surge are row-driven via resolverFor's fallback path, not hand-authored here; Second Wind's heal is rolled server-side too.
-
   summonBondedWeapon: { key: "summonBondedWeapon", kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
 
   bonusUnarmedStrike: { key: "bonusUnarmedStrike", kind: "twf-picker", slot: "bonusAction", serverEffect: false, subtitle: "One Unarmed Strike as a Bonus Action (Dex + Martial Arts die)." },
@@ -101,7 +96,7 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // SRD 5.1 — same reminder-only-reaction shape as deflectAttacks; no bespoke roll math wired yet.
   deflectMissiles:      { key: "deflectMissiles",      kind: "simple-confirm", slot: "reaction", serverEffect: false },
   deflectMissilesThrow: { key: "deflectMissilesThrow", kind: "simple-confirm", slot: "free",     serverEffect: true, resourceKey: "ki" },
-  // Cloak of Shadows (L17) is a real cast now, wired through ClassResourceBlocks' shadow-arts transactions, not this reaction-slot registry.
+  // Cloak of Shadows (L17) is a real cast, wired through ClassResourceBlocks' shadow-arts transactions, not this reaction-slot registry.
   shadowStep:        { key: "shadowStep",        kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   // Open Hand Technique / Quivering Palm have no resolver here — they're post-hit riders rendered by OpenHandTechniqueSection / QuiveringPalmSection.
   wholenessOfBody: {
@@ -154,7 +149,7 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   metamagic:         { key: "metamagic",         kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "sorceryPoints" },
 };
 
-// resourceKey: action.key is a scoped assumption valid only for Second Wind/Action Surge (a Fighter action's key is its own pool key) — several ACTION_RESOLVERS entries like flurryOfBlows/metamagic spend a different pool than their key.
+// resourceKey: action.key holds only where a row's action key IS its pool key; hand-authored entries like flurryOfBlows/metamagic spend a different pool than their key.
 // healRoll is deliberately absent — Second Wind's heal is rolled server-side and reported via ExecuteActionResult; classActionOption falls back to the served action.reminder as the subtitle when healRoll is unset.
 function resolverFromRow(action: AvailableAction, kind: ResolutionKind): ActionResolver {
   return {
@@ -173,7 +168,6 @@ export function resolverFor(key: string, action?: AvailableAction): ActionResolv
   return resolverFromRow(action, action.resolverKind);
 }
 
-// Used by tests to assert parity with the backend ACTION_EFFECT_FN table.
 export const SERVER_EFFECT_KEYS = Object.values(ACTION_RESOLVERS)
   .filter((r) => r.serverEffect)
   .map((r) => r.key);

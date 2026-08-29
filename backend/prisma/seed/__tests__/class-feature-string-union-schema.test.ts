@@ -1,6 +1,5 @@
-// Every ClassFeature string-union / stringly-typed column now parses against a zod enum derived
-// from its named TS union (#1277's gap: these columns used to accept ANY string). One test per
-// column proves the schema actually rejects a bad value, not just that valid rows still pass.
+// Every ClassFeature string-union column parses against a zod enum derived from its named TS
+// union (#1277). One negative case per column proves the schema rejects a bad value.
 import { describe, expect, it } from "vitest";
 
 import { classFeatureSeedSchema, KNOWN_BUFF_TARGETS } from "../class-features.js";

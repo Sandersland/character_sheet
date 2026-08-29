@@ -17,7 +17,7 @@ const FULL_CASTER_CLASSES = new Set(["wizard", "sorcerer", "cleric", "druid", "b
 
 const HALF_CASTER_CLASSES = new Set(["paladin", "ranger"]);
 
-// PHB p. 114 / Basic Rules spell table. Verified byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`.
+// PHB'14 p.114; SRD 5.1 and SRD 5.2 byte-identical — no edition fork (#1507).
 export const FULL_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
    1: { 1: 2 },
    2: { 1: 3 },
@@ -41,7 +41,7 @@ export const FULL_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, 
   20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 },
 };
 
-// PHB p. 164 — byte-for-byte the full-caster table; aliased rather than duplicated.
+// PHB'14 p.164 — byte-for-byte the full-caster table; aliased rather than duplicated.
 export const MULTICLASS_SPELL_SLOTS = FULL_CASTER_SLOTS;
 
 export interface DerivedSpellcastingInfo {
@@ -77,7 +77,7 @@ const HALF_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>
   20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2 },
 };
 
-// PHB p. 106. Byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`. Every Pact slot is the same (highest) level and recharges on a short rest.
+// PHB'14 p.106. Byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`. Every Pact slot is the same (highest) level and recharges on a short rest.
 const PACT_MAGIC_SLOTS: Readonly<Record<number, { slotLevel: number; count: number }>> = {
    1: { slotLevel: 1, count: 1 },
    2: { slotLevel: 1, count: 2 },
@@ -101,7 +101,7 @@ const PACT_MAGIC_SLOTS: Readonly<Record<number, { slotLevel: number; count: numb
   20: { slotLevel: 5, count: 4 },
 };
 
-// PHB p. 108. Byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`.
+// PHB'14 p.108. Byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`.
 function mysticArcanumLevels(warlockLevel: number): number[] {
   const levels: number[] = [];
   if (warlockLevel >= 11) levels.push(6);
@@ -123,7 +123,7 @@ function thirdCasterAbilityOf(subclassRef: SubclassCasterRef | null | undefined)
   return subclassRef.spellcastingAbility;
 }
 
-// PHB Fighter/Rogue spell slot table. Re-verified against PHB'14 during #1507 and byte-identical to PHB'24 — no `edition`. Starts at class level 3.
+// PHB'14 Fighter/Rogue spell slot table. Re-verified during #1507 and byte-identical to PHB'24 — no `edition`. Starts at class level 3.
 const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
    3: { 1: 2 },
    4: { 1: 3 },
@@ -450,7 +450,7 @@ function resolveCombinedSlotTotals(
   return [];
 }
 
-// PHB p. 164 multiclass rules: sum full levels, half of half-caster levels, a third of third-caster levels, then read the combined caster level against the multiclass slot table.
+// PHB'14 p.164 multiclass rules (edition-invariant): sum full levels, half of half-caster levels, a third of third-caster levels, then read the combined caster level against the multiclass slot table.
 // Warlock Pact Magic (and Mystic Arcanum) stays separate — never merged into the combined pool. Pure — safe to call in serializeCharacter.
 export function deriveMulticlassSpellcasting(
   classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null; subclassRef?: SubclassCasterRef | null }>,
@@ -612,7 +612,7 @@ export function spellListsFor(
 
   const key = className.toLowerCase();
   if (key !== "bard" || level < 10) return { spells: [key], cantrips: [key] };
-  // Exhaustive switch, not `if (edition === "EDITION_2014") … else …` (#1527): the if/else shape let an unrecognized third edition silently take the SRD 5.2 Magical Secrets branch instead of failing loudly.
+  // Total mapping over edition, never if/else (#1527).
   switch (edition) {
     case "EDITION_2014":
       return { spells: null, cantrips: null };
@@ -624,9 +624,6 @@ export function spellListsFor(
     }
   }
 }
-
-/** @deprecated Renamed to spellListsFor (#1825); kept for existing callers. */
-export const magicalSecretsSpellLists = spellListsFor;
 
 // PHB'14 p. 74: Fighter grants a free "any school" leveled pick at 3rd, 8th, 14th, and 20th level — one per level, matching THIRD_CASTER_PREPARED's own delta at each (always exactly 1), so no separate count is persisted.
 const EK_FREE_SCHOOL_LEVELS = new Set([3, 8, 14, 20]);

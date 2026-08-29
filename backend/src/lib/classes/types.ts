@@ -52,7 +52,7 @@ export interface InitiativeRegen {
    * points remaining") is `{ amount: 4, threshold: 0 }`. Absent ⇒ the implicit
    * rule (fires whenever remaining < amount); 2024 Perfect Focus stays on the
    * implicit rule deliberately — an explicit `threshold: 3` would behave
-   * identically, but class-features-snapshot.test.ts pins its exact shape.
+   * identically, but the class-features snapshot test pins its exact shape.
    */
   threshold?: number;
 }
@@ -86,14 +86,7 @@ export interface DerivedResource {
   details?: { label: string; value: string }[];
 }
 
-/**
- * A feature exactly as authored in a class module — still the seed's AUTHORING
- * input after #1524 (`CLASS_FEATURES` compiles from the modules at seed time;
- * they no longer feed derivation directly). `edition` is optional: the large
- * majority of entries never set it (both editions share the text) and #1374
- * rejected a blanket tagging pass. `DerivedFeature` is the read-time
- * counterpart — split out because the two can no longer share one type.
- */
+// The seed's authoring input. edition is optional: most entries share both editions' text (#1374). DerivedFeature is the read-time counterpart.
 export interface AuthoredFeature {
   name: string;
   level: number;        // character level at which this feature is gained
@@ -213,19 +206,12 @@ export interface DerivedSubclassChoice {
 }
 
 /**
- * A choose-N subclass choice's swap-on-learn cadence (#1503, owner decision
- * 2026-08-03) — deliberately separate from `swapCadenceFor`, which feeds
- * `preparedSpellCountAt`/`maxSpellLevelForClass` and would read a non-caster
- * subclass as a caster. Lives here so leveling's pure planner can call it
- * without importing resources.ts's Prisma-typed machinery.
- *
- * Defaults to "never"; "onLevelUp" is reserved for a choice whose own 5e text
- * states "whenever you learn a new X, you may replace one you know" (PHB'14
- * p.80, Way of the Four Elements' Disciple of the Elements). `edition` last
- * (subclassGateLevel's pattern, #1499); future choose-N features extend this
- * function, never duplicate it. #1516 makes the privilege exclusive:
- * `forgetSubclassChoice` 400s outside a validated level-up step, so a "never"
- * catalogSource is unreachable end to end.
+ * A choose-N subclass choice's swap-on-learn cadence (#1503) — deliberately
+ * separate from `swapCadenceFor`, which would read a non-caster subclass as
+ * a caster. Defaults to "never"; "onLevelUp" is reserved for a choice whose
+ * own 5e text states "whenever you learn a new X, you may replace one you
+ * know" (PHB'14 p.80, Way of the Four Elements' Disciple of the Elements).
+ * `edition` last (subclassGateLevel's pattern, #1499).
  */
 export function subclassChoiceSwapCadence(catalogSource: string, edition: RulesEdition): "onLevelUp" | "never" {
   if (catalogSource !== "discipline") return "never";

@@ -1,7 +1,6 @@
-// The five GrantedAbility source-family schemas (#1277's gap: none of these had a seed-time
-// schema before this) — MANEUVERS, SHADOW_ARTS, DISCIPLINES, CHANNEL_DIVINITIES,
-// SUBCLASS_CHOICE_OPTIONS. One negative case per string-union column proves each schema
-// actually rejects a bad value.
+// The five GrantedAbility source-family schemas — MANEUVERS, SHADOW_ARTS, DISCIPLINES,
+// CHANNEL_DIVINITIES, SUBCLASS_CHOICE_OPTIONS. One negative case per string-union column proves
+// each schema actually rejects a bad value.
 import { describe, expect, it } from "vitest";
 
 import { maneuverSeedSchema } from "../maneuvers.js";

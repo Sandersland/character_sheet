@@ -3,10 +3,10 @@
 # Action — the five edition-tagged models, #1306) resolved by a bare
 # findUnique/findFirst outside the declared allowlist below (#1345). A row
 # whose `edition` doesn't match the character's must never be admitted
-# silently: four of the seven real call sites were missed by the issue as
-# filed, and two of those (resources.ts's learnManeuver/learnSubclassChoice)
-# snapshot the wrong rule PERMANENTLY into AdvancementEntry-shaped state — the
-# same failure mode the issue described for feats.
+# silently — two of the real call sites (resources.ts's learnManeuver/
+# learnSubclassChoice) snapshot the wrong rule PERMANENTLY into
+# AdvancementEntry-shaped state, the same failure mode the issue described for
+# feats.
 #
 # ALLOWLIST pairs each real occurrence's `path:symbol` — the enclosing
 # top-level declaration — with why it needs no guard here: the eight "guarded"
@@ -60,9 +60,8 @@ PATTERN='\.(feat|subclass|grantedAbility|background|action)\.(findUnique|findFir
 # lands — the same reason check-subclass-substring.sh greps --untracked.
 # generated/ (the Prisma client) is gitignored, so it's excluded for free.
 #
-# `|| true` because grep exits 1 when nothing matches, and under `set -e` that
-# killed the script right here — leaving the anti-vacuity message below
-# unreachable in the one case it exists to explain (red, but silent).
+# `|| true` because grep exits 1 on no match and `set -e` would abort before
+# the anti-vacuity check below.
 FILES=$(git ls-files --cached --others --exclude-standard -- ':(glob)backend/src/**/*.ts' | grep -v '__tests__/' || true)
 FILE_COUNT=$(printf '%s\n' "$FILES" | grep -c . || true)
 # MUST stay above the awk call: with an empty $FILES, awk gets no file operands
@@ -90,8 +89,7 @@ fi
 # OWN line carries a lookup (`const row = await prisma.feat.findFirst(…)`) would
 # then set the symbol and skip the emit rule, dropping the occurrence entirely —
 # silent, and below MIN_OCCURRENCES' notice. Falling through keys it on the
-# declaration it just named, which is the right answer anyway. The rules are
-# mutually exclusive at column 0, so the `next`s bought nothing.
+# declaration it just named, which is the right answer anyway.
 records=$(PATTERN="$PATTERN" awk '
 FNR == 1 { sym = "" }   # or a symbol leaks across a file boundary into a file
                         # whose first match precedes any declaration

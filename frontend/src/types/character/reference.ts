@@ -65,7 +65,7 @@ export interface SpeciesOption {
   speed: number;
   /** [] for every EDITION_2024 row — 2024 ability increases come from backgrounds only, never species. */
   abilityIncreases: AbilityIncreaseSpec[];
-  /** Always false this wave; same signal as `SpeciesVariantOption.needsCastingAbility` at the species level. */
+  /** Always false — 2024 casting-ability choices are served on the variant, never the species itself; same signal as `SpeciesVariantOption.needsCastingAbility` at that level. */
   needsCastingAbility: boolean;
   /** Null/false for every row except the one carrying the matching trait. */
   chooseSkills: SpeciesSkillChoiceOption | null;
@@ -89,7 +89,7 @@ export interface ClassOption {
   subclasses: SubclassOption[];
   /** Starting equipment definition, null if the class has no package defined. */
   startingEquipment: ClassStartingEquipment | null;
-  /** PHB p. 163: any one of `options` satisfied against the character's scores counts as met. */
+  /** PHB'14 p.163 — multiclass prerequisites are edition-invariant (also PHB'24). Any one of `options` satisfied against the character's scores counts as met. */
   multiclassPrerequisite: {
     options: Record<string, number>[];
     description: string;
@@ -190,7 +190,7 @@ export interface ReferenceData {
   artisanTools: ToolOption[];
   /** The 14 conditions' rules text, resolved for the requested edition. */
   conditions: ConditionOption[];
-  /** Resolved for the requested edition, ordered by name; 15 rows for 2014, 17 for 2024. */
+  /** Resolved for the requested edition, ordered by name. */
   universalActions: UniversalActionOption[];
   /** The six magic-item rarity tiers, ascending. */
   itemRarities: ItemRarityOption[];
@@ -213,7 +213,7 @@ export interface CreateCharacterInput {
   name: string;
   alignment: string;
   experiencePoints?: number;
-  /** The sole mechanical anchor — the flat `race` field and its legacy create path were pruned. */
+  /** The sole mechanical anchor for species. */
   speciesId: string;
   variantId?: string;
   /** The CHOSEN portion only; fixed increases apply server-side with no request field — see `deriveSpeciesBonuses`. */

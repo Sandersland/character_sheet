@@ -16,7 +16,6 @@ interface RawDruidFeature {
   name: string;
   level: number;
   description: string;
-  // Omitted -> identical text seeded for both editions.
   edition?: SeedEdition;
   resourceKey?: string;
   resourceLabel?: string;

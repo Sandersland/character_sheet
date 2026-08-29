@@ -62,7 +62,7 @@ function validateSpeciesChoose(
   return abilityCapOverflowError(entries, base, "speciesAbilities", method) ?? { chosen: Object.fromEntries(entries) };
 }
 
-// Validates via the SAME floatingSpreadShapeValid function validateBackgroundSpread uses — not a second copy.
+// Shared shape check — see floatingSpreadShapeValid.
 function validateSpeciesFloating(
   submitted: Record<string, number>,
   fixedAbilities: Set<string>,

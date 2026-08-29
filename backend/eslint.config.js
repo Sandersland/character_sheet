@@ -58,15 +58,6 @@ export default tseslint.config(
     // pattern — so any later block that also sets this rule for an
     // overlapping files glob must re-declare every pattern that should still
     // apply there, not just the one it's adding or removing.
-    //
-    // src/lib/storage/** re-declares PARENT_RELATIVE_PATTERN only (the
-    // s3 driver and its tests legitimately use the SDK, so the aws-sdk fence
-    // is off there by design). **/__tests__/** re-declares AWS_SDK_PATTERN
-    // only (those files sit one directory below the module they test and
-    // import it as "../foo.js", a pre-existing convention this rule doesn't
-    // try to migrate, but the aws-sdk fence still applies to test code
-    // outside the storage domain). src/lib/storage/**/__tests__/** is both
-    // at once, so it gets its own block below with the rule fully off.
     files: ["src/**/*.ts"],
     rules: {
       "no-restricted-imports": ["error", { patterns: [AWS_SDK_PATTERN, PARENT_RELATIVE_PATTERN] }],

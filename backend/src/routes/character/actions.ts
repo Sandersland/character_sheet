@@ -72,7 +72,7 @@ interface EligibleRowAction {
 }
 
 // Mirrors deriveEntryScopedActions's per-entry gate and toggleActionsFromRow's two-entry split, so availableActions[] and this dispatcher's legality check can never drift apart.
-// The activationCost/resourceKey/toggle shape of this gate must also stay identical to rowIsAnAvailableAction (lib/classes/actions.ts) and action-effect-parity.test.ts's CLASS_FEATURE_ROW_KEYS — update all three together.
+// The activationCost/resourceKey/toggle shape of this gate must also stay identical to rowIsAnAvailableAction and CLASS_FEATURE_ROW_KEYS — update all three together.
 function eligibleRowActions(character: RowActionCharacter): EligibleRowAction[] {
   const totalLevel = levelForExperience(character.experiencePoints);
   const edition = editionOf(character);
@@ -277,7 +277,6 @@ async function applyActionEffectInTx(
       break;
 
     default: {
-      // Exhaustive — ACTION_EFFECT_FN returns the six op types above.
       const _never: never = effect;
       throw new Error(`Unexpected op type in action effect: ${JSON.stringify(_never)}`);
     }
@@ -300,8 +299,7 @@ async function assertKnownActionKeys(tx: Prisma.TransactionClient, operations: E
 }
 
 // Heightened Focus, PHB'24 p.98/SRD 5.2: temp HP = two Martial Arts die rolls, rolled server-side.
-// Takes tx for the same reason as assertKnownActionKeys above — a pre-tx read here shipped a
-// level-10 Monk 0 temp HP when a level-up raced between the read and the row lock (#1980).
+// Must take tx: a pre-tx read races a concurrent level-up between the read and the row lock (#1980).
 async function computeHeightenedFocusTempHp(tx: Prisma.TransactionClient, operations: ExecuteActionOperation[], characterId: string): Promise<number> {
   if (!operations.some((op) => op.actionKey === "patientDefenseFocus")) return 0;
   const classRow = await tx.character.findUnique({
@@ -315,10 +313,8 @@ async function computeHeightenedFocusTempHp(tx: Prisma.TransactionClient, operat
   return rollDie(dieFaces) + rollDie(dieFaces);
 }
 
-// Stays pre-tx, unlike assertKnownActionKeys/computeHeightenedFocusTempHp above: rulesEdition is
-// write-once (never changes after character creation, CLAUDE.md), so there's no stale-read race to
-// guard against here. Falls back to the schema default if the character is missing between this
-// read and the transaction — the transaction itself already guards that case.
+// Pre-tx is safe here only because rulesEdition is write-once — no stale-read race. The
+// transaction guards the missing-character case.
 async function characterEdition(characterId: string): Promise<RulesEdition> {
   const row = await prisma.character.findUnique({ where: { id: characterId }, select: { rulesEdition: true } });
   return row ? editionOf(row) : DEFAULT_RULES_EDITION;

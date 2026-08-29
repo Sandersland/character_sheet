@@ -1,10 +1,4 @@
 // DATA MODULE ONLY (#1277 AC 4): no direct database calls in this file.
-//
-// EDITION RULE: `edition` omitted on a row -> expand() seeds identical text
-// for both editions. `edition` set -> exactly the one row named. A "removed
-// in 2024" feature means not authoring a 2024 row, never deleting the 2014
-// row. A level-shift is two rows with two `level` values, never one row
-// edited in place.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { ResourceTotalAbility } from "../../src/lib/classes/class-feature-rows.js";
 import type { SeedEdition } from "./edition.js";
@@ -29,7 +23,6 @@ interface RawFighterFeature {
   name: string;
   level: number;
   description: string;
-  /** Omitted -> identical text seeded for both editions. */
   edition?: SeedEdition;
   resourceKey?: string;
   resourceLabel?: string;
@@ -587,8 +580,8 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
 ];
 
 // Eldritch Knight — text unverified against any first-party 2024 source;
-// every row below is UNTAGGED (`edition` omitted per the EDITION RULE) rather
-// than authoring unverified 2024 content.
+// every row below is UNTAGGED (`edition` omitted) rather than authoring
+// unverified 2024 content.
 const ELDRITCH_KNIGHT_SLUG = slug("fighter-eldritch-knight");
 const ELDRITCH_KNIGHT_RAW: RawFighterFeature[] = [
   {

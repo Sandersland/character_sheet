@@ -24,7 +24,6 @@ function asCategory(value: string | undefined): CharacterEventCategory | undefin
     : undefined;
 }
 
-// Derived from the Prisma-generated enum so it can never drift from the schema.
 const TYPE_VALUES = new Set<string>(Object.values(CharacterEventType));
 
 function asType(value: string | undefined): CharacterEventType | undefined {
@@ -74,7 +73,7 @@ type ActivityEventRow = CharacterEvent & {
 
 type RevertResult = { ok: true } | { ok: false; status: 404 | 409; error: string };
 
-// Handlers stay here, not in domain libs: moving them would close an activity → domainlib → … → activity import cycle.
+// Handlers stay here, not in domain libs: moving them would create an activity → domainlib → … → activity import cycle.
 
 interface RevertContext {
   tx: Prisma.TransactionClient;
@@ -461,12 +460,12 @@ async function revertPreflight(
   }
 
   // Ended-session events are excluded — they're frozen so the session-end summary/XP award stays coherent.
+  // #1861: roll-category events (before/after null) still count as "the most recent action" here, not skipped as a dead log entry.
   const latestEvent = await db.characterEvent.findFirst({
     where: {
       characterId,
       reverted: false,
       type: { not: "revert" },
-      // #1861: roll-category events (before/after null) still count as "the most recent action" here, not skipped as a dead log entry.
       OR: [
         { sessionId: null },
         { session: { status: "active" } },

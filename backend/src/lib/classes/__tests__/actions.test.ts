@@ -51,20 +51,18 @@ const atRows = (
     testFeatureRowsFor(entry.name, entry.subclass),
   );
 
-// #1528 regression class: applyActionOpInTx (routes/character/actions.ts) checks
-// ACTION_EFFECT_FN BEFORE eligibleRowActions, so an entry here for a key that's
-// ALSO a ClassFeature row's own resourceKey would silently SHADOW the row path —
-// skipping its level/edition gate, assertActivationRequirementsMet, and (for a
+// #1528 regression class: applyActionOpInTx checks ACTION_EFFECT_FN BEFORE eligibleRowActions, so
+// an entry here for a key that's ALSO a ClassFeature row's own resourceKey would silently SHADOW
+// the row path — skipping its level/edition gate, assertActivationRequirementsMet, and (for a
 // cast-core row) the server-rolled dice castSpecFromRow computes. The seed-level
-// action-effect-parity.test.ts reverse-direction check can't guard against this:
-// it only proves a key is reachable from SOME seeded identity, and 20 of today's
-// ACTION_EFFECT_FN keys legitimately live in both tables (their row can't express
-// a client-rolled heal or an edition-forked pool key generically). These six have
-// no legitimate reason to ever be dual-homed — a pure counter (secondWind,
-// actionSurge), or a cast that only ever runs through its own dedicated endpoint
-// with its own activation-requirement checks (shadowArts/cloakOfShadows via
-// /abilities/shadow-arts, elementalAttunement/elementalBurst via
-// /abilities/warrior-of-elements) — so a fn reappearing here is unambiguously the regression.
+// action-effect-parity.test.ts reverse-direction check can't guard against this: it only proves a
+// key is reachable from SOME seeded identity, and many of today's ACTION_EFFECT_FN keys
+// legitimately live in both tables (their row can't express a client-rolled heal or an
+// edition-forked pool key generically). These six have no legitimate reason to ever be dual-homed
+// — a pure counter (secondWind, actionSurge), or a cast that only ever runs through its own
+// dedicated endpoint with its own activation-requirement checks (shadowArts/cloakOfShadows via
+// /abilities/shadow-arts, elementalAttunement/elementalBurst via /abilities/warrior-of-elements) —
+// so a fn reappearing here is unambiguously the regression.
 const ROW_ONLY_ACTION_KEYS = [
   "secondWind",
   "actionSurge",

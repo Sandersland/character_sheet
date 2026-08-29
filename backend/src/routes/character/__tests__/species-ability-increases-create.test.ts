@@ -67,9 +67,8 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
     expect(raceRow.abilityBonuses).toHaveLength(2);
   });
 
-  // baseBody declares no abilityGenerationMethod, so the omitted-method sanity
-  // ceiling (30, same shared postBonusAbilityCap function the background spread
-  // uses — shared.ts) applies here, not ABILITY_CAP (20, #1978).
+  // Cap is method-aware — see postBonusAbilityCap. baseBody declares no
+  // abilityGenerationMethod, so the omitted-method sanity ceiling (30) applies here, not ABILITY_CAP (20, #1978).
   it("a fixed increase pushing a score past the 30 sanity ceiling 400s (same cap family as the background spread)", async () => {
     const dwarf = await prisma.species.findFirstOrThrow({
       where: { slug: "dwarf", edition: "EDITION_2014" },

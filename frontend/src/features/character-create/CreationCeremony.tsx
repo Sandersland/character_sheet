@@ -63,8 +63,6 @@ function SkillsStepBody({ c }: StepBodyProps) {
       {/* Renders only when the server serves a chooseSkills spec for the chosen
           species+variant (#1689/#1690). */}
       <SpeciesSkillSection choice={c.speciesSkillChoice} onToggle={c.speciesSkillChoice.toggle} />
-      {/* Renders only when the server serves a chooseOriginFeat spec for the
-          chosen species+variant (#1690). */}
       <SpeciesOriginFeatSection
         choice={c.speciesOriginFeatChoice}
         edition={c.draft.rulesEdition}

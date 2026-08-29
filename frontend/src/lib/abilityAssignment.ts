@@ -75,7 +75,7 @@ export function usedSlotIndices(assignments: AbilityAssignments): Set<number> {
 
 export type SpreadMode = "twoOne" | "oneOneOne";
 
-/** The PHB'24 spread implied by an assignment: three explicit +1s is oneOneOne, else twoOne. */
+/** The PHB'24 ability-score spread an assignment implies. */
 export function spreadMode(assignment: Partial<Record<AbilityName, number>>): SpreadMode {
   const values = Object.values(assignment);
   return values.length === 3 && values.every((v) => v === 1) ? "oneOneOne" : "twoOne";
@@ -149,7 +149,7 @@ export function sumBonusMaps(
   return sum;
 }
 
-export interface AbilityRow {
+interface AbilityRow {
   ability: AbilityName;
   /** Base score before the background/species bonus; null for an unassigned pool row. */
   base: number | null;
@@ -160,8 +160,6 @@ export interface AbilityRow {
   recommended: boolean;
 }
 
-/** The per-ability display rows: base (from pool slot or stored score), the
- *  background bonus, and the derived total + modifier. */
 export function abilityRows(input: {
   method: AbilityMethod;
   scores: AbilityScores;

@@ -139,12 +139,10 @@ describe("POST /api/characters — ability score generation validation", () => {
     expect(rejected.status).toBe(400);
   });
 
-  // Post-bonus cap is method-aware (postBonusAbilityCap, shared.ts): the base check
-  // above only validates the PRE-bonus scores. This matrix pins the cap actually
-  // applied AFTER Acolyte's backgroundAbilities spread (a PHB'24-only mechanic —
-  // the default anchor is EDITION_2024), which is where #1978's bug lived: a
-  // manual/omitted-method score legally above 20 (transcribing an existing or
-  // DM-fiat character) 400'd against ABILITY_CAP the moment ANY spread applied.
+  // Cap is method-aware — see postBonusAbilityCap. This matrix pins the cap
+  // actually applied after Acolyte's backgroundAbilities spread (PHB'24-only;
+  // the default anchor is EDITION_2024) — #1978's bug applied ABILITY_CAP even
+  // to a manual/omitted-method score legally above 20.
   describe("post-bonus cap is method-aware, not a flat ABILITY_CAP=20 (#1978)", () => {
     it("manual: accepts a spread pushing a score above 20 (but not 30)", async () => {
       const res = await create({

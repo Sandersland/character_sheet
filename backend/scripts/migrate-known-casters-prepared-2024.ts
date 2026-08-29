@@ -113,8 +113,7 @@ export async function migrateKnownCastersPrepared(prisma: PrismaClient = default
     // model this file's header describes — its cap is always the 2024 table, not a per-character
     // rule choice. abilityScores is {} because the 2024 branch of preparedSpellCountAt is a flat
     // per-class-level table lookup that never reads ability scores (only the retired 2014 formula
-    // branch did) — surfaced by #1978's exhaustive switch, which no longer silently defaults an
-    // omitted edition onto the 2024 branch the way the old `if (edition === "EDITION_2014")` did.
+    // branch did).
     const limit = derivePreparedSpellLimit(limitEntriesFor(character.experiencePoints, character.classEntries), {}, "EDITION_2024");
     if (limit == null) continue;
 
@@ -167,7 +166,6 @@ export async function migrateKnownCastersPrepared(prisma: PrismaClient = default
   return { scannedCharacters: characters.length, changedCharacters };
 }
 
-// Thin CLI: run the migration against DATABASE_URL and report the outcome.
 if (import.meta.url === `file://${process.argv[1]}`) {
   migrateKnownCastersPrepared()
     .then((result) => {

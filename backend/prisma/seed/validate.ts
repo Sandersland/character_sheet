@@ -76,10 +76,9 @@ export interface SeedValidationSummary {
   rowsChecked: number;
 }
 
-// Split into one function per tree level to keep cyclomatic/cognitive
-// complexity low: prisma/seed/** carries no coverage instrumentation, so a
-// single triple-nested-loop version floors at the uncovered-CRAP formula
-// regardless of real test coverage.
+// Split into one function per tree level: prisma/seed/** has no coverage instrumentation, so a
+// single triple-nested-loop version would fail the uncovered-CRAP complexity gate regardless of
+// real test coverage.
 //
 // Typed against `package` alone (StartingEquipmentSeed and
 // BackgroundStartingEquipmentSeed's shared ClassStartingEquipment tree, #1565)
@@ -173,7 +172,7 @@ function assertSpeciesTraitsResolve(speciesRows: typeof SPECIES, traitRows: type
 
 // The #1683 twin of assertSpeciesTraitRowResolves above — catches a typo'd
 // slug/name before seedSpeciesGrantedSpells' DB-backed resolution throws a
-// less specific error. Every row this slice grants is variant-level.
+// less specific error. Every SPECIES_GRANTED_SPELLS row is variant-level.
 function assertSpeciesGrantedSpellRowResolves(
   grant: (typeof SPECIES_GRANTED_SPELLS)[number],
   index: number,

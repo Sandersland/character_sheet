@@ -18,8 +18,7 @@ const MAGIC_INITIATE_CLASS_BY_BACKGROUND: Record<string, string> = {
   Sage: "Wizard",
 };
 
-// Post-bonus cap is method-aware (postBonusAbilityCap, shared.ts) — 20 for
-// standardArray/pointBuy, the wider manual-sanity ceiling otherwise.
+// Cap is method-aware — see postBonusAbilityCap.
 // floatingSpreadShapeValid is the SAME shared shape check validateSpeciesFloating uses — not a copy.
 function validateBackgroundSpread(
   spread: Record<string, number>,

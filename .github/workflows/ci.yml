@@ -45,12 +45,13 @@ jobs:
         run: sh scripts/check-edition-branching.sh
 
       # Boot-contract gate (#1277 defect 3): needs no node, runs alongside
-      # the other grep gates above.
+      # the other grep gates above. Twin of the lefthook pre-commit job.
       - name: every migrate-deploy boot command also seeds
         run: sh scripts/check-seed-required.sh
 
       # AC-4 machine enforcement (#1277): a seed DATA module must carry no
-      # prisma/upsert/await token. Needs no node.
+      # prisma/upsert/await token. Needs no node. Twin of the lefthook
+      # pre-commit job.
       - name: seed data modules contain no upsert logic
         run: sh scripts/check-seed-data-modules.sh
 
@@ -185,8 +186,7 @@ jobs:
       - name: fallow health (no HIGH-complexity findings in frontend)
         run: npx --no-install fallow health -w frontend --production --min-severity high --max-crap 999 --no-cache
 
-      # #692 backend tightening, enabled 2026-07-11 after clearing the backend
-      # cognitive-complexity tier. Plain mode = fails on ANY finding in scope, so
+      # #692 backend tightening. Plain mode = fails on ANY finding in scope, so
       # this enforces the coverage-INDEPENDENT thresholds (cyclomatic <=20 AND
       # cognitive <=15) in every backend PRODUCTION function — stricter than the
       # `audit --gate new-only` step above, which only inspects the PR diff (a
@@ -197,17 +197,12 @@ jobs:
       #     instead of the export-reference estimate that inflated under
       #     --production (#717).
       #   --max-cyclomatic 16 / --max-crap 25  ratchet BELOW the .fallowrc.jsonc
-      #     bars (20/30), locked to the backend's actual ceiling at tightening
-      #     time (max cyclomatic 15, max real-coverage CRAP 21.2). CLI-only
-      #     because the config bars are shared with the frontend, which can't
-      #     absorb them (55 functions over). Cognitive stays at the config's 15:
-      #     three functions sit exactly at it (zero headroom). CRAP 25 (not 20)
-      #     because an UNCOVERED function floors at CC²+CC — 20 would ban every
-      #     untested cyc-4 helper (seed.ts, customLogLevel sit at exactly 20.0);
-      #     25 still bans untested cyc≥5. Next notch to 20 needs branch tests
-      #     for resolveSubclass (21.2) and validateToolChoicePicks (20.1) in
-      #     create/selections.ts. A new backend function in the 16–20 cyclomatic
-      #     band passes the local pre-commit audit (config bars) and fails only
+      #     bars (20/30). CLI-only because the config bars are shared with the
+      #     frontend, which can't absorb them. Cognitive stays at the config's
+      #     15. CRAP 25 (not 20) because an UNCOVERED function floors at
+      #     CC²+CC, which would ban untested cyc-4 helpers at 20; 25 still bans
+      #     untested cyc≥5. A new backend function in the 16–20 cyclomatic band
+      #     passes the local pre-commit audit (config bars) and fails only
       #     here — required check, so it still can't merge.
       # The coverage artifact was generated in this same runner (identical
       # $GITHUB_WORKSPACE absolute paths across jobs), so no --coverage-root remap
@@ -279,11 +274,10 @@ jobs:
     # Proves the root Dockerfile — the image Railway deploys — still assembles
     # (#1454). `build` above type-checks and bundles on the runner's own tree,
     # which never exercises the three-stage COPY chain, the workspace links, or
-    # .dockerignore: a stage rename, a moved COPY or a dropped context path used
-    # to surface at DEPLOY time, against the real database, because nothing in
-    # CI ever built this file. Deliberately absent from every job's `needs:` —
-    # it duplicates no other gate, so it runs alongside them rather than
-    # extending the critical path.
+    # .dockerignore — a stage rename, a moved COPY or a dropped context path
+    # would otherwise surface at DEPLOY time, against the real database.
+    # Deliberately absent from every job's `needs:` — it duplicates no other
+    # gate, so it runs alongside them rather than extending the critical path.
     #
     # This job is also the only thing that ever executes stage 2's contracts
     # barrel load assertion (#1370), which fails the build below 12 *Schema

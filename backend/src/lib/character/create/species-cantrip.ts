@@ -53,10 +53,6 @@ async function resolveSpeciesCantripGrant(
   return { ok: true, entry };
 }
 
-// Groups the three spell-related creation phases — class/background picks (resolveCreationSpells),
-// the species cantrip choice (resolveSpeciesCantripGrant), and folding the two into one entry list —
-// behind a single PhaseResult so createCharacter's own branch count doesn't carry all three (#1980,
-// fallow's cyclomatic gate).
 export async function resolveSpellPhase(
   input: CreateCharacterBody,
   selections: ResolvedSelections,

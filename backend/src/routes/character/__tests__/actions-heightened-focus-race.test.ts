@@ -1,15 +1,15 @@
 /**
- * #1980: assertKnownActionKeys/computeHeightenedFocusTempHp used to read via
- * the global prisma client BEFORE the transaction opened. A concurrent
- * level-up landing between that read and lockCharacterRow meant a monk who
- * just hit level 10 could still get 0 Heightened Focus temp HP, because the
- * pre-flight read had already captured the stale (pre-level-up) level.
+ * #1980: assertKnownActionKeys/computeHeightenedFocusTempHp must read inside
+ * the transaction, after lockCharacterRow. A pre-tx read via the global
+ * prisma client lets a concurrent level-up land between the read and the
+ * lock, so a monk who just hit level 10 can get 0 Heightened Focus temp HP
+ * from a stale (pre-level-up) level.
  *
  * lockCharacterRow is the first statement inside the transaction, so hooking
  * it deterministically pinpoints "after every pre-tx read, before the row is
- * locked" — exactly the old race window — with no real clock-based race
- * needed: JS's single-threaded await ordering guarantees any pre-tx reads
- * have already resolved by the time this hook fires.
+ * locked" — the race window this guards against — with no real clock-based
+ * race needed: JS's single-threaded await ordering guarantees any pre-tx
+ * reads have already resolved by the time this hook fires.
  */
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
@@ -30,8 +30,8 @@ vi.mock("@/lib/character/character-transaction.js", async (importOriginal) => {
   };
 });
 
-// Fires once, the moment the transaction's first lockCharacterRow call happens — used to
-// land a concurrent level-up exactly at the old race window before the row lock is acquired.
+// Fires once, the moment the transaction's first lockCharacterRow call happens — lands a
+// concurrent level-up exactly at the race window before the row lock is acquired.
 let onFirstLock: (() => Promise<void>) | null = null;
 
 const { app } = await import("@/test-support/app-server.js");

@@ -1,6 +1,4 @@
-// spellSeedSchema is the new validation surface for SPELLS/SPELLS_2014 (#1277's gap: Spell rows
-// had NO seed-time schema at all before this). One negative case per string-union column proves
-// the schema actually rejects a bad value.
+// spellSeedSchema is the validation surface for SPELLS/SPELLS_2014 (#1277).
 import { describe, expect, it } from "vitest";
 
 import { spellSeedSchema } from "../spells.js";

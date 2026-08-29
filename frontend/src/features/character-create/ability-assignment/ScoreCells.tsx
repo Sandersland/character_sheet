@@ -13,7 +13,7 @@ export interface RowScoreCellProps {
   method: AbilityMethod;
   held: number | null;
   scores: AbilityScores;
-  /** Served by GET /api/reference — point-buy/manual bounds are never a local constant (#1383). */
+  /** #1383 — see AbilityAssignmentPanel. */
   config: AbilityGenerationConfig;
   onPlace: (a: AbilityName) => void;
   onClear: (a: AbilityName) => void;
