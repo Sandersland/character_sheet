@@ -1,7 +1,6 @@
-// The seeded CharacterClass.subclassLevel is the 2014 subclass-gate source;
-// every class this file tests is module-deleted, so nothing here exercises
-// subclassGateLevel's `?? def.grantLevel` fallback until a future TS class's
-// grantLevel differs from 3.
+// The seeded CharacterClass.subclassLevel is the sole 2014 subclass-gate
+// source: SubclassDefinition carries no per-subclass override any more, so
+// an absent seeded value falls back to subclassGateLevel's plain 3.
 import { describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -21,14 +20,6 @@ const PHB14_GATE: Array<[string, string, number]> = [
   ["warlock", "the fiend", 1], // PHB'14 p.105
   ["druid", "circle of the land", 2], // PHB'14 p.66
   ["wizard", "school of evocation", 2], // PHB'14 p.114
-];
-
-const MODULE_DELETED: Array<[string, string, number]> = [
-  ["cleric", "life domain", 1],
-  ["sorcerer", "draconic bloodline", 1],
-  ["warlock", "the fiend", 1],
-  ["druid", "circle of the land", 2],
-  ["wizard", "school of evocation", 2],
 ];
 
 // subclassLevel: undefined reproduces a narrow-select caller (the fallback path).
@@ -65,8 +56,8 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
     },
   );
 
-  it.each(MODULE_DELETED)(
-    "%s / %s: the seeded value alone decides the gate (no module left to beat)",
+  it.each(PHB14_GATE)(
+    "%s / %s: a seeded value of 3 overrides the PHB'14 gate",
     (className, subclass, gate) => {
       expect(subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", 3)).toEqual([]);
       expect(subclassFeaturesWithSeededGate(className, subclass, 3, "EDITION_2014", 3).length).toBeGreaterThan(0);
@@ -74,8 +65,8 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
   );
 
   // Narrow-select-only consequence: every production caller already carries the seeded relation.
-  it.each(MODULE_DELETED)(
-    "%s / %s: with no seeded value and no module left, the gate falls back to subclassGateLevel's plain 3",
+  it.each(PHB14_GATE)(
+    "%s / %s: an absent seeded value falls back to 3",
     (className, subclass, gate) => {
       expect(subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", undefined)).toEqual([]);
       expect(

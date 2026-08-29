@@ -24,8 +24,8 @@ Level-gated state is persisted state whose legal maximum is determined by level.
 
 A feature that is just "choose N options from a catalog" with no extra mechanics is declared as **data** — no new reconciler, state key, or clamp:
 
-- Declare `choices: [{ key, label, catalogSource, count: (level) => n }]` on the subclass in `lib/classes/<class>.ts`.
-- Options are seeded `GrantedAbility` rows keyed by `source = catalogSource` (`prisma/seed/subclass-choices.ts`); `GET /api/subclass-choices/:source` lists them.
+- Add `choiceKey`/`choiceLabel`/`choiceCatalogSource`/`choiceCountTiers` columns to the subclass's seeded `ClassFeature` row (`prisma/seed/<class>-features.ts`); `choicesFromRows` (`lib/classes/class-feature-rows.ts`) resolves them at read time.
+- Options are seeded `GrantedAbility` rows keyed by `source = choiceCatalogSource` (`prisma/seed/subclass-choices.ts`); `GET /api/subclass-choices/:source` lists them.
 - Selections persist in the generic `resources.choicesKnown[key]` map. `learnSubclassChoice` is unrestricted (bounded only by the level-derived cap) via the resources endpoint at any time; `forgetSubclassChoice` (#1516: PHB'14 p.80/p.73 bound a choose-N replacement to learn-time) is reachable only through a validated level-up ceremony step, never the generic endpoint.
 - `reconcileSubclassChoices` and one read-clamp loop cover every such choice generically.
 
@@ -37,7 +37,7 @@ A level-gated grant with zero player choice (e.g. Warrior of Shadow's Minor Illu
 
 ## Checklist: adding a new level-gated feature
 
-1. **Rules data** → the appropriate `lib/srd/` file (or `lib/classes/<class>.ts`). Never inline in a route or duplicate on the frontend.
+1. **Rules data** → the appropriate `lib/srd/` file, or a seeded `ClassFeature` row for a class/subclass feature. Never inline in a route or duplicate on the frontend.
 2. **Reconciler** → for a "known" list capped by a choice count, write a thin `reconcileKnownList(ctx, config)` config; otherwise a hand-written `Reconciler` (one indexed re-read → derive cap → early-return if within → trim → `logEvent` with a category that has an existing undo branch). Register it in `LEVEL_GATED_RECONCILERS` in dependency order.
 3. **Clamp-on-read** in `serializeCharacter`, analogous to the existing `slice`/`Math.min` clamps.
 4. **New `EventType`** (if needed): add to the `CharacterEventType` Prisma enum + the `EventType` union in `lib/activity/events.ts`; `prisma migrate dev` **and** `prisma generate` (both required).

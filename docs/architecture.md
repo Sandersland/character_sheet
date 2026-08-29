@@ -37,7 +37,7 @@ Item mechanics live in category detail tables (`Item*Detail` + their `Inventory*
 
 Rules code obtains it exactly one way: `editionOf` (`lib/rules/edition.ts`). The parameter is required, so a `select` that omits `rulesEdition` is a compile error rather than a silent 2024 default. A rule that varies by edition takes `edition` as its last parameter and stays one function per rule; a rule that is edition-invariant — the majority (XP/PB, every spell-slot table, death saves, ASI levels, multiclass prerequisites, Unarmored Defense) — takes no `edition`. `subclassGateLevel` is the pattern-setter, and shows the required discipline: its reconcile-on-write (`reconcileSubclass`), clamp-on-read (`buildClassesView`), write-side-validation (`applySetSubclass`, post-creation subclass set), level-up-plan resolution (`subclassLevelFor`), creation-time validation (`resolveSubclass`/`resolveSubclassName`), and feature/pool derivation (`isSubclassActive`, #1291) callers all resolve through it, so none of the six can disagree (#1308, #1291).
 
-Edition-tagged **content** is the second edition-varying mechanism alongside `subclassGateLevel`: a `DerivedFeature` whose text genuinely diverges between editions forks into one row per edition sharing a name, resolved by `featureAppliesToEdition` (`lib/classes/registry.ts`) at read time and stripped before the wire (#1374).
+Edition-tagged **content** is the second edition-varying mechanism alongside `subclassGateLevel`: a `DerivedFeature` whose text genuinely diverges between editions forks into one row per edition sharing a name, filtered by `featuresFromRows` (`lib/classes/class-feature-rows.ts`) at read time and stripped before the wire (#1374).
 
 ### JSON columns on Character
 

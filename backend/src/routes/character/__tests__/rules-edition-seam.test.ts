@@ -16,10 +16,8 @@ import { seededSpeciesAnchor } from "@/test-support/species.js";
  *
  * Seeded Cleric/Sorcerer/Warlock/Druid/Wizard now carry a real 2014 gate below 3
  * too (#1308) — this fixture class predates that and stays useful for a
- * different reason: its name matches no entry in the registry's CLASSES map, so
- * deriveResources returns null and the test exercises only the catalog-driven
- * gate — isSubclassActive's independent grantLevel table (edition-aware since
- * #1291, but keyed on a class name this fixture never matches) can't interfere.
+ * different reason: it seeds no ClassFeature rows, so deriveResources returns
+ * null for it and the test exercises only the catalog-driven subclassGateLevel.
  */
 const OWNER_ID = "owner-rules-edition-seam";
 const CLASS_NAME = "Rules Edition Seam Wizard";

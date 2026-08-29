@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
 
-import type { ClassDefinition } from "@/lib/classes/types.js";
-
 import { BACKGROUNDS, CLASSES, ITEMS } from "../catalog-data.js";
 import { ACTIONS, TWENTY_FOUR_ONLY_ACTION_KEYS } from "../actions.js";
 import { SUBCLASSES } from "../subclasses.js";
@@ -16,7 +14,7 @@ import { SUBCLASS_SPELL_LIST_EXPANSIONS } from "../subclass-spell-list-expansion
 import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/feats.js";
 import { cantripsKnownAtLevel, preparedSpellCountAt } from "@/lib/srd/srd.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
-import { SUBCLASS_SLUGS, SUBCLASS_IDENTITY, type SubclassSlug } from "@/lib/classes/subclass-slug.js";
+import { SUBCLASS_SLUGS, SUBCLASS_IDENTITY } from "@/lib/classes/subclass-slug.js";
 import { REGRANTED_UNIVERSAL_KEYS } from "@/lib/classes/actions.js";
 import { CLASS_FEATURES } from "../class-features.js";
 
@@ -756,17 +754,10 @@ describe("referential integrity", () => {
 });
 
 describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
-  // Empty — no TS ClassDefinition carries a subclasses map any more.
-  const CLASS_DEFS: Record<string, ClassDefinition> = {};
-
   // The named twin of the class-migration guard's NOT_YET_MIGRATED list,
   // keyed by SUBCLASS_IDENTITY's classKey. Deliberate-coupling latch: if you
   // change one, update the other.
   const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard", "paladin", "druid", "ranger", "monk"];
-
-  // Empty on purpose — the allowlist for an engine-first subclass in a class
-  // that keeps its module, with its reason recorded.
-  const INTENTIONAL_GAPS: SubclassSlug[] = [];
 
   it("every SUBCLASSES row's slug is a member of SUBCLASS_SLUGS and maps back to its own (className, name)", () => {
     const bad = SUBCLASSES.filter((s) => {
@@ -785,30 +776,11 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
     expect(dupes, "slug seeded more than once").toEqual([]);
   });
 
-  it("every SubclassDefinition's slug is a member of SUBCLASS_SLUGS and matches its own (classKey, nameKey)", () => {
-    const bad: string[] = [];
-    for (const [classKey, def] of Object.entries(CLASS_DEFS)) {
-      for (const [nameKey, sub] of Object.entries(def.subclasses ?? {})) {
-        const identity = SUBCLASS_IDENTITY[sub.slug];
-        if (!identity || identity.classKey !== classKey || identity.nameKey !== nameKey) {
-          bad.push(`${classKey}/${nameKey} -> ${sub.slug}`);
-        }
-      }
-    }
-    expect(bad, "SubclassDefinition's slug doesn't resolve back to its own (classKey, nameKey)").toEqual([]);
-  });
-
-  it("every SUBCLASS_SLUGS member has a matching SubclassDefinition, or belongs to a row-migrated class", () => {
-    const definedSlugs = new Set<SubclassSlug>();
-    for (const def of Object.values(CLASS_DEFS)) {
-      for (const sub of Object.values(def.subclasses ?? {})) definedSlugs.add(sub.slug);
-    }
+  it("every SUBCLASS_SLUGS member belongs to a row-migrated class (no TS SubclassDefinition carries a subclass any more)", () => {
     const missing = SUBCLASS_SLUGS.filter((slug) => {
-      if (definedSlugs.has(slug)) return false;
-      if (INTENTIONAL_GAPS.includes(slug)) return false;
       const identity = SUBCLASS_IDENTITY[slug];
       return !identity || !ROW_MIGRATED_CLASSES.includes(identity.classKey);
     });
-    expect(missing, "slug declared but no SubclassDefinition carries it, and not a row-migrated class").toEqual([]);
+    expect(missing, "slug's class is missing from ROW_MIGRATED_CLASSES").toEqual([]);
   });
 });

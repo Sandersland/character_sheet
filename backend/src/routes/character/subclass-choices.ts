@@ -11,7 +11,7 @@ export const subclassChoicesRouter = Router({ mergeParams: true });
 // fetchSubclassChoiceOptions) -- its only client today. GET
 // /api/subclass-choices/:source lists the option catalog for one generic
 // subclass choice (e.g. "huntersPrey"), as GrantedAbility rows keyed by `source`
-// = the SubclassChoice.catalogSource. Which choices a character can make and how
+// = the DerivedSubclassChoice.catalogSource. Which choices a character can make and how
 // many is carried by the serialized character's resources.subclassChoices; this
 // route supplies the pickable options. Alphabetical.
 //

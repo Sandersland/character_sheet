@@ -143,7 +143,7 @@ export interface ChoiceCountTier {
   count: number;
 }
 
-// Row-driven counterpart to SubclassChoice: choiceKey keys choicesKnown,
+// Resolves to DerivedSubclassChoice: choiceKey keys choicesKnown,
 // choiceCatalogSource names the GrantedAbility.source catalog.
 export interface ChoiceColumns {
   choiceKey?: string | null;
@@ -227,7 +227,7 @@ export interface ClassFeatureRowsCarrier {
 
   // The seeded CharacterClass.subclassLevel (PHB'14 subclass grant level).
   // Undefined only for narrow-select callers that carry no class relation, in
-  // which case isSubclassActive falls back to the TS module's own grantLevel.
+  // which case subclassGateLevel's plain 3 applies.
   subclassLevel?: number;
 }
 
