@@ -60,6 +60,10 @@ if ! printf '%s\n' '  if (edition != "EDITION_2014") return true;' | grep -qE "$
   echo "error: check-edition-branching.sh's PATTERN no longer matches its own loose-equality (!=) violation probe — the gate is broken (anti-vacuity)" >&2
   exit 1
 fi
+if ! printf '%s\n' '  if (edition !== "EDITION_2014") return true;' | grep -qE "$PATTERN"; then
+  echo "error: check-edition-branching.sh's PATTERN no longer matches its own strict-inequality (!==) violation probe — the gate is broken (anti-vacuity)" >&2
+  exit 1
+fi
 if printf '%s\n' '    case "EDITION_2014":' | grep -qE "$PATTERN"; then
   echo "error: check-edition-branching.sh's PATTERN matches a switch case label — the gate would wrongly block the sanctioned total-mapping shape" >&2
   exit 1
@@ -78,18 +82,27 @@ fi
 # Known limitation: counts `{`/`}` characters textually, so a brace inside a
 # string or comment within the switch body would miscount — no real
 # switch(edition) body does this today.
-SWITCH_PATTERN='switch[[:space:]]*\([^)]*[Ee]dition[^)]*\)'
+# Matches the generic "switch (...)" head only — the word-bound edition check
+# below runs on the extracted head text, where `^`/`$` correctly anchor to
+# that substring instead of the whole line. A bare substring match here would
+# false-fire on `switch (expeditionPhase)` (#1980).
+SWITCH_HEAD_PATTERN='switch[[:space:]]*\([^)]*\)'
 
 # One shared awk program for both the self-test probes (fed via stdin) and
 # the real multi-file scan below — FNR==1 resets state per file so a switch
 # straddling a file's end can never leak into the next file's count.
 switch_default_scan() {
-  awk -v pat="$SWITCH_PATTERN" '
+  awk -v pat="$SWITCH_HEAD_PATTERN" '
+    function is_edition_switch(line,    head) {
+      if (match(line, pat) == 0) return 0
+      head = substr(line, RSTART, RLENGTH)
+      return (head ~ /(^|[^A-Za-z])(edition|rulesEdition)([^A-Za-z]|$)/)
+    }
     FNR == 1 { in_sw = 0; depth = 0; has_default = 0 }
     {
-      if (!in_sw && $0 ~ pat) { in_sw = 1; depth = 0; has_default = 0; start = FNR }
+      if (!in_sw && is_edition_switch($0)) { in_sw = 1; depth = 0; has_default = 0; start = FNR }
       if (in_sw) {
-        if ($0 ~ /default:/) has_default = 1
+        if ($0 ~ /^[[:space:]]*default:/) has_default = 1
         n = length($0)
         for (i = 1; i <= n; i++) {
           c = substr($0, i, 1)
@@ -117,6 +130,16 @@ if [ -n "$has_default_probe" ]; then
   echo "error: check-edition-branching.sh's switch-default scan fired on a switch (edition) WITH an exhaustive default — false positive (anti-vacuity)" >&2
   exit 1
 fi
+fake_default_string_probe=$(printf '%s\n' 'switch (edition) {' '  case "EDITION_2014": throw new Error("default: x");' '}' | switch_default_scan)
+if [ -z "$fake_default_string_probe" ]; then
+  echo "error: check-edition-branching.sh's switch-default scan treats a string literal containing 'default:' inside a case body as an exhaustive default — the gate is broken (anti-vacuity)" >&2
+  exit 1
+fi
+non_edition_switch_probe=$(printf '%s\n' 'switch (expeditionPhase) {' '  case "FIRST": return 1;' '}' | switch_default_scan)
+if [ -n "$non_edition_switch_probe" ]; then
+  echo "error: check-edition-branching.sh's switch-default scan fired on switch (expeditionPhase) — substring match on 'edition' instead of a word boundary (anti-vacuity)" >&2
+  exit 1
+fi
 
 # Excludes *.test.*/__tests__/** (fixture literals like test-feature-rows.fixture.ts
 # author both editions' data inline on purpose, not a rule fn). --others
@@ -132,8 +155,20 @@ if [ "$FILE_COUNT" -lt "$MIN_SCANNED_FILES" ]; then
   exit 1
 fi
 
+# Rebuilt as positional params, one path per $FILES line, instead of an unquoted
+# $FILES word-split — a path containing a space used to be split into two
+# separate (nonexistent) "files" (#1980).
+tmp_file_list=$(mktemp)
+trap 'rm -f "$tmp_file_list"' EXIT
+printf '%s\n' "$FILES" > "$tmp_file_list"
+set --
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  set -- "$@" "$f"
+done < "$tmp_file_list"
+
 bad=""
-for f in $FILES; do
+for f in "$@"; do
   hits=$(grep -nE "$PATTERN" "$f" || true)
   [ -z "$hits" ] && continue
   filtered=$(printf '%s\n' "$hits" | while IFS= read -r hit; do
@@ -153,7 +188,7 @@ if [ -n "$bad" ]; then
   exit 1
 fi
 
-switch_default_bad=$(switch_default_scan $FILES)
+switch_default_bad=$(switch_default_scan "$@")
 if [ -n "$switch_default_bad" ]; then
   echo "error: an edition switch with no exhaustive default (#1978):" >&2
   printf '%s\n' "$switch_default_bad" >&2
