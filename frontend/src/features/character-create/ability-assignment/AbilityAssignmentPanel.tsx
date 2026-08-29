@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import Card from "@/components/ui/Card";
 import { AbilityRow, RowHeader } from "@/features/character-create/ability-assignment/AbilityRow";
-import { MANUAL_CEILING, MANUAL_FLOOR } from "@/features/character-create/ability-assignment/constants";
 import { MethodChips, PoolChips } from "@/features/character-create/ability-assignment/MethodChips";
 import { SpeciesBonusBlock } from "@/features/character-create/ability-assignment/SpeciesBonusBlock";
 import { SpreadControls } from "@/features/character-create/ability-assignment/SpreadControls";
@@ -22,10 +21,9 @@ import {
   type SpreadMode,
 } from "@/lib/abilityAssignment";
 import AbilityRollTray from "@/features/character-create/AbilityRollTray";
-import { POINT_BUY_BUDGET } from "@/lib/abilityGen";
 import type { CreationBackgroundBonuses, CreationSpeciesBonuses } from "@/lib/characterCreation";
 import type { AbilityMethod, CharacterDraft } from "@/hooks/useCharacterDraft";
-import type { AbilityName, AbilityScores } from "@/types/character";
+import type { AbilityGenerationConfig, AbilityName, AbilityScores } from "@/types/character";
 
 interface AbilityAssignmentPanelProps {
   method: AbilityMethod;
@@ -39,6 +37,8 @@ interface AbilityAssignmentPanelProps {
   primaryAbility: AbilityName[];
   /** Display name of the class, not a CSS class list — shown beside a recommended row. */
   className: string;
+  /** Served by GET /api/reference — standard array / point-buy / manual bounds are never a local constant (#1383). */
+  config: AbilityGenerationConfig;
   update: (patch: Partial<CharacterDraft>) => void;
 }
 
@@ -56,6 +56,7 @@ export default function AbilityAssignmentPanel({
   speciesBonuses,
   primaryAbility,
   className,
+  config,
   update,
 }: AbilityAssignmentPanelProps) {
   const [held, setHeld] = useState<number | null>(null);
@@ -68,7 +69,7 @@ export default function AbilityAssignmentPanel({
 
   function selectMethod(next: AbilityMethod) {
     setHeld(null);
-    const defaults = methodDefaults(next);
+    const defaults = methodDefaults(next, config);
     update({
       abilityMethod: next,
       abilityPool: defaults.pool,
@@ -89,7 +90,7 @@ export default function AbilityAssignmentPanel({
   }
 
   function adjustManual(ability: AbilityName, delta: number) {
-    const next = Math.min(MANUAL_CEILING, Math.max(MANUAL_FLOOR, scores[ability] + delta));
+    const next = Math.min(config.manual.ceiling, Math.max(config.manual.floor, scores[ability] + delta));
     update({ abilityScores: { ...scores, [ability]: next } });
   }
 
@@ -98,7 +99,7 @@ export default function AbilityAssignmentPanel({
     if (!raw.trim()) return;
     const parsed = Number(raw);
     if (!Number.isInteger(parsed)) return;
-    const clamped = Math.min(MANUAL_CEILING, Math.max(MANUAL_FLOOR, parsed));
+    const clamped = Math.min(config.manual.ceiling, Math.max(config.manual.floor, parsed));
     update({ abilityScores: { ...scores, [ability]: clamped } });
   }
 
@@ -113,7 +114,7 @@ export default function AbilityAssignmentPanel({
 
         {method === "pointBuy" && (
           <p className="text-xs font-semibold text-parchment-600">
-            {remainingPoints(scores)} of {POINT_BUY_BUDGET} points
+            {remainingPoints(config.pointBuy, scores)} of {config.pointBuy.budget} points
           </p>
         )}
 
@@ -144,6 +145,7 @@ export default function AbilityAssignmentPanel({
               method={method}
               held={held}
               scores={scores}
+              config={config}
               bonusAbilities={bonusAbilities}
               bonusAssignment={bonusAssignment}
               label={ABILITY_LABELS[row.ability]}

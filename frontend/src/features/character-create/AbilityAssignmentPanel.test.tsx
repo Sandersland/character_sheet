@@ -6,7 +6,13 @@ import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmen
 import { EMPTY_ASSIGNMENTS } from "@/lib/abilityAssignment";
 import type { CreationBackgroundBonuses, CreationSpeciesBonuses } from "@/lib/characterCreation";
 import { axe } from "@/test/axe";
-import type { AbilityName, AbilityScores } from "@/types/character";
+import type { AbilityGenerationConfig, AbilityName, AbilityScores } from "@/types/character";
+
+const CONFIG: AbilityGenerationConfig = {
+  standardArray: [15, 14, 13, 12, 10, 8],
+  pointBuy: { budget: 27, floor: 8, ceiling: 15, costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 } },
+  manual: { floor: 1, ceiling: 30 },
+};
 
 const ALL_EIGHT: AbilityScores = {
   strength: 8,
@@ -57,6 +63,7 @@ function renderPanel(props: Partial<React.ComponentProps<typeof AbilityAssignmen
       speciesBonuses={INERT_SPECIES_BONUSES}
       primaryAbility={[]}
       className=""
+      config={CONFIG}
       update={update}
       {...props}
     />,

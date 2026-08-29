@@ -1,8 +1,7 @@
-import { MANUAL_CEILING, MANUAL_FLOOR } from "@/features/character-create/ability-assignment/constants";
 import type { AbilityRowData, Update } from "@/features/character-create/ability-assignment/types";
 import { adjustPointBuy, canDecrement, canIncrement } from "@/lib/abilityAssignment";
 import type { AbilityMethod } from "@/hooks/useCharacterDraft";
-import type { AbilityName, AbilityScores } from "@/types/character";
+import type { AbilityGenerationConfig, AbilityName, AbilityScores } from "@/types/character";
 
 const STEP_BTN =
   "flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-full border border-parchment-300 text-base leading-none disabled:opacity-40";
@@ -14,6 +13,8 @@ export interface RowScoreCellProps {
   method: AbilityMethod;
   held: number | null;
   scores: AbilityScores;
+  /** Served by GET /api/reference — point-buy/manual bounds are never a local constant (#1383). */
+  config: AbilityGenerationConfig;
   onPlace: (a: AbilityName) => void;
   onClear: (a: AbilityName) => void;
   onAdjustManual: (a: AbilityName, delta: number) => void;
@@ -47,14 +48,14 @@ function PooledScoreCell({ row, label, held, onPlace, onClear }: RowScoreCellPro
   );
 }
 
-function PointBuyScoreCell({ row, label, scores, update }: RowScoreCellProps) {
+function PointBuyScoreCell({ row, label, scores, config, update }: RowScoreCellProps) {
   return (
     <span className="flex items-center gap-1 sm:gap-2">
       <button
         type="button"
         aria-label={`Decrease ${label}`}
-        disabled={!canDecrement(scores, row.ability)}
-        onClick={() => update({ abilityScores: adjustPointBuy(scores, row.ability, -1) })}
+        disabled={!canDecrement(config.pointBuy, scores, row.ability)}
+        onClick={() => update({ abilityScores: adjustPointBuy(config.pointBuy, scores, row.ability, -1) })}
         className={STEP_BTN}
       >
         −
@@ -63,8 +64,8 @@ function PointBuyScoreCell({ row, label, scores, update }: RowScoreCellProps) {
       <button
         type="button"
         aria-label={`Increase ${label}`}
-        disabled={!canIncrement(scores, row.ability)}
-        onClick={() => update({ abilityScores: adjustPointBuy(scores, row.ability, 1) })}
+        disabled={!canIncrement(config.pointBuy, scores, row.ability)}
+        onClick={() => update({ abilityScores: adjustPointBuy(config.pointBuy, scores, row.ability, 1) })}
         className={STEP_BTN}
       >
         +
@@ -73,7 +74,7 @@ function PointBuyScoreCell({ row, label, scores, update }: RowScoreCellProps) {
   );
 }
 
-function ManualScoreCell({ row, label, scores, onAdjustManual, onSetManual }: RowScoreCellProps) {
+function ManualScoreCell({ row, label, scores, config, onAdjustManual, onSetManual }: RowScoreCellProps) {
   return (
     <span className="flex items-center gap-1 sm:gap-1.5">
       <button
@@ -87,8 +88,8 @@ function ManualScoreCell({ row, label, scores, onAdjustManual, onSetManual }: Ro
       <input
         aria-label={label}
         type="number"
-        min={MANUAL_FLOOR}
-        max={MANUAL_CEILING}
+        min={config.manual.floor}
+        max={config.manual.ceiling}
         value={scores[row.ability]}
         onChange={(e) => onSetManual(row.ability, e.target.value)}
         className="w-10 sm:w-14 rounded-control border border-parchment-300 bg-parchment-50 px-1 sm:px-2 py-1 text-center text-sm tabular-nums"

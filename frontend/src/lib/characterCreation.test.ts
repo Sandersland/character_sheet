@@ -79,6 +79,11 @@ const reference: ReferenceData = {
   conditions: [],
   universalActions: [],
   itemRarities: [],
+  abilityGeneration: {
+    standardArray: [15, 14, 13, 12, 10, 8],
+    pointBuy: { budget: 27, floor: 8, ceiling: 15, costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 } },
+    manual: { floor: 1, ceiling: 30 },
+  },
 };
 
 function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
@@ -654,6 +659,13 @@ describe("buildCreatePayload", () => {
     const selections = resolveSelections(reference, draft);
     const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
     expect(payload.backgroundAbilities).toEqual({ dexterity: 2, intelligence: 1 });
+  });
+
+  it("sends the draft's ability generation method so the backend can validate abilityScores against it", () => {
+    const draft = makeDraft({ name: "X", className: "Rogue", background: "Criminal", abilityMethod: "standardArray" });
+    const selections = resolveSelections(reference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.abilityGenerationMethod).toBe("standardArray");
   });
 
   it("omits backgroundAbilities when incomplete or inert", () => {

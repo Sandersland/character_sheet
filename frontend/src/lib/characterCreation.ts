@@ -396,6 +396,7 @@ export function buildCreatePayload(
       subclassId: draft.subclassId || undefined,
     }],
     abilityScores: draft.abilityScores,
+    abilityGenerationMethod: draft.abilityMethod,
     // Only send a complete spread; the backend derives HP/init from it (#1130).
     backgroundAbilities: backgroundBonuses.complete ? backgroundBonuses.assignment : undefined,
     skillProficiencies: classBackgroundSkills,

@@ -364,6 +364,31 @@ describe("characters routes", () => {
     expect(response.status).toBe(400);
   });
 
+  // A record schema let abilityScores through unbounded (any key, any int) — tightened to the six named keys + validateAbilityScores(undefined, ...).
+  describe("PATCH abilityScores bound (#1383's ability-score wave)", () => {
+    const NAMED_SCORES = {
+      strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10,
+    };
+
+    it("rejects an out-of-bound score (strength 999)", async () => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .patch(`/api/characters/${FIXTURE.id}`)
+        .send({ abilityScores: { ...NAMED_SCORES, strength: 999 } });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(/1 and 30/);
+    });
+
+    it("drops an unrecognized key (\"luck\") instead of persisting it", async () => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .patch(`/api/characters/${FIXTURE.id}`)
+        .send({ abilityScores: { ...NAMED_SCORES, luck: 5 } });
+
+      expect(response.status).toBe(200);
+      expect(response.body.abilityScores).not.toHaveProperty("luck");
+    });
+  });
+
   // portraitUrl is read-only, derived from Character.portraitKey — a client-supplied URL was an IDOR (#1615).
   describe("portrait wire seam (#1615)", () => {
     it.each([

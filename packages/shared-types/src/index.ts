@@ -1,4 +1,5 @@
 // Pure types only — every consumer imports via `import type`, so nothing here reaches either runtime bundle.
+export type * from "./ability-generation.js";
 export type * from "./action-result.js";
 export type * from "./attack-row.js";
 export type * from "./capabilities.js";

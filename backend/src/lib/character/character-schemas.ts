@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { ALL_RULES_EDITIONS } from "@/lib/rules/edition.js";
+import { ALL_ABILITY_GENERATION_METHODS } from "@/lib/srd/ability-generation.js";
 
 const abilityScoresSchema = z.object({
   strength: z.number().int(),
@@ -48,6 +49,11 @@ export const createCharacterSchema = z
     background: z.string().min(1),
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,
+    // How the player produced abilityScores below — validateAbilityScores checks
+    // the scores against the matching rule (standardArray/pointBuy: the exact
+    // PHB rule; roll: the 3-18 dice-math bound); an omitted or "manual" method
+    // gets only the wider 1-30 sanity bound, never zero validation.
+    abilityGenerationMethod: z.enum(ALL_ABILITY_GENERATION_METHODS).optional(),
     backgroundAbilities: z.record(z.string(), z.number().int().positive()).optional(),
     skillProficiencies: z.array(z.string()).optional(),
     toolChoices: z.array(z.string()).optional(),
@@ -87,7 +93,11 @@ export const updateCharacterSchema = z
       die: z.string(),
       spent: z.number().int().min(0).optional(),
     }),
-    abilityScores: z.record(z.string(), z.number().int()),
+    // The six named keys, not z.record(z.string(), ...) — a record accepted
+    // any key ("luck") with any int value. PATCH also declares no generation
+    // method, so the route runs validateAbilityScores(undefined, ...) — the
+    // same sanity-bound rule createCharacter's omitted-method branch uses.
+    abilityScores: abilityScoresSchema,
     savingThrowProficiencies: z.array(z.string()),
     skills: z.array(z.unknown()),
     currency: z.object({

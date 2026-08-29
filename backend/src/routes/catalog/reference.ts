@@ -11,6 +11,15 @@ import {
   type MulticlassPrerequisiteOption,
 } from "@/lib/srd/srd.js";
 import {
+  MANUAL_SCORE_CEILING,
+  MANUAL_SCORE_FLOOR,
+  POINT_BUY_BUDGET,
+  POINT_BUY_CEILING,
+  POINT_BUY_COSTS,
+  POINT_BUY_FLOOR,
+  STANDARD_ARRAY,
+} from "@/lib/srd/ability-generation.js";
+import {
   mapStartingEquipmentPackage,
   EQUIPMENT_PACKAGE_INCLUDE,
 } from "@/lib/inventory/starting-equipment-package.js";
@@ -222,5 +231,11 @@ referenceRouter.get("/reference", async (req, res) => {
     universalActions,
     // Edition-invariant — ITEM_RARITIES takes no edition param. Served as the whole table since the DM item form computes its value hint over unsaved form state.
     itemRarities: ITEM_RARITIES,
+    // Edition-invariant (PHB'14 p.13 / SRD 5.2) — same values validateAbilityScores enforces server-side; the create ceremony renders from these instead of a frontend-owned copy.
+    abilityGeneration: {
+      standardArray: STANDARD_ARRAY,
+      pointBuy: { budget: POINT_BUY_BUDGET, floor: POINT_BUY_FLOOR, ceiling: POINT_BUY_CEILING, costs: POINT_BUY_COSTS },
+      manual: { floor: MANUAL_SCORE_FLOOR, ceiling: MANUAL_SCORE_CEILING },
+    },
   });
 });

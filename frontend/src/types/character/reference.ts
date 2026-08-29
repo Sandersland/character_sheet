@@ -1,11 +1,11 @@
-import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
+import type { AbilityGenerationMethod, ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 
 import type { ActionCost } from "./actions";
 import type { ConditionKey } from "./combat";
 import type { ItemRarity } from "./inventory";
 import type { AbilityName, AbilityScores, SkillName } from "./primitives";
 
-export type { ClassStartingEquipment };
+export type { ClassStartingEquipment, AbilityGenerationMethod };
 export type { EquipmentBundle, EquipmentChoiceGroup, OpenPick, StartingGold } from "@character-sheet/shared-types";
 
 /** Subclass option (from GET /api/reference). */
@@ -173,6 +173,13 @@ export interface EditionsResponse {
   editions: EditionOption[];
 }
 
+/** Edition-invariant (PHB'14 p.13 / SRD 5.2) — the same values validateAbilityScores enforces server-side; the create ceremony renders from this instead of owning its own copy. `costs` keys are ability scores 8-15 (JSON round-trips them as string keys). */
+export interface AbilityGenerationConfig {
+  standardArray: number[];
+  pointBuy: { budget: number; floor: number; ceiling: number; costs: Record<number, number> };
+  manual: { floor: number; ceiling: number };
+}
+
 export interface ReferenceData {
   /** The sole species catalog anchor — there is no separate flat `races` list. */
   species: SpeciesOption[];
@@ -187,6 +194,8 @@ export interface ReferenceData {
   universalActions: UniversalActionOption[];
   /** The six magic-item rarity tiers, ascending. */
   itemRarities: ItemRarityOption[];
+  /** Standard array / point buy / manual-entry bounds for the ability-score step. */
+  abilityGeneration: AbilityGenerationConfig;
 }
 
 // One selection per equipment choice group when mode:"package".
@@ -219,6 +228,8 @@ export interface CreateCharacterInput {
   background: string;
   classes: [{ name: string; subclass?: string | null; subclassId?: string }];
   abilityScores: AbilityScores;
+  /** How `abilityScores` above was produced — the backend's validateAbilityScores checks it against the matching PHB rule; omitted falls back to a sanity-bound-only check (#1383's ability-score wave). */
+  abilityGenerationMethod?: AbilityGenerationMethod;
   /** PHB'24 background ability spread (2+1 or 1+1+1 over `abilityChoices`); omitted for custom/spec-less backgrounds. */
   backgroundAbilities?: Partial<Record<AbilityName, number>>;
   skillProficiencies?: SkillName[];

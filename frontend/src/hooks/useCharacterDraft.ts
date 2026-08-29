@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { RulesEdition } from "@character-sheet/shared-types";
+import type { AbilityGenerationMethod, RulesEdition } from "@character-sheet/shared-types";
 
 import type { CreationStepKey } from "@/lib/creationSteps";
 import type { EquipmentDraft } from "@/lib/startingEquipment";
@@ -8,7 +8,7 @@ import type { AbilityName, AbilityScores, SkillName } from "@/types/character";
 
 const DRAFT_STORAGE_KEY = "character-draft:new";
 
-export type AbilityMethod = "manual" | "roll" | "standardArray" | "pointBuy";
+export type AbilityMethod = AbilityGenerationMethod;
 
 const DEFAULT_ABILITY_SCORES: AbilityScores = {
   strength: 10,

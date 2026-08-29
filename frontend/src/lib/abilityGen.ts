@@ -1,41 +1,28 @@
 import { rollSpec } from "./dice";
+import type { AbilityGenerationConfig } from "@/types/character";
 
-export const STANDARD_ARRAY: readonly number[] = [15, 14, 13, 12, 10, 8];
+type PointBuyConfig = AbilityGenerationConfig["pointBuy"];
 
-export const POINT_BUY_BUDGET = 27;
-
-const POINT_BUY_COSTS: Readonly<Record<number, number>> = {
-  8: 0,
-  9: 1,
-  10: 2,
-  11: 3,
-  12: 4,
-  13: 5,
-  14: 7,
-  15: 9,
-};
-
-export function pointBuyCost(score: number): number {
-  const cost = POINT_BUY_COSTS[score];
+// The standard array, point-buy budget, and cost table are server-owned
+// (backend/src/lib/srd/ability-generation.ts — PHB'14's "Variant: Customizing
+// Ability Scores" sidebar, p.13 / PHB'24's standard method; the numbers agree
+// across both) and arrive over the wire as ReferenceData.abilityGeneration —
+// no local mirror of the numbers themselves lives here (#1383).
+export function pointBuyCost(config: PointBuyConfig, score: number): number {
+  const cost = config.costs[score];
   if (cost === undefined) {
-    throw new RangeError(`Point buy scores must be between 8 and 15 (got ${score})`);
+    throw new RangeError(`Point buy scores must be between ${config.floor} and ${config.ceiling} (got ${score})`);
   }
   return cost;
 }
 
-export function totalPointBuyCost(scores: readonly number[]): number {
-  return scores.reduce((total, score) => total + pointBuyCost(score), 0);
+export function totalPointBuyCost(config: PointBuyConfig, scores: readonly number[]): number {
+  return scores.reduce((total, score) => total + pointBuyCost(config, score), 0);
 }
 
-export function isValidPointBuy(scores: readonly number[]): boolean {
-  if (scores.length !== 6) return false;
-  try {
-    return totalPointBuyCost(scores) <= POINT_BUY_BUDGET;
-  } catch {
-    return false;
-  }
-}
-
+// 4d6-drop-lowest rolling is a client-side UX convenience (the animation and
+// the roll itself) — the backend never trusts the result, it only sanity-
+// bounds it like any "roll"-method submission (validateAbilityScores).
 export function roll4d6DropLowest(): number {
   return rollSpec({ count: 4, faces: 6, dropLowest: 1 }).total;
 }

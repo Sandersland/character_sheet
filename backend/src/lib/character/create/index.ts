@@ -1,4 +1,5 @@
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
+import { validateAbilityScores } from "@/lib/srd/ability-generation.js";
 import type { CreateCharacterBody } from "@/lib/character/character-schemas.js";
 import { resolveSelections } from "./selections.js";
 import { resolveBackgroundGrants } from "./background-grants.js";
@@ -14,10 +15,24 @@ export type CreateCharacterResult =
   | { ok: true; id: string }
   | { ok: false; status: 400; error: string };
 
+// Runs before any DB access: the pre-bonus scores are self-contained input,
+// so a crafted request (e.g. straight 20s under a false "standardArray"/
+// "pointBuy" claim) 400s before touching a query. abilityScores is required
+// by createCharacterSchema — the undefined case here is only for direct
+// (schema-bypassing) callers, e.g. unit tests targeting an earlier check.
+function abilityScoresGuard(input: CreateCharacterBody): CreateCharacterResult | null {
+  if (!input.abilityScores) return null;
+  const result = validateAbilityScores(input.abilityGenerationMethod, input.abilityScores);
+  return result.ok ? null : { ok: false, status: 400, error: result.error };
+}
+
 export async function createCharacter(
   input: CreateCharacterBody,
   ownerId: string,
 ): Promise<CreateCharacterResult> {
+  const scoresError = abilityScoresGuard(input);
+  if (scoresError) return scoresError;
+
   const selections = await resolveSelections(input);
   if (!selections.ok) return selections;
 

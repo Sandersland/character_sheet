@@ -16,6 +16,7 @@ import {
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { storedPortraitKey } from "@/lib/character/character-portrait.js";
 import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
+import { validateAbilityScores } from "@/lib/srd/ability-generation.js";
 
 export const charactersRouter = Router();
 
@@ -94,6 +95,17 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
       .status(400)
       .json({ error: "Invalid request body", details: parseResult.error.flatten() });
     return;
+  }
+
+  // PATCH declares no generation method — the omitted-method (sanity-bound)
+  // branch is exactly right here, the same rule createCharacter's own
+  // omitted-method case applies. Runs before any DB access.
+  if (parseResult.data.abilityScores) {
+    const scoresResult = validateAbilityScores(undefined, parseResult.data.abilityScores);
+    if (!scoresResult.ok) {
+      res.status(400).json({ error: scoresResult.error });
+      return;
+    }
   }
 
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");

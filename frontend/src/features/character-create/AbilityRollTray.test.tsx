@@ -10,7 +10,7 @@ import { rollAbilityScoreSet } from "@/lib/abilityGen";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 import type { CreationBackgroundBonuses, CreationSpeciesBonuses } from "@/lib/characterCreation";
 import type { RollResult } from "@/lib/dice";
-import type { AbilityScores } from "@/types/character";
+import type { AbilityGenerationConfig, AbilityScores } from "@/types/character";
 
 vi.mock("@/features/dice/PhysicsDiceRoller", () => ({
   default: function MockPhysicsRoller({
@@ -127,6 +127,12 @@ const INERT_SPECIES: CreationSpeciesBonuses = {
   complete: true,
 };
 
+const CONFIG: AbilityGenerationConfig = {
+  standardArray: [15, 14, 13, 12, 10, 8],
+  pointBuy: { budget: 27, floor: 8, ceiling: 15, costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 } },
+  manual: { floor: 1, ceiling: 30 },
+};
+
 describe("AbilityAssignmentPanel — roll mode", () => {
   it("shows the roll tray and leaves rows unassignable until a pool exists", () => {
     render(
@@ -140,6 +146,7 @@ describe("AbilityAssignmentPanel — roll mode", () => {
           speciesBonuses={INERT_SPECIES}
           primaryAbility={[]}
           className=""
+          config={CONFIG}
           update={vi.fn()}
         />
       </DiceRollStyleProvider>,

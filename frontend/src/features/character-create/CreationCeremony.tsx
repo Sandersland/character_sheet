@@ -32,7 +32,7 @@ function IdentityStepBody({ c, reference }: StepBodyProps) {
   );
 }
 
-function AbilitiesStepBody({ c }: StepBodyProps) {
+function AbilitiesStepBody({ c, reference }: StepBodyProps) {
   return (
     <AbilityAssignmentPanel
       method={c.draft.abilityMethod}
@@ -43,6 +43,7 @@ function AbilitiesStepBody({ c }: StepBodyProps) {
       speciesBonuses={c.speciesBonuses}
       primaryAbility={c.selections.class?.primaryAbility ?? []}
       className={c.draft.className}
+      config={reference.abilityGeneration}
       update={c.update}
     />
   );
