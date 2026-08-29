@@ -285,8 +285,11 @@ async function applyActionEffectInTx(
 }
 
 // Reuses eligibleRowActions — the same gate applyRowDrivenActionInTx dispatches through, so a rejected key can never be one the dispatcher would accept.
-async function assertKnownActionKeys(operations: ExecuteActionOperation[], characterId: string): Promise<void> {
-  const character = await prisma.character.findUnique({ where: { id: characterId }, select: ROW_ACTION_SELECT });
+// Takes tx, not the global client: called inside the transaction, after lockCharacterRow, so a
+// concurrent level-up can't land between this read and the lock and get judged against a stale
+// level (#1980).
+async function assertKnownActionKeys(tx: Prisma.TransactionClient, operations: ExecuteActionOperation[], characterId: string): Promise<void> {
+  const character = await tx.character.findUnique({ where: { id: characterId }, select: ROW_ACTION_SELECT });
   // actionKey, not row.resourceKey, so a toggle row's synthesized end key is recognized too.
   const rowKeys = new Set((character ? eligibleRowActions(character) : []).map((e) => e.actionKey));
   for (const op of operations) {
@@ -297,9 +300,11 @@ async function assertKnownActionKeys(operations: ExecuteActionOperation[], chara
 }
 
 // Heightened Focus, PHB'24 p.98/SRD 5.2: temp HP = two Martial Arts die rolls, rolled server-side.
-async function computeHeightenedFocusTempHp(operations: ExecuteActionOperation[], characterId: string): Promise<number> {
+// Takes tx for the same reason as assertKnownActionKeys above — a pre-tx read here shipped a
+// level-10 Monk 0 temp HP when a level-up raced between the read and the row lock (#1980).
+async function computeHeightenedFocusTempHp(tx: Prisma.TransactionClient, operations: ExecuteActionOperation[], characterId: string): Promise<number> {
   if (!operations.some((op) => op.actionKey === "patientDefenseFocus")) return 0;
-  const classRow = await prisma.character.findUnique({
+  const classRow = await tx.character.findUnique({
     where: { id: characterId },
     select: { classEntries: { select: { name: true, level: true } }, rulesEdition: true },
   });
@@ -310,7 +315,10 @@ async function computeHeightenedFocusTempHp(operations: ExecuteActionOperation[]
   return rollDie(dieFaces) + rollDie(dieFaces);
 }
 
-// Falls back to the schema default if the character is missing between this read and the transaction — the transaction itself already guards that case.
+// Stays pre-tx, unlike assertKnownActionKeys/computeHeightenedFocusTempHp above: rulesEdition is
+// write-once (never changes after character creation, CLAUDE.md), so there's no stale-read race to
+// guard against here. Falls back to the schema default if the character is missing between this
+// read and the transaction — the transaction itself already guards that case.
 async function characterEdition(characterId: string): Promise<RulesEdition> {
   const row = await prisma.character.findUnique({ where: { id: characterId }, select: { rulesEdition: true } });
   return row ? editionOf(row) : DEFAULT_RULES_EDITION;
@@ -331,10 +339,6 @@ actionsRouter.post<{ id: string }>(
 
     const { operations } = parsed.data;
 
-    // Every domain error carries an explicit status, so it flows to errorHandler as a 400 (or an unexpected throw as a 500) — no message-string sniffing.
-    await assertKnownActionKeys(operations, characterId);
-
-    const heightenedFocusTempHp = await computeHeightenedFocusTempHp(operations, characterId);
     const edition = await characterEdition(characterId);
     const batchId = randomUUID();
     const sessionId = await getActiveSessionId(characterId);
@@ -344,6 +348,11 @@ actionsRouter.post<{ id: string }>(
     await prisma.$transaction(
       async (tx) => {
         await lockCharacterRow(tx, characterId);
+
+        // Every domain error carries an explicit status, so it flows to errorHandler as a 400 (or an unexpected throw as a 500) — no message-string sniffing.
+        await assertKnownActionKeys(tx, operations, characterId);
+
+        const heightenedFocusTempHp = await computeHeightenedFocusTempHp(tx, operations, characterId);
 
         for (const op of operations) {
           results.push(await applyActionOpInTx(tx, characterId, op, batchId, sessionId, heightenedFocusTempHp, edition));
