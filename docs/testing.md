@@ -10,14 +10,14 @@ Read this when running or writing tests.
 docker compose up db -d          # backend tests need Postgres
 npm run test                     # both workspaces
 npm run test -w backend          # backend only
-cd backend && npx vitest run src/routes/__tests__/spellcasting.test.ts   # one file
+cd backend && npx vitest run src/routes/character/__tests__/spellcasting.test.ts   # one file
 npm run test:coverage -w backend # Istanbul coverage → feeds the fallow CRAP gate
 cd frontend && npx vitest run    # frontend (no DB)
 ```
 
 Local setup: `backend/.env` must contain `DATABASE_URL` (`cp .env.example backend/.env` on a fresh clone); `backend/vitest.config.ts` reads it automatically via `loadEnv`. Tests derive their own databases from it on the same server and never read or write the one it names, so a test run can't disturb your dev data.
 
-## Backend route tests (`backend/src/routes/__tests__/`)
+## Backend route tests (`backend/src/routes/[<domain>/]__tests__/`)
 
 `supertest` against `createApp()`, real Postgres via Prisma — no mocks.
 
@@ -32,7 +32,7 @@ Each vitest worker runs against its own database, cloned in `globalSetup` from a
 
 **Every transaction endpoint gets:** a 404 test (unknown character), a 400 test (malformed op), one test per domain error, and a multi-op **atomicity** test (a failing second op rolls back the first).
 
-Pure domain logic gets lib-level unit tests in `backend/src/lib/__tests__/`.
+Pure domain logic gets lib-level unit tests in `backend/src/lib/[<domain>/]__tests__/`.
 
 ## Frontend tests
 

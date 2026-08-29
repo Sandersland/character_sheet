@@ -12,7 +12,7 @@ docker build -f Dockerfile .
 
 Single-origin is a commitment, not a default: one hostname → one Cloudflare Access policy, same-origin fetch, no CORS/cookie problems. A split-mode pair of images existed until #1456 deleted them — nothing had ever built them, and the backend one had silently become a duplicate of this image's backend stage.
 
-CI builds this image on every PR (#1454), so a stage rename or a broken `COPY` fails the PR rather than the deploy.
+CI builds this image on every PR (#1454) and reports status, so a stage rename or a broken `COPY` shows red on the PR instead of surfacing only at deploy time — but `docker-build` is not a required status check, so a red run does not block merge on its own.
 
 ### Environment variables
 

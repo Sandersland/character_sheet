@@ -23,7 +23,13 @@ import { PACKS } from "./packs.js";
 import { SPECIES, speciesSeedSchema } from "./species-data.js";
 import { SPECIES_TRAITS, speciesTraitSeedSchema } from "./species-traits-data.js";
 import { SPECIES_GRANTED_SPELLS, speciesGrantedSpellSeedSchema } from "./species-granted-spells-data.js";
-import { SPELLS } from "./spells.js";
+import { SPELLS, spellSeedSchema } from "./spells.js";
+import { SPELLS_2014 } from "./spells-2014/index.js";
+import { MANEUVERS, maneuverSeedSchema } from "./maneuvers.js";
+import { SHADOW_ARTS, shadowArtSeedSchema } from "./shadow-arts.js";
+import { DISCIPLINES, disciplineSeedSchema } from "./disciplines.js";
+import { CHANNEL_DIVINITIES, channelDivinitySeedSchema } from "./channel-divinity.js";
+import { SUBCLASS_CHOICE_OPTIONS, subclassChoiceOptionSeedSchema } from "./subclass-choices.js";
 
 interface SeedFamily {
   schema: z.ZodTypeAny;
@@ -51,6 +57,18 @@ const SEED_FAMILIES: Record<string, SeedFamily> = {
   // Cross-referenced against SPECIES (variant must exist) and SPELLS
   // (spellName must resolve) below, same split as SPECIES_TRAITS.
   SPECIES_GRANTED_SPELLS: { schema: speciesGrantedSpellSeedSchema, rows: SPECIES_GRANTED_SPELLS },
+  // SPELLS (2024, this file's default) and SPELLS_2014 (the 2014 fork) are separate arrays —
+  // both validate against the SAME spellSeedSchema (spells.ts), the one CatalogSpell shape.
+  SPELLS: { schema: spellSeedSchema, rows: SPELLS },
+  SPELLS_2014: { schema: spellSeedSchema, rows: SPELLS_2014 },
+  // The five GrantedAbility source families (source discriminates: maneuver / shadowArts /
+  // discipline / channelDivinity / the choice's own catalogSource) — each keeps its own
+  // co-located schema since their column shapes only partially overlap.
+  MANEUVERS: { schema: maneuverSeedSchema, rows: MANEUVERS },
+  SHADOW_ARTS: { schema: shadowArtSeedSchema, rows: SHADOW_ARTS },
+  DISCIPLINES: { schema: disciplineSeedSchema, rows: DISCIPLINES },
+  CHANNEL_DIVINITIES: { schema: channelDivinitySeedSchema, rows: CHANNEL_DIVINITIES },
+  SUBCLASS_CHOICE_OPTIONS: { schema: subclassChoiceOptionSeedSchema, rows: SUBCLASS_CHOICE_OPTIONS },
 };
 
 export interface SeedValidationSummary {
@@ -58,10 +76,9 @@ export interface SeedValidationSummary {
   rowsChecked: number;
 }
 
-// Split into one function per tree level to keep cyclomatic/cognitive
-// complexity low: prisma/seed/** carries no coverage instrumentation, so a
-// single triple-nested-loop version floors at the uncovered-CRAP formula
-// regardless of real test coverage.
+// Split into one function per tree level: prisma/seed/** has no coverage instrumentation, so a
+// single triple-nested-loop version would fail the uncovered-CRAP complexity gate regardless of
+// real test coverage.
 //
 // Typed against `package` alone (StartingEquipmentSeed and
 // BackgroundStartingEquipmentSeed's shared ClassStartingEquipment tree, #1565)
@@ -83,7 +100,7 @@ function collectCatalogNames(rows: readonly { package: PackageTree }[]): string[
   return rows.flatMap((row) => row.package.groups.flatMap(catalogNamesInGroup));
 }
 
-// resolveFixedItems (character-create.ts) looks a catalogName up against Pack
+// resolveFixedItems (lib/character/create/equipment.ts) looks a catalogName up against Pack
 // FIRST, then Item — so a catalogName is valid if it resolves against EITHER
 // catalog. All seven packs also exist as ITEMS rows today (#1533 [R4]), so an
 // Item-only check would pass by luck and only diverge the first time they do.
@@ -155,7 +172,7 @@ function assertSpeciesTraitsResolve(speciesRows: typeof SPECIES, traitRows: type
 
 // The #1683 twin of assertSpeciesTraitRowResolves above — catches a typo'd
 // slug/name before seedSpeciesGrantedSpells' DB-backed resolution throws a
-// less specific error. Every row this slice grants is variant-level.
+// less specific error. Every SPECIES_GRANTED_SPELLS row is variant-level.
 function assertSpeciesGrantedSpellRowResolves(
   grant: (typeof SPECIES_GRANTED_SPELLS)[number],
   index: number,
@@ -251,14 +268,33 @@ export function assertNoDuplicateChoiceDeclaringRows(rows: readonly ChoiceDeclar
   });
 }
 
+// A short "(name, edition)" tag for the error message below — every family's rows carry `name`
+// EXCEPT StartingEquipmentPackage's two families, which key on `className`/`backgroundName`
+// instead; falls back to those so the message still identifies the row rather than just its index.
+export function rowIdentity(row: unknown): string {
+  if (typeof row !== "object" || row === null) return "";
+  const r = row as Record<string, unknown>;
+  const label = [r.name, r.className, r.backgroundName].find((v) => typeof v === "string");
+  const parts = [label, r.edition].filter((v): v is string => typeof v === "string");
+  return parts.length ? ` (${parts.join(", ")})` : "";
+}
+
+// Reads the actual offending value back off the row via the issue's own path, so the thrown
+// message shows what was received without depending on zod-version-specific issue shapes (v4's
+// `invalid_value` issue carries no `received` field the way v3's `invalid_enum_value` did).
+function valueAtPath(row: unknown, path: readonly PropertyKey[]): unknown {
+  return path.reduce<unknown>((acc, key) => (acc && typeof acc === "object" ? (acc as Record<PropertyKey, unknown>)[key] : undefined), row);
+}
+
 /**
  * Validates every registered family's rows against its schema, throwing on
- * the FIRST invalid row with its family/index/path. Also enforces cross-row
- * invariants no per-row schema can express: two SUBCLASSES rows must never
- * share a slug (a duplicate would silently collapse two subclasses' seeded
- * content onto one DB row), every STARTING_EQUIPMENT_PACKAGES catalogName
- * must resolve against ITEMS ∪ PACKS, and no two CLASS_FEATURES rows may
- * declare the same pool or the same choice key.
+ * the FIRST invalid row with its family/index/identity/path/value. Also
+ * enforces cross-row invariants no per-row schema can express: two SUBCLASSES
+ * rows must never share a slug (a duplicate would silently collapse two
+ * subclasses' seeded content onto one DB row), every
+ * STARTING_EQUIPMENT_PACKAGES catalogName must resolve against ITEMS ∪ PACKS,
+ * and no two CLASS_FEATURES rows may declare the same pool or the same choice
+ * key.
  *
  * Returns a summary so a permanent test can assert this function actually
  * visited real content, rather than reporting "valid" vacuously (#1370).
@@ -271,8 +307,9 @@ export function assertSeedContentValid(): SeedValidationSummary {
       if (!result.success) {
         const issue = result.error.issues[0];
         const path = issue.path.join(".");
+        const value = valueAtPath(row, issue.path);
         throw new Error(
-          `Seed content invalid — ${familyName}[${index}]${path ? `.${path}` : ""}: ${issue.message}`,
+          `Seed content invalid — ${familyName}[${index}]${rowIdentity(row)}${path ? `.${path}` : ""} = ${JSON.stringify(value)}: ${issue.message}`,
         );
       }
       rowsChecked += 1;

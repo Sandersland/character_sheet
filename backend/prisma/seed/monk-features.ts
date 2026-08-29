@@ -1,6 +1,3 @@
-// Monk ClassFeature rows, authored as literal data (#1675), following the
-// fighter-features.ts pattern every other class uses.
-//
 // DATA MODULE ONLY (#1277 AC 4): no direct database calls or async writes.
 //
 // Way of the Open Hand: SRD 5.1 p.78 / PHB'14 p.78.
@@ -10,7 +7,14 @@
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { ChoiceCountTier, EffectBuffRow, InitiativeRegenRow, ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import type { SeedEdition } from "./edition.js";
-import type { ClassFeatureSeedRow } from "./class-features.js";
+import type {
+  ActionCostSeed,
+  ClassFeatureSeedRow,
+  CostKindSeed,
+  DerivedStatSeed,
+  ResolverKindSeed,
+  ResourceRechargeSeed,
+} from "./class-features.js";
 
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`monk-features: unknown subclass slug "${s}"`);
@@ -22,14 +26,13 @@ interface RawMonkFeature {
   name: string;
   level: number;
   description: string;
-  // Omitted seeds both editions with identical text; set to fork wording for one edition only (#1430).
   edition?: SeedEdition;
-  derivedStat?: string;
+  derivedStat?: DerivedStatSeed;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
   // fallow-ignore-next-line code-duplication -- mirrors fighter-features.ts's Raw*Feature shape by convention, not a shared base type
   resourceKey?: string;
   resourceLabel?: string;
-  resourceRecharge?: string;
+  resourceRecharge?: ResourceRechargeSeed;
   // fallow-ignore-next-line code-duplication -- same per-class-file mirror as above
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula }[];
   resourceOnInitiative?: InitiativeRegenRow[];
@@ -37,9 +40,9 @@ interface RawMonkFeature {
   choiceLabel?: string;
   choiceCatalogSource?: string;
   choiceCountTiers?: ChoiceCountTier[];
-  activationCost?: string;
-  resolverKind?: string;
-  costKind?: string;
+  activationCost?: ActionCostSeed;
+  resolverKind?: ResolverKindSeed;
+  costKind?: CostKindSeed;
   costPoolKey?: string;
   costBase?: number;
   effectBuffs?: EffectBuffRow[];
@@ -1020,8 +1023,8 @@ const WAY_OF_THE_FOUR_ELEMENTS_RAW: RawMonkFeature[] = [
   },
 ];
 
-// 33 EDITION_2014 + 37 EDITION_2024 = 70 rows total — pinned by
-// monk-2024-content.test.ts's per-partition counts.
+// 33 EDITION_2014 + 37 EDITION_2024 feature rows, plus the actionOnly rows
+// (43/46 in total) — all four counts pinned by the monk 2024 content test.
 export const MONK_FEATURES: ClassFeatureSeedRow[] = [
   ...MONK_BASE_RAW.flatMap(expand),
   ...WARRIOR_OF_THE_OPEN_HAND_RAW.flatMap(expand),

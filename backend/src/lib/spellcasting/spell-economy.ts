@@ -13,16 +13,22 @@ export function spellEconomyRestrictions(
   edition: RulesEdition,
 ): SpellEconomyState {
   const leveledAction = spellCastAsAction === "leveled";
-  if (edition === "EDITION_2014") {
-    return {
-      bonusActionBlockedByActionSpell: leveledAction,
-      bonusActionLimitedToCantrips: false,
-      actionLimitedToCantrips: spellCastAsBonus != null,
-    };
+  switch (edition) {
+    case "EDITION_2014":
+      return {
+        bonusActionBlockedByActionSpell: leveledAction,
+        bonusActionLimitedToCantrips: false,
+        actionLimitedToCantrips: spellCastAsBonus != null,
+      };
+    case "EDITION_2024":
+      return {
+        bonusActionBlockedByActionSpell: false,
+        bonusActionLimitedToCantrips: leveledAction,
+        actionLimitedToCantrips: spellCastAsBonus === "leveled",
+      };
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`spellEconomyRestrictions: unhandled edition ${String(exhaustive)}`);
+    }
   }
-  return {
-    bonusActionBlockedByActionSpell: false,
-    bonusActionLimitedToCantrips: leveledAction,
-    actionLimitedToCantrips: spellCastAsBonus === "leveled",
-  };
 }

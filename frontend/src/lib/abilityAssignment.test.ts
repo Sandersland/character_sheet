@@ -7,6 +7,7 @@ import {
   canDecrement,
   canIncrement,
   clearSlot,
+  methodDefaults,
   remainingPoints,
   setPlusOne,
   setPlusTwo,
@@ -15,7 +16,20 @@ import {
   toTwoOne,
   usedSlotIndices,
 } from "@/lib/abilityAssignment";
-import type { AbilityName, AbilityScores } from "@/types/character";
+import type { AbilityGenerationConfig, AbilityName, AbilityScores } from "@/types/character";
+
+const POINT_BUY: AbilityGenerationConfig["pointBuy"] = {
+  budget: 27,
+  floor: 8,
+  ceiling: 15,
+  costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 },
+};
+
+const CONFIG: AbilityGenerationConfig = {
+  standardArray: [15, 14, 13, 12, 10, 8],
+  pointBuy: POINT_BUY,
+  manual: { floor: 1, ceiling: 30 },
+};
 
 const ALL_EIGHT: AbilityScores = {
   strength: 8,
@@ -46,26 +60,52 @@ const EMPTY_ASSIGNMENTS: Record<AbilityName, number | null> = {
 
 describe("point buy", () => {
   it("starts with the full 27-point budget for an all-8 spread", () => {
-    expect(remainingPoints(ALL_EIGHT)).toBe(27);
+    expect(remainingPoints(POINT_BUY, ALL_EIGHT)).toBe(27);
   });
 
   it("cannot increment at the 15 ceiling", () => {
-    expect(canIncrement(SPENT, "strength")).toBe(false);
+    expect(canIncrement(POINT_BUY, SPENT, "strength")).toBe(false);
   });
 
   it("cannot increment when the next step's cost exceeds the remaining budget", () => {
-    expect(canIncrement(SPENT, "intelligence")).toBe(false);
+    expect(canIncrement(POINT_BUY, SPENT, "intelligence")).toBe(false);
   });
 
   it("cannot decrement at the 8 floor", () => {
-    expect(canDecrement(ALL_EIGHT, "strength")).toBe(false);
-    expect(canDecrement(SPENT, "intelligence")).toBe(false);
+    expect(canDecrement(POINT_BUY, ALL_EIGHT, "strength")).toBe(false);
+    expect(canDecrement(POINT_BUY, SPENT, "intelligence")).toBe(false);
   });
 
   it("adjustPointBuy bumps a legal step and refuses an illegal one", () => {
-    expect(adjustPointBuy(ALL_EIGHT, "strength", 1).strength).toBe(9);
-    expect(adjustPointBuy(ALL_EIGHT, "strength", -1)).toEqual(ALL_EIGHT);
-    expect(adjustPointBuy(SPENT, "intelligence", 1)).toEqual(SPENT);
+    expect(adjustPointBuy(POINT_BUY, ALL_EIGHT, "strength", 1).strength).toBe(9);
+    expect(adjustPointBuy(POINT_BUY, ALL_EIGHT, "strength", -1)).toEqual(ALL_EIGHT);
+    expect(adjustPointBuy(POINT_BUY, SPENT, "intelligence", 1)).toEqual(SPENT);
+  });
+});
+
+describe("methodDefaults", () => {
+  it("standardArray seeds the pool from the served config, not a local constant", () => {
+    const defaults = methodDefaults("standardArray", CONFIG);
+    expect(defaults.pool).toEqual([15, 14, 13, 12, 10, 8]);
+    expect(defaults.pool).not.toBe(CONFIG.standardArray);
+  });
+
+  it("pointBuy seeds every ability at the served floor", () => {
+    const defaults = methodDefaults("pointBuy", CONFIG);
+    expect(defaults.scores).toEqual({
+      strength: 8, dexterity: 8, constitution: 8, intelligence: 8, wisdom: 8, charisma: 8,
+    });
+  });
+
+  it("manual sets no pool and no scores default", () => {
+    expect(methodDefaults("manual", CONFIG)).toEqual({ pool: null, assignments: EMPTY_ASSIGNMENTS });
+  });
+
+  // roll's 3-18 dice-math bound (validateAbilityScores) is a backend
+  // acceptance rule, not a frontend default — the pool starts empty here
+  // the same as manual, and is filled only once AbilityRollTray rolls it.
+  it("roll also sets no pool default (the roll tray fills it, not a preset)", () => {
+    expect(methodDefaults("roll", CONFIG)).toEqual({ pool: null, assignments: EMPTY_ASSIGNMENTS });
   });
 });
 

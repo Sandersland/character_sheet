@@ -12,7 +12,16 @@ const sumParts = (parts: ArmorClassPart[]) => parts.reduce((total, p) => total +
 
 // Draconic Resilience: 13 + Dex, no shield restriction (PHB'14 p.106, #1122); SRD 5.2 forks to a different addend shape at Sorcerer L3 (PHB'24 p.978) — out of scope here.
 export function draconicResilienceBase(edition: RulesEdition): { label: string; value: number } | undefined {
-  return edition === "EDITION_2014" ? { label: "Draconic Resilience", value: 13 } : undefined;
+  switch (edition) {
+    case "EDITION_2014":
+      return { label: "Draconic Resilience", value: 13 };
+    case "EDITION_2024":
+      return undefined;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`draconicResilienceBase: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 // unarmoredBaseOverride and draconicResilience are separate candidate slots since both
@@ -50,7 +59,7 @@ function bestUnarmoredParts(
       ...shieldPart,
     ]);
   }
-  // Monk Unarmored Defense is unusable while wielding a shield (PHB p.78).
+  // Monk Unarmored Defense is unusable while wielding a shield (PHB'14 pp.76-79 / PHB'24 pp.87-89 — Unarmored Defense is edition-invariant).
   if (ud && !hasShield && classes.includes("monk")) {
     candidates.push([
       { label: "Unarmored Defense", value: 10 },

@@ -78,11 +78,24 @@ describe("chronicle payload — GET /api/campaigns/:id/sessions", () => {
     const arc = await agent(cookieOwner).post(`/api/campaigns/${campaignId}/arcs`).send({ name: "Act I" });
     const arcId = arc.body.id as string;
 
+    // Only the newest (c) is left active — Session_campaignId_active_key (schema.prisma) allows
+    // at most one active session per campaign, so history's older rows must already be ended.
     const a = await prisma.session.create({
-      data: { campaignId, arcId, startedAt: new Date("2026-01-01T00:00:00Z") },
+      data: {
+        campaignId,
+        arcId,
+        status: "ended",
+        startedAt: new Date("2026-01-01T00:00:00Z"),
+        endedAt: new Date("2026-01-01T04:00:00Z"),
+      },
     });
     const b = await prisma.session.create({
-      data: { campaignId, startedAt: new Date("2026-01-02T00:00:00Z") },
+      data: {
+        campaignId,
+        status: "ended",
+        startedAt: new Date("2026-01-02T00:00:00Z"),
+        endedAt: new Date("2026-01-02T04:00:00Z"),
+      },
     });
     const c = await prisma.session.create({
       data: { campaignId, startedAt: new Date("2026-01-03T00:00:00Z") },

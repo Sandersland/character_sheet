@@ -1,12 +1,11 @@
 import { abilityModifier, ABILITY_ORDER } from "@/lib/abilities";
-import { POINT_BUY_BUDGET, STANDARD_ARRAY, pointBuyCost, totalPointBuyCost } from "@/lib/abilityGen";
+import { pointBuyCost, totalPointBuyCost } from "@/lib/abilityGen";
 import type { AbilityMethod } from "@/hooks/useCharacterDraft";
-import type { AbilityName, AbilityScores } from "@/types/character";
+import type { AbilityGenerationConfig, AbilityName, AbilityScores } from "@/types/character";
 
 export type AbilityAssignments = Record<AbilityName, number | null>;
 
-const POINT_BUY_FLOOR = 8;
-const POINT_BUY_CEILING = 15;
+type PointBuyConfig = AbilityGenerationConfig["pointBuy"];
 
 export const EMPTY_ASSIGNMENTS: AbilityAssignments = {
   strength: null,
@@ -17,26 +16,26 @@ export const EMPTY_ASSIGNMENTS: AbilityAssignments = {
   charisma: null,
 };
 
-export function remainingPoints(scores: AbilityScores): number {
-  return POINT_BUY_BUDGET - totalPointBuyCost(Object.values(scores));
+export function remainingPoints(config: PointBuyConfig, scores: AbilityScores): number {
+  return config.budget - totalPointBuyCost(config, Object.values(scores));
 }
 
-export function canIncrement(scores: AbilityScores, ability: AbilityName): boolean {
+export function canIncrement(config: PointBuyConfig, scores: AbilityScores, ability: AbilityName): boolean {
   const current = scores[ability];
-  if (current >= POINT_BUY_CEILING) return false;
-  const stepCost = pointBuyCost(current + 1) - pointBuyCost(current);
-  return stepCost <= remainingPoints(scores);
+  if (current >= config.ceiling) return false;
+  const stepCost = pointBuyCost(config, current + 1) - pointBuyCost(config, current);
+  return stepCost <= remainingPoints(config, scores);
 }
 
-export function canDecrement(scores: AbilityScores, ability: AbilityName): boolean {
-  return scores[ability] > POINT_BUY_FLOOR;
+export function canDecrement(config: PointBuyConfig, scores: AbilityScores, ability: AbilityName): boolean {
+  return scores[ability] > config.floor;
 }
 
-export function adjustPointBuy(scores: AbilityScores, ability: AbilityName, delta: number): AbilityScores {
+export function adjustPointBuy(config: PointBuyConfig, scores: AbilityScores, ability: AbilityName, delta: number): AbilityScores {
   const next = scores[ability] + delta;
-  if (next < POINT_BUY_FLOOR || next > POINT_BUY_CEILING) return scores;
+  if (next < config.floor || next > config.ceiling) return scores;
   const candidate = { ...scores, [ability]: next };
-  if (totalPointBuyCost(Object.values(candidate)) > POINT_BUY_BUDGET) return scores;
+  if (totalPointBuyCost(config, Object.values(candidate)) > config.budget) return scores;
   return candidate;
 }
 
@@ -76,7 +75,7 @@ export function usedSlotIndices(assignments: AbilityAssignments): Set<number> {
 
 export type SpreadMode = "twoOne" | "oneOneOne";
 
-/** The PHB'24 spread implied by an assignment: three explicit +1s is oneOneOne, else twoOne. */
+/** The PHB'24 ability-score spread an assignment implies. */
 export function spreadMode(assignment: Partial<Record<AbilityName, number>>): SpreadMode {
   const values = Object.values(assignment);
   return values.length === 3 && values.every((v) => v === 1) ? "oneOneOne" : "twoOne";
@@ -108,25 +107,26 @@ export function toTwoOne(): Partial<Record<AbilityName, number>> {
   return {};
 }
 
-export function methodDefaults(method: AbilityMethod): {
+export function methodDefaults(method: AbilityMethod, config: AbilityGenerationConfig): {
   pool: number[] | null;
   assignments: AbilityAssignments;
   scores?: AbilityScores;
 } {
   if (method === "standardArray") {
-    return { pool: [...STANDARD_ARRAY], assignments: EMPTY_ASSIGNMENTS };
+    return { pool: [...config.standardArray], assignments: EMPTY_ASSIGNMENTS };
   }
   if (method === "pointBuy") {
+    const floor = config.pointBuy.floor;
     return {
       pool: null,
       assignments: EMPTY_ASSIGNMENTS,
       scores: {
-        strength: POINT_BUY_FLOOR,
-        dexterity: POINT_BUY_FLOOR,
-        constitution: POINT_BUY_FLOOR,
-        intelligence: POINT_BUY_FLOOR,
-        wisdom: POINT_BUY_FLOOR,
-        charisma: POINT_BUY_FLOOR,
+        strength: floor,
+        dexterity: floor,
+        constitution: floor,
+        intelligence: floor,
+        wisdom: floor,
+        charisma: floor,
       },
     };
   }
@@ -149,7 +149,7 @@ export function sumBonusMaps(
   return sum;
 }
 
-export interface AbilityRow {
+interface AbilityRow {
   ability: AbilityName;
   /** Base score before the background/species bonus; null for an unassigned pool row. */
   base: number | null;
@@ -160,8 +160,6 @@ export interface AbilityRow {
   recommended: boolean;
 }
 
-/** The per-ability display rows: base (from pool slot or stored score), the
- *  background bonus, and the derived total + modifier. */
 export function abilityRows(input: {
   method: AbilityMethod;
   scores: AbilityScores;

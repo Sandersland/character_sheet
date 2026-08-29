@@ -18,7 +18,7 @@ import type {
 } from "@/types/character";
 
 export interface CreationSelections {
-  // The sole species/variant source of truth — the flat Race catalog was pruned (#1684).
+  // The sole species/variant source of truth (#1684).
   species: SpeciesOption | undefined;
   variant: SpeciesVariantOption | undefined;
   class: ClassOption | undefined;
@@ -105,7 +105,7 @@ function isValidFloatingSpread(assignment: Partial<Record<AbilityName, number>>)
   return isValidSpread(Object.values(assignment));
 }
 
-// Mirrors resolveSpeciesGrants/resolveChosenIncreases in character-create.ts — eligible abilities exclude anything already fixed, and choose wins over floating.
+// Mirrors resolveSpeciesGrants/resolveChosenIncreases — eligible abilities exclude anything already fixed, and choose wins over floating.
 function splitSpeciesIncreases(specs: AbilityIncreaseSpec[]): {
   fixed: Partial<Record<AbilityName, number>>;
   choice: SpeciesAbilityChoice | null;
@@ -365,7 +365,7 @@ export function buildCreatePayload(
   selections: CreationSelections,
   skills: CreationSkillChoices,
   selectedToolChoices: string[],
-  // Independent of selectedToolChoices (the class's); defaulted so pre-#1779 call sites still compile (#1779).
+  // Independent of selectedToolChoices, which is the class's own pool (#1779).
   selectedBackgroundToolChoices: string[] = []
 ): CreateCharacterInput {
   const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
@@ -379,12 +379,12 @@ export function buildCreatePayload(
   return {
     name: draft.name.trim(),
     alignment: draft.alignment,
-    // The sole mechanical anchor — the flat race field and its legacy create path are gone; always set by submit time (same guarantee rulesEdition below relies on) (#1684).
+    // Always set by submit time — the same guarantee rulesEdition below relies on (#1684).
     speciesId: draft.speciesId,
     variantId: draft.variantId || undefined,
     // Only sent when the choice is completed — a fixed-only species sends undefined; the backend 400s a speciesAbilities it didn't ask for (#1681).
     speciesAbilities: completedSpeciesAbilities(speciesBonuses),
-    // Only sent when completed — the backend 400s a castingAbility it didn't ask for (resolveCastingAbility, character-create.ts) (#1683).
+    // Only sent when completed — the backend 400s a castingAbility it didn't ask for (resolveCastingAbility) (#1683).
     castingAbility: completedCastingAbility(castingAbilityChoice),
     speciesSkills: completedSpeciesSkills(speciesSkillChoice),
     speciesCantripId: completedSpeciesCantripId(speciesCantripChoice),
@@ -396,6 +396,7 @@ export function buildCreatePayload(
       subclassId: draft.subclassId || undefined,
     }],
     abilityScores: draft.abilityScores,
+    abilityGenerationMethod: draft.abilityMethod,
     // Only send a complete spread; the backend derives HP/init from it (#1130).
     backgroundAbilities: backgroundBonuses.complete ? backgroundBonuses.assignment : undefined,
     skillProficiencies: classBackgroundSkills,

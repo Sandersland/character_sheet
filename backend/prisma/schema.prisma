@@ -46,7 +46,7 @@ model Character {
 
   currency      Json
   spellcasting  Json?
-  // { used: Record<key,count>, maneuversKnown: ManeuverEntry[] } — only `used`/known lists persist; totals/die-size/recharge derived by deriveResources() in src/lib/srd.ts.
+  // { used: Record<key,count>, maneuversKnown: ManeuverEntry[] } — only `used`/known lists persist; totals/die-size/recharge derived by deriveResources.
   resources     Json?
   // { active: ConditionEntry[], exhaustion: number } — exhaustion is a single 0–6 level.
   conditions    Json?
@@ -342,7 +342,6 @@ model AuthSession {
 }
 
 // Baseline lists offered in the character-creation form, NOT referenced directly by Character — only through the nullable FKs on the selection models below, so deleting/renaming a catalog row never breaks an existing character sheet.
-
 // `edition` is NOT NULL — no species is edition-neutral (a 2014 and 2024 Dwarf are two rows sharing a name, never one shared row).
 // SpeciesVariant/SpeciesTrait/SpeciesGrantedSpell carry no `edition` column of their own — they inherit it through speciesId.
 model Species {
@@ -570,7 +569,7 @@ model ClassFeature {
   effectDiceFaces      Int?
   effectDieSource      String?
   effectModifier       Int?
-  effectModifierSource String? // "classLevel" | "abilityMod:<ability>"
+  effectModifierSource String? // "classLevel" | "abilityMod:<ability>" — seed validation (classFeatureSeedSchema) rejects "abilityMod:<ability>" until a reader resolves it.
   damageType           String?
   attackType           String?
   saveAbility          String?
@@ -582,7 +581,7 @@ model ClassFeature {
   derivedStat      String?
   derivedStatTiers Json? // [{ minLevel, value }] — ASCENDING by minLevel, last-match-wins
 
-  // Closed-form save DC: 8 + proficiency + the higher named ability (PHB'14 p.73 / PHB'24 p.83). A non-empty list IS the trigger — never matched by derivedStat name. Feeds ClassExtras.announcedSaveDC, which throws on a collision — why Cleric keeps its own channelDivinitySaveDC path.
+  // Closed-form save DC: 8 + proficiency + the highest of the named abilities (PHB'14 p.73 / PHB'24 p.83). A non-empty list IS the trigger — never matched by derivedStat name. Feeds ClassExtras.announcedSaveDC; a second class entry also declaring one is a logged-and-dropped collision, not a crash (assignAnnouncedSaveDC keeps the primary entry's DC — throwing here would 500 the character load) — why Cleric keeps its own channelDivinitySaveDC path instead of using this column.
   saveDcAbilities String[] @default([])
 
   // A passive grant no other column expresses. Validated against featImprovementSchema — the same vocabulary a taken feat's `improvements` snapshot uses, reused not forked.
@@ -595,7 +594,7 @@ model ClassFeature {
   conditionImmunities                  String[] @default([])
   // Gates the immunities on a buff of this key being active (e.g. Mindless Rage names "rage"); null = unconditional.
   conditionImmunitiesRequireActiveBuff String?
-  // For an existing matching condition when the gating buff STARTS: "clear" removes it permanently (2024 Mindless Rage, SRD 5.2); "suspend" restores it when the buff ends (2014 Mindless Rage, PHB'14 p.49). Interpreted by applyRowDrivenActionInTx's toggle branch and conditionImmunitiesFromRows.
+  // For an existing matching condition when the gating buff STARTS: "clear" removes it permanently (2024 Mindless Rage, SRD 5.2); "suspend" restores it when the buff ends (2014 Mindless Rage, PHB'14 p.49). Interpreted by syncConditionImmunityOnBuffStartInTx and conditionImmunitiesFromRows.
   conditionImmunitiesOnBuffStart       String?
 
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot express it): subclassId is nullable, so without it two identical base-class rows would both insert.
@@ -709,7 +708,6 @@ model Background {
 }
 
 // Each selection links a Character to a catalog row (optionally — null means homebrew, no baseline) and carries its own `name`, defaulting to the catalog entry's name at creation but free to drift independently.
-
 model CharacterRace {
   id                    String          @id @default(uuid())
   characterId           String          @unique
@@ -771,7 +769,7 @@ enum ItemScope {
   CAMPAIGN
 }
 
-// The six 5e magic-item rarity tiers (DMG p. 135). Rules data + gp values live in lib/srd.ts (ITEM_RARITIES); this is only the persisted column domain.
+// The six 5e magic-item rarity tiers (DMG p. 135). gp values live in ITEM_RARITIES; this is only the persisted column domain.
 enum ItemRarity {
   COMMON
   UNCOMMON
@@ -828,7 +826,7 @@ enum SessionStatus {
   ended
 }
 
-// Reserves the full A–E menu; only passiveBonus is implemented this slice — the rest are forward-declared so the side-table column set + adapter don't churn when they land.
+// The full A–E capability menu; each kind has its own payload block on ItemCapability.
 enum CapabilityKind {
   passiveBonus
   castSpell
@@ -868,7 +866,7 @@ enum CapabilityTarget {
   maxHp
 }
 
-// setTo (absolute floor/override) is not yet consumed in derivation this slice.
+// setTo is declared but not consumed in derivation — buildTargetModifiers skips it.
 enum CapabilityOp {
   add
   setTo
@@ -912,7 +910,7 @@ enum AttunementPrereqKind {
   alignment
 }
 
-// Mirrors frontend/src/types/character.ts SpellSchool — the two must stay in sync.
+// Mirrors the frontend's SpellSchool — the two must stay in sync.
 enum SpellSchool {
   abjuration
   conjuration
@@ -924,30 +922,32 @@ enum SpellSchool {
   transmutation
 }
 
-// Holds DISPLAY + GATING data only. Executable mechanics are hardcoded in backend/src/lib/actions.ts (ACTION_EFFECT_FN keyed by `key`). Adding a new action = append a row to seed.ts + add the effect fn in actions.ts. No migration needed for new actions; only new columns need one.
+// Serves universal actions (available to every character) to GET /api/reference;
+// `key` also doubles as the dispatch identity ACTION_EFFECT_FN is keyed by for the
+// actions/transactions endpoint. Every row is `universal: true` — class/subclass/
+// level gating for class-specific actions lives elsewhere: the one permanent
+// DERIVED_ACTIONS holdout (summonBondedWeapon), or a ClassFeature row's own
+// activationCost/resourceKey columns, post-#1522 retab (#1979). Adding a
+// universal action: append a row here and an ACTION_EFFECT_FN entry (or
+// NO_DISPATCH_ACTION_KEYS if it's reminder-only) — the seed-side
+// ACTION_EFFECT_FN parity test enforces the two stay in sync. No migration
+// needed for a new row; only a new column needs one.
 model Action {
   id          String @id @default(uuid())
-  key         String // stable machine key, e.g. "rage" | "dodge"
+  key         String // stable machine key, e.g. "attack" | "dodge"
   name        String // display label
   description String
 
   // Which economy slot this action consumes on the character's turn.
   cost ActionCost
 
-  // universal actions are available to everyone; class/subclass/level actions are gated by the character's class entry.
-  universal     Boolean @default(false)
-  grantClass    String? // lowercase class name, e.g. "fighter"
-  grantSubclass String? // lowercase subclass name (optional, for subclass-only abilities)
-  grantLevel    Int? // minimum character level for this action to appear
+  // Always true today (see the model comment above) — kept as a real column, not a hardcoded assumption, so a future non-universal use has somewhere to land without a migration.
+  universal Boolean @default(false)
 
-  // Used by deriveActions to check remaining > amount for `enabled` (e.g. Rage costs 1 "rage").
-  resourceKey    String? // matches DerivedResource.key, e.g. "rage"
-  resourceAmount Int? // units required; null means no resource check needed
-
-  // NULL = valid in both editions — still true for every class row. Every `universal: true` row is forked: each `description` is a transcription from ONE named document, so a shared row could only cite "SRD 5.1 and SRD 5.2" and an ambiguous citation is a bug. The business key is (key, edition) rather than plain `key` — `key` is edition-stable identity, so the 2024 Magic row keeps `key: "castSpell"`.
+  // NULL = valid in both editions (#1306); no seeded row uses it today since every universal row forks per edition — each `description` is a transcription from ONE named document, so a shared row could only cite "SRD 5.1 and SRD 5.2" and an ambiguous citation is a bug. The business key is (key, edition) rather than plain `key` — `key` is edition-stable identity, so the 2024 Magic row keeps `key: "castSpell"`.
   edition RulesEdition?
 
-  // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot emit it), so a class row's NULL edition still admits at most one row per key.
+  // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot emit it), so a shared (NULL-edition) row still admits at most one row per key.
   @@unique([key, edition])
 }
 
@@ -1135,10 +1135,10 @@ model Spell {
   speciesGrantedBy SpeciesGrantedSpell[]
   // A picker-only widening, never a free grant (see grantedBy above).
   listExpandedBy   SubclassSpellListExpansion[]
-  // Replaces the old `classes String[]` column. No `edition` filter needed on this side: a 2014-fork Spell row and its 2024 sibling are separate Spell rows, each owning disjoint SpellClass rows already.
+  // No `edition` filter needed on this side: a 2014-fork Spell row and its 2024 sibling are separate Spell rows, each owning disjoint SpellClass rows already.
   classMemberships SpellClass[]
 
-  // NULL = valid in both editions; a diverging spell forks into one row per edition sharing this name. NULLS NOT DISTINCT on the migration's unique index — see resolveEditionRow. The existing ~109 seeded rows are SRD 5.2 text and are tagged EDITION_2024, not NULL — they're edition-specific content, not rules that happen to agree.
+  // NULL = valid in both editions; a diverging spell forks into one row per edition sharing this name. NULLS NOT DISTINCT on the migration's unique index — see resolveEditionRow. Seeded 2024 rows are SRD 5.2 text tagged EDITION_2024, not NULL — edition-specific content, not rules that happen to agree.
   edition RulesEdition?
 
   // Every Spell row — seeded or homebrew — is 1:1 with exactly one CatalogEntry, which carries ownership/scope. A bare scalar, deliberately with no Prisma relation field: CatalogEntry carries no back-relation to Spell either, which keeps the supertype closed to future kinds instead of hard-coupling it to Spell specifically. The FK constraint (ON DELETE CASCADE) is hand-written into the migration — Prisma only emits one from an actual `@relation`.
@@ -1173,7 +1173,7 @@ model Item {
   description  String?
   // null = bag-only (not wearable). Weapons and body armor derive their slot from detail data, so this is only set for wearable gear.
   slot         EquipSlot?
-  // Set only for the small set of Item rows that ARE tools; null for everything else. Lets a StartingEquipmentOpenPick filter "musical instrument" / "artisan tool" as a column read, never a reach into lib/srd/tools.ts from the equipment resolver.
+  // Set only for the small set of Item rows that ARE tools; null for everything else. Lets a StartingEquipmentOpenPick filter "musical instrument" / "artisan tool" as a column read, never a reach into the tools catalog from the equipment resolver.
   toolCategory ToolCategory?
 
   rarity                ItemRarity?
@@ -1261,7 +1261,7 @@ model ItemCapability {
   @@index([itemId])
 }
 
-// The FK lives here (joins up to Item) rather than Item holding a column that points at this table — keeps Item itself free of per-category columns no matter how many detail tables exist. Dice fields are decomposed to match frontend/src/lib/dice.ts's RollSpec shape rather than a "1d6" string.
+// The FK lives here (joins up to Item) rather than Item holding a column that points at this table — keeps Item itself free of per-category columns no matter how many detail tables exist. Dice fields are decomposed to match the frontend's RollSpec shape rather than a "1d6" string.
 model ItemWeaponDetail {
   id     String @id @default(uuid())
   itemId String @unique
@@ -1365,7 +1365,7 @@ model InventoryItem {
   requiresAttunement    Boolean               @default(false)
   attunementPrereqKind  AttunementPrereqKind?
   attunementPrereqValue String?
-  // Eldritch Knight Weapon Bond (2014, PHB'14 p.75): mirrors `attuned` — the WEAPON_BOND_LIMIT-item cap is derived (counted), never stored. A character no longer eligible is handled by reconcileWeaponBond (level-reconciliation.ts).
+  // Eldritch Knight Weapon Bond (2014, PHB'14 p.75): mirrors `attuned` — the WEAPON_BOND_LIMIT-item cap is derived (counted), never stored. A character no longer eligible is handled by reconcileWeaponBond.
   weaponBonded          Boolean               @default(false)
   notes                 String?
   position              Int                   @default(0)
@@ -1411,7 +1411,6 @@ enum CharacterEventCategory {
   conditions // status conditions (prone, poisoned, etc.) + exhaustion level
   effects // active cast-granted stat modifiers (buffs)
   roll // dice rolls logged from the session UI (attack/damage/check/save/initiative)
-  // future: journal
 }
 
 enum CharacterEventType {
@@ -1500,7 +1499,7 @@ enum CharacterEventType {
   combatStarted
   combatEnded
   combatRoundAdvanced
-  // One undoable event per resolved weapon swing/spell cast, carrying its rolls in `data` — replaces the separate attackRoll/damageRoll/castSpell rows a resolution used to write.
+  // One undoable event per resolved swing/cast, carrying its rolls in `data`.
   resolveAction
   conditionApplied
   conditionRemoved
@@ -1549,7 +1548,12 @@ model CharacterEvent {
   @@index([sessionId, createdAt])
 }
 
-// At most one `active` session per campaign, and at most one `active` solo session per character (campaignId null) — both enforced in lib, not a DB partial-unique.
+// At most one `active` session per campaign is DB-enforced by the hand-written partial unique index
+// Session_campaignId_active_key — Prisma's DSL cannot express a partial (WHERE-clause) index, so it has
+// no field here to attach to. At most one `active` solo session per character (campaignId null) is
+// enforced in lib only: a solo session's character lives on SessionParticipant, a separate table, and a
+// partial unique index can only constrain columns of the table it's defined on, so this half of the
+// invariant has no DB-level equivalent yet.
 model Session {
   id           String        @id @default(uuid())
   // Null for a character-scoped solo session.

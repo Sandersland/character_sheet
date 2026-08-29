@@ -364,6 +364,30 @@ describe("characters routes", () => {
     expect(response.status).toBe(400);
   });
 
+  // abilityScores is bound to the six named keys (.strict(), #1978) plus validateAbilityScores(undefined, ...) — never an unbounded record accepting any key with any int.
+  describe("PATCH abilityScores bound (#1383's ability-score wave)", () => {
+    const NAMED_SCORES = {
+      strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10,
+    };
+
+    it("rejects an out-of-bound score (strength 999)", async () => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .patch(`/api/characters/${FIXTURE.id}`)
+        .send({ abilityScores: { ...NAMED_SCORES, strength: 999 } });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(/1 and 30/);
+    });
+
+    it("400s an unrecognized key (\"luck\") instead of silently stripping it", async () => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .patch(`/api/characters/${FIXTURE.id}`)
+        .send({ abilityScores: { ...NAMED_SCORES, luck: 5 } });
+
+      expect(response.status).toBe(400);
+    });
+  });
+
   // portraitUrl is read-only, derived from Character.portraitKey — a client-supplied URL was an IDOR (#1615).
   describe("portrait wire seam (#1615)", () => {
     it.each([
@@ -495,6 +519,15 @@ describe("characters routes", () => {
       expect(response.status).toBe(400);
     });
 
+    it("rejects a duplicate skill in skillProficiencies with 400 (#1980)", async () => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .post("/api/characters")
+        .send({ ...createBody(), skillProficiencies: ["athletics", "athletics"] });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(/must be distinct/i);
+    });
+
     it("allows a homebrew background with no catalog match", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
@@ -619,13 +652,44 @@ describe("characters routes", () => {
         expect(res.status).toBe(400);
       });
 
-      it("rejects a spread pushing a score over 20 with 400", async () => {
+      // Cap is method-aware — see postBonusAbilityCap. criminalBody declares no
+      // abilityGenerationMethod, landing in the omitted-method branch (cap 30, not 20).
+      it("accepts a spread pushing a score over 20 (but not 30) when no method is declared", async () => {
         const res = await post({
           ...criminalBody,
           abilityScores: { ...criminalBody.abilityScores, dexterity: 19 },
           backgroundAbilities: { dexterity: 2, constitution: 1 },
         });
+        expect(res.status).toBe(201);
+        createdCharacterIds.push(res.body.id);
+        expect(res.body.abilityScores.dexterity).toBe(21);
+      });
+
+      it("rejects a spread pushing a score over 30 when no method is declared", async () => {
+        const res = await post({
+          ...criminalBody,
+          abilityScores: { ...criminalBody.abilityScores, dexterity: 29 },
+          backgroundAbilities: { dexterity: 2, constitution: 1 },
+        });
         expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/exceed 30/);
+      });
+
+      // standardArray's own 8-15 base range plus this background's max +2/+1 spread
+      // tops out at 17 — the API can never combine enough bonus to reach the 20
+      // cap this way, so the cap ITSELF (not just this reachable slice of it) is
+      // pinned directly against postBonusAbilityCap.
+      it("still applies a legal spread on top of a standardArray assignment", async () => {
+        const res = await post({
+          ...criminalBody,
+          abilityGenerationMethod: "standardArray",
+          abilityScores: { strength: 8, dexterity: 15, constitution: 14, intelligence: 13, wisdom: 12, charisma: 10 },
+          backgroundAbilities: { dexterity: 2, constitution: 1 },
+        });
+        expect(res.status).toBe(201);
+        createdCharacterIds.push(res.body.id);
+        expect(res.body.abilityScores.dexterity).toBe(17);
+        expect(res.body.abilityScores.constitution).toBe(15);
       });
 
       it("rejects backgroundAbilities on a spec-less/custom background with 400", async () => {

@@ -3,7 +3,7 @@
 Read this when you need the cross-cutting data patterns (catalog+snapshot, JSON columns, audit log, transaction pattern) or the auth/ownership model. For inventories of what exists, read the code — it is the source of truth:
 
 - **Routers:** registered in `backend/src/routes/manifest.ts` (`{ router, mount, scope }`), mounted by `app.ts`. Catalog/plain-REST routers mount at `/api`; character-scoped mutation routers mount on their owned sub-path under `/api/characters/:id` via `Router({ mergeParams: true })`.
-- **Domain logic:** `ls backend/src/lib/` — domain folders (`auth`, `activity`, `srd`, `rules`, `classes`, `leveling`, `spellcasting`, `combat`, `inventory`, `character`, `session`, `campaign`, `core`, `http`).
+- **Domain logic:** `ls backend/src/lib/` — domain folders.
 - **Frontend routes:** `frontend/src/App.tsx`.
 - **Schema:** `backend/prisma/schema.prisma` — model comments carry the per-model reasoning.
 
@@ -81,4 +81,4 @@ The frontend's derived type is **`z.input<typeof schema>`, not `z.infer`/`z.outp
 
 ## Docker Compose
 
-Four services: `db` (Postgres 17, 5432), `pgadmin` (5050, behind the `tools` profile), `backend` (Express, 4000), `frontend` (Vite, 5173). Backend/frontend build from the repo-root context (npm workspaces must link `packages/*`) with the whole repo bind-mounted for hot reload and per-service named volumes shadowing both the hoisted root `node_modules` and the workspace-local one. Prisma client generates into `src/generated/prisma` (gitignored) — run `npx prisma generate` after a fresh clone or schema change.
+`db` (Postgres 17, 5432) is the only service the dev loop needs, with `pgadmin` (5050) and the Playwright `e2e` runner available behind opt-in profiles — see `docs/development.md` for the Quickstart. Prisma client generates into `src/generated/prisma` (gitignored) — run `npx prisma generate` after a fresh clone or schema change.

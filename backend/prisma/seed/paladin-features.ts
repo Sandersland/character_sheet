@@ -20,7 +20,13 @@
 import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
-import type { ClassFeatureSeedRow } from "./class-features.js";
+import type {
+  ActionCostSeed,
+  ClassFeatureSeedRow,
+  CostKindSeed,
+  DerivedStatSeed,
+  ResourceRechargeSeed,
+} from "./class-features.js";
 
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`paladin-features: unknown subclass slug "${s}"`);
@@ -33,14 +39,14 @@ interface RawPaladinFeature {
   level: number;
   description: string;
   edition: SeedEdition;
-  derivedStat?: string;
+  derivedStat?: DerivedStatSeed;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
   resourceKey?: string;
   resourceLabel?: string;
-  resourceRecharge?: string;
+  resourceRecharge?: ResourceRechargeSeed;
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
-  activationCost?: string;
-  costKind?: string;
+  activationCost?: ActionCostSeed;
+  costKind?: CostKindSeed;
   costPoolKey?: string;
   costBase?: number;
   reminder?: string;
@@ -79,8 +85,7 @@ const BASE_RAW: RawPaladinFeature[] = [
     edition: "EDITION_2014",
     description:
       "As an action, sense the presence of celestials, fiends, and undead within 60 ft until the end of your next turn (they aren't hidden from this sense). You can also detect consecrated or desecrated places/objects. Uses = 1 + Charisma modifier per long rest.",
-    // PHB'14 p.84: 1 + Charisma modifier, no stated minimum. `min: 1` is NOT
-    // RAW — kept for byte-parity with the legacy Math.max(1, 1 + chaMod) floor.
+    // PHB'14 p.84: 1 + Charisma modifier, no stated minimum — `min: 1` floors it deliberately.
     resourceKey: "divineSense",
     resourceLabel: "Divine Sense",
     resourceRecharge: "longRest",

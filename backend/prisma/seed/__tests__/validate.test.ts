@@ -6,23 +6,26 @@
 // impossible to fake — and feeding a deliberately-broken FIXTURE array (never
 // the real SUBCLASSES) through the real schema proves the schema itself still
 // rejects bad content, independent of what's currently seeded.
+//
+// SEED_FAMILIES is NOT every seeded content array — ITEMS, PACKS, FEATS,
+// BACKGROUNDS, and ACTIONS are seeded too but carry no zod schema yet; the
+// families/rows floors below cover only what's registered, not the whole
+// seeded surface.
 import { describe, it, expect } from "vitest";
 
-import { assertSeedContentValid, assertCatalogNamesResolve, assertNoDuplicatePoolDeclaringRows, assertNoDuplicateChoiceDeclaringRows } from "../validate.js";
+import { assertSeedContentValid, assertCatalogNamesResolve, assertNoDuplicatePoolDeclaringRows, assertNoDuplicateChoiceDeclaringRows, rowIdentity } from "../validate.js";
 import { subclassSeedSchema } from "../subclasses.js";
 
 describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
-  // 5 families today: SUBCLASSES, SUBCLASS_GRANTED_SPELLS, CLASS_FEATURES
-  // (#1523, 522 rows), STARTING_EQUIPMENT_PACKAGES (#1533, 24 rows), and
-  // BACKGROUND_STARTING_EQUIPMENT_PACKAGES (#1565, 5 rows) — >= floors rather
-  // than exact counts so this doesn't need editing every time a family is
-  // added. The floor is bumped 4->5 in the SAME diff that registers the fifth
-  // family — writing toBe(4)/60 here would keep passing if the registration
-  // were silently dropped (#1370's exact failure shape).
-  it("visited at least 5 families and 60 rows", () => {
+  // 16 families today (SEED_FAMILIES in validate.ts) — >= floors rather than
+  // exact counts so this doesn't need editing every time a family is added.
+  // The floor is bumped in the SAME diff that registers a new family —
+  // writing toBe(N) here would keep passing if a registration were silently
+  // dropped (#1370's exact failure shape).
+  it("visited at least 16 families and 1000 rows", () => {
     const summary = assertSeedContentValid();
-    expect(summary.familiesChecked).toBeGreaterThanOrEqual(5);
-    expect(summary.rowsChecked).toBeGreaterThanOrEqual(60);
+    expect(summary.familiesChecked).toBeGreaterThanOrEqual(16);
+    expect(summary.rowsChecked).toBeGreaterThanOrEqual(1000);
   });
 
   it("the real content passes cleanly", () => {
@@ -80,7 +83,7 @@ describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
     expect(() => assertCatalogNamesResolve(okFixture)).not.toThrow();
   });
 
-  // #1564: the twelve PHB'24 catalog additions (11 fixed items + 9 new
+  // #1564: the PHB'24 catalog additions (11 fixed items + 9 new
   // musical instruments, Lute already existed) must resolve the same way any
   // other ITEMS row does — a FIXTURE package referencing all of them, never
   // the real STARTING_EQUIPMENT_PACKAGES (which doesn't cite them until #1535).
@@ -173,5 +176,52 @@ describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
       },
     ];
     expect(() => assertCatalogNamesResolve(fixture)).not.toThrow();
+  });
+});
+
+describe("rowIdentity — the error-message identity tag (#1980)", () => {
+  it("returns empty string for a non-object row", () => {
+    expect(rowIdentity("not-a-row")).toBe("");
+    expect(rowIdentity(42)).toBe("");
+    expect(rowIdentity(undefined)).toBe("");
+  });
+
+  it("returns empty string for null", () => {
+    expect(rowIdentity(null)).toBe("");
+  });
+
+  it("returns empty string when neither a label nor an edition field is present", () => {
+    expect(rowIdentity({ someOtherField: 1 })).toBe("");
+  });
+
+  it("tags (name, edition) when both are present", () => {
+    expect(rowIdentity({ name: "Fireball", edition: "EDITION_2014" })).toBe(" (Fireball, EDITION_2014)");
+  });
+
+  it("falls back to className when name is absent", () => {
+    expect(rowIdentity({ className: "Fighter", edition: "EDITION_2024" })).toBe(" (Fighter, EDITION_2024)");
+  });
+
+  it("falls back to backgroundName when neither name nor className is present", () => {
+    expect(rowIdentity({ backgroundName: "Soldier", edition: "EDITION_2014" })).toBe(" (Soldier, EDITION_2014)");
+  });
+
+  it("prefers name over className over backgroundName when more than one is present", () => {
+    expect(rowIdentity({ name: "Fireball", className: "Wizard", backgroundName: "Sage", edition: "EDITION_2014" })).toBe(
+      " (Fireball, EDITION_2014)",
+    );
+  });
+
+  it("omits the edition segment when a label is present but edition is absent", () => {
+    expect(rowIdentity({ name: "Fireball" })).toBe(" (Fireball)");
+  });
+
+  it("tags just the edition when no label field is present", () => {
+    expect(rowIdentity({ edition: "EDITION_2024" })).toBe(" (EDITION_2024)");
+  });
+
+  it("ignores a non-string label or edition value", () => {
+    expect(rowIdentity({ name: 123, edition: "EDITION_2014" })).toBe(" (EDITION_2014)");
+    expect(rowIdentity({ name: "Fireball", edition: 2014 })).toBe(" (Fireball)");
   });
 });

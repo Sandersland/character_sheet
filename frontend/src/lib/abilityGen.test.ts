@@ -1,14 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  POINT_BUY_BUDGET,
-  STANDARD_ARRAY,
-  isValidPointBuy,
   pointBuyCost,
   roll4d6DropLowest,
   rollAbilityScoreSet,
   totalPointBuyCost,
 } from "./abilityGen";
+import type { AbilityGenerationConfig } from "@/types/character";
+
+const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
+const POINT_BUY: AbilityGenerationConfig["pointBuy"] = {
+  budget: 27,
+  floor: 8,
+  ceiling: 15,
+  costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 },
+};
 
 describe("roll4d6DropLowest", () => {
   afterEach(() => {
@@ -49,41 +55,22 @@ describe("rollAbilityScoreSet", () => {
   });
 });
 
-describe("STANDARD_ARRAY", () => {
-  it("is the fixed 15/14/13/12/10/8 set", () => {
-    expect(STANDARD_ARRAY).toEqual([15, 14, 13, 12, 10, 8]);
-  });
-});
-
 describe("pointBuyCost", () => {
-  it("returns the SRD cost for each valid score", () => {
-    expect(pointBuyCost(8)).toBe(0);
-    expect(pointBuyCost(10)).toBe(2);
-    expect(pointBuyCost(13)).toBe(5);
-    expect(pointBuyCost(15)).toBe(9);
+  it("returns the served cost for each valid score", () => {
+    expect(pointBuyCost(POINT_BUY, 8)).toBe(0);
+    expect(pointBuyCost(POINT_BUY, 10)).toBe(2);
+    expect(pointBuyCost(POINT_BUY, 13)).toBe(5);
+    expect(pointBuyCost(POINT_BUY, 15)).toBe(9);
   });
 
-  it("throws for scores outside 8-15", () => {
-    expect(() => pointBuyCost(7)).toThrow(RangeError);
-    expect(() => pointBuyCost(16)).toThrow(RangeError);
+  it("throws for scores outside the served floor/ceiling", () => {
+    expect(() => pointBuyCost(POINT_BUY, 7)).toThrow(RangeError);
+    expect(() => pointBuyCost(POINT_BUY, 16)).toThrow(RangeError);
   });
 });
 
-describe("totalPointBuyCost / isValidPointBuy", () => {
+describe("totalPointBuyCost", () => {
   it("accepts the standard array as exactly spending the full budget", () => {
-    expect(totalPointBuyCost(STANDARD_ARRAY)).toBe(POINT_BUY_BUDGET);
-    expect(isValidPointBuy(STANDARD_ARRAY)).toBe(true);
-  });
-
-  it("rejects a set that overspends the budget", () => {
-    expect(isValidPointBuy([15, 15, 15, 15, 15, 15])).toBe(false);
-  });
-
-  it("rejects a set with an out-of-range score", () => {
-    expect(isValidPointBuy([16, 8, 8, 8, 8, 8])).toBe(false);
-  });
-
-  it("rejects a set that isn't six scores", () => {
-    expect(isValidPointBuy([8, 8, 8])).toBe(false);
+    expect(totalPointBuyCost(POINT_BUY, STANDARD_ARRAY)).toBe(POINT_BUY.budget);
   });
 });

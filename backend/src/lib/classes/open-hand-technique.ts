@@ -57,9 +57,16 @@ const RIDER_EFFECT: Record<OpenHandRider, string> = {
 // SRD 5.2 / PHB'24 p.90 vs SRD 5.1 / PHB'14 p.78 — the reaction scope and
 // whose next turn the clock runs to differ materially, not just wording.
 function addleClause(edition: RulesEdition): string {
-  return edition === "EDITION_2014"
-    ? "the target can't take reactions until the end of your next turn"
-    : "the target can't make Opportunity Attacks until the start of its next turn";
+  switch (edition) {
+    case "EDITION_2014":
+      return "the target can't take reactions until the end of your next turn";
+    case "EDITION_2024":
+      return "the target can't make Opportunity Attacks until the start of its next turn";
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`addleClause: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 export function openHandRiderSummary(
@@ -118,7 +125,7 @@ async function imposeOpenHandRider(
     throw new InvalidOpenHandTechniqueOperationError("Open Hand Technique can only be imposed once per turn");
   }
 
-  // fallow-ignore-next-line code-duplication -- intentionally repeated per monk save-DC vertical (mirrors the same pattern in quivering-palm and stunning-strike) rather than a shared helper
+  // fallow-ignore-next-line code-duplication -- intentionally repeated per monk save-DC vertical (mirrors the same pattern in applyQuiveringPalmOperations and applyStunningStrikeOperations) rather than a shared helper
   // Proficiency bonus is total-character-level based, not monk-level — matches every DC formula in this codebase.
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);

@@ -34,7 +34,16 @@ export interface StunningStrikeAttemptResult {
 
 /** 2014 (SRD 5.1 / PHB'14 p.77) has no once-per-turn cap — any melee hit can attempt one, gated only by ki remaining (enforced by the spend below). */
 export function canAttemptStunningStrike(input: { usedThisTurn: boolean }, edition: RulesEdition): boolean {
-  return edition === "EDITION_2014" ? true : !input.usedThisTurn;
+  switch (edition) {
+    case "EDITION_2014":
+      return true;
+    case "EDITION_2024":
+      return !input.usedThisTurn;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`canAttemptStunningStrike: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 /** Constitution save (both editions): fail (roll < DC) is Stunned. 2024 success halves speed + grants advantage; 2014 has no success rider. */
@@ -44,14 +53,20 @@ export function resolveStunningStrikeOutcome(roll: number, dc: number): Stunning
 
 export function stunningStrikeSummary(dc: number, roll: number, outcome: StunningStrikeOutcome, edition: RulesEdition): string {
   const base = `Stunning Strike — DC ${dc}, target rolled ${roll}`;
-  if (edition === "EDITION_2014") {
-    return outcome === "fail"
-      ? `${base}: failed the save — Stunned until the end of your next turn.`
-      : `${base}: made the save — no effect.`;
+  switch (edition) {
+    case "EDITION_2014":
+      return outcome === "fail"
+        ? `${base}: failed the save — Stunned until the end of your next turn.`
+        : `${base}: made the save — no effect.`;
+    case "EDITION_2024":
+      return outcome === "fail"
+        ? `${base}: failed the save — Stunned until the start of your next turn.`
+        : `${base}: made the save — its speed is halved until the start of your next turn, and the next attack roll against it before then has advantage.`;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`stunningStrikeSummary: unhandled edition ${String(exhaustive)}`);
+    }
   }
-  return outcome === "fail"
-    ? `${base}: failed the save — Stunned until the start of your next turn.`
-    : `${base}: made the save — its speed is halved until the start of your next turn, and the next attack roll against it before then has advantage.`;
 }
 
 const STUNNING_STRIKE_SELECT = {

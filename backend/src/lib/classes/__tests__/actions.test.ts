@@ -51,6 +51,35 @@ const atRows = (
     testFeatureRowsFor(entry.name, entry.subclass),
   );
 
+// #1528 regression class: applyActionOpInTx checks ACTION_EFFECT_FN BEFORE eligibleRowActions, so
+// an entry here for a key that's ALSO a ClassFeature row's own resourceKey would silently SHADOW
+// the row path — skipping its level/edition gate, assertActivationRequirementsMet, and (for a
+// cast-core row) the server-rolled dice castSpecFromRow computes. The seed-level
+// action-effect-parity.test.ts reverse-direction check can't guard against this: it only proves a
+// key is reachable from SOME seeded identity, and many of today's ACTION_EFFECT_FN keys
+// legitimately live in both tables (their row can't express a client-rolled heal or an
+// edition-forked pool key generically). These six have no legitimate reason to ever be dual-homed
+// — a pure counter (secondWind, actionSurge), or a cast that only ever runs through its own
+// dedicated endpoint with its own activation-requirement checks (shadowArts/cloakOfShadows via
+// /abilities/shadow-arts, elementalAttunement/elementalBurst via /abilities/warrior-of-elements) —
+// so a fn reappearing here is unambiguously the regression.
+const ROW_ONLY_ACTION_KEYS = [
+  "secondWind",
+  "actionSurge",
+  "shadowArts",
+  "cloakOfShadows",
+  "elementalAttunement",
+  "elementalBurst",
+] as const;
+
+describe("row-only action keys never regain an ACTION_EFFECT_FN entry (#1528)", () => {
+  it("secondWind/actionSurge/shadowArts/cloakOfShadows/elementalAttunement/elementalBurst have no ACTION_EFFECT_FN entry", () => {
+    for (const key of ROW_ONLY_ACTION_KEYS) {
+      expect(ACTION_EFFECT_FN[key], key).toBeUndefined();
+    }
+  });
+});
+
 describe("deriveActions — class gates", () => {
   it("Fighter has no DERIVED_ACTIONS entries (#1528 — Second Wind/Action Surge are row-driven now; see entry-scoped-actions.test.ts's deriveEntryScopedActions coverage)", () => {
     const l2 = keys(at("fighter", undefined, 2, []));
@@ -440,11 +469,6 @@ describe("Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (
     expect(stepFocus!.reminder).toMatch(/jump/i);
   });
 
-  it("free variants are pure reminder actions — no server effect fn (like Shadow Step/Opportunist)", () => {
-    expect(ACTION_EFFECT_FN.patientDefense).toBeUndefined();
-    expect(ACTION_EFFECT_FN.stepOfTheWind).toBeUndefined();
-  });
-
   it("patientDefenseFocus spends exactly 1 focus", () => {
     expect(ACTION_EFFECT_FN.patientDefenseFocus({})).toEqual([
       { type: "spendResource", key: "focus" },
@@ -500,10 +524,6 @@ describe("Monk Stunning Strike — not a catalog action (#1242)", () => {
     expect(keys(atRows("monk", undefined, 4, []))).not.toContain("stunningStrike");
     expect(keys(atRows("monk", undefined, 5, []))).not.toContain("stunningStrike");
     expect(keys(atRows("monk", undefined, 20, []))).not.toContain("stunningStrike");
-  });
-
-  it("has no ACTION_EFFECT_FN entry (post-hit rider, not a selectable action)", () => {
-    expect(ACTION_EFFECT_FN.stunningStrike).toBeUndefined();
   });
 });
 
@@ -572,10 +592,6 @@ describe("Warrior of Shadow — Shadow Step (2024 rewrite, #1246)", () => {
     const flurry = atRows("monk", SHADOW, 17, []).find((a) => a.key === "flurryOfBlows");
     expect(flurry?.reminder).toBeUndefined();
   });
-
-  it("is a pure reminder action — no server effect fn (no ACTION_EFFECT_FN entry)", () => {
-    expect(ACTION_EFFECT_FN.shadowStep).toBeUndefined();
-  });
 });
 
 describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
@@ -593,10 +609,6 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
     const deflect = atRows("monk", undefined, 3, []).find((a) => a.key === "deflectAttacks");
     expect(deflect?.reminder).toMatch(/bludgeoning, piercing, or slashing/i);
     expect(deflect?.reminder).toMatch(/reaction/i);
-  });
-
-  it("is a pure reminder action — no server effect fn for the base reduction", () => {
-    expect(ACTION_EFFECT_FN.deflectAttacks).toBeUndefined();
   });
 
   it("deflectAttacksRedirect is granted at monk L3 as a free-cost Focus spend", () => {
@@ -748,10 +760,6 @@ describe("2014 Monk Deflect Missiles (#1500)", () => {
     expect(deflect?.reminder).toMatch(/ranged weapon attack/i);
   });
 
-  it("is a pure reminder action — no server effect fn for the base reduction", () => {
-    expect(ACTION_EFFECT_FN.deflectMissiles).toBeUndefined();
-  });
-
   it("deflectMissilesThrow is granted at monk L3, costs 1 ki, and spends it", () => {
     const l3 = atRows("monk", undefined, 3, [pool("ki", 3)], true, "EDITION_2014");
     const throwBack = l3.find((a) => a.key === "deflectMissilesThrow");
@@ -792,11 +800,6 @@ describe("2014 Monk Empty Body (L18, #1500) — gating/reminder rows, no dedicat
     const l18 = atRows("monk", undefined, 18, [pool("ki", 5)], true, "EDITION_2014");
     expect(l18.find((a) => a.key === "emptyBody")?.enabled).toBe(true); // 5 >= 4
     expect(l18.find((a) => a.key === "emptyBodyAstralProjection")?.enabled).toBe(false); // 5 < 8
-  });
-
-  it("neither has an ACTION_EFFECT_FN entry — reminder-only, like shadowArts/cloakOfShadows", () => {
-    expect(ACTION_EFFECT_FN.emptyBody).toBeUndefined();
-    expect(ACTION_EFFECT_FN.emptyBodyAstralProjection).toBeUndefined();
   });
 });
 
@@ -886,10 +889,6 @@ function secondWindRow(): ClassFeatureRow {
 }
 
 describe("castSpecFromRow — Second Wind, row-driven (#1528, retired ACTION_CAST_FN)", () => {
-  it("is row-driven now, not an ACTION_EFFECT_FN op-list action", () => {
-    expect(ACTION_EFFECT_FN.secondWind).toBeUndefined();
-  });
-
   it("spends the secondWind pool (base 1), rolls 1d10 + Fighter level server-side, and self-heals the total", () => {
     const { spec, roll } = castSpecFromRow(secondWindRow(), 3, () => 7); // fixed die roll of 7
     expect(spec.name).toBe("Second Wind");
@@ -913,12 +912,6 @@ describe("castSpecFromRow — Second Wind, row-driven (#1528, retired ACTION_CAS
     const rowWithoutAxis: ClassFeatureRow = { ...secondWindRow(), effectModifierSource: undefined };
     const withoutAxis = castSpecFromRow(rowWithoutAxis, 14, () => 4);
     expect(withoutAxis.roll).toBe(4); // die only — the level term never applied
-  });
-});
-
-describe("Action Surge stays a counter, row-driven (#1528, retired ACTION_CAST_FN/ACTION_EFFECT_FN entries)", () => {
-  it("has no ACTION_EFFECT_FN entry — the pure-counter spend is dispatched via the row's costKind, not this table", () => {
-    expect(ACTION_EFFECT_FN.actionSurge).toBeUndefined();
   });
 });
 
@@ -992,10 +985,6 @@ describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", 
     expect(fleetStep?.reminder).toMatch(/step of the wind/i);
   });
 
-  it("fleetStep is a pure reminder — no server effect fn (like recklessAttack/metamagic's free cost siblings)", () => {
-    expect(ACTION_EFFECT_FN.fleetStep).toBeUndefined();
-  });
-
   it("subclass gate: a non-Open-Hand monk gets neither at L11+", () => {
     const shadow = keys(atRows("monk", "Warrior of Shadow", 17, []));
     expect(shadow).not.toContain("wholenessOfBody");
@@ -1009,8 +998,6 @@ describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", 
     const l20 = keys(atRows("monk", OPEN_HAND, 20, []));
     expect(l20).not.toContain("openHandTechnique");
     expect(l20).not.toContain("quiveringPalm");
-    expect(ACTION_EFFECT_FN.openHandTechnique).toBeUndefined();
-    expect(ACTION_EFFECT_FN.quiveringPalm).toBeUndefined();
   });
 });
 
@@ -1055,10 +1042,6 @@ describe("Way of the Open Hand — 2014 Wholeness of Body / Tranquility (#1501)"
     expect(tranquility?.cost).toBe("free");
     expect(tranquility?.enabled).toBe(true);
     expect(tranquility?.reminder).toMatch(/sanctuary/i);
-  });
-
-  it("tranquility is a pure reminder — no server effect fn", () => {
-    expect(ACTION_EFFECT_FN.tranquility).toBeUndefined();
   });
 
   it("a 2024 monk never sees the 2014 keys, and vice versa", () => {
@@ -1135,8 +1118,6 @@ describe("Warrior of Mercy — Hand of Healing (#1248)", () => {
     const l20 = keys(atRows("monk", MERCY, 20, []));
     expect(l20).not.toContain("handOfHarm");
     expect(l20).not.toContain("handOfUltimateMercy");
-    expect(ACTION_EFFECT_FN.handOfHarm).toBeUndefined();
-    expect(ACTION_EFFECT_FN.handOfUltimateMercy).toBeUndefined();
   });
 });
 
@@ -1206,11 +1187,6 @@ describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#13
     expect(noSub).not.toContain("shadowArts");
     expect(noSub).not.toContain("cloakOfShadows");
   });
-
-  it("both cast through the dedicated /abilities/shadow-arts endpoint — no ACTION_EFFECT_FN entry", () => {
-    expect(ACTION_EFFECT_FN.shadowArts).toBeUndefined();
-    expect(ACTION_EFFECT_FN.cloakOfShadows).toBeUndefined();
-  });
 });
 
 // PHB'14 pp.79-80 (not in SRD 5.1).
@@ -1253,10 +1229,6 @@ describe("Way of Shadow (2014) — Shadow Arts / Shadow Step / Cloak of Shadows 
     expect(opportunist).toBeDefined();
     expect(opportunist?.cost).toBe("reaction");
     expect(opportunist?.enabled).toBe(true);
-  });
-
-  it("is a pure reminder action — no ACTION_EFFECT_FN entry (mirrors 2014's own shadowStep)", () => {
-    expect(ACTION_EFFECT_FN.opportunist).toBeUndefined();
   });
 
   it("none of the four rows leak to an EDITION_2024 request, even for the same slug", () => {
@@ -1336,11 +1308,6 @@ describe("Warrior of the Elements — Elemental Attunement / Elemental Burst cat
     expect(noSub).not.toContain("elementalAttunement");
     expect(noSub).not.toContain("elementalBurst");
   });
-
-  it("both cast through the dedicated /abilities/warrior-of-elements endpoint — no ACTION_EFFECT_FN entry", () => {
-    expect(ACTION_EFFECT_FN.elementalAttunement).toBeUndefined();
-    expect(ACTION_EFFECT_FN.elementalBurst).toBeUndefined();
-  });
 });
 
 // PHB'14 p.164.
@@ -1370,11 +1337,6 @@ describe("Channel Divinity — one merged row, gated cleric≥2 OR paladin≥3 (
     );
     expect(disabled?.enabled).toBe(false);
     expect(disabled?.disabledReason).toBe("No channelDivinity remaining");
-  });
-
-  it("the old per-class keys no longer exist in either dispatch table", () => {
-    expect(ACTION_EFFECT_FN.channelDivinityCleric).toBeUndefined();
-    expect(ACTION_EFFECT_FN.channelDivinityPaladin).toBeUndefined();
   });
 });
 

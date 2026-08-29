@@ -1,11 +1,11 @@
-import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
+import type { AbilityGenerationMethod, ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 
 import type { ActionCost } from "./actions";
 import type { ConditionKey } from "./combat";
 import type { ItemRarity } from "./inventory";
 import type { AbilityName, AbilityScores, SkillName } from "./primitives";
 
-export type { ClassStartingEquipment };
+export type { ClassStartingEquipment, AbilityGenerationMethod };
 export type { EquipmentBundle, EquipmentChoiceGroup, OpenPick, StartingGold } from "@character-sheet/shared-types";
 
 /** Subclass option (from GET /api/reference). */
@@ -65,7 +65,7 @@ export interface SpeciesOption {
   speed: number;
   /** [] for every EDITION_2024 row — 2024 ability increases come from backgrounds only, never species. */
   abilityIncreases: AbilityIncreaseSpec[];
-  /** Always false this wave; same signal as `SpeciesVariantOption.needsCastingAbility` at the species level. */
+  /** Always false — 2024 casting-ability choices are served on the variant, never the species itself; same signal as `SpeciesVariantOption.needsCastingAbility` at that level. */
   needsCastingAbility: boolean;
   /** Null/false for every row except the one carrying the matching trait. */
   chooseSkills: SpeciesSkillChoiceOption | null;
@@ -89,7 +89,7 @@ export interface ClassOption {
   subclasses: SubclassOption[];
   /** Starting equipment definition, null if the class has no package defined. */
   startingEquipment: ClassStartingEquipment | null;
-  /** PHB p. 163: any one of `options` satisfied against the character's scores counts as met. */
+  /** PHB'14 p.163 — multiclass prerequisites are edition-invariant (also PHB'24). Any one of `options` satisfied against the character's scores counts as met. */
   multiclassPrerequisite: {
     options: Record<string, number>[];
     description: string;
@@ -173,6 +173,13 @@ export interface EditionsResponse {
   editions: EditionOption[];
 }
 
+/** Edition-invariant (PHB'14 p.13 / SRD 5.2) — the same values validateAbilityScores enforces server-side; the create ceremony renders from this instead of owning its own copy. `costs` keys are ability scores 8-15 (JSON round-trips them as string keys). */
+export interface AbilityGenerationConfig {
+  standardArray: number[];
+  pointBuy: { budget: number; floor: number; ceiling: number; costs: Record<number, number> };
+  manual: { floor: number; ceiling: number };
+}
+
 export interface ReferenceData {
   /** The sole species catalog anchor — there is no separate flat `races` list. */
   species: SpeciesOption[];
@@ -183,10 +190,12 @@ export interface ReferenceData {
   artisanTools: ToolOption[];
   /** The 14 conditions' rules text, resolved for the requested edition. */
   conditions: ConditionOption[];
-  /** Resolved for the requested edition, ordered by name; 15 rows for 2014, 17 for 2024. */
+  /** Resolved for the requested edition, ordered by name. */
   universalActions: UniversalActionOption[];
   /** The six magic-item rarity tiers, ascending. */
   itemRarities: ItemRarityOption[];
+  /** Standard array / point buy / manual-entry bounds for the ability-score step. */
+  abilityGeneration: AbilityGenerationConfig;
 }
 
 // One selection per equipment choice group when mode:"package".
@@ -204,7 +213,7 @@ export interface CreateCharacterInput {
   name: string;
   alignment: string;
   experiencePoints?: number;
-  /** The sole mechanical anchor — the flat `race` field and its legacy create path were pruned. */
+  /** The sole mechanical anchor for species. */
   speciesId: string;
   variantId?: string;
   /** The CHOSEN portion only; fixed increases apply server-side with no request field — see `deriveSpeciesBonuses`. */
@@ -219,6 +228,8 @@ export interface CreateCharacterInput {
   background: string;
   classes: [{ name: string; subclass?: string | null; subclassId?: string }];
   abilityScores: AbilityScores;
+  /** How `abilityScores` above was produced — the backend's validateAbilityScores checks it against the matching PHB rule; omitted falls back to a sanity-bound-only check (#1383's ability-score wave). */
+  abilityGenerationMethod?: AbilityGenerationMethod;
   /** PHB'24 background ability spread (2+1 or 1+1+1 over `abilityChoices`); omitted for custom/spec-less backgrounds. */
   backgroundAbilities?: Partial<Record<AbilityName, number>>;
   skillProficiencies?: SkillName[];

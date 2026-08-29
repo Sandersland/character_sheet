@@ -32,7 +32,16 @@ export function hasQuiveringPalm(monkLevel: number): boolean {
 // SRD 5.1 / PHB'14 p.79: 3 ki. SRD 5.2 / PHB'24 p.90: 4 focus — the pool NAME
 // forks via monkPoolKey; only the amount needs its own switch here.
 function quiveringPalmCost(edition: RulesEdition): number {
-  return edition === "EDITION_2014" ? 3 : 4;
+  switch (edition) {
+    case "EDITION_2014":
+      return 3;
+    case "EDITION_2024":
+      return 4;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`quiveringPalmCost: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 export type QuiveringPalmSaveOutcome = "fail" | "success";
@@ -63,10 +72,16 @@ export function resolveQuiveringPalmDamage(
   edition: RulesEdition,
 ): { outcome: QuiveringPalmSaveOutcome; appliedDamage: number } {
   const outcome: QuiveringPalmSaveOutcome = roll >= dc ? "success" : "fail";
-  if (edition === "EDITION_2014") {
-    return { outcome, appliedDamage: outcome === "fail" ? 0 : rawDamage };
+  switch (edition) {
+    case "EDITION_2014":
+      return { outcome, appliedDamage: outcome === "fail" ? 0 : rawDamage };
+    case "EDITION_2024":
+      return { outcome, appliedDamage: outcome === "success" ? Math.floor(rawDamage / 2) : rawDamage };
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`resolveQuiveringPalmDamage: unhandled edition ${String(exhaustive)}`);
+    }
   }
-  return { outcome, appliedDamage: outcome === "success" ? Math.floor(rawDamage / 2) : rawDamage };
 }
 
 function quiveringPalmSummary(
@@ -78,14 +93,20 @@ function quiveringPalmSummary(
   edition: RulesEdition,
 ): string {
   const base = `Quivering Palm — Constitution save DC ${dc}, target rolled ${saveRoll}`;
-  if (edition === "EDITION_2014") {
-    return outcome === "fail"
-      ? `${base}: failed — dropped to 0 hit points.`
-      : `${base}: made it — ${appliedDamage} necrotic damage.`;
+  switch (edition) {
+    case "EDITION_2014":
+      return outcome === "fail"
+        ? `${base}: failed — dropped to 0 hit points.`
+        : `${base}: made it — ${appliedDamage} necrotic damage.`;
+    case "EDITION_2024":
+      return outcome === "fail"
+        ? `${base}: failed — ${appliedDamage} Force damage.`
+        : `${base}: made it — ${appliedDamage} Force damage (half of ${rawDamage}).`;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`quiveringPalmSummary: unhandled edition ${String(exhaustive)}`);
+    }
   }
-  return outcome === "fail"
-    ? `${base}: failed — ${appliedDamage} Force damage.`
-    : `${base}: made it — ${appliedDamage} Force damage (half of ${rawDamage}).`;
 }
 
 const QUIVERING_PALM_SELECT = {

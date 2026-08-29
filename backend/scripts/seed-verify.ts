@@ -49,11 +49,9 @@ if (rawEdition !== undefined && !isRulesEdition(rawEdition)) {
 }
 const EDITION: RulesEdition = rawEdition ?? DEFAULT_RULES_EDITION;
 
-// Edition-suffixed (#1506) so findExisting (below) can never hand back the
-// OTHER edition's character — reusing one "Verify Dummy" name across both
-// editions was the sharpest trap in this file: a 2014 run would silently
-// reuse a pre-existing 2024 row (findExisting returns BEFORE /api/reference
-// is ever loaded) and report success without ever exercising 2014 at all.
+// Edition-suffixed (#1506) so findExisting can't hand back the other edition's character — it
+// returns before /api/reference is loaded, so a shared name would let a 2014 run reuse a 2024 row
+// and report success.
 const CHARACTER_NAME = `Verify Dummy (${RULES_EDITION_LABELS[EDITION]})`;
 
 function die(message: string): never {
@@ -61,7 +59,6 @@ function die(message: string): never {
   process.exit(1);
 }
 
-// Pull the cs_session token out of a Set-Cookie header.
 function sessionTokenFrom(setCookie: string | null): string | null {
   if (!setCookie) return null;
   const match = setCookie.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`));
@@ -94,7 +91,6 @@ async function api<T>(
   return { status: res.status, body: body as T, setCookie: res.headers.get("set-cookie") };
 }
 
-// Print the cs_session cookie + URLs, ready to inject into Playwright.
 function report(cookie: string, token: string, charId: string) {
   console.log("\n─────────────────────────────────────────────");
   console.log("✓ verification data ready. Sign in by injecting this cookie:\n");
@@ -108,10 +104,8 @@ function report(cookie: string, token: string, charId: string) {
 }
 
 type Reference = {
-  // #1684/#1506: the flat `race`-name creation path was pruned — `species` is
-  // the mechanical anchor now (POST /api/characters' speciesId), same as
-  // every other creation caller in this repo (frontend/e2e's own
-  // resolveSpeciesId, global-setup.ts's).
+  // `species` is the mechanical anchor (POST /api/characters' speciesId), same as every other
+  // creation caller.
   species: RefSpecies[];
   classes: RefClass[];
   backgrounds: { name: string }[];
@@ -123,12 +117,10 @@ type Reference = {
   universalActions: unknown[];
 };
 
-// Prefer the Set-Cookie token, falling back to the JSON body token.
 function tokenOf(setCookie: string | null, body: { token?: string } | undefined): string | null {
   return sessionTokenFrom(setCookie) ?? body?.token ?? null;
 }
 
-// 1. Mint a session via the guarded dev-login endpoint.
 async function devLogin(): Promise<{ cookie: string; token: string }> {
   const login = await api<{ token: string; user: { id: string } }>("/api/auth/dev-login", {
     method: "POST",
@@ -156,7 +148,6 @@ async function findExisting(cookie: string): Promise<{ id: string; name: string 
   return null;
 }
 
-// 2. Read valid creation options from the catalog, for the requested edition.
 async function loadReference(cookie: string): Promise<Reference> {
   const ref = await api<Reference>(`/api/reference?edition=${EDITION}`, { cookie });
   if (ref.status !== 200) die(`GET /api/reference returned ${ref.status}: ${JSON.stringify(ref.body)}`);
@@ -165,7 +156,6 @@ async function loadReference(cookie: string): Promise<Reference> {
   return ref.body;
 }
 
-// 3. Create the character through the real endpoint.
 async function createCharacter(
   cookie: string,
   ref: Reference,
@@ -185,9 +175,9 @@ async function createCharacter(
       background: ref.backgrounds[0].name,
       classes: [classChoice],
       abilityScores: { strength: 15, dexterity: 14, constitution: 13, intelligence: 12, wisdom: 10, charisma: 8 },
-      // No `startingEquipment` (#1506, live pre-existing break found here):
+      // No `startingEquipment` (#1506):
       // `mode: "gold"` is a 2014-only path now — PHB'24 has no roll-for-gold
-      // rule at all (character-create.ts's resolveStartingGold), so a
+      // rule at all (lib/character/create/equipment.ts's resolveStartingGold), so a
       // hardcoded gold-mode body 400s for EVERY EDITION_2024 class, not just
       // some. `mode: "package"` needs a per-class optionIndex/openPicks plan
       // this script has no reason to carry — omitting the field entirely
@@ -210,8 +200,6 @@ async function createCharacter(
   return charId;
 }
 
-// 4. Sell the freshly-acquired trinkets in one transaction → one batchId → a
-//    "bulk sale" entry in the activity log.
 async function sellTrinkets(
   cookie: string,
   charId: string,
@@ -238,7 +226,6 @@ async function sellTrinkets(
   }
 }
 
-// Fetch the item catalog, warning + returning null on an empty/unavailable list.
 async function fetchItems(cookie: string): Promise<CatalogRow[] | null> {
   const items = await api<CatalogRow[]>("/api/items", { cookie });
   if (items.status !== 200 || !Array.isArray(items.body) || !items.body.length) {
@@ -248,7 +235,6 @@ async function fetchItems(cookie: string): Promise<CatalogRow[] | null> {
   return items.body;
 }
 
-// Acquire the planned items, then sell the trinkets in one bulk transaction.
 async function acquireAndSell(
   cookie: string,
   charId: string,
@@ -267,8 +253,6 @@ async function acquireAndSell(
   console.log(`✓ added inventory (weapon + armor equipped, trinkets)`);
 }
 
-// 4. Add representative inventory: an equippable weapon + armor, plus two
-//    sellable trinkets we then sell together.
 async function seedInventory(cookie: string, charId: string) {
   const items = await fetchItems(cookie);
   if (!items) return;
@@ -291,7 +275,7 @@ async function main() {
   // ref.classes is already scoped to EDITION (loadReference's ?edition=), so
   // pickClassChoice's subclasses[0].id below can only ever resolve a
   // same-edition subclassId — a 2014 character can never be created with a
-  // 2024 subclassId (#1506; crossEditionRejection would 400 it, character-create.ts).
+  // 2024 subclassId (#1506; crossEditionRejection would 400 it, in resolveSubclass).
   const ref = await loadReference(cookie);
   const { classChoice } = pickClassChoice(ref.classes);
   const charId = await createCharacter(cookie, ref, classChoice);

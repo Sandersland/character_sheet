@@ -1,4 +1,4 @@
-// A fixture class with two StartingEquipmentPackage rows whose content genuinely differs between editions proves character-create.ts resolves (classId, edition), not classId alone (#1534).
+// A fixture class with two StartingEquipmentPackage rows whose content genuinely differs between editions proves loadClassEquipmentDef resolves (classId, edition), not classId alone (#1534).
 // This fixture class name is safe from assertEveryClassEditionHasPackage — that guard only checks the real seed literals, and this test never calls the seeder.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";

@@ -12,6 +12,7 @@ import {
 } from "@/lib/inventory/inventory.js";
 import { mirrorCapabilityUsedSet, mirrorUsesRemaining } from "@/lib/inventory/inventory-capability-use.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
+import { lockCharacterRow } from "@/lib/character/character-transaction.js";
 
 // Derived from the Prisma-generated enum so it can never drift from the schema.
 const CATEGORY_VALUES = new Set<string>(Object.values(CharacterEventCategory));
@@ -23,7 +24,6 @@ function asCategory(value: string | undefined): CharacterEventCategory | undefin
     : undefined;
 }
 
-// Derived from the Prisma-generated enum so it can never drift from the schema.
 const TYPE_VALUES = new Set<string>(Object.values(CharacterEventType));
 
 function asType(value: string | undefined): CharacterEventType | undefined {
@@ -73,7 +73,12 @@ type ActivityEventRow = CharacterEvent & {
 
 type RevertResult = { ok: true } | { ok: false; status: 404 | 409; error: string };
 
-// Handlers stay here, not in domain libs: moving them would close an activity → domainlib → … → activity import cycle.
+// revertPreflight's already-reverted check runs OUTSIDE the transaction (it's a cheap early
+// exit); applyBatchReversal must re-verify under lockCharacterRow's lock, or two concurrent
+// reverts of the same batch both pass preflight and both apply reverseEvent (#1980 TOCTOU).
+class BatchAlreadyRevertedError extends Error {}
+
+// Handlers stay here, not in domain libs: moving them would create an activity → domainlib → … → activity import cycle.
 
 interface RevertContext {
   tx: Prisma.TransactionClient;
@@ -460,12 +465,12 @@ async function revertPreflight(
   }
 
   // Ended-session events are excluded — they're frozen so the session-end summary/XP award stays coherent.
+  // #1861: roll-category events (before/after null) still count as "the most recent action" here, not skipped as a dead log entry.
   const latestEvent = await db.characterEvent.findFirst({
     where: {
       characterId,
       reverted: false,
       type: { not: "revert" },
-      // #1861: roll-category events (before/after null) still count as "the most recent action" here, not skipped as a dead log entry.
       OR: [
         { sessionId: null },
         { session: { status: "active" } },
@@ -502,6 +507,21 @@ async function applyBatchReversal(
   batchId: string,
   reversed: CharacterEvent[],
 ): Promise<void> {
+  // Locking Character first (before reverseEvent can lock InventoryItem rows) keeps lock
+  // acquisition order consistent with runCharacterTransaction/actionsRouter — reversed order
+  // would deadlock (Postgres 40P01) against a concurrent locked transaction on the same rows.
+  await lockCharacterRow(tx, characterId);
+
+  // Re-check reverted status under the lock: revertPreflight's scan (outside the transaction)
+  // can't see a sibling revert that committed while this one was waiting on the lock.
+  const freshBatchEvents = await tx.characterEvent.findMany({
+    where: { characterId, batchId },
+    select: { reverted: true },
+  });
+  if (freshBatchEvents.some((e) => e.reverted)) {
+    throw new BatchAlreadyRevertedError("This batch has already been reverted");
+  }
+
   for (const event of reversed) {
     await reverseEvent(tx, characterId, event);
   }
@@ -542,12 +562,16 @@ export async function revertBatch(
   const reversed = [...batchEvents].reverse();
 
   try {
-    await db.$transaction((tx) => applyBatchReversal(tx, characterId, batchId, reversed));
+    await db.$transaction(
+      (tx) => applyBatchReversal(tx, characterId, batchId, reversed),
+      { timeout: 30_000 },
+    );
   } catch (error) {
     // InsufficientCurrencyError/InvalidInventoryOperationError carry their own 400, remapped to 409 here: an undo blocked by later state (e.g. sale proceeds already spent) is a conflict, not a bad request.
     if (
       error instanceof InsufficientCurrencyError ||
-      error instanceof InvalidInventoryOperationError
+      error instanceof InvalidInventoryOperationError ||
+      error instanceof BatchAlreadyRevertedError
     ) {
       return { ok: false, status: 409, error: error.message };
     }

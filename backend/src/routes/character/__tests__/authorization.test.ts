@@ -105,6 +105,14 @@ describe("character ownership (#101)", () => {
     expect(res.status).toBe(403);
   });
 
+  it("403s PATCHing a character owned by someone else even with invalid ability scores (ownership checked before validation)", async () => {
+    const res = await supertest(app)
+      .patch(`/api/characters/${CHAR_B}`)
+      .set("Cookie", cookieA)
+      .send({ abilityScores: { strength: 999, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 } });
+    expect(res.status).toBe(403);
+  });
+
   it("403s DELETing a character owned by someone else", async () => {
     const res = await supertest(app)
       .delete(`/api/characters/${CHAR_B}`)

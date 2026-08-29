@@ -327,6 +327,24 @@ describe("GET /api/reference", () => {
     expect(res2024.body.itemRarities).toEqual(res2014.body.itemRarities);
   });
 
+  // Edition-invariant (PHB'14 p.13 / SRD 5.2) — same values validateAbilityScores enforces.
+  it("ships the ability-score generation config, identically for both editions", async () => {
+    const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+
+    expect(res2024.body.abilityGeneration).toEqual({
+      standardArray: [15, 14, 13, 12, 10, 8],
+      pointBuy: {
+        budget: 27,
+        floor: 8,
+        ceiling: 15,
+        costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 },
+      },
+      manual: { floor: 1, ceiling: 30 },
+    });
+    expect(res2024.body.abilityGeneration).toEqual(res2014.body.abilityGeneration);
+  });
+
   // Mirrors crossEditionRejection's write-path rejection — the read path must not offer what the write path refuses (#1336, until #1559).
   describe("edition-scoping backgrounds and subclasses (#1336)", () => {
     const FIGHTER = "Fighter";

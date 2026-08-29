@@ -1,5 +1,5 @@
 import Spinner from "@/components/ui/Spinner";
-import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmentPanel";
+import AbilityAssignmentPanel from "@/features/character-create/ability-assignment/AbilityAssignmentPanel";
 import CreationEntryGate from "@/features/character-create/CreationEntryGate";
 import CreationReviewStep from "@/features/character-create/CreationReviewStep";
 import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";
@@ -32,7 +32,7 @@ function IdentityStepBody({ c, reference }: StepBodyProps) {
   );
 }
 
-function AbilitiesStepBody({ c }: StepBodyProps) {
+function AbilitiesStepBody({ c, reference }: StepBodyProps) {
   return (
     <AbilityAssignmentPanel
       method={c.draft.abilityMethod}
@@ -43,6 +43,7 @@ function AbilitiesStepBody({ c }: StepBodyProps) {
       speciesBonuses={c.speciesBonuses}
       primaryAbility={c.selections.class?.primaryAbility ?? []}
       className={c.draft.className}
+      config={reference.abilityGeneration}
       update={c.update}
     />
   );
@@ -62,8 +63,6 @@ function SkillsStepBody({ c }: StepBodyProps) {
       {/* Renders only when the server serves a chooseSkills spec for the chosen
           species+variant (#1689/#1690). */}
       <SpeciesSkillSection choice={c.speciesSkillChoice} onToggle={c.speciesSkillChoice.toggle} />
-      {/* Renders only when the server serves a chooseOriginFeat spec for the
-          chosen species+variant (#1690). */}
       <SpeciesOriginFeatSection
         choice={c.speciesOriginFeatChoice}
         edition={c.draft.rulesEdition}

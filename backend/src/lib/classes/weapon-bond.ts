@@ -10,7 +10,7 @@ import { logEvent } from "@/lib/activity/events.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
-import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
+import { lockCharacterRow, runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
 import type { BondWeaponOperation, UnbondWeaponOperation, WeaponBondOperation } from "@character-sheet/contracts";
 
@@ -26,19 +26,14 @@ class WeaponBondLimitError extends InvalidWeaponBondOperationError {
 export const WEAPON_BOND_LEVEL = 3;
 export const WEAPON_BOND_LIMIT = 2;
 
-// Total-mapping per #1527 (mirrors subclassGateLevel) — never `=== EDITION_…`.
+// Total mapping per #1527 (mirrors subclassGateLevel) — never `=== EDITION_…`.
+// PHB'24 text is unverified/PARKED (#1531) — stays 2014-only until that lands.
+const EDITION_HAS_WEAPON_BOND: Record<RulesEdition, boolean> = {
+  EDITION_2014: true,
+  EDITION_2024: false,
+};
 export function weaponBondAvailable(edition: RulesEdition): boolean {
-  switch (edition) {
-    case "EDITION_2014":
-      return true;
-    case "EDITION_2024":
-      // PHB'24 text is unverified/PARKED (#1531) — stays 2014-only until that lands.
-      return false;
-    default: {
-      const exhaustive: never = edition;
-      throw new Error(`weaponBondAvailable: unhandled edition ${String(exhaustive)}`);
-    }
-  }
+  return EDITION_HAS_WEAPON_BOND[edition];
 }
 
 export function hasWeaponBond(entryLevel: number, isEldritchKnight: boolean, edition: RulesEdition): boolean {
@@ -115,8 +110,8 @@ async function bondWeapon(
   }
 
   // Serializes concurrent bondWeapon calls for the SAME character before the already-bonded check and the cap recount below: under READ COMMITTED, two concurrent requests could each read pre-write state while the other's UPDATE is uncommitted — letting a 3rd weapon bond past the cap, or (both targeting the same item) both see weaponBonded: false, both write true, and both log a weaponBonded event for one real transition, corrupting LIFO undo.
-  // Locking the Character row makes every read after this line authoritative: a blocked FOR UPDATE re-evaluates against the latest COMMITTED state once the first request's transaction finishes.
-  await tx.$queryRaw`SELECT id FROM "Character" WHERE id = ${characterId} FOR UPDATE`;
+  // runCharacterTransaction (the only caller) already holds this lock by the time this runs; re-acquiring it here is a harmless no-op wait, kept so the check below stays correct even if bondWeapon is ever invoked as the first lock-taker in its own transaction.
+  await lockCharacterRow(tx, characterId);
 
   // Re-read under the lock, not the pre-lock `item` above — the authoritative check for whether this bond is actually a false→true transition.
   const locked = await tx.inventoryItem.findUniqueOrThrow({
@@ -164,7 +159,7 @@ async function unbondWeapon(
   }
 
   // Same TOCTOU shape as bondWeapon's own lock: two concurrent unbondWeapon calls on the SAME item could otherwise both read weaponBonded: true unlocked, both write false, and both log a weaponUnbonded event for one real transition.
-  await tx.$queryRaw`SELECT id FROM "Character" WHERE id = ${characterId} FOR UPDATE`;
+  await lockCharacterRow(tx, characterId);
 
   // Re-read under the lock — the authoritative check for whether this unbond is actually a true→false transition.
   const locked = await tx.inventoryItem.findUniqueOrThrow({

@@ -1,5 +1,7 @@
 // Heightened Focus, PHB'24 p.88 / SRD 5.2, Monk L10 — upgrades Flurry of Blows/Patient Defense's Focus variant/Step of the Wind's Focus variant in place.
 // Base L1-9 facts live on those actions' own ClassFeature rows; this descriptor supplies only the L10 delta.
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { AnnounceAugmentor, AugmentPayload } from "./announce-augmentors.js";
 
 // PHB'24 p.88 — Heightened Focus's own grant level.
@@ -18,8 +20,17 @@ function heightenedFocusPayload(key: string): AugmentPayload | null {
   return null;
 }
 
+// 2024-only feature (PHB'24 p.88) — SRD 5.1 has no Heightened Focus.
+const EDITION_HAS_HEIGHTENED_FOCUS: Record<RulesEdition, boolean> = {
+  EDITION_2024: true,
+  EDITION_2014: false,
+};
+function editionHasHeightenedFocus(edition: RulesEdition): boolean {
+  return EDITION_HAS_HEIGHTENED_FOCUS[edition];
+}
+
 export const heightenedFocusAugmentor: AnnounceAugmentor = {
   targetKeys: ["flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus"],
-  appliesTo: (ctx) => ctx.edition === "EDITION_2024" && ctx.entryLevel >= HEIGHTENED_FOCUS_LEVEL,
+  appliesTo: (ctx) => editionHasHeightenedFocus(ctx.edition) && ctx.entryLevel >= HEIGHTENED_FOCUS_LEVEL,
   augment: (action) => heightenedFocusPayload(action.key),
 };

@@ -21,10 +21,19 @@ export function deriveDeflectSpec(
   edition: RulesEdition,
 ): { reduction: DeflectRoll; redirect: DeflectRoll } {
   const reduction: DeflectRoll = { count: 1, faces: 10, modifier: dexMod + monkLevel };
-  const redirect: DeflectRoll =
-    edition === "EDITION_2014"
-      ? { count: 1, faces: 6, modifier: dexMod }
-      : { count: 2, faces: deriveMartialArtsDie(monkLevel, edition), modifier: dexMod };
+  let redirect: DeflectRoll;
+  switch (edition) {
+    case "EDITION_2014":
+      redirect = { count: 1, faces: 6, modifier: dexMod };
+      break;
+    case "EDITION_2024":
+      redirect = { count: 2, faces: deriveMartialArtsDie(monkLevel, edition), modifier: dexMod };
+      break;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`deriveDeflectSpec: unhandled edition ${String(exhaustive)}`);
+    }
+  }
   return { reduction, redirect };
 }
 
@@ -54,11 +63,20 @@ export const deflectAugmentor: AnnounceAugmentor = {
 // SRD 5.2 / PHB'24 p.89 — Deflect Energy's own grant level.
 export const DEFLECT_ENERGY_LEVEL = 13;
 
+// SRD 5.2 / PHB'24 p.89 — SRD 5.1's Deflect Missiles carries no damage-type clause.
+const EDITION_HAS_DEFLECT_ENERGY: Record<RulesEdition, boolean> = {
+  EDITION_2024: true,
+  EDITION_2014: false,
+};
+function editionHasDeflectEnergy(edition: RulesEdition): boolean {
+  return EDITION_HAS_DEFLECT_ENERGY[edition];
+}
+
 // Deflect Attacks' damage-type clause (SRD 5.2 only — SRD 5.1's Deflect Missiles has none): "bludgeoning, piercing, or slashing damage" below Deflect Energy (Monk L13), "any damage type" from L13 on.
 // This is the sole source of damageTypeClause, so appliesTo gates on edition alone (not level) and augment carries the L13 branch internally.
 export const deflectEnergyAugmentor: AnnounceAugmentor = {
   targetKeys: ["deflectAttacks"],
-  appliesTo: (ctx) => ctx.edition === "EDITION_2024",
+  appliesTo: (ctx) => editionHasDeflectEnergy(ctx.edition),
   augment: (_action, ctx) => ({
     damageTypeClause: ctx.entryLevel >= DEFLECT_ENERGY_LEVEL ? "any damage type" : "bludgeoning, piercing, or slashing damage",
   }),

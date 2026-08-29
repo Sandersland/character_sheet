@@ -9,7 +9,7 @@ import {
   computeSessionSummary,
   type ParticipantSummary,
 } from "./session-summary.js";
-import type { Prisma, SpellCastKind } from "@/generated/prisma/client.js";
+import { Prisma, type SpellCastKind } from "@/generated/prisma/client.js";
 import type { CombatState } from "@character-sheet/shared-types";
 
 // The central errorHandler reads `.status` on thrown errors; default 409 (conflict), pass 404 at not-found throw sites.
@@ -210,6 +210,25 @@ async function assertActiveParticipant(
   }
 }
 
+function activeCampaignSessionError(sessionId: string | null): SessionError {
+  return new SessionError(
+    sessionId
+      ? `A session is already active (id: ${sessionId}). End it before starting a new one.`
+      : `A session is already active for this campaign. End it before starting a new one.`,
+  );
+}
+
+// Scoped to Session specifically (via meta.modelName, not the bare P2002 code) so a P2002 from an
+// unrelated constraint elsewhere in this transaction — the participant create, say — isn't mislabeled
+// as "already active". Prisma 7.8 has no top-level meta.target to key off instead (#1646).
+function isSessionUniqueViolation(err: unknown): err is Prisma.PrismaClientKnownRequestError {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    err.code === "P2002" &&
+    err.meta?.modelName === "Session"
+  );
+}
+
 export async function startCampaignSession(
   campaignId: string,
   characterId: string,
@@ -217,44 +236,52 @@ export async function startCampaignSession(
 ) {
   const existing = await activeSessionForCampaign(campaignId);
   if (existing) {
-    throw new SessionError(
-      `A session is already active (id: ${existing.id}). End it before starting a new one.`,
-    );
+    throw activeCampaignSessionError(existing.id);
   }
 
   const batchId = randomUUID();
-  return prisma.$transaction(async (tx) => {
-    // Re-checked inside the tx so two concurrent starts can't both pass the pre-check above and create rival sessions.
-    const conflict = await tx.session.findFirst({
-      where: { campaignId, status: "active" },
-      select: { id: true },
-    });
-    if (conflict) {
-      throw new SessionError(
-        `A session is already active (id: ${conflict.id}). End it before starting a new one.`,
-      );
-    }
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Narrows the race but does not close it: two truly concurrent starts can both pass this
+      // SELECT under READ COMMITTED before either INSERT commits. Session_campaignId_active_key
+      // is what closes it at the database — the loser's create() throws P2002, caught below and
+      // mapped to the SAME error this check raises.
+      const conflict = await tx.session.findFirst({
+        where: { campaignId, status: "active" },
+        select: { id: true },
+      });
+      if (conflict) {
+        throw activeCampaignSessionError(conflict.id);
+      }
 
-    const session = await tx.session.create({
-      data: {
-        campaignId,
-        title: title ?? null,
-        participants: { create: { characterId } },
-      },
-      include: sessionWithParticipants,
-    });
+      const session = await tx.session.create({
+        data: {
+          campaignId,
+          title: title ?? null,
+          participants: { create: { characterId } },
+        },
+        include: sessionWithParticipants,
+      });
 
-    await logEvent(tx, {
-      characterId,
-      category: "session",
-      type: "sessionStarted",
-      summary: title ? `Session started: ${title}` : "Session started",
-      batchId,
-      sessionId: session.id,
-    });
+      await logEvent(tx, {
+        characterId,
+        category: "session",
+        type: "sessionStarted",
+        summary: title ? `Session started: ${title}` : "Session started",
+        batchId,
+        sessionId: session.id,
+      });
 
-    return session;
-  });
+      return session;
+    });
+  } catch (err) {
+    if (!isSessionUniqueViolation(err)) throw err;
+    // The winner can be gone by the time we look it up — a concurrent endSession, or
+    // activeSessionForCampaign's own maybeAutoClose closing it — so this degrades to an idless
+    // message rather than fabricate one.
+    const winner = await activeSessionForCampaign(campaignId);
+    throw activeCampaignSessionError(winner?.id ?? null);
+  }
 }
 
 // Invariant: at most one active solo session per character.
@@ -279,7 +306,10 @@ export async function startSoloSession(characterId: string, title?: string) {
 
   const batchId = randomUUID();
   return prisma.$transaction(async (tx) => {
-    // Re-checked inside the tx so two concurrent starts can't both pass the pre-check above and create rival solo sessions.
+    // Narrows the race but does not close it: unlike startCampaignSession, there is no DB constraint
+    // backing this check — a solo session's character lives on SessionParticipant, a separate table, so
+    // a partial unique index on Session can't express "one active solo session per character". Two
+    // truly concurrent starts can still both pass this SELECT.
     const conflict = await tx.session.findFirst({
       where: { campaignId: null, status: "active", participants: { some: { characterId } } },
       select: { id: true },
@@ -382,8 +412,6 @@ const COMBAT_SUMMARIES: Record<CombatEventType, (round?: number) => string> = {
   combatRoundAdvanced: (round) => `Round ${round ?? 2} began`,
 };
 
-// round/combatActive are the authoritative Session columns; spellEconomy is resolved via the shared rule fn spellEconomyRestrictions.
-// updatedAt is the max of the session's and the participant's own, so the client's monotonic sync guard advances on a cast-only change too.
 export type { CombatState };
 
 async function readCombatColumns(
@@ -432,6 +460,8 @@ async function readCombatColumns(
   };
 }
 
+// round/combatActive are the authoritative Session columns; spellEconomy is resolved via the shared rule fn spellEconomyRestrictions.
+// updatedAt is the max of the session's and the participant's own, so the client's monotonic sync guard advances on a cast-only change too.
 function toCombatState(cols: NonNullable<Awaited<ReturnType<typeof readCombatColumns>>>): CombatState {
   const updatedAt =
     cols.participantUpdatedAt && cols.participantUpdatedAt > cols.sessionUpdatedAt

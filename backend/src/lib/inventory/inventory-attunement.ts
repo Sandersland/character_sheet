@@ -2,6 +2,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { describeAttunementPrereq, meetsAttunementPrereq } from "./capabilities.js";
 import { clearBuffByKeyInTx } from "@/lib/combat/buff-end.js";
 import { logEvent } from "@/lib/activity/events.js";
+import { lockCharacterRow } from "@/lib/character/character-transaction.js";
 import { AttunementLimitError, InvalidInventoryOperationError } from "./inventory-currency.js";
 import {
   type AttuneOperation,
@@ -55,8 +56,9 @@ export async function applyAttune(
     }
   }
 
-  // #1888 (same shape as #1854): under READ COMMITTED, two concurrent attunes can each read the pre-write count and both pass the cap — a phantom read, since the row being attuned doesn't match `attuned: true` yet. Locking the Character row (not the InventoryItem rows) is what serializes them.
-  await tx.$queryRaw`SELECT id FROM "Character" WHERE id = ${characterId} FOR UPDATE`;
+  // #1888 (same shape as #1854): under READ COMMITTED, two concurrent attunes can each read the pre-write count and both pass the cap — a phantom read, since the row being attuned doesn't match `attuned: true` yet.
+  // runCharacterTransaction (the only caller) already holds the Character lock by now; re-acquiring it here is a harmless no-op wait, kept so the count below stays correct even if applyAttune is ever invoked as the first lock-taker in its own transaction.
+  await lockCharacterRow(tx, characterId);
 
   const attunedCount = await tx.inventoryItem.count({ where: { characterId, attuned: true } });
   if (attunedCount >= ATTUNEMENT_LIMIT) {
@@ -95,7 +97,6 @@ export async function applyUnattune(
 
   await tx.inventoryItem.update({ where: { id: item.id }, data: { attuned: false } });
 
-  // Unattuning ends any active effect once the item is no longer equipped either.
   if (item.equippedSlot == null) {
     await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `unattuned ${item.name}`);
   }

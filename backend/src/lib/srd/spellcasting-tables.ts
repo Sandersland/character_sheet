@@ -17,7 +17,7 @@ const FULL_CASTER_CLASSES = new Set(["wizard", "sorcerer", "cleric", "druid", "b
 
 const HALF_CASTER_CLASSES = new Set(["paladin", "ranger"]);
 
-// PHB p. 114 / Basic Rules spell table. Verified byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`.
+// PHB'14 p.114; SRD 5.1 and SRD 5.2 byte-identical — no edition fork (#1507).
 export const FULL_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
    1: { 1: 2 },
    2: { 1: 3 },
@@ -41,7 +41,7 @@ export const FULL_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, 
   20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 },
 };
 
-// PHB p. 164 — byte-for-byte the full-caster table; aliased rather than duplicated.
+// PHB'14 p.164 — byte-for-byte the full-caster table; aliased rather than duplicated.
 export const MULTICLASS_SPELL_SLOTS = FULL_CASTER_SLOTS;
 
 export interface DerivedSpellcastingInfo {
@@ -77,7 +77,7 @@ const HALF_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>
   20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2 },
 };
 
-// PHB p. 106. Byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`. Every Pact slot is the same (highest) level and recharges on a short rest.
+// PHB'14 p.106. Byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`. Every Pact slot is the same (highest) level and recharges on a short rest.
 const PACT_MAGIC_SLOTS: Readonly<Record<number, { slotLevel: number; count: number }>> = {
    1: { slotLevel: 1, count: 1 },
    2: { slotLevel: 1, count: 2 },
@@ -101,7 +101,7 @@ const PACT_MAGIC_SLOTS: Readonly<Record<number, { slotLevel: number; count: numb
   20: { slotLevel: 5, count: 4 },
 };
 
-// PHB p. 108. Byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`.
+// PHB'14 p.108. Byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`.
 function mysticArcanumLevels(warlockLevel: number): number[] {
   const levels: number[] = [];
   if (warlockLevel >= 11) levels.push(6);
@@ -123,7 +123,7 @@ function thirdCasterAbilityOf(subclassRef: SubclassCasterRef | null | undefined)
   return subclassRef.spellcastingAbility;
 }
 
-// PHB Fighter/Rogue spell slot table. Re-verified against PHB'14 during #1507 and byte-identical to PHB'24 — no `edition`. Starts at class level 3.
+// PHB'14 Fighter/Rogue spell slot table. Re-verified during #1507 and byte-identical to PHB'24 — no `edition`. Starts at class level 3.
 const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
    3: { 1: 2 },
    4: { 1: 3 },
@@ -222,8 +222,17 @@ export function spellcastingStartLevel(
   edition: RulesEdition,
 ): number {
   if (thirdCasterAbilityOf(subclassRef)) return 3;
-  if (edition === "EDITION_2014" && HALF_CASTER_CLASSES.has(className.toLowerCase())) return 2;
-  return 1;
+  if (!HALF_CASTER_CLASSES.has(className.toLowerCase())) return 1;
+  switch (edition) {
+    case "EDITION_2014":
+      return 2;
+    case "EDITION_2024":
+      return 1;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`spellcastingStartLevel: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 // SRD 5.1 known-caster count. `key` is already lowercased and confirmed present in SPELLS_KNOWN_BY_CLASS_2014 by the caller.
@@ -262,13 +271,19 @@ export function preparedSpellCountAt(
   }
 
   const key = className.toLowerCase();
-  if (edition === "EDITION_2014") {
-    return preparedSpellCount2014(key, level, abilityScores);
+  switch (edition) {
+    case "EDITION_2014":
+      return preparedSpellCount2014(key, level, abilityScores);
+    case "EDITION_2024": {
+      const table = PREPARED_SPELLS_BY_CLASS[key];
+      if (!table) return null;
+      return table[Math.min(20, Math.max(1, level)) - 1] ?? null;
+    }
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`preparedSpellCountAt: unhandled edition ${String(exhaustive)}`);
+    }
   }
-
-  const table = PREPARED_SPELLS_BY_CLASS[key];
-  if (!table) return null;
-  return table[Math.min(20, Math.max(1, level)) - 1] ?? null;
 }
 
 // Deliberate-coupling latch (#1507 D2): the one function both reconcilePreparedSpells and buildSpellcastingView call — never two inline copies of the cap.
@@ -299,8 +314,16 @@ export function casterModelFor(
   const isThirdCaster = Boolean(thirdCasterAbilityOf(subclassRef));
   const key = className.toLowerCase();
   if (!isThirdCaster && CASTER_FRACTION_BY_CLASS[key] === undefined) return null;
-  if (edition !== "EDITION_2014") return "prepared";
-  return isThirdCaster || KNOWN_CASTER_CLASSES_2014.has(key) ? "known" : "prepared";
+  switch (edition) {
+    case "EDITION_2014":
+      return isThirdCaster || KNOWN_CASTER_CLASSES_2014.has(key) ? "known" : "prepared";
+    case "EDITION_2024":
+      return "prepared";
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`casterModelFor: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 // The one combiner both buildSpellcastingView and applyLearnSpellOp call — never two inline copies.
@@ -374,11 +397,18 @@ export function swapCadenceFor(
 ): SwapCadence | null {
   if (thirdCasterAbilityOf(subclassRef)) return "onLevelUp";
   const key = className.toLowerCase();
-  if (edition === "EDITION_2014") {
-    if (key === "ranger") return "onLevelUp";
-    if (key === "paladin") return "anyOnLongRest";
+  switch (edition) {
+    case "EDITION_2014":
+      if (key === "ranger") return "onLevelUp";
+      if (key === "paladin") return "anyOnLongRest";
+      return SWAP_CADENCE_BY_CLASS[key] ?? null;
+    case "EDITION_2024":
+      return SWAP_CADENCE_BY_CLASS[key] ?? null;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`swapCadenceFor: unhandled edition ${String(exhaustive)}`);
+    }
   }
-  return SWAP_CADENCE_BY_CLASS[key] ?? null;
 }
 
 export interface MulticlassCasterClass {
@@ -420,7 +450,7 @@ function resolveCombinedSlotTotals(
   return [];
 }
 
-// PHB p. 164 multiclass rules: sum full levels, half of half-caster levels, a third of third-caster levels, then read the combined caster level against the multiclass slot table.
+// PHB'14 p.164 multiclass rules (edition-invariant): sum full levels, half of half-caster levels, a third of third-caster levels, then read the combined caster level against the multiclass slot table.
 // Warlock Pact Magic (and Mystic Arcanum) stays separate — never merged into the combined pool. Pure — safe to call in serializeCharacter.
 export function deriveMulticlassSpellcasting(
   classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null; subclassRef?: SubclassCasterRef | null }>,
@@ -582,7 +612,7 @@ export function spellListsFor(
 
   const key = className.toLowerCase();
   if (key !== "bard" || level < 10) return { spells: [key], cantrips: [key] };
-  // Exhaustive switch, not `if (edition === "EDITION_2014") … else …` (#1527): the if/else shape let an unrecognized third edition silently take the SRD 5.2 Magical Secrets branch instead of failing loudly.
+  // Total mapping over edition, never if/else (#1527).
   switch (edition) {
     case "EDITION_2014":
       return { spells: null, cantrips: null };
@@ -594,9 +624,6 @@ export function spellListsFor(
     }
   }
 }
-
-/** @deprecated Renamed to spellListsFor (#1825); kept for existing callers. */
-export const magicalSecretsSpellLists = spellListsFor;
 
 // PHB'14 p. 74: Fighter grants a free "any school" leveled pick at 3rd, 8th, 14th, and 20th level — one per level, matching THIRD_CASTER_PREPARED's own delta at each (always exactly 1), so no separate count is persisted.
 const EK_FREE_SCHOOL_LEVELS = new Set([3, 8, 14, 20]);
@@ -670,11 +697,23 @@ export function level1SpellPicksFor(
   if (spellcastingStartLevel(className, subclassRef, edition) > 1) return null;
 
   const isWizard = className.toLowerCase() === "wizard";
-  const spells = isWizard
-    ? WIZARD_LEVEL1_SPELLBOOK_SIZE
-    : edition === "EDITION_2014"
-      ? (LEVEL1_CREATION_SPELLS_2014[className.toLowerCase()] ?? null)
-      : preparedSpellCountAt(className, 1, subclassRef, {}, edition);
+  let spells: number | null;
+  if (isWizard) {
+    spells = WIZARD_LEVEL1_SPELLBOOK_SIZE;
+  } else {
+    switch (edition) {
+      case "EDITION_2014":
+        spells = LEVEL1_CREATION_SPELLS_2014[className.toLowerCase()] ?? null;
+        break;
+      case "EDITION_2024":
+        spells = preparedSpellCountAt(className, 1, subclassRef, {}, edition);
+        break;
+      default: {
+        const exhaustive: never = edition;
+        throw new Error(`level1SpellPicksFor: unhandled edition ${String(exhaustive)}`);
+      }
+    }
+  }
   if (spells == null) return null;
 
   const cantrips = cantripsKnownAtLevel(className, 1, subclassRef);

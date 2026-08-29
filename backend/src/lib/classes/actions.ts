@@ -1,26 +1,5 @@
-/**
- * Action catalog: derive-at-read + effect dispatch table.
- *
- * `DERIVED_ACTIONS` + `deriveActions` — hardcoded list of class-specific
- * actions and a pure derive function that filters it for a character's
- * class/level/subclass/edition, cross-referencing resource pools to set
- * `enabled`. Called from serializeCharacter — sync, no DB access.
- *
- * `ACTION_EFFECT_FN` — dispatch table keyed by action `key`, returning op
- * arrays (spendResource, adjustQuantity, heal, tempHp, applyBuff, clearBuff)
- * for the actions transactions endpoint.
- *
- * `actionsFromRows` + `castSpecFromRow` — a ClassFeature row whose
- * `activationCost` column is populated becomes an AvailableAction directly,
- * no DERIVED_ACTIONS entry needed; a row with an `effectKind` rolls its die
- * server-side here rather than trusting a client roll. Only Fighter's rows
- * populate `activationCost` today; every other class still goes through
- * DERIVED_ACTIONS/ACTION_EFFECT_FN until its own retab.
- *
- * Adding a new mechanical action: append the entry to DERIVED_ACTIONS and add
- * its effect fn to ACTION_EFFECT_FN. No migration needed — only new columns
- * need one.
- */
+// Adding a mechanical action: give the ClassFeature row an activationCost (+ resourceKey, effectKind if server-rolled). DERIVED_ACTIONS is for the one case no row descriptor can express, not a fallback.
+// Add an ACTION_EFFECT_FN entry only for a richer effect than spendResource. NO_DISPATCH_ACTION_KEYS is only for a seeded universal row or the DERIVED_ACTIONS holdout — never a row-driven key.
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
@@ -77,7 +56,7 @@ interface DerivedActionRecord {
    */
   grantSubclassSlugs?: SubclassSlug[];
   resourceKey?: string;  // pool key to check for `enabled`
-  resourceAmount?: number; // pool units required
+  resourceAmount?: number;
   /**
    * In-play rule text for no-server-effect reminder actions. A function form
    * (Heightened Focus, monk L10) lets patientDefenseFocus/stepOfTheWindFocus
@@ -116,9 +95,7 @@ interface DerivedActionRecord {
   regrants?: readonly string[];
 }
 
-// The row's class/level gate as a list — the one normalization both the legacy
-// grantClass/grantLevel shape and the grantClasses shape resolve through, so
-// matchesActionGate/actionGrantLevel each keep a single class-gate code path.
+// Both gate shapes normalize here so matchesActionGate/actionGrantLevel keep one class-gate path.
 function classGatesOf(a: DerivedActionRecord): ActionClassGate[] {
   return a.grantClasses ?? [{ className: a.grantClass ?? "", minLevel: a.grantLevel ?? 0 }];
 }
@@ -128,17 +105,12 @@ function matchesClassGate(gate: ActionClassGate, cls: string, level: number): bo
   return level >= gate.minLevel;
 }
 
-// Slug equality against the row's accepted slugs; an ungated row matches
-// every subclass (including `undefined` — a homebrew/off-catalog subclass).
-// `slug` arrives already resolved (FK-or-name, never substring) — the
-// resolution happens per class entry in deriveEntryScopedActions, which is the
-// only caller that has the entry's subclassRef in scope.
+// An ungated row matches every subclass, including `undefined` (a homebrew/off-catalog subclass). `slug` arrives already resolved (FK-or-name, never substring) — never re-resolved here.
 function matchesSubclassGate(a: DerivedActionRecord, slug: SubclassSlug | undefined): boolean {
   if (!a.grantSubclassSlugs) return true;
   return slug !== undefined && a.grantSubclassSlugs.includes(slug);
 }
 
-/** Available action shape serialized onto the character. */
 export interface AvailableAction {
   key: string;
   name: string;
@@ -170,7 +142,7 @@ export interface AvailableAction {
    * only for a row-driven action (`actionsFromRows` below); a DERIVED_ACTIONS
    * row leaves this undefined, and the frontend's own ACTION_RESOLVERS table
    * (keyed by actionKey) still owns those. Values mirror the frontend's
-   * ResolutionKind enum (actionResolvers.ts).
+   * ResolutionKind enum.
    */
   resolverKind?: string;
 }
@@ -181,15 +153,13 @@ export interface ResourcePool {
   remaining: number;
 }
 
-// The single source of truth for the CLASS action catalog (prisma/seed.ts's
-// ACTIONS class rows are not consumed by any route and don't need to stay in
-// sync — only its universal rows are, via referenceRouter).
-//
 // summonBondedWeapon is the one row that stays TS permanently: its `enabled`
 // reads a synthetic "weaponBond" pool built from a LIVE COUNT of
 // `weaponBonded` inventory rows — no ClassFeature descriptor column expresses
 // a live-inventory gate, so it has no row-driven destination to move to.
-const DERIVED_ACTIONS: DerivedActionRecord[] = [
+// Exported so the seed-side ACTION_EFFECT_FN parity test can check its key
+// against the dispatch table without a second hardcoded copy of "summonBondedWeapon".
+export const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Fighter / Eldritch Knight — Weapon Bond (2014, PHB'14 p.75). 2014-only:
   // 2024 Eldritch Knight text is unverified/parked, so this stays 2014 until that lands.
   {
@@ -228,11 +198,8 @@ export function matchesActionGate(
   // before the class/subclass gates below ever see it.
   if (a.edition !== undefined && a.edition !== edition) return false;
 
-  // Class + level gate (single-class grantClass/grantLevel or a multi-class
-  // grantClasses list — matched when ANY gate matches; see classGatesOf).
   if (!classGatesOf(a).some((g) => matchesClassGate(g, cls, level))) return false;
 
-  // Subclass gate (slug equality, ANY accepted slug; see grantSubclassSlugs).
   if (!matchesSubclassGate(a, slug)) return false;
 
   return true;
@@ -390,18 +357,6 @@ function resolveEnablement(
   return { enabled: true };
 }
 
-// Keyed by action `key`. Each fn receives an execution context and returns an
-// array of op objects the orchestrator dispatches within a single Prisma
-// transaction. Convention: return op arrays, never side-effect directly; a
-// client-side roll arrives via ctx.roll and is validated, not recomputed; a
-// server-rolled value with no client input is precomputed by the route and
-// passed through its own ctx field. Use only the existing op types below.
-//
-// A while-active BUFF-GRANTING feature does not belong in this table — author
-// it as a ClassFeature row with resolverKind "toggle" + effectBuffs instead
-// (toggleActionsFromRow/toggleRowOps below); this table is for actions with
-// no buff to grant.
-
 interface ActionContext {
   /** Arbitrary dice roll total supplied by the client (e.g. potion healing). */
   roll?: number;
@@ -429,12 +384,30 @@ type HealOp = { type: "heal"; amount: number };
 type TempHpOp = { type: "tempHp"; amount: number };
 type ApplyBuffOp = { type: "applyBuff"; buff: Omit<ActiveBuff, "id"> };
 type ClearBuffOp = { type: "clearBuff"; key: string; reason: string };
-// Exported so toggleRowOps below and the routes/character/actions.ts
-// dispatcher share this exact union instead of a second, equal copy.
+// Exported so toggleRowOps below and applyActionEffectInTx share this exact union instead of a second, equal copy.
 export type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | TempHpOp | ApplyBuffOp | ClearBuffOp;
 
 type EffectFn = (ctx: ActionContext) => ActionOp[];
 
+// Keys with no ACTION_EFFECT_FN entry and no ClassFeature-row fallback to resolve through. castSpellBonus/shove/summonBondedWeapon have an ACTION_RESOLVERS entry marked serverEffect: false, so they're never sent; study/influence have no ACTION_RESOLVERS entry and never appear in availableActions, so nothing is sent for them either.
+// Thinner latch on study/influence: a future universal row served with its own resolverKind would flip them into resolverFromRow's serverEffect: true default and start dispatching them for real.
+export const NO_DISPATCH_ACTION_KEYS: readonly string[] = [
+  // App affordance, not a distinct action — renders nowhere today, dead
+  // content until #1431/#1439.
+  "castSpellBonus",
+  // Narrated only — no target-combatant model to apply a contest outcome to
+  // (self-or-announce).
+  "shove",
+  // SRD 5.2-only reminder actions (ability-check prompts), no server state.
+  "study",
+  "influence",
+  // The DERIVED_ACTIONS holdout documented above — reminder-only, never sent
+  // to actions/transactions.
+  "summonBondedWeapon",
+];
+
+// Convention: return op arrays, never side-effect directly. A client-side roll arrives via ctx.roll and is validated, not recomputed; a server-rolled value with no client input is precomputed by the route and passed through its own ctx field.
+// A while-active buff-granting feature does not belong here — author it as a ClassFeature row with resolverKind "toggle" + effectBuffs instead (toggleActionsFromRow/toggleRowOps below).
 export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // Generic no-op actions — ephemeral only, no server effect needed.
   attack: () => [],
@@ -579,11 +552,11 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   },
 };
 
-// Cast-core actions: the orchestrator routes these through castAbilityInTx (pay
-// pool cost → self-apply heal), not the op-list dispatch. The 5e rule lives here
-// (pool key + base spend + the self-heal effect).
-
-/** A cast-core action's cost + effect + resolved self-apply, if any. */
+/**
+ * A cast-core action's cost + effect + resolved self-apply, if any. The
+ * orchestrator routes these through castAbilityInTx (pay pool cost →
+ * self-apply heal), not the op-list dispatch.
+ */
 export interface ActionCastSpec {
   name: string;
   cost: AbilityCost;
@@ -591,23 +564,11 @@ export interface ActionCastSpec {
   apply?: { target: "self"; kind: "heal" | "damage" | "tempHp"; amount: number };
 }
 
-/**
- * One row's AvailableAction, or null when it declares no activation
- * (`activationCost` absent) or the grant level isn't reached. Data-gated:
- * only a row with BOTH `activationCost` and `resourceKey` populated
- * contributes. `enabled`/`disabledReason` reuse `resolveEnablement` so a
- * row's gate can never diverge from a DERIVED_ACTIONS row's.
- */
-// The row-driven gate: right edition, grant level reached, and the two
-// fields that make a row an action at all. Split out to keep actionFromRow's
-// own cyclomatic count low (fallow's complexity gate).
+// Must stay identical to eligibleRowActions' gate and the parity test's CLASS_FEATURE_ROW_KEYS — update all three together.
 function rowIsAnAvailableAction(row: ClassFeatureRow, level: number, edition: RulesEdition): boolean {
   return row.edition === edition && row.level <= level && Boolean(row.activationCost) && Boolean(row.resourceKey);
 }
 
-// The optional AvailableAction fields a row may populate — isolated from
-// buildRowAction so that function's own branching budget covers only the
-// gate/reminder logic (fallow's complexity gate).
 function optionalRowActionFields(
   row: ClassFeatureRow,
   reminder: string | undefined,
@@ -624,8 +585,6 @@ function optionalRowActionFields(
   };
 }
 
-// Assembles the AvailableAction object once enablement is known — pulled out
-// of actionFromRow to keep its own branching budget for the gate check.
 function buildRowAction(
   row: ClassFeatureRow,
   level: number,
@@ -646,6 +605,13 @@ function buildRowAction(
   };
 }
 
+/**
+ * One row's AvailableAction, or null when it declares no activation
+ * (`activationCost` absent) or the grant level isn't reached. Data-gated:
+ * only a row with BOTH `activationCost` and `resourceKey` populated
+ * contributes. `enabled`/`disabledReason` reuse `resolveEnablement` so a
+ * row's gate can never diverge from a DERIVED_ACTIONS row's.
+ */
 function actionFromRow(
   row: ClassFeatureRow,
   level: number,
@@ -672,9 +638,9 @@ function actionFromRow(
 }
 
 // "rage" -> "endRage" — this exact string is load-bearing:
-// DURABLE_BUFF_END_CONDITIONS (frontend/src/lib/turnHooks.ts) hardcodes
-// "endRage" as the auto-end action keyed by the "rage" buff. Must keep
-// producing that string for Rage forever, not merely today.
+// DURABLE_BUFF_END_CONDITIONS hardcodes "endRage" as the auto-end action
+// keyed by the "rage" buff. Must keep producing that string for Rage
+// forever, not merely today.
 export function endActionKey(activateKey: string): string {
   return `end${activateKey.charAt(0).toUpperCase()}${activateKey.slice(1)}`;
 }

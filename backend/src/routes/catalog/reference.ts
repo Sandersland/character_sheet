@@ -11,6 +11,15 @@ import {
   type MulticlassPrerequisiteOption,
 } from "@/lib/srd/srd.js";
 import {
+  MANUAL_SCORE_CEILING,
+  MANUAL_SCORE_FLOOR,
+  POINT_BUY_BUDGET,
+  POINT_BUY_CEILING,
+  POINT_BUY_COSTS,
+  POINT_BUY_FLOOR,
+  STANDARD_ARRAY,
+} from "@/lib/srd/ability-generation.js";
+import {
   mapStartingEquipmentPackage,
   EQUIPMENT_PACKAGE_INCLUDE,
 } from "@/lib/inventory/starting-equipment-package.js";
@@ -49,7 +58,7 @@ referenceRouter.get("/reference", async (req, res) => {
       grantedSpells: { select: { id: true, variantId: true } },
     },
   });
-  // edition is present on the row only to drive resolveEditionCatalog's resolution; the projections below never forward it to the wire.
+  // Edition rides the nested subclasses rows, not the class row itself — same pattern as originFeatByName below, never forwarded to the wire.
   const rawClasses = await prisma.characterClass.findMany({
     orderBy: { name: "asc" },
     include: { subclasses: { where: withEditionOrShared({}, edition), orderBy: { name: "asc" } } },
@@ -202,7 +211,7 @@ referenceRouter.get("/reference", async (req, res) => {
   // Catalog content identical for every character of the edition — not per-character derived state.
   const conditions = conditionRulesText(edition);
 
-  // Only universal: true rows; class-specific Action rows reach the sheet through DERIVED_ACTIONS instead.
+  // Every seeded Action row is universal: true today (#1979) — class-specific actions reach the sheet via a ClassFeature row's actionsFromRows entry, or the DERIVED_ACTIONS holdout (summonBondedWeapon).
   const universalActionRows = await prisma.action.findMany({
     where: withEditionOrShared({ universal: true }, edition),
     select: { key: true, name: true, cost: true, description: true, edition: true },
@@ -222,5 +231,11 @@ referenceRouter.get("/reference", async (req, res) => {
     universalActions,
     // Edition-invariant — ITEM_RARITIES takes no edition param. Served as the whole table since the DM item form computes its value hint over unsaved form state.
     itemRarities: ITEM_RARITIES,
+    // Edition-invariant (PHB'14 p.13 / SRD 5.2) — same values validateAbilityScores enforces server-side; the create ceremony renders from these instead of a frontend-owned copy.
+    abilityGeneration: {
+      standardArray: STANDARD_ARRAY,
+      pointBuy: { budget: POINT_BUY_BUDGET, floor: POINT_BUY_FLOOR, ceiling: POINT_BUY_CEILING, costs: POINT_BUY_COSTS },
+      manual: { floor: MANUAL_SCORE_FLOOR, ceiling: MANUAL_SCORE_CEILING },
+    },
   });
 });

@@ -112,6 +112,11 @@ const referenceFixture: ReferenceData = {
   conditions: [],
   universalActions: [],
   itemRarities: [],
+  abilityGeneration: {
+    standardArray: [15, 14, 13, 12, 10, 8],
+    pointBuy: { budget: 27, floor: 8, ceiling: 15, costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 } },
+    manual: { floor: 1, ceiling: 30 },
+  },
 };
 
 beforeEach(() => {
@@ -217,6 +222,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
         wisdom: 10,
         charisma: 10,
       },
+      abilityGenerationMethod: "manual",
       skillProficiencies: ["history", "acrobatics", "arcana"],
       toolChoices: ["Lute", "Drum"],
       startingEquipment: undefined,

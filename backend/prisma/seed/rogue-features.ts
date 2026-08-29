@@ -1,9 +1,7 @@
 // DATA MODULE ONLY (#1277 AC 4): no direct database calls in this file.
 //
-// EDITION RULE: `edition` set on a row -> exactly the one row named (no
-// untagged rows in this file — every 2024 Rogue feature's text differs from
-// its 2014 counterpart, even where the mechanics agree). A "removed in 2024"
-// feature means not authoring a 2024 row, never deleting the 2014 row.
+// No row in this file omits `edition` — every 2024 Rogue feature's text
+// differs from its 2014 counterpart, even where the mechanics agree.
 //
 // Rogue has no resource pool in either edition — Sneak Attack's Nd6 is a
 // computed rule function (sneak-attack.ts), never a persisted pool. Cunning
@@ -12,7 +10,7 @@
 // wire consumer reads a Rogue announced DC today.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
-import type { ClassFeatureSeedRow } from "./class-features.js";
+import type { ActionCostSeed, ClassFeatureSeedRow, DerivedStatSeed } from "./class-features.js";
 
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`rogue-features: unknown subclass slug "${s}"`);
@@ -24,14 +22,13 @@ interface RawRogueFeature {
   name: string;
   level: number;
   description: string;
-  /** Omitted -> identical text seeded for both editions; unused today. */
   edition?: SeedEdition;
-  derivedStat?: string;
+  derivedStat?: DerivedStatSeed;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
   // resourceKey with no cost columns means "always enabled" (Cunning
   // Action/Fast Hands).
   resourceKey?: string;
-  activationCost?: string;
+  activationCost?: ActionCostSeed;
   regrants?: string[];
   reminder?: string;
 }

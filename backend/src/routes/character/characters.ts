@@ -5,7 +5,7 @@ import { Router } from "express";
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { createCharacter } from "@/lib/character/character-create.js";
+import { createCharacter } from "@/lib/character/create/index.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter, serializeCharacterSummary } from "@/lib/character/character-serialize.js";
 import {
@@ -15,7 +15,9 @@ import {
 } from "@/lib/character/character-schemas.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { storedPortraitKey } from "@/lib/character/character-portrait.js";
+import { lockCharacterRow } from "@/lib/character/character-transaction.js";
 import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
+import { validateAbilityScores } from "@/lib/srd/ability-generation.js";
 
 export const charactersRouter = Router();
 
@@ -98,46 +100,65 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
 
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
-  const existing = await prisma.character.findUniqueOrThrow({
-    where: { id: req.params.id },
-    select: { id: true, currency: true },
-  });
+  // PATCH declares no generation method — the omitted-method (sanity-bound)
+  // branch is exactly right here, the same rule createCharacter's own
+  // omitted-method case applies. Runs after ownership so a non-owner gets
+  // the 403, not a 400 that leaks whether the body would validate.
+  if (parseResult.data.abilityScores) {
+    const scoresResult = validateAbilityScores(undefined, parseResult.data.abilityScores);
+    if (!scoresResult.ok) {
+      res.status(400).json({ error: scoresResult.error });
+      return;
+    }
+  }
 
-  // Logs a currencyAdjust event only when currency changed, so DM-handed-over amounts show in the timeline.
-  let updated: Awaited<ReturnType<typeof prisma.character.findUnique>> & object;
   const patchData = parseResult.data as Prisma.CharacterUpdateInput;
 
-  if (parseResult.data.currency) {
-    const oldCurrency = existing.currency as Record<string, number>;
-    const newCurrency = parseResult.data.currency as Record<string, number>;
-    const summary = currencyAdjustSummary(oldCurrency, newCurrency);
+  // Locked read-modify-write: the currency branch reads `currency` to compute
+  // the event's `before`, so it must run after lockCharacterRow, inside the
+  // same transaction as the write — otherwise two concurrent currency
+  // PATCHes both read the pre-update currency and emit currencyAdjust events
+  // with the same stale `before`, and LIFO undo double-reverts (#1978).
+  const updated = await prisma.$transaction(
+    async (tx) => {
+      await lockCharacterRow(tx, req.params.id);
 
-    updated = await prisma.$transaction(async (tx) => {
+      const existing = await tx.character.findUniqueOrThrow({
+        where: { id: req.params.id },
+        select: { id: true, currency: true },
+      });
+
       const result = await tx.character.update({
         where: { id: req.params.id },
         data: patchData,
         include: characterInclude,
       });
-      await logEvent(tx, {
-        characterId: req.params.id,
-        category: "currency",
-        type: "currencyAdjust",
-        summary,
-        before: { currency: oldCurrency },
-        after: { currency: newCurrency },
-        batchId: randomUUID(),
-      });
-      return result;
-    });
-  } else {
-    updated = await prisma.character.update({
-      where: { id: req.params.id },
-      data: patchData,
-      include: characterInclude,
-    }) as typeof updated;
-  }
 
-  res.json(await serializeCharacter(updated as Parameters<typeof serializeCharacter>[0]));
+      // Logs a currencyAdjust event only when currency changed, so DM-handed-over amounts show in the timeline.
+      if (parseResult.data.currency) {
+        const oldCurrency = existing.currency as Record<string, number>;
+        const newCurrency = parseResult.data.currency as Record<string, number>;
+        const summary = currencyAdjustSummary(oldCurrency, newCurrency);
+
+        await logEvent(tx, {
+          characterId: req.params.id,
+          category: "currency",
+          type: "currencyAdjust",
+          summary,
+          before: { currency: oldCurrency },
+          after: { currency: newCurrency },
+          batchId: randomUUID(),
+        });
+      }
+
+      return result;
+    },
+    // Generous timeout: the row lock above means real contention (a queued concurrent PATCH)
+    // waits out the whole batch ahead of it, mirroring runCharacterTransaction's precedent.
+    { timeout: 30_000 },
+  );
+
+  res.json(await serializeCharacter(updated));
 });
 
 // No audit event: cosmetic play settings, not a domain mutation.

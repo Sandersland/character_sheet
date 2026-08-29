@@ -1,15 +1,18 @@
 import { z } from "zod";
 
 import { ALL_RULES_EDITIONS } from "@/lib/rules/edition.js";
+import { ALL_ABILITY_GENERATION_METHODS } from "@/lib/srd/ability-generation.js";
 
-const abilityScoresSchema = z.object({
-  strength: z.number().int(),
-  dexterity: z.number().int(),
-  constitution: z.number().int(),
-  intelligence: z.number().int(),
-  wisdom: z.number().int(),
-  charisma: z.number().int(),
-});
+const abilityScoresSchema = z
+  .object({
+    strength: z.number().int(),
+    dexterity: z.number().int(),
+    constitution: z.number().int(),
+    intelligence: z.number().int(),
+    wisdom: z.number().int(),
+    charisma: z.number().int(),
+  })
+  .strict();
 
 const classChoiceSchema = z.object({
   name: z.string().min(1),
@@ -48,6 +51,12 @@ export const createCharacterSchema = z
     background: z.string().min(1),
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,
+    // How the player produced abilityScores below — validateAbilityScores checks
+    // the scores against the matching rule (standardArray/pointBuy: PHB'14 p.13 /
+    // SRD 5.2's standard array and point-buy rules; roll: the 3-18 dice-math bound);
+    // an omitted or "manual" method gets only the wider 1-30 sanity bound, never
+    // zero validation.
+    abilityGenerationMethod: z.enum(ALL_ABILITY_GENERATION_METHODS).optional(),
     backgroundAbilities: z.record(z.string(), z.number().int().positive()).optional(),
     skillProficiencies: z.array(z.string()).optional(),
     toolChoices: z.array(z.string()).optional(),
@@ -57,14 +66,17 @@ export const createCharacterSchema = z
     spells: z
       .object({ cantripIds: z.array(z.string()), spellIds: z.array(z.string()) })
       .optional(),
-    // Derives from ALL_RULES_EDITIONS (#1527), never a literal array — a third edition becomes settable here the moment it's added to RulesEdition.
+    // Never a literal array (#1527) — a third edition becomes settable the moment RulesEdition gains it.
     rulesEdition: z.enum(ALL_RULES_EDITIONS).optional(),
   })
   .strict();
 
 export type CreateCharacterBody = z.infer<typeof createCharacterSchema>;
 
-// race/class/subclass/background/level/proficiencyBonus/experiencePoints/rulesEdition/inventory/spellcasting/journal are deliberately absent: derived, relation-backed, or mutated only through their own transaction/REST endpoint (never a blind PATCH) — .strict() 400s an attempt instead of silently ignoring it. rulesEdition is write-once (#1281).
+// race/class/subclass/background/level/proficiencyBonus/experiencePoints/rulesEdition/inventory/spellcasting/journal
+// are deliberately absent: derived, relation-backed, or mutated only through their own
+// transaction/REST endpoint (never a blind PATCH) — .strict() 400s an attempt instead of silently
+// ignoring it. rulesEdition is write-once (#1281).
 // currency IS still patchable here; the handler logs a currencyAdjust event in the same transaction.
 export const updateCharacterSchema = z
   .object({
@@ -87,7 +99,11 @@ export const updateCharacterSchema = z
       die: z.string(),
       spent: z.number().int().min(0).optional(),
     }),
-    abilityScores: z.record(z.string(), z.number().int()),
+    // The six named keys, not z.record: a record admits any key with any int value.
+    // PATCH also declares no generation method, so the route runs
+    // validateAbilityScores(undefined, ...) — the same sanity-bound rule
+    // createCharacter's omitted-method branch uses.
+    abilityScores: abilityScoresSchema,
     savingThrowProficiencies: z.array(z.string()),
     skills: z.array(z.unknown()),
     currency: z.object({

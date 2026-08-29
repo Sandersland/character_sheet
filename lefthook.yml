@@ -6,7 +6,7 @@
 #
 # Jobs scope per workspace via `root:` — a backend-only push runs the backend
 # jobs and skips the frontend ones (push_files filtered to that root), and
-# vice-versa. Both tiers now consume packages/shared-types via `import type`
+# vice-versa. Both tiers consume packages/shared-types via `import type`
 # (#820), so a change THERE can only surface in a consumer's tsc — its own
 # typecheck-shared job catches the package in isolation, and CI's `build` job
 # (npm run build --workspaces) is the cross-tier authority that re-typechecks
@@ -44,9 +44,9 @@ pre-commit:
         else
           BASE="origin/staging"
         fi
-        # --no-cache: skip fallow's persistent base-snapshot git worktree
-        # (fallow-audit-base-cache-*). Those leak — they accumulate and exhaust
-        # the git worktree slot limit, which broke the autodev/antidote pipeline.
+        # --no-cache: skip fallow's persistent base-snapshot worktrees
+        # (fallow-audit-base-cache-*) — they accumulate and exhaust the git
+        # worktree slot limit.
         "$FALLOW" audit --base "$BASE" --quiet --gate-marker pre-commit --no-cache
     # fallow twin of eslint's require-description gate (#1045): every
     # `fallow-ignore-next-line` must carry a `-- <reason>`. fallow has no built-in
@@ -68,6 +68,11 @@ pre-commit:
     # #1339's fix from one gate to the other six). Also a CI step.
     subclass-substring:
       run: sh scripts/check-subclass-substring.sh
+    # An edition rule must branch as a total mapping over RulesEdition, never
+    # a binary `edition === "EDITION_…"` comparison (#1978, generalizing
+    # #1527's subclassGateLevel pattern to every rule fn). Also a CI step.
+    edition-branching:
+      run: sh scripts/check-edition-branching.sh
     # Boot-contract gate (#1277 defect 3): every Dockerfile running `prisma
     # migrate deploy` must also run `prisma db seed` — catalog content lives
     # in the seed, not migrations. Also a CI step.

@@ -1,4 +1,4 @@
-// #1648/#1649: buildInventorySnapshot is the one construction function every creation path calls; the snapshot + InventoryCapabilityUse / InventoryItem.usesRemaining are now the SOLE write, no mirror tables left to cross-check against.
+// #1648/#1649: buildInventorySnapshot is the one construction function every creation path calls; the snapshot + InventoryCapabilityUse / InventoryItem.usesRemaining are the SOLE write, no mirror tables to cross-check against.
 import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -11,7 +11,7 @@ import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { applyInventoryOperations, revertInventoryEvent } from "@/lib/inventory/inventory.js";
 import { awardCampaignItem, revokeCampaignItem } from "@/lib/campaign/campaign-item-award.js";
-import { createCharacter } from "@/lib/character/character-create.js";
+import { createCharacter } from "@/lib/character/create/index.js";
 import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
 import { revertBatch } from "@/lib/activity/activity.js";
