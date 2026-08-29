@@ -275,8 +275,7 @@ export function rowIdentity(row: unknown): string {
   if (typeof row !== "object" || row === null) return "";
   const r = row as Record<string, unknown>;
   const label = [r.name, r.className, r.backgroundName].find((v) => typeof v === "string");
-  const edition = typeof r.edition === "string" ? r.edition : undefined;
-  const parts = [label, edition].filter((v): v is string => typeof v === "string");
+  const parts = [label, r.edition].filter((v): v is string => typeof v === "string");
   return parts.length ? ` (${parts.join(", ")})` : "";
 }
 
