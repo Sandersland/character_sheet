@@ -196,7 +196,7 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns, Cho
   effectDiceFaces?: number | null;
   effectDieSource?: string | null;
   effectModifier?: number | null;
-  effectModifierSource?: string | null; // "classLevel" | "abilityMod:<ability>" — see EffectSpec.modifierSource.
+  effectModifierSource?: string | null; // "classLevel" | "abilityMod:<ability>" — see EffectSpec.modifierSource. Seed validation rejects "abilityMod:<ability>" until a reader resolves it.
   damageType?: string | null;
   attackType?: string | null;
   saveAbility?: string | null;

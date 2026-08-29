@@ -12,7 +12,7 @@
 // wire consumer reads a Rogue announced DC today.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
-import type { ClassFeatureSeedRow } from "./class-features.js";
+import type { ActionCostSeed, ClassFeatureSeedRow, DerivedStatSeed } from "./class-features.js";
 
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`rogue-features: unknown subclass slug "${s}"`);
@@ -26,12 +26,12 @@ interface RawRogueFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions; unused today. */
   edition?: SeedEdition;
-  derivedStat?: string;
+  derivedStat?: DerivedStatSeed;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
   // resourceKey with no cost columns means "always enabled" (Cunning
   // Action/Fast Hands).
   resourceKey?: string;
-  activationCost?: string;
+  activationCost?: ActionCostSeed;
   regrants?: string[];
   reminder?: string;
 }

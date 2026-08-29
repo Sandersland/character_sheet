@@ -570,7 +570,7 @@ model ClassFeature {
   effectDiceFaces      Int?
   effectDieSource      String?
   effectModifier       Int?
-  effectModifierSource String? // "classLevel" | "abilityMod:<ability>"
+  effectModifierSource String? // "classLevel" | "abilityMod:<ability>" — seed validation (classFeatureSeedSchema) rejects "abilityMod:<ability>" until a reader resolves it.
   damageType           String?
   attackType           String?
   saveAbility          String?

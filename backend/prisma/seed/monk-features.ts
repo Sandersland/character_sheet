@@ -10,7 +10,14 @@
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { ChoiceCountTier, EffectBuffRow, InitiativeRegenRow, ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import type { SeedEdition } from "./edition.js";
-import type { ClassFeatureSeedRow } from "./class-features.js";
+import type {
+  ActionCostSeed,
+  ClassFeatureSeedRow,
+  CostKindSeed,
+  DerivedStatSeed,
+  ResolverKindSeed,
+  ResourceRechargeSeed,
+} from "./class-features.js";
 
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`monk-features: unknown subclass slug "${s}"`);
@@ -24,12 +31,12 @@ interface RawMonkFeature {
   description: string;
   // Omitted seeds both editions with identical text; set to fork wording for one edition only (#1430).
   edition?: SeedEdition;
-  derivedStat?: string;
+  derivedStat?: DerivedStatSeed;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
   // fallow-ignore-next-line code-duplication -- mirrors fighter-features.ts's Raw*Feature shape by convention, not a shared base type
   resourceKey?: string;
   resourceLabel?: string;
-  resourceRecharge?: string;
+  resourceRecharge?: ResourceRechargeSeed;
   // fallow-ignore-next-line code-duplication -- same per-class-file mirror as above
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula }[];
   resourceOnInitiative?: InitiativeRegenRow[];
@@ -37,9 +44,9 @@ interface RawMonkFeature {
   choiceLabel?: string;
   choiceCatalogSource?: string;
   choiceCountTiers?: ChoiceCountTier[];
-  activationCost?: string;
-  resolverKind?: string;
-  costKind?: string;
+  activationCost?: ActionCostSeed;
+  resolverKind?: ResolverKindSeed;
+  costKind?: CostKindSeed;
   costPoolKey?: string;
   costBase?: number;
   effectBuffs?: EffectBuffRow[];

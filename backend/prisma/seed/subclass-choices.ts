@@ -6,6 +6,8 @@
 // added by declaring a SubclassChoice on its subclass and adding its options
 // here — no new reconciler or state key.
 
+import { z } from "zod";
+
 import type { SeedEdition } from "./edition.js";
 
 export interface SubclassChoiceOptionSeed {
@@ -19,6 +21,17 @@ export interface SubclassChoiceOptionSeed {
   // mechanically diverging row forks, which #1415 made expressible.
   edition?: SeedEdition;
 }
+
+// No stringly-typed union column here (source is a free identifier matched against a
+// SubclassChoice.catalogSource elsewhere, not a closed vocabulary) — this schema exists so
+// SUBCLASS_CHOICE_OPTIONS goes through the same zod gate as every other GrantedAbility family.
+export const subclassChoiceOptionSeedSchema = z.object({
+  name: z.string().min(1),
+  source: z.string().min(1),
+  description: z.string().min(1),
+  minLevel: z.number().int().positive(),
+  edition: z.enum(["EDITION_2014", "EDITION_2024"]).optional(),
+});
 
 // SRD 5.1 pp. 37-38 (EDITION_2014/shared rows below); SRD 5.2 p. 61 (EDITION_2024 forks).
 export const SUBCLASS_CHOICE_OPTIONS: SubclassChoiceOptionSeed[] = [

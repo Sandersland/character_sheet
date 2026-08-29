@@ -1,18 +1,38 @@
 // SRD Battle Master maneuvers. Every maneuver costs 1 superiority die and rolls it; the server owns the roll on castManeuver.
+import { z } from "zod";
+
 import type { SeedEdition } from "./edition.js";
 
-export type ManeuverPlacement = "attackRoll" | "damageRoll" | "reaction" | "effect" | "attackOption";
+// The session UI's routing key (GrantedAbility.placement) — mirrors it as a const array so
+// maneuverSeedSchema below derives from the SAME list a type error would catch drifting.
+const MANEUVER_PLACEMENT_VALUES = ["attackRoll", "damageRoll", "reaction", "effect", "attackOption"] as const;
+export type ManeuverPlacement = (typeof MANEUVER_PLACEMENT_VALUES)[number];
+
+const ACTION_SLOT_VALUES = ["bonusAction", "reaction"] as const;
+// Only the four abilities a Battle Master maneuver's save can target — narrower than the full
+// six-ability set (no maneuver imposes an Intelligence/Charisma save).
+const MANEUVER_SAVE_ABILITY_VALUES = ["strength", "dexterity", "wisdom", "constitution"] as const;
 
 export interface ManeuverSeed {
   name: string;
   description: string;
   placement: ManeuverPlacement;
-  actionSlot?: "bonusAction" | "reaction";
-  saveAbility?: "strength" | "dexterity" | "wisdom" | "constitution";
+  actionSlot?: (typeof ACTION_SLOT_VALUES)[number];
+  saveAbility?: (typeof MANEUVER_SAVE_ABILITY_VALUES)[number];
   selfTempHp?: boolean;
   // Omitted = shared (NULL column, valid in both editions, #1306); a diverging row forks (#1415).
   edition?: SeedEdition;
 }
+
+export const maneuverSeedSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1),
+  placement: z.enum(MANEUVER_PLACEMENT_VALUES),
+  actionSlot: z.enum(ACTION_SLOT_VALUES).optional(),
+  saveAbility: z.enum(MANEUVER_SAVE_ABILITY_VALUES).optional(),
+  selfTempHp: z.boolean().optional(),
+  edition: z.enum(["EDITION_2014", "EDITION_2024"]).optional(),
+});
 
 export const MANEUVERS: ManeuverSeed[] = [
   {

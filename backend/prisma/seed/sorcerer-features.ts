@@ -5,7 +5,7 @@
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import type { SeedEdition } from "./edition.js";
-import type { ClassFeatureSeedRow } from "./class-features.js";
+import type { ActionCostSeed, ClassFeatureSeedRow, CostKindSeed, ResourceRechargeSeed } from "./class-features.js";
 
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`sorcerer-features: unknown subclass slug "${s}"`);
@@ -20,11 +20,11 @@ interface RawSorcererFeature {
   edition?: SeedEdition;
   resourceKey?: string;
   resourceLabel?: string;
-  resourceRecharge?: string;
+  resourceRecharge?: ResourceRechargeSeed;
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
   // Metamagic's resourceKey is the action's identity ("metamagic"), not the pool it spends (costPoolKey "sorceryPoints") — actionFromRow gates on the cost pool, never this key (#1909).
-  activationCost?: string;
-  costKind?: string;
+  activationCost?: ActionCostSeed;
+  costKind?: CostKindSeed;
   costPoolKey?: string;
   costBase?: number;
 }

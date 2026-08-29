@@ -6,23 +6,26 @@
 // impossible to fake — and feeding a deliberately-broken FIXTURE array (never
 // the real SUBCLASSES) through the real schema proves the schema itself still
 // rejects bad content, independent of what's currently seeded.
+//
+// SEED_FAMILIES is NOT every seeded content array — ITEMS, PACKS, FEATS,
+// BACKGROUNDS, and ACTIONS are seeded too but carry no zod schema yet; the
+// families/rows floors below cover only what's registered, not the whole
+// seeded surface.
 import { describe, it, expect } from "vitest";
 
 import { assertSeedContentValid, assertCatalogNamesResolve, assertNoDuplicatePoolDeclaringRows, assertNoDuplicateChoiceDeclaringRows } from "../validate.js";
 import { subclassSeedSchema } from "../subclasses.js";
 
 describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
-  // 5 families today: SUBCLASSES, SUBCLASS_GRANTED_SPELLS, CLASS_FEATURES
-  // (#1523, 522 rows), STARTING_EQUIPMENT_PACKAGES (#1533, 24 rows), and
-  // BACKGROUND_STARTING_EQUIPMENT_PACKAGES (#1565, 5 rows) — >= floors rather
-  // than exact counts so this doesn't need editing every time a family is
-  // added. The floor is bumped 4->5 in the SAME diff that registers the fifth
-  // family — writing toBe(4)/60 here would keep passing if the registration
-  // were silently dropped (#1370's exact failure shape).
-  it("visited at least 5 families and 60 rows", () => {
+  // 16 families today (SEED_FAMILIES in validate.ts) — >= floors rather than
+  // exact counts so this doesn't need editing every time a family is added.
+  // The floor is bumped in the SAME diff that registers a new family —
+  // writing toBe(N) here would keep passing if a registration were silently
+  // dropped (#1370's exact failure shape).
+  it("visited at least 16 families and 1000 rows", () => {
     const summary = assertSeedContentValid();
-    expect(summary.familiesChecked).toBeGreaterThanOrEqual(5);
-    expect(summary.rowsChecked).toBeGreaterThanOrEqual(60);
+    expect(summary.familiesChecked).toBeGreaterThanOrEqual(16);
+    expect(summary.rowsChecked).toBeGreaterThanOrEqual(1000);
   });
 
   it("the real content passes cleanly", () => {

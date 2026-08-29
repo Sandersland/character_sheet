@@ -5,7 +5,7 @@ import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-r
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import type { RechargeOn } from "../../src/lib/classes/types.js";
 import type { SeedEdition } from "./edition.js";
-import type { ClassFeatureSeedRow } from "./class-features.js";
+import type { ActionCostSeed, ClassFeatureSeedRow, CostKindSeed, DerivedStatSeed } from "./class-features.js";
 
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`bard-features: unknown subclass slug "${s}"`);
@@ -18,7 +18,7 @@ interface RawBardFeature {
   level: number;
   description: string;
   edition?: SeedEdition;
-  derivedStat?: string;
+  derivedStat?: DerivedStatSeed;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
   improvements?: FeatImprovement[];
   resourceKey?: string;
@@ -26,8 +26,8 @@ interface RawBardFeature {
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula }[];
   resourceDieTiers?: { minLevel: number; die: string }[];
   resourceRechargeTiers?: { minLevel: number; recharge: RechargeOn }[];
-  activationCost?: string;
-  costKind?: string;
+  activationCost?: ActionCostSeed;
+  costKind?: CostKindSeed;
   costPoolKey?: string;
   costBase?: number;
 }

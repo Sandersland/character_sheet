@@ -1,16 +1,38 @@
 // Every Channel Divinity option spends 1 Channel Divinity charge.
 // Sacred Weapon's buff modifier is derived from Charisma at cast time (left null here).
+import { z } from "zod";
+
+import { ABILITY_VALUES, KNOWN_BUFF_TARGETS } from "./class-features.js";
 import type { SeedEdition } from "./edition.js";
+
+const EFFECT_KIND_VALUES = ["buff"] as const;
 
 export interface ChannelDivinitySeed {
   name: string;
   description: string;
-  saveAbility?: string;
-  effectKind?: "buff";
+  saveAbility?: (typeof ABILITY_VALUES)[number];
+  effectKind?: (typeof EFFECT_KIND_VALUES)[number];
   buffTarget?: string;
   // Omitted = shared (NULL column, valid in both editions, #1306); a diverging row forks (#1415).
   edition?: SeedEdition;
 }
+
+// buffTarget reuses ClassFeature's KNOWN_BUFF_TARGETS: a GrantedAbility row's flat buffTarget
+// column feeds the SAME buffsByTarget consumer as ClassFeature.buffTarget (readEffectSpec ->
+// resolveBuffSpec), so the two share one legal vocabulary rather than each guessing their own.
+export const channelDivinitySeedSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().min(1),
+    saveAbility: z.enum(ABILITY_VALUES).optional(),
+    effectKind: z.enum(EFFECT_KIND_VALUES).optional(),
+    buffTarget: z.string().min(1).optional(),
+    edition: z.enum(["EDITION_2014", "EDITION_2024"]).optional(),
+  })
+  .refine((row) => !row.buffTarget || KNOWN_BUFF_TARGETS.includes(row.buffTarget), {
+    message: "buffTarget must be a known skill/stat key (see KNOWN_BUFF_TARGETS)",
+    path: ["buffTarget"],
+  });
 
 export const CHANNEL_DIVINITIES: ChannelDivinitySeed[] = [
   {

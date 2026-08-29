@@ -17,7 +17,7 @@ import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclas
 import type { ActionCost } from "../../src/lib/classes/actions.js";
 import type { EffectBuffRow } from "../../src/lib/classes/class-feature-rows.js";
 import type { SeedEdition } from "./edition.js";
-import type { ClassFeatureSeedRow } from "./class-features.js";
+import type { ClassFeatureSeedRow, DerivedStatSeed, ResourceRechargeSeed } from "./class-features.js";
 
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`barbarian-features: unknown subclass slug "${s}"`);
@@ -31,11 +31,11 @@ interface RawBarbarianFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions. */
   edition?: SeedEdition;
-  derivedStat?: string;
+  derivedStat?: DerivedStatSeed;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
   resourceKey?: string;
   resourceLabel?: string;
-  resourceRecharge?: string;
+  resourceRecharge?: ResourceRechargeSeed;
   resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
   activationCost?: ActionCost;
   resolverKind?: "toggle";

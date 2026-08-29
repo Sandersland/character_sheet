@@ -4,7 +4,17 @@
 // The per-cast ki cap (min(6, 2 + floor((monkLevel-1)/4)) -> 2/3/4/5/6 at L3/L5/L9/L13/L17) is enforced by maxKiPerDiscipline, not here — this module is a pure content array only.
 // costBase for every spell-equivalent discipline is exactly one more than the underlying spell's level (Thunderwave 1st -> 2 ki ... Cone of Cold 5th -> 6 ki) — PHB'14 p.80's own worked example ("spend 3 ki points to cast [Burning Hands] as a 2nd-level spell" from Sweeping Cinder Strike's 2-ki base).
 // costPerStep is set only where the discipline's own text allows spending extra ki to add damage dice (Fangs of the Fire Snake, Fist of Unbroken Air, Water Whip, Gong of the Summit, Sweeping Cinder Strike) — the others cast a spell at a fixed level with no upcast option.
+import { z } from "zod";
+
+import { ABILITY_VALUES, ATTACK_TYPE_VALUES, DAMAGE_TYPE_VALUES } from "./class-features.js";
 import type { SeedEdition } from "./edition.js";
+
+const COST_KIND_VALUES = ["pool", "none"] as const;
+// Every discipline reproduces a spell as an attack or a save; no discipline is a bare heal/buff.
+const EFFECT_KIND_VALUES = ["damage"] as const;
+// Deliberately narrower than the shared SAVE_EFFECT_VALUES (class-features.ts) — no discipline
+// negates damage entirely on a successful save, so "none" is never a legal value here.
+const SAVE_EFFECT_VALUES = ["half"] as const;
 
 export interface DisciplineSeed {
   name: string;
@@ -12,18 +22,37 @@ export interface DisciplineSeed {
   minLevel: number;
   alwaysKnown?: boolean;
   edition: SeedEdition;
-  costKind: "pool" | "none";
+  costKind: (typeof COST_KIND_VALUES)[number];
   costPoolKey?: string;
   costBase?: number;
   costPerStep?: number;
-  effectKind?: "damage";
+  effectKind?: (typeof EFFECT_KIND_VALUES)[number];
   effectDiceCount?: number;
   effectDiceFaces?: number;
-  damageType?: string;
-  attackType?: "attack" | "save";
-  saveAbility?: string;
-  saveEffect?: "half";
+  damageType?: (typeof DAMAGE_TYPE_VALUES)[number];
+  attackType?: (typeof ATTACK_TYPE_VALUES)[number];
+  saveAbility?: (typeof ABILITY_VALUES)[number];
+  saveEffect?: (typeof SAVE_EFFECT_VALUES)[number];
 }
+
+export const disciplineSeedSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1),
+  minLevel: z.number().int().positive(),
+  alwaysKnown: z.boolean().optional(),
+  edition: z.enum(["EDITION_2014", "EDITION_2024"]),
+  costKind: z.enum(COST_KIND_VALUES),
+  costPoolKey: z.string().min(1).optional(),
+  costBase: z.number().int().nonnegative().optional(),
+  costPerStep: z.number().int().nonnegative().optional(),
+  effectKind: z.enum(EFFECT_KIND_VALUES).optional(),
+  effectDiceCount: z.number().int().positive().optional(),
+  effectDiceFaces: z.number().int().positive().optional(),
+  damageType: z.enum(DAMAGE_TYPE_VALUES).optional(),
+  attackType: z.enum(ATTACK_TYPE_VALUES).optional(),
+  saveAbility: z.enum(ABILITY_VALUES).optional(),
+  saveEffect: z.enum(SAVE_EFFECT_VALUES).optional(),
+});
 
 export const DISCIPLINES: DisciplineSeed[] = [
   {

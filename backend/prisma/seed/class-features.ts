@@ -10,13 +10,17 @@ import {
   type ChoiceCountTier,
   type EffectBuffRow,
   type InitiativeRegenRow,
+  type ResourceTotalAbility,
   type ResourceTotalFormula,
 } from "../../src/lib/classes/class-feature-rows.js";
 import type { RechargeOn } from "../../src/lib/classes/types.js";
+import type { ActionCost } from "../../src/lib/classes/actions.js";
+import type { AbilityCost } from "../../src/lib/spellcasting/ability-cost.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import { featImprovementSchema } from "../../src/lib/srd/feats.js";
 import { SKILL_KEYS } from "../../src/lib/srd/alignments.js";
+import type { EffectType } from "@character-sheet/shared-types";
 import type { SeedEdition } from "./edition.js";
 
 import { MONK_FEATURES } from "./monk-features.js";
@@ -65,7 +69,7 @@ export interface ClassFeatureSeedRow {
   edition: SeedEdition;
   resourceKey?: string;
   resourceLabel?: string;
-  resourceRecharge?: string;
+  resourceRecharge?: (typeof RECHARGE_ON_VALUES)[number];
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
   resourceDieTiers?: { minLevel: number; die: string }[];
   resourceRechargeTiers?: { minLevel: number; recharge: RechargeOn }[];
@@ -75,8 +79,8 @@ export interface ClassFeatureSeedRow {
   choiceLabel?: string;
   choiceCatalogSource?: string;
   choiceCountTiers?: ChoiceCountTier[];
-  activationCost?: string;
-  resolverKind?: string;
+  activationCost?: (typeof ACTION_COST_VALUES)[number];
+  resolverKind?: (typeof RESOLVER_KIND_VALUES)[number];
   requiresUnarmored?: boolean;
   regrants?: string[];
   activationRequires?: ActivationRequirement[];
@@ -84,25 +88,28 @@ export interface ClassFeatureSeedRow {
   count?: number;
   // `true` requires `activationCost` + `resourceKey` (classFeatureSeedSchema).
   actionOnly?: boolean;
-  costKind?: string;
+  costKind?: (typeof COST_KIND_VALUES)[number];
   costPoolKey?: string;
   costBase?: number;
   costPerStep?: number;
-  effectKind?: string;
+  effectKind?: (typeof EFFECT_KIND_VALUES)[number];
   effectDiceCount?: number;
   effectDiceFaces?: number;
   effectDieSource?: string;
   effectModifier?: number;
-  effectModifierSource?: string;
-  damageType?: string;
-  attackType?: string;
-  saveAbility?: string;
-  saveEffect?: string;
+  effectModifierSource?: (typeof EFFECT_MODIFIER_SOURCE_VALUES)[number];
+  damageType?: (typeof DAMAGE_TYPE_VALUES)[number];
+  attackType?: (typeof ATTACK_TYPE_VALUES)[number];
+  saveAbility?: (typeof ABILITY_VALUES)[number];
+  saveEffect?: (typeof SAVE_EFFECT_VALUES)[number];
+  // Free string, not a derived union: KNOWN_BUFF_TARGETS is a runtime string[] built from
+  // SKILL_KEYS, not a literal tuple a type can be derived from — membership is a schema-time
+  // `.refine`, not a compile-time check (see classFeatureSeedSchema's buffTarget field).
   buffTarget?: string;
   buffModifier?: number;
-  derivedStat?: string;
+  derivedStat?: (typeof DERIVED_STAT_VALUES)[number];
   derivedStatTiers?: { minLevel: number; value: number | string }[];
-  saveDcAbilities?: string[];
+  saveDcAbilities?: (typeof ABILITY_VALUES)[number][];
   improvements?: FeatImprovement[];
   effectBuffs?: EffectBuffRow[];
   conditionImmunities?: string[];
@@ -136,11 +143,23 @@ const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending
 // file should parse against — the per-column tier schemas stay un-exported.
 // Mirrors ResourceTotalFormula field-for-field; evaluateResourceTotal is the
 // one interpreter.
+// The six ability score keys — this is the ONE seed-side copy (exported so spells.ts,
+// disciplines.ts, and channel-divinity.ts import it instead of each re-declaring it).
+// `satisfies` + the coverage check make this a two-way COMPILE latch against
+// ResourceTotalAbility: a member added/removed on either side fails typecheck, the same
+// pattern actionResolvers.ts uses for ResolutionKind/RESOLUTION_KINDS.
+export const ABILITY_VALUES = [
+  "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma",
+] as const satisfies readonly ResourceTotalAbility[];
+type _AbilityValuesCoverResourceTotalAbility = ResourceTotalAbility extends (typeof ABILITY_VALUES)[number] ? true : never;
+const _abilityValuesCoverResourceTotalAbility: _AbilityValuesCoverResourceTotalAbility = true;
+void _abilityValuesCoverResourceTotalAbility;
+
 const resourceTotalFormulaSchema = z.union([
   z.number().int().nonnegative(),
   z.literal("proficiencyBonus"),
   z.object({
-    abilityMod: z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]),
+    abilityMod: z.enum(ABILITY_VALUES),
     // PHB'14 p.84 — Divine Sense's own "1 + Charisma modifier" formula.
     plus: z.number().int().nonnegative().optional(),
     // A floor for the modifier (+ plus); never a source of negative totals (#1685).
@@ -246,8 +265,10 @@ const rollEffectSchema = z.object({
 
 // Every `target` a row-declared buff may name (#1686) — widen only in the
 // same diff that adds a new consumer in buildTargetModifiers. A marker buff
-// (`target === key`) is admitted separately by the `.refine` below.
-const KNOWN_BUFF_TARGETS: readonly string[] = [
+// (`target === key`) is admitted separately by the `.refine` below. Exported
+// so channel-divinity.ts's schema (a flat ClassFeature-sibling buffTarget
+// column feeding the SAME buffsByTarget consumer) can reuse it too.
+export const KNOWN_BUFF_TARGETS: readonly string[] = [
   ...SKILL_KEYS,
   "meleeDamage",
   "attackRoll",
@@ -351,8 +372,100 @@ function choiceTiersStartAtOrAfterRowLevel(row: ChoiceTierGapRow): boolean {
   return tiersStart === undefined || tiersStart >= row.level;
 }
 
+// Mirrors ActionCost (src/lib/classes/actions.ts) — activationCost's closed vocabulary. Two-way
+// compile latch, same shape as ABILITY_VALUES above.
+const ACTION_COST_VALUES = [
+  "action", "bonusAction", "reaction", "free", "special",
+] as const satisfies readonly ActionCost[];
+type _ActionCostValuesCoverActionCost = ActionCost extends (typeof ACTION_COST_VALUES)[number] ? true : never;
+const _actionCostValuesCoverActionCost: _ActionCostValuesCoverActionCost = true;
+void _actionCostValuesCoverActionCost;
+
+// Mirrors ResolutionKind (frontend/src/features/session/actionResolvers.ts) — resolverKind is
+// served on the wire and switched on there via ACTION_RESOLVERS/resolverFromRow. The two lists
+// are a coupling latch in BOTH directions: adding a ResolutionKind member without adding it here
+// means a seed row can never author it (rejected at seed time); adding a value here without
+// adding it to ResolutionKind means the frontend silently ignores a resolverKind it doesn't
+// recognize (see actionResolvers.ts's own reciprocal comment on ResolutionKind). No shared-types
+// migration in this slice (#1369 is the tracked follow-up) — cross-package TS types can't express
+// a two-way check the way ABILITY_VALUES/ACTION_COST_VALUES do above, so this stays prose-latched.
+const RESOLVER_KIND_VALUES = [
+  "attack-picker",
+  "twf-picker",
+  "flurry-picker",
+  "spell-picker",
+  "item-picker",
+  "heal-roll",
+  "heal-input",
+  "loadout-picker",
+  "simple-confirm",
+  "toggle",
+  "slot-picker",
+] as const;
+
+// Mirrors AbilityCost's `kind` discriminant (src/lib/spellcasting/ability-cost.ts). Two-way
+// compile latch, same shape as ABILITY_VALUES above.
+const COST_KIND_VALUES = ["none", "pool", "slot"] as const satisfies readonly AbilityCost["kind"][];
+type _CostKindValuesCoverAbilityCostKind = AbilityCost["kind"] extends (typeof COST_KIND_VALUES)[number] ? true : never;
+const _costKindValuesCoverAbilityCostKind: _CostKindValuesCoverAbilityCostKind = true;
+void _costKindValuesCoverAbilityCostKind;
+
+// Mirrors EffectType (packages/shared-types/src/effects.ts). "utility" is sometimes authored
+// explicitly (Song of Defense) even though an absent effectKind resolves to the same value via
+// resolveEffectType's fallback (src/lib/combat/effects.ts). Two-way compile latch, same shape as
+// ABILITY_VALUES above.
+const EFFECT_KIND_VALUES = ["damage", "heal", "buff", "utility"] as const satisfies readonly EffectType[];
+type _EffectKindValuesCoverEffectType = EffectType extends (typeof EFFECT_KIND_VALUES)[number] ? true : never;
+const _effectKindValuesCoverEffectType: _EffectKindValuesCoverEffectType = true;
+void _effectKindValuesCoverEffectType;
+
+// Every 5e damage type (SRD 5.2 / SRD 5.1 PHB'14 p.196) — a closed rules vocabulary, not open
+// text. Exported so spells.ts and disciplines.ts import it instead of each re-declaring it.
+export const DAMAGE_TYPE_VALUES = [
+  "acid", "bludgeoning", "cold", "fire", "force", "lightning", "necrotic",
+  "piercing", "poison", "psychic", "radiant", "slashing", "thunder",
+] as const;
+
+// Exported so spells.ts and disciplines.ts import it instead of each re-declaring it.
+export const ATTACK_TYPE_VALUES = ["attack", "save"] as const;
+// The full vocabulary — exported so spells.ts imports it (spells author both values). Disciplines
+// only ever author "half" (no discipline negates damage entirely on a successful save), so
+// disciplines.ts keeps its own deliberately narrower local array rather than importing this one.
+export const SAVE_EFFECT_VALUES = ["half", "none"] as const;
+
+// Every derivedStat name a reader matches against — class-feature-rows.ts's
+// derivedStatFromRows callers (registry.ts, srd/crit-range.ts, srd/extra-attack.ts). Adding a
+// new derivedStat consumer means adding its name here too, or its rows fail seed validation.
+const DERIVED_STAT_VALUES = [
+  "attacksPerAction", "critRange", "expertiseChoiceCount", "maneuverChoiceCount", "toolProfChoiceCount",
+] as const;
+
+// "abilityMod:<ability>" is reserved (EffectSpec.modifierSource, shared-types/effects.ts;
+// schema.prisma's effectModifierSource column comment) but no reader resolves it yet — accepting
+// it here would validate content nothing acts on. Widen only alongside a real reader.
+const EFFECT_MODIFIER_SOURCE_VALUES = ["classLevel"] as const;
+
+// Named aliases for the per-class-file Raw*Feature interfaces (fighter-features.ts,
+// wizard-features.ts, …) to import instead of `string` — every literal those files author is then
+// checked against the SAME vocabulary classFeatureSeedSchema validates at runtime, catching a
+// typo at compile time too. `ResourceRechargeSeed` is a plain passthrough of `RechargeOn` so a
+// per-class file needs only this one import path for every narrowed seed field. No
+// damageType/attackType/saveEffect alias: no per-class file authors those columns today (only
+// Spell/GrantedAbility rows do) — ClassFeatureSeedRow below references DAMAGE_TYPE_VALUES etc.
+// directly since it's their only consumer.
+export type ResourceRechargeSeed = RechargeOn;
+export type ActionCostSeed = (typeof ACTION_COST_VALUES)[number];
+export type ResolverKindSeed = (typeof RESOLVER_KIND_VALUES)[number];
+export type CostKindSeed = (typeof COST_KIND_VALUES)[number];
+export type EffectKindSeed = (typeof EFFECT_KIND_VALUES)[number];
+export type DerivedStatSeed = (typeof DERIVED_STAT_VALUES)[number];
+export type EffectModifierSourceSeed = (typeof EFFECT_MODIFIER_SOURCE_VALUES)[number];
+
 // Only the identity fields are required; descriptor fields are declared here
 // too so a population pass validates against this SAME schema, never a second one.
+// Not `.strict()`: tsconfig.seed.json type-checks every CLASS_FEATURES literal against
+// ClassFeatureSeedRow, so TS's excess-property check already rejects a typo'd key at the
+// authoring site — a runtime `.strict()` here would only duplicate that catch.
 export const classFeatureSeedSchema = z
   .object({
     className: z.string().min(1),
@@ -364,6 +477,7 @@ export const classFeatureSeedSchema = z
     // Declared here (not just on ClassFeatureSeedRow) so the cross-field
     // `.refine`s below can see it — same for activationCost/resourceKey.
     resourceRecharge: z.enum(RECHARGE_ON_VALUES).optional(),
+    resourceLabel: z.string().min(1).optional(),
     resourceTotals: resourceTotalsTierSchema.nullable().optional(),
     resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
     resourceRechargeTiers: resourceRechargeTiersSchema.nullable().optional(),
@@ -373,8 +487,9 @@ export const classFeatureSeedSchema = z
     choiceLabel: z.string().min(1).optional(),
     choiceCatalogSource: z.string().min(1).optional(),
     choiceCountTiers: choiceCountTiersSchema.nullable().optional(),
+    derivedStat: z.enum(DERIVED_STAT_VALUES).optional(),
     derivedStatTiers: derivedStatTiersSchema.nullable().optional(),
-    saveDcAbilities: z.array(z.string().min(1)).optional(),
+    saveDcAbilities: z.array(z.enum(ABILITY_VALUES)).optional(),
     // The SAME zod a taken feat's improvements snapshot validates against
     // (#1691), never a second declaration.
     improvements: z.array(featImprovementSchema).nullable().optional(),
@@ -384,13 +499,38 @@ export const classFeatureSeedSchema = z
     conditionImmunities: z.array(z.string().min(1)).optional(),
     conditionImmunitiesRequireActiveBuff: z.string().min(1).optional(),
     conditionImmunitiesOnBuffStart: z.enum(["clear", "suspend"]).optional(),
-    activationCost: z.string().min(1).optional(),
+    activationCost: z.enum(ACTION_COST_VALUES).optional(),
+    resolverKind: z.enum(RESOLVER_KIND_VALUES).optional(),
+    requiresUnarmored: z.boolean().optional(),
+    regrants: z.array(z.string().min(1)).optional(),
     resourceKey: z.string().min(1).optional(),
     count: z.number().int().optional(),
     actionOnly: z.boolean().optional(),
+    costKind: z.enum(COST_KIND_VALUES).optional(),
+    costPoolKey: z.string().min(1).optional(),
+    costBase: z.number().int().nonnegative().optional(),
+    costPerStep: z.number().int().nonnegative().optional(),
+    effectKind: z.enum(EFFECT_KIND_VALUES).optional(),
+    effectDiceCount: z.number().int().positive().optional(),
+    effectDiceFaces: z.number().int().positive().optional(),
+    effectDieSource: z.string().min(1).optional(),
+    effectModifier: z.number().int().nonnegative().optional(),
+    effectModifierSource: z.enum(EFFECT_MODIFIER_SOURCE_VALUES).optional(),
+    damageType: z.enum(DAMAGE_TYPE_VALUES).optional(),
+    attackType: z.enum(ATTACK_TYPE_VALUES).optional(),
+    saveAbility: z.enum(ABILITY_VALUES).optional(),
+    saveEffect: z.enum(SAVE_EFFECT_VALUES).optional(),
+    // Free string, not z.enum: KNOWN_BUFF_TARGETS is a plain string[] built from SKILL_KEYS at
+    // runtime, not a literal tuple zod can enumerate — membership is checked by the `.refine` below.
+    buffTarget: z.string().min(1).optional(),
+    buffModifier: z.number().int().nonnegative().optional(),
   })
   .refine((row) => !row.actionOnly || (Boolean(row.activationCost) && Boolean(row.resourceKey)), {
     message: "an actionOnly row must declare both activationCost and resourceKey",
+  })
+  .refine((row) => !row.buffTarget || KNOWN_BUFF_TARGETS.includes(row.buffTarget), {
+    message: "buffTarget must be a known skill/stat key (see KNOWN_BUFF_TARGETS)",
+    path: ["buffTarget"],
   })
   // resourceRecharge is the ONLY fallback poolFromRow reads below a row's
   // first recharge tier.

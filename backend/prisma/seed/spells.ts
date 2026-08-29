@@ -1,10 +1,26 @@
 // Structured effect fields (effectKind/effectDiceCount, etc.) mirror ItemWeaponDetail/ItemConsumableDetail so the frontend rolls damage/healing with the same dice engine.
 // Every row here is SRD 5.2 (2024) text; seedSpells defaults an untagged entry's `edition` to EDITION_2024, not Feat's NULL/shared convention (#1710) — a 2014 fork lives in a sibling spells-2014/*.ts file.
+import { z } from "zod";
+
+import { ABILITY_VALUES, ATTACK_TYPE_VALUES, DAMAGE_TYPE_VALUES, SAVE_EFFECT_VALUES } from "./class-features.js";
 import type { SeedEdition } from "./edition.js";
 
-export type SpellSchoolSeed =
-  | "abjuration" | "conjuration" | "divination" | "enchantment"
-  | "evocation" | "illusion" | "necromancy" | "transmutation";
+// Mirrors the DB's SpellSchool enum (schema.prisma) — kept as a const array (not a bare union)
+// so spellSeedSchema below derives from the SAME list a type error would catch drifting.
+const SPELL_SCHOOL_VALUES = [
+  "abjuration", "conjuration", "divination", "enchantment",
+  "evocation", "illusion", "necromancy", "transmutation",
+] as const;
+export type SpellSchoolSeed = (typeof SPELL_SCHOOL_VALUES)[number];
+
+// Spells never author "utility" (a spell's effectKind is omitted for a no-roll spell) — narrower
+// than ClassFeature's EFFECT_KIND_VALUES, which some rows do author explicitly, so this stays its
+// own local array rather than importing that one.
+const EFFECT_KIND_VALUES = ["damage", "heal", "buff"] as const;
+// A spell's buffTarget is narrower than ClassFeature's KNOWN_BUFF_TARGETS by CatalogSpell's own
+// declared union below — only the AC family. A spell that buffs a skill or attack roll would need
+// CatalogSpell's buffTarget type widened first, in the same diff as this schema.
+const BUFF_TARGET_VALUES = ["ac", "acUnarmoredBase", "acFloor"] as const;
 
 export interface CatalogSpell {
   name: string;
@@ -23,22 +39,59 @@ export interface CatalogSpell {
     material: boolean;
     materialDescription?: string;
   };
-  saveEffect?: "half" | "none";
-  effectKind?: "damage" | "heal" | "buff";
+  saveEffect?: (typeof SAVE_EFFECT_VALUES)[number];
+  effectKind?: (typeof EFFECT_KIND_VALUES)[number];
   effectDiceCount?: number;
   effectDiceFaces?: number;
   effectModifier?: number;    // flat bonus (e.g. +3 in "3d4+3" for Magic Missile)
-  damageType?: string;
-  attackType?: "attack" | "save";
-  saveAbility?: string;
+  damageType?: (typeof DAMAGE_TYPE_VALUES)[number];
+  attackType?: (typeof ATTACK_TYPE_VALUES)[number];
+  saveAbility?: (typeof ABILITY_VALUES)[number];
   upcastDicePerLevel?: number;
   cantripScaling?: boolean;
   // buffModifier is the ABSOLUTE value the target reads, not a delta — flat add for "ac" (Shield of Faith 2), full unarmored base for "acUnarmoredBase" (Mage Armor 13), floor for "acFloor" (Barkskin 17).
-  buffTarget?: "ac" | "acUnarmoredBase" | "acFloor";
+  buffTarget?: (typeof BUFF_TARGET_VALUES)[number];
   buffModifier?: number;
   // Omitted = EDITION_2024 (this file's own default) — NOT "shared", unlike Feat/Background/Subclass's `edition?`.
   edition?: SeedEdition;
 }
+
+// The one validation surface for CatalogSpell rows (SPELLS below and every spells-2014/*.ts
+// file, which import CatalogSpell from here) — registered against both SPELLS and SPELLS_2014 by
+// prisma/seed/validate.ts's SEED_FAMILIES.
+export const spellSeedSchema = z.object({
+  name: z.string().min(1),
+  level: z.number().int().nonnegative(),
+  school: z.enum(SPELL_SCHOOL_VALUES),
+  castingTime: z.string().min(1),
+  range: z.string().min(1),
+  duration: z.string().min(1),
+  description: z.string().min(1),
+  concentration: z.boolean().optional(),
+  ritual: z.boolean().optional(),
+  classes: z.array(z.string().min(1)),
+  components: z
+    .object({
+      verbal: z.boolean(),
+      somatic: z.boolean(),
+      material: z.boolean(),
+      materialDescription: z.string().min(1).optional(),
+    })
+    .optional(),
+  saveEffect: z.enum(SAVE_EFFECT_VALUES).optional(),
+  effectKind: z.enum(EFFECT_KIND_VALUES).optional(),
+  effectDiceCount: z.number().int().positive().optional(),
+  effectDiceFaces: z.number().int().positive().optional(),
+  effectModifier: z.number().int().nonnegative().optional(),
+  damageType: z.enum(DAMAGE_TYPE_VALUES).optional(),
+  attackType: z.enum(ATTACK_TYPE_VALUES).optional(),
+  saveAbility: z.enum(ABILITY_VALUES).optional(),
+  upcastDicePerLevel: z.number().int().positive().optional(),
+  cantripScaling: z.boolean().optional(),
+  buffTarget: z.enum(BUFF_TARGET_VALUES).optional(),
+  buffModifier: z.number().int().nonnegative().optional(),
+  edition: z.enum(["EDITION_2014", "EDITION_2024"]).optional(),
+});
 
 // Renames the catalog row in place at seed time (applySpellRenames), preserving its id so SubclassGrantedSpell/InventoryCapability.spellId FKs survive. `to` must be a live SPELLS name; `from` must not be.
 export interface SpellRename {

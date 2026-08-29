@@ -5,7 +5,7 @@
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import type { SeedEdition } from "./edition.js";
-import type { ClassFeatureSeedRow } from "./class-features.js";
+import type { ActionCostSeed, ClassFeatureSeedRow, CostKindSeed, ResourceRechargeSeed } from "./class-features.js";
 
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`cleric-features: unknown subclass slug "${s}"`);
@@ -20,11 +20,11 @@ interface RawClericFeature {
   edition: SeedEdition;
   resourceKey?: string;
   resourceLabel?: string;
-  resourceRecharge?: string;
+  resourceRecharge?: ResourceRechargeSeed;
   resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
   improvements?: FeatImprovement[];
-  activationCost?: string;
-  costKind?: string;
+  activationCost?: ActionCostSeed;
+  costKind?: CostKindSeed;
   costPoolKey?: string;
   costBase?: number;
   reminder?: string;

@@ -6,8 +6,18 @@
 // row. A level-shift is two rows with two `level` values, never one row
 // edited in place.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
+import type { ResourceTotalAbility } from "../../src/lib/classes/class-feature-rows.js";
 import type { SeedEdition } from "./edition.js";
-import type { ClassFeatureSeedRow } from "./class-features.js";
+import type {
+  ActionCostSeed,
+  ClassFeatureSeedRow,
+  CostKindSeed,
+  DerivedStatSeed,
+  EffectKindSeed,
+  EffectModifierSourceSeed,
+  ResolverKindSeed,
+  ResourceRechargeSeed,
+} from "./class-features.js";
 
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`fighter-features: unknown subclass slug "${s}"`);
@@ -23,23 +33,23 @@ interface RawFighterFeature {
   edition?: SeedEdition;
   resourceKey?: string;
   resourceLabel?: string;
-  resourceRecharge?: string;
+  resourceRecharge?: ResourceRechargeSeed;
   resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
   resourceDieTiers?: { minLevel: number; die: string }[];
-  activationCost?: string;
-  resolverKind?: string;
-  costKind?: string;
+  activationCost?: ActionCostSeed;
+  resolverKind?: ResolverKindSeed;
+  costKind?: CostKindSeed;
   costPoolKey?: string;
   costBase?: number;
-  effectKind?: string;
+  effectKind?: EffectKindSeed;
   effectDiceCount?: number;
   effectDiceFaces?: number;
-  effectModifierSource?: string;
-  derivedStat?: string;
+  effectModifierSource?: EffectModifierSourceSeed;
+  derivedStat?: DerivedStatSeed;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
   // announcedSaveDC = 8 + PB + max of these abilities — a separate axis from
   // `derivedStat` on the same row (saveDcAbilitiesFromRows, class-feature-rows.ts).
-  saveDcAbilities?: string[];
+  saveDcAbilities?: ResourceTotalAbility[];
 }
 
 function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {

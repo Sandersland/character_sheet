@@ -5,6 +5,9 @@ import type { AvailableAction, Character } from "@/types/character";
 import type { RollSpec } from "@/lib/dice";
 
 // `toggle` behaves exactly like `simple-confirm`; kept distinct only because resolverFromRow sources it from a row's resolverKind rather than a hand-authored entry.
+// Mirrored on the backend by RESOLVER_KIND_VALUES (backend/prisma/seed/class-features.ts), which
+// validates ClassFeature.resolverKind at seed time — add a member here AND there together, or a
+// seed row authoring the new value gets rejected at `prisma db seed` before it ever reaches this file.
 export type ResolutionKind =
   | "attack-picker"
   | "twf-picker"

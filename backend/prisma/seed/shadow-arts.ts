@@ -1,7 +1,11 @@
 // Warrior of Shadow (2024, PHB'24 p.91): exactly one cast, a single L3 GrantedAbility row, 1 focus, always concentrates (shadowArtEffectSpec). Minor Illusion (the feature's other grant) is a granted cantrip in SUBCLASS_GRANTED_SPELLS; Darkvision is flavor text (this app tracks no senses).
 // Way of Shadow (2014, PHB'14 pp.79-80 — not in SRD 5.1, #1502): "As an action, you can spend 2 ki points to cast darkness, darkvision, pass without trace, or silence, without providing material components" — four L3 rows, 2 ki each, the same-name fork #1415's (name, edition) widening exists for.
 // costPoolKey/costBase genuinely differ per edition (ki/2 vs focus/1) and are threaded per row below; minLevel(3)/alwaysKnown(true)/costKind("pool") stay hardcoded in seedShadowArts since every row agrees on them.
+import { z } from "zod";
+
 import type { SeedEdition } from "./edition.js";
+
+const COST_POOL_KEY_VALUES = ["ki", "focus"] as const;
 
 export interface ShadowArtSeed {
   name: string;
@@ -9,9 +13,17 @@ export interface ShadowArtSeed {
   // A mechanically diverging row forks (#1415 made this expressible); never omitted here — every row today is edition-specific.
   edition: SeedEdition;
   // The pool this art spends from and how much — genuinely differs per edition (2014's ki vs 2024's focus, 2 vs 1).
-  costPoolKey: "ki" | "focus";
+  costPoolKey: (typeof COST_POOL_KEY_VALUES)[number];
   costBase: number;
 }
+
+export const shadowArtSeedSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1),
+  edition: z.enum(["EDITION_2014", "EDITION_2024"]),
+  costPoolKey: z.enum(COST_POOL_KEY_VALUES),
+  costBase: z.number().int().positive(),
+});
 
 export const SHADOW_ARTS: ShadowArtSeed[] = [
   {
