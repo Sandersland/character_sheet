@@ -405,9 +405,12 @@ jobs:
   e2e:
     # Playwright smoke suite against a booted dev stack (same postgres service as
     # `test`, plus the backend + Vite dev servers the e2e harness proxies through).
-    # A required check. Runs SERIALLY (playwright.config.ts sets workers: 1) — the
-    # specs share one dev stack and a campaign allows only one active session, so
-    # parallel workers overload the stack; don't reintroduce --workers here.
+    # Runs on every PR and reports status, but is NOT a required status check
+    # (branch protection lists claude-review/lint/test/build/fallow only) — a red
+    # run here does not block merge, so watch it manually on UI-layout changes.
+    # Runs SERIALLY (playwright.config.ts sets workers: 1) — the specs share one
+    # dev stack and a campaign allows only one active session, so parallel
+    # workers overload the stack; don't reintroduce --workers here.
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
