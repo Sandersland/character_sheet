@@ -635,8 +635,9 @@ export interface ActionCastSpec {
 // The row-driven gate: right edition, grant level reached, and the two
 // fields that make a row an action at all. Split out to keep actionFromRow's
 // own cyclomatic count low (fallow's complexity gate).
-// Must stay identical to eligibleRowActions' own gate (routes/character/actions.ts)
-// and action-effect-parity.test.ts's CLASS_FEATURE_ROW_KEYS — update all three together.
+// The activationCost/resourceKey/toggle shape of this gate must stay identical to
+// eligibleRowActions' own gate (routes/character/actions.ts) and action-effect-parity.test.ts's
+// CLASS_FEATURE_ROW_KEYS — update all three together.
 function rowIsAnAvailableAction(row: ClassFeatureRow, level: number, edition: RulesEdition): boolean {
   return row.edition === edition && row.level <= level && Boolean(row.activationCost) && Boolean(row.resourceKey);
 }

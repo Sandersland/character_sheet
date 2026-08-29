@@ -82,7 +82,7 @@ export default tseslint.config(
   {
     // __tests__ directories outside the storage domain. See the re-declare
     // why-comment on the main ban above.
-    files: ["src/**/__tests__/**/*.ts"],
+    files: ["src/**/__tests__/*.ts"],
     rules: {
       "no-restricted-imports": ["error", { patterns: [AWS_SDK_PATTERN] }],
     },
@@ -92,7 +92,7 @@ export default tseslint.config(
     // legitimate aws-sdk callers AND the __tests__ "../foo.js" convention.
     // Ordered after both single exemptions above so it wins outright for
     // this narrower glob.
-    files: ["src/lib/storage/**/__tests__/**/*.ts"],
+    files: ["src/lib/storage/**/__tests__/*.ts"],
     rules: { "no-restricted-imports": "off" },
   }
 );
