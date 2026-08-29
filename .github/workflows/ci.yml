@@ -205,7 +205,7 @@ jobs:
       #     because an UNCOVERED function floors at CC²+CC — 20 would ban every
       #     untested cyc-4 helper (seed.ts, customLogLevel sit at exactly 20.0);
       #     25 still bans untested cyc≥5. Next notch to 20 needs branch tests
-      #     for resolveSubclass (21.2) and validateToolChoices (20.1) in
+      #     for resolveSubclass (21.2) and validateToolChoicePicks (20.1) in
       #     create/selections.ts. A new backend function in the 16–20 cyclomatic
       #     band passes the local pre-commit audit (config bars) and fails only
       #     here — required check, so it still can't merge.

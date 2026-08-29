@@ -67,7 +67,10 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
     expect(raceRow.abilityBonuses).toHaveLength(2);
   });
 
-  it("a fixed increase pushing a score past the 20 cap 400s (same cap family as the background spread)", async () => {
+  // baseBody declares no abilityGenerationMethod, so the omitted-method sanity
+  // ceiling (30, same shared postBonusAbilityCap function the background spread
+  // uses — shared.ts) applies here, not ABILITY_CAP (20, #1978).
+  it("a fixed increase pushing a score past the 30 sanity ceiling 400s (same cap family as the background spread)", async () => {
     const dwarf = await prisma.species.findFirstOrThrow({
       where: { slug: "dwarf", edition: "EDITION_2014" },
       include: { variants: true },
@@ -79,12 +82,12 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
       rulesEdition: "EDITION_2014",
       speciesId: dwarf.id,
       variantId: mountainDwarf.id,
-      abilityScores: { ...BASE_SCORES, constitution: 19 },
+      abilityScores: { ...BASE_SCORES, constitution: 29 },
     });
 
     expect(res.status).toBe(400);
     // The +2 CON is server-applied, not client-submitted, so the error names "species", not speciesAbilities.
-    expect(res.body.error).toBe("species: constitution would exceed 20");
+    expect(res.body.error).toBe("species: constitution would exceed 30");
   });
 });
 
@@ -177,18 +180,21 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
     expect(res.body.error).toBe("speciesAbilities: each choice must be +1");
   });
 
-  it("400s a choice pushing a score past the 20 cap", async () => {
+  // baseBody declares no abilityGenerationMethod, so the omitted-method sanity
+  // ceiling (30) applies here, not ABILITY_CAP (20, #1978) — see the Dwarf
+  // fixed-increase test above for the same cap family.
+  it("400s a choice pushing a score past the 30 sanity ceiling", async () => {
     const halfElf = await halfElf2014();
     const res = await post({
       ...baseBody,
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
-      abilityScores: { ...BASE_SCORES, strength: 20 },
+      abilityScores: { ...BASE_SCORES, strength: 30 },
       speciesAbilities: { strength: 1, dexterity: 1 },
       speciesSkills: SPECIES_SKILLS,
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe("speciesAbilities: strength would exceed 20");
+    expect(res.body.error).toBe("speciesAbilities: strength would exceed 30");
   });
 
   it("400s speciesAbilities on a fixed-only species (Dwarf has no choice)", async () => {

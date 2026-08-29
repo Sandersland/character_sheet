@@ -11,17 +11,12 @@ export const IMPROVED_SHADOW_STEP_REMINDER =
   "Improved Shadow Step (L11): for 1 focus, ignore the dim/dark destination requirement.";
 
 // 2024-only feature (PHB'24 p.91) — SRD 5.1's Way of Shadow has no Improved Shadow Step.
+const EDITION_HAS_IMPROVED_SHADOW_STEP: Record<RulesEdition, boolean> = {
+  EDITION_2024: true,
+  EDITION_2014: false,
+};
 function editionHasImprovedShadowStep(edition: RulesEdition): boolean {
-  switch (edition) {
-    case "EDITION_2024":
-      return true;
-    case "EDITION_2014":
-      return false;
-    default: {
-      const exhaustive: never = edition;
-      throw new Error(`editionHasImprovedShadowStep: unhandled edition ${String(exhaustive)}`);
-    }
-  }
+  return EDITION_HAS_IMPROVED_SHADOW_STEP[edition];
 }
 
 export const improvedShadowStepAugmentor: AnnounceAugmentor = {

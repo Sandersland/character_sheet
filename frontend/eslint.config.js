@@ -29,11 +29,18 @@ const FETCH_MESSAGE =
   "Don't call global fetch directly — use apiFetch/rawFetch from '@/api/http', or a domain module via the '@/api/client' barrel.";
 
 export default tseslint.config(
-  { ignores: ["dist/**", "playwright-report/**", "test-results/**"] },
+  // e2e/** falls outside every rule block's "src/**" files glob already, but
+  // that's exclusion by omission — list it here so the carve-out is by name,
+  // matching this file's own "by name, not by omission" standard below.
+  { ignores: ["dist/**", "playwright-report/**", "test-results/**", "e2e/**"] },
   // Stale eslint-disable directives fail lint the moment they stop being needed (#1045).
   { linterOptions: { reportUnusedDisableDirectives: "error" } },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  // `null: "ignore"` permits the codebase's pervasive `== null`/`!= null` idiom
+  // (catches null and undefined together); every other loose comparison is
+  // banned — closes check-edition-branching.sh's `==`/`!=` escape hatch (#1978).
+  { rules: { eqeqeq: ["error", "always", { null: "ignore" }] } },
   {
     // Comment hygiene, machine-enforcing the CLAUDE.md comment policy.
     // Suppression directives (#1045): every disable must name its rule

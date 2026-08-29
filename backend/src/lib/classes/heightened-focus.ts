@@ -21,17 +21,12 @@ function heightenedFocusPayload(key: string): AugmentPayload | null {
 }
 
 // 2024-only feature (PHB'24 p.88) — SRD 5.1 has no Heightened Focus.
+const EDITION_HAS_HEIGHTENED_FOCUS: Record<RulesEdition, boolean> = {
+  EDITION_2024: true,
+  EDITION_2014: false,
+};
 function editionHasHeightenedFocus(edition: RulesEdition): boolean {
-  switch (edition) {
-    case "EDITION_2024":
-      return true;
-    case "EDITION_2014":
-      return false;
-    default: {
-      const exhaustive: never = edition;
-      throw new Error(`editionHasHeightenedFocus: unhandled edition ${String(exhaustive)}`);
-    }
-  }
+  return EDITION_HAS_HEIGHTENED_FOCUS[edition];
 }
 
 export const heightenedFocusAugmentor: AnnounceAugmentor = {

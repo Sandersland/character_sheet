@@ -138,4 +138,67 @@ describe("POST /api/characters — ability score generation validation", () => {
     });
     expect(rejected.status).toBe(400);
   });
+
+  // Post-bonus cap is method-aware (postBonusAbilityCap, shared.ts): the base check
+  // above only validates the PRE-bonus scores. This matrix pins the cap actually
+  // applied AFTER Acolyte's backgroundAbilities spread (a PHB'24-only mechanic —
+  // the default anchor is EDITION_2024), which is where #1978's bug lived: a
+  // manual/omitted-method score legally above 20 (transcribing an existing or
+  // DM-fiat character) 400'd against ABILITY_CAP the moment ANY spread applied.
+  describe("post-bonus cap is method-aware, not a flat ABILITY_CAP=20 (#1978)", () => {
+    it("manual: accepts a spread pushing a score above 20 (but not 30)", async () => {
+      const res = await create({
+        name: "CreateAbilityGen ManualSpreadOver20",
+        abilityGenerationMethod: "manual",
+        abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 19, wisdom: 10, charisma: 8 },
+        backgroundAbilities: { intelligence: 2, wisdom: 1 },
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.abilityScores.intelligence).toBe(21);
+    });
+
+    it("manual: rejects a spread pushing a score over 30, citing 30 (not 20)", async () => {
+      const res = await create({
+        name: "CreateAbilityGen ManualSpreadOver30",
+        abilityGenerationMethod: "manual",
+        abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 29, wisdom: 10, charisma: 8 },
+        backgroundAbilities: { intelligence: 2, wisdom: 1 },
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/exceed 30/);
+    });
+
+    it("omitted method: behaves exactly like manual (PATCH's own case)", async () => {
+      const accepted = await create({
+        name: "CreateAbilityGen NoMethodSpreadOver20",
+        abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 19, wisdom: 10, charisma: 8 },
+        backgroundAbilities: { intelligence: 2, wisdom: 1 },
+      });
+      expect(accepted.status).toBe(201);
+      expect(accepted.body.abilityScores.intelligence).toBe(21);
+
+      const rejected = await create({
+        name: "CreateAbilityGen NoMethodSpreadOver30",
+        abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 29, wisdom: 10, charisma: 8 },
+        backgroundAbilities: { intelligence: 2, wisdom: 1 },
+      });
+      expect(rejected.status).toBe(400);
+      expect(rejected.body.error).toMatch(/exceed 30/);
+    });
+
+    // standardArray's own 8-15 base range plus this background's max +2/+1 spread
+    // tops out at 17 — the API can never combine enough bonus to reach the 20
+    // cap this way, so the cap ITSELF is pinned directly in shared.test.ts
+    // (backend/src/lib/character/create/__tests__/shared.test.ts).
+    it("standardArray: a legal spread on top of the array is still accepted", async () => {
+      const res = await create({
+        name: "CreateAbilityGen StandardArraySpread",
+        abilityGenerationMethod: "standardArray",
+        abilityScores: { strength: 8, dexterity: 10, constitution: 12, intelligence: 15, wisdom: 14, charisma: 13 },
+        backgroundAbilities: { intelligence: 2, wisdom: 1 },
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.abilityScores.intelligence).toBe(17);
+    });
+  });
 });

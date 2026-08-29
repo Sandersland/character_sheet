@@ -364,7 +364,7 @@ describe("characters routes", () => {
     expect(response.status).toBe(400);
   });
 
-  // A record schema let abilityScores through unbounded (any key, any int) — tightened to the six named keys + validateAbilityScores(undefined, ...).
+  // A record schema let abilityScores through unbounded (any key, any int) — tightened to the six named keys (.strict(), #1978) + validateAbilityScores(undefined, ...).
   describe("PATCH abilityScores bound (#1383's ability-score wave)", () => {
     const NAMED_SCORES = {
       strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10,
@@ -379,13 +379,12 @@ describe("characters routes", () => {
       expect(response.body.error).toMatch(/1 and 30/);
     });
 
-    it("drops an unrecognized key (\"luck\") instead of persisting it", async () => {
+    it("400s an unrecognized key (\"luck\") instead of silently stripping it", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .patch(`/api/characters/${FIXTURE.id}`)
         .send({ abilityScores: { ...NAMED_SCORES, luck: 5 } });
 
-      expect(response.status).toBe(200);
-      expect(response.body.abilityScores).not.toHaveProperty("luck");
+      expect(response.status).toBe(400);
     });
   });
 
@@ -644,13 +643,47 @@ describe("characters routes", () => {
         expect(res.status).toBe(400);
       });
 
-      it("rejects a spread pushing a score over 20 with 400", async () => {
+      // Post-bonus cap is method-aware (postBonusAbilityCap, shared.ts): criminalBody
+      // declares no abilityGenerationMethod, so the omitted-method sanity ceiling
+      // (30, same as validateAbilityScores' pre-bonus manual/omitted bound) applies
+      // here, not ABILITY_CAP (20) — manual/omitted exists to transcribe an existing
+      // or DM-fiat character, which can legitimately sit above the ordinary 20 cap.
+      it("accepts a spread pushing a score over 20 (but not 30) when no method is declared", async () => {
         const res = await post({
           ...criminalBody,
           abilityScores: { ...criminalBody.abilityScores, dexterity: 19 },
           backgroundAbilities: { dexterity: 2, constitution: 1 },
         });
+        expect(res.status).toBe(201);
+        createdCharacterIds.push(res.body.id);
+        expect(res.body.abilityScores.dexterity).toBe(21);
+      });
+
+      it("rejects a spread pushing a score over 30 when no method is declared", async () => {
+        const res = await post({
+          ...criminalBody,
+          abilityScores: { ...criminalBody.abilityScores, dexterity: 29 },
+          backgroundAbilities: { dexterity: 2, constitution: 1 },
+        });
         expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/exceed 30/);
+      });
+
+      // standardArray's own 8-15 base range plus this background's max +2/+1 spread
+      // tops out at 17 — the API can never combine enough bonus to reach the 20
+      // cap this way, so the cap ITSELF (not just this reachable slice of it) is
+      // pinned directly against postBonusAbilityCap in shared.test.ts.
+      it("still applies a legal spread on top of a standardArray assignment", async () => {
+        const res = await post({
+          ...criminalBody,
+          abilityGenerationMethod: "standardArray",
+          abilityScores: { strength: 8, dexterity: 15, constitution: 14, intelligence: 13, wisdom: 12, charisma: 10 },
+          backgroundAbilities: { dexterity: 2, constitution: 1 },
+        });
+        expect(res.status).toBe(201);
+        createdCharacterIds.push(res.body.id);
+        expect(res.body.abilityScores.dexterity).toBe(17);
+        expect(res.body.abilityScores.constitution).toBe(15);
       });
 
       it("rejects backgroundAbilities on a spec-less/custom background with 400", async () => {

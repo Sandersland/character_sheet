@@ -11,15 +11,9 @@
 -- 20260807130000_catalog_entitlement) decorates a column or unique
 -- constraint that DOES have a `@@unique` counterpart in schema.prisma; a
 -- partial (WHERE-clause) index has no DSL representation at all, so there is
--- no schema.prisma line for this one to attach to.
--- item_scope_discriminator's own header warned that "a raw partial index is
--- invisible to drift detection — every later migration would propose
--- dropping it," and added a denormalized scopeKey column to stay visible
--- instead. That warning is verified FALSE on the Prisma 7.8 this repo runs:
--- `migrate dev`'s diff against this schema proposes only the one known
--- artifact (the Spell FK drop, #1571) and leaves this index alone —
--- introspection ignores partial indexes rather than flagging them for
--- removal. That's why this needs no denormalized column of its own.
+-- no schema.prisma line for this one to attach to. It needs no denormalized
+-- shadow column either: on the Prisma 7.8 this repo runs, `migrate dev`'s
+-- diff ignores partial indexes rather than proposing to drop them.
 --
 -- campaignId IS NOT NULL does not follow from status = 'active' — a solo
 -- session (campaignId null) is exactly active + null, so the two predicates
@@ -32,9 +26,7 @@
 -- If a database already holds two or more active sessions for the same
 -- campaign, this CREATE UNIQUE INDEX aborts, and the existing rows need
 -- manual cleanup (end all but one) before `prisma migrate resolve --applied`
--- can mark this migration applied. Verified clean against the owner's dev DB
--- before merge; the app is unreleased, so there is no production data to
--- reconcile.
+-- can mark this migration applied.
 --
 -- This does NOT close the mirror-image solo-session race (at most one active
 -- solo session per CHARACTER, campaignId null): a solo session's character

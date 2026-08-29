@@ -11,17 +11,12 @@ export const ASSASSINATE_LEVEL = 3;
 type AssassinateClassEntry = SubclassIdentityInput & { name: string; level: number };
 
 // SRD 5.2 has no Assassin subclass; PHB'24's Assassinate drops the auto-crit this module models — no 2024 counterpart here.
+const EDITION_HAS_ASSASSINATE: Record<RulesEdition, boolean> = {
+  EDITION_2014: true,
+  EDITION_2024: false,
+};
 function editionHasAssassinate(edition: RulesEdition): boolean {
-  switch (edition) {
-    case "EDITION_2014":
-      return true;
-    case "EDITION_2024":
-      return false;
-    default: {
-      const exhaustive: never = edition;
-      throw new Error(`editionHasAssassinate: unhandled edition ${String(exhaustive)}`);
-    }
-  }
+  return EDITION_HAS_ASSASSINATE[edition];
 }
 
 // Single shared gate used by both assassinateRider and assertAssassinateEligible — must never drift into two inline copies (CLAUDE.md one-shared-function rule).

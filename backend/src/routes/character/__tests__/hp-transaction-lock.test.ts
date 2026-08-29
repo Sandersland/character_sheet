@@ -22,6 +22,10 @@ async function postAction(id: string, body: object) {
   return supertest(app).post(`/api/characters/${id}/actions/transactions`).set("Cookie", COOKIE).send(body);
 }
 
+async function patchCharacter(id: string, body: object) {
+  return supertest(app).patch(`/api/characters/${id}`).set("Cookie", COOKIE).send(body);
+}
+
 describe("Character transactions — concurrent requests serialize on the character row", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
@@ -78,5 +82,33 @@ describe("Character transactions — concurrent requests serialize on the charac
     const final = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
     const expected = START_HP - damageRequests * damageAmount + healRequests * healAmount;
     expect((final.hitPoints as { current: number }).current).toBe(expected);
+  });
+
+  // Regression for PATCH /characters/:id, which read `existing.currency` OUTSIDE its $transaction:
+  // two concurrent currency PATCHes both saw the pre-update currency, so their currencyAdjust events'
+  // `before` was the same stale snapshot for both — a LIFO undo of the second event would then
+  // restore currency to a value the character never actually had (#1978).
+  it("chains currencyAdjust events' before/after across two concurrent PATCH currency requests", async () => {
+    const [resA, resB] = await Promise.all([
+      patchCharacter(characterId, { currency: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
+      patchCharacter(characterId, { currency: { cp: 0, sp: 0, gp: 20, pp: 0 } }),
+    ]);
+
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+
+    const events = await prisma.characterEvent.findMany({
+      where: { characterId, category: "currency", type: "currencyAdjust" },
+      orderBy: { createdAt: "asc" },
+    });
+
+    expect(events).toHaveLength(2);
+    expect(events[0]!.before).toEqual({ currency: { cp: 0, sp: 0, gp: 0, pp: 0 } });
+    // The second event's `before` must be the first event's `after` — proof the second
+    // PATCH's read ran after the first PATCH's write committed, not before it.
+    expect(events[1]!.before).toEqual(events[0]!.after);
+
+    const final = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
+    expect({ currency: final.currency }).toEqual(events[1]!.after);
   });
 });

@@ -3,23 +3,12 @@
 import { abilityModifier } from "@/lib/abilities";
 import type { AvailableAction, Character } from "@/types/character";
 import type { RollSpec } from "@/lib/dice";
+import type { ResolutionKind } from "@character-sheet/shared-types";
 
-// `toggle` behaves exactly like `simple-confirm`; kept distinct only because resolverFromRow sources it from a row's resolverKind rather than a hand-authored entry.
-// Mirrored on the backend by RESOLVER_KIND_VALUES (backend/prisma/seed/class-features.ts), which
-// validates ClassFeature.resolverKind at seed time — add a member here AND there together, or a
-// seed row authoring the new value gets rejected at `prisma db seed` before it ever reaches this file.
-export type ResolutionKind =
-  | "attack-picker"
-  | "twf-picker"
-  | "flurry-picker"
-  | "spell-picker"
-  | "item-picker"
-  | "heal-roll"
-  | "heal-input"
-  | "loadout-picker"
-  | "simple-confirm"
-  | "toggle"
-  | "slot-picker";
+// Re-exported for existing importers (e.g. useTurnActions.ts). Mirrored on the backend by
+// RESOLVER_KIND_VALUES, which `satisfies` the same ResolutionKind — a two-way compile
+// latch, not the old prose-only mirror.
+export type { ResolutionKind };
 
 // Adding a ResolutionKind member without a matching entry here fails typecheck (mirrors registry.ts's EXTRAS_FIELDS latch), keeping the two from drifting.
 const RESOLUTION_KINDS = [

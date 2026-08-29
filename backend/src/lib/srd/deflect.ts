@@ -64,17 +64,12 @@ export const deflectAugmentor: AnnounceAugmentor = {
 export const DEFLECT_ENERGY_LEVEL = 13;
 
 // SRD 5.2 / PHB'24 p.89 — SRD 5.1's Deflect Missiles carries no damage-type clause.
+const EDITION_HAS_DEFLECT_ENERGY: Record<RulesEdition, boolean> = {
+  EDITION_2024: true,
+  EDITION_2014: false,
+};
 function editionHasDeflectEnergy(edition: RulesEdition): boolean {
-  switch (edition) {
-    case "EDITION_2024":
-      return true;
-    case "EDITION_2014":
-      return false;
-    default: {
-      const exhaustive: never = edition;
-      throw new Error(`editionHasDeflectEnergy: unhandled edition ${String(exhaustive)}`);
-    }
-  }
+  return EDITION_HAS_DEFLECT_ENERGY[edition];
 }
 
 // Deflect Attacks' damage-type clause (SRD 5.2 only — SRD 5.1's Deflect Missiles has none): "bludgeoning, piercing, or slashing damage" below Deflect Energy (Monk L13), "any damage type" from L13 on.

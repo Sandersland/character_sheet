@@ -3,44 +3,29 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 // PHB'24 moves a free Origin feat and an ability-score spread onto Background; PHB'14 feats are optional from level 4 (PHB'14 p. 165) and ability increases come from race, not background.
 // These grant checks are called from both the creation path and the reference preview, so one function per grant keeps the two from disagreeing.
 
+const EDITION_GRANTS_ORIGIN_FEAT: Record<RulesEdition, boolean> = {
+  EDITION_2024: true,
+  EDITION_2014: false,
+};
 export function backgroundGrantsOriginFeat(edition: RulesEdition): boolean {
-  switch (edition) {
-    case "EDITION_2024":
-      return true;
-    case "EDITION_2014":
-      return false;
-    default: {
-      const exhaustive: never = edition;
-      throw new Error(`backgroundGrantsOriginFeat: unhandled edition ${String(exhaustive)}`);
-    }
-  }
+  return EDITION_GRANTS_ORIGIN_FEAT[edition];
 }
 
+const EDITION_GRANTS_ABILITY_SPREAD: Record<RulesEdition, boolean> = {
+  EDITION_2024: true,
+  EDITION_2014: false,
+};
 export function backgroundGrantsAbilitySpread(edition: RulesEdition): boolean {
-  switch (edition) {
-    case "EDITION_2024":
-      return true;
-    case "EDITION_2014":
-      return false;
-    default: {
-      const exhaustive: never = edition;
-      throw new Error(`backgroundGrantsAbilitySpread: unhandled edition ${String(exhaustive)}`);
-    }
-  }
+  return EDITION_GRANTS_ABILITY_SPREAD[edition];
 }
 
 // The opposite verdict of backgroundGrantsAbilitySpread — the two mechanisms are edition-complementary, never both-on or both-off.
+const EDITION_GRANTS_SPECIES_ABILITY_INCREASES: Record<RulesEdition, boolean> = {
+  EDITION_2014: true,
+  EDITION_2024: false,
+};
 export function speciesGrantsAbilityIncreases(edition: RulesEdition): boolean {
-  switch (edition) {
-    case "EDITION_2014":
-      return true;
-    case "EDITION_2024":
-      return false;
-    default: {
-      const exhaustive: never = edition;
-      throw new Error(`speciesGrantsAbilityIncreases: unhandled edition ${String(exhaustive)}`);
-    }
-  }
+  return EDITION_GRANTS_SPECIES_ABILITY_INCREASES[edition];
 }
 
 // A legal floating spread is +2/+1 or +1/+1/+1, always summing to 3.

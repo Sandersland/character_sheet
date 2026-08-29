@@ -15,11 +15,14 @@ export type CreateCharacterResult =
   | { ok: true; id: string }
   | { ok: false; status: 400; error: string };
 
-// Runs before any DB access: the pre-bonus scores are self-contained input,
-// so a crafted request (e.g. straight 20s under a false "standardArray"/
-// "pointBuy" claim) 400s before touching a query. abilityScores is required
-// by createCharacterSchema — the undefined case here is only for direct
-// (schema-bypassing) callers, e.g. unit tests targeting an earlier check.
+// Runs before any DB access: the pre-bonus scores are self-contained input.
+// abilityGenerationMethod is client-declared and optional (validateAbilityScores'
+// own doc comment), so this only 400s a method that imposes an exact rule
+// (standardArray/pointBuy/roll) — a request that omits the method, or falsely
+// claims "manual", gets the wide MANUAL_SCORE_CEILING sanity bound instead,
+// same as PATCH. abilityScores is required by createCharacterSchema — the
+// undefined case here is only for direct (schema-bypassing) callers, e.g.
+// unit tests targeting an earlier check.
 function abilityScoresGuard(input: CreateCharacterBody): CreateCharacterResult | null {
   if (!input.abilityScores) return null;
   const result = validateAbilityScores(input.abilityGenerationMethod, input.abilityScores);

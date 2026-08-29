@@ -3,14 +3,16 @@ import { z } from "zod";
 import { ALL_RULES_EDITIONS } from "@/lib/rules/edition.js";
 import { ALL_ABILITY_GENERATION_METHODS } from "@/lib/srd/ability-generation.js";
 
-const abilityScoresSchema = z.object({
-  strength: z.number().int(),
-  dexterity: z.number().int(),
-  constitution: z.number().int(),
-  intelligence: z.number().int(),
-  wisdom: z.number().int(),
-  charisma: z.number().int(),
-});
+const abilityScoresSchema = z
+  .object({
+    strength: z.number().int(),
+    dexterity: z.number().int(),
+    constitution: z.number().int(),
+    intelligence: z.number().int(),
+    wisdom: z.number().int(),
+    charisma: z.number().int(),
+  })
+  .strict();
 
 const classChoiceSchema = z.object({
   name: z.string().min(1),

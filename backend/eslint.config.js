@@ -31,6 +31,10 @@ export default tseslint.config(
   { linterOptions: { reportUnusedDisableDirectives: "error" } },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  // `null: "ignore"` permits the codebase's pervasive `== null`/`!= null` idiom
+  // (catches null and undefined together); every other loose comparison is
+  // banned — closes check-edition-branching.sh's `==`/`!=` escape hatch (#1978).
+  { rules: { eqeqeq: ["error", "always", { null: "ignore" }] } },
   {
     // Comment hygiene, machine-enforcing the CLAUDE.md comment policy.
     // Suppression directives (#1045): every disable must name its rule

@@ -1,5 +1,5 @@
 import Spinner from "@/components/ui/Spinner";
-import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmentPanel";
+import AbilityAssignmentPanel from "@/features/character-create/ability-assignment/AbilityAssignmentPanel";
 import CreationEntryGate from "@/features/character-create/CreationEntryGate";
 import CreationReviewStep from "@/features/character-create/CreationReviewStep";
 import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";

@@ -8,6 +8,7 @@ export type * from "./class-resources.js";
 export type * from "./edition.js";
 export type * from "./effects.js";
 export type * from "./item-detail-inputs.js";
+export type * from "./resolution-kind.js";
 export type * from "./resolve-action-event.js";
 export type * from "./riders.js";
 export type * from "./roll-event.js";

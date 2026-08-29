@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmentPanel";
+import AbilityAssignmentPanel from "@/features/character-create/ability-assignment/AbilityAssignmentPanel";
 import { EMPTY_ASSIGNMENTS } from "@/lib/abilityAssignment";
 import type { CreationBackgroundBonuses, CreationSpeciesBonuses } from "@/lib/characterCreation";
 import { axe } from "@/test/axe";

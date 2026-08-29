@@ -10,19 +10,10 @@ The gotcha worth knowing before you hit it: below a resource's first `resourceTo
 
 ## Block structure: one row, up to ten interpreted blocks
 
-A `ClassFeature` row is not one thing — it's an identity (name/level/description/edition) plus up to ten independent optional blocks, each read by its own function. A row can populate any subset.
+A `ClassFeature` row is not one thing — it's an identity (name/level/description/edition) plus up to ten independent optional blocks, each read by its own function. A row can populate any subset. Each block's columns, citations, and reader function are documented on the column itself in `backend/prisma/schema.prisma` (the `ClassFeature` model's own block comments) — this doc covers only the cross-cutting behavior no single column comment can state:
 
-- **Identity/text** → `featuresFromRows` — projects `name`/`level`/`description` into the feature-card list; skipped for `actionOnly` rows.
-- **Resource** (`resourceKey`/`resourceLabel`/`resourceRecharge` + the tier columns above) → `poolFromRow` (via `deriveResources`/`poolsFromRows`) — produces a `DerivedResource` pool.
-- **Choice** (`choiceKey`/`choiceLabel`/`choiceCatalogSource`/`choiceCountTiers`) → `choicesFromRows`. If the choice count can shrink on level-down, it also needs `docs/leveling.md`'s reconciliation recipe — that doc owns the choice-column reconciler pattern, not this one.
-- **Activation** (`activationCost`/`resolverKind`/`activationRequires`/`reminder`/`count`/`actionOnly`) → `buildRowAction`/`actionsFromRows`; `activationRequires` gates are evaluated by `unmetActivationRequirements`. `resolverKind: "toggle"` forks into `toggleActionsFromRow`, which synthesizes an activate/end action PAIR from one row via `endActionKey`, and routes the row's Buff/Immunity blocks through the activate side (`applyToggleRowActionInTx`).
-- **Cost** (`costKind`/`costPoolKey`/`costBase`/`costPerStep`) → `readAbilityCost`.
-- **Effect** (`effectKind`/`effectDiceCount`/`effectDiceFaces`/`effectDieSource`/`effectModifier*`/`damageType`/`attackType`/`saveAbility`/`saveEffect`/`buffTarget`/`buffModifier`) → `readEffectSpec`/`castSpecFromRow`.
-- **Derived-stat** (`derivedStat`/`derivedStatTiers`) → `derivedStatFromRows`.
-- **Buff** (`effectBuffs`) → `effectBuffsFromRow` (see the tier-rule split above).
-- **Immunity** (`conditionImmunities`/`conditionImmunitiesRequireActiveBuff`/`conditionImmunitiesOnBuffStart`) → `conditionImmunitiesFromRows` on the read path; the clear/suspend mutation itself runs through `syncConditionImmunityOnBuffStartInTx` (`lib/combat/conditions.ts`), not the row-action dispatcher that calls it.
-- **Improvements** (`improvements`) → `improvementsFromRows`.
-- **Save-DC** (`saveDcAbilities`) → `saveDcAbilitiesFromRows`/`deriveAnnouncedSaveDC` — a non-empty list IS the trigger, never matched by `derivedStat` name; two class entries both declaring one is a logged-and-dropped collision (`assignAnnouncedSaveDC`), not a crash, which is why Cleric leaves it unset everywhere and computes its own DC via `channelDivinitySaveDC` instead.
+- A **Choice** block whose count can shrink on level-down also needs `docs/leveling.md`'s reconciliation recipe — that doc owns the choice-column reconciler pattern, not this one.
+- An **Activation** block's `resolverKind: "toggle"` forks into `toggleActionsFromRow`, which synthesizes an activate/end action PAIR from one row via `endActionKey`, and routes the row's Buff/Immunity blocks through the activate side (`applyToggleRowActionInTx`).
 
 ## The one permanent TS holdout
 

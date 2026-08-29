@@ -5,7 +5,7 @@ import {
   type AbilityIncreaseSpec,
   type ChooseIncrease,
 } from "@/lib/srd/species-ability-increases.js";
-import type { RulesEdition } from "@character-sheet/shared-types";
+import type { AbilityGenerationMethod, RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "@/lib/character/character-schemas.js";
 import { abilityCapOverflowError, type Fail, type PhaseResult, type SpeciesGrants, type SpeciesSelection } from "./shared.js";
 
@@ -34,6 +34,7 @@ function validateSpeciesChoose(
   submitted: Record<string, number>,
   fixedAbilities: Set<string>,
   base: Record<string, number>,
+  method: AbilityGenerationMethod | undefined,
 ): Fail | { chosen: Record<string, number> } {
   const eligible: string[] = spec.from ?? [...ABILITY_NAMES];
   const entries = Object.entries(submitted);
@@ -58,7 +59,7 @@ function validateSpeciesChoose(
       error: `speciesAbilities: choose exactly ${spec.count} distinct abilities (got ${entries.length})`,
     };
   }
-  return abilityCapOverflowError(entries, base, "speciesAbilities") ?? { chosen: Object.fromEntries(entries) };
+  return abilityCapOverflowError(entries, base, "speciesAbilities", method) ?? { chosen: Object.fromEntries(entries) };
 }
 
 // Validates via the SAME floatingSpreadShapeValid function validateBackgroundSpread uses — not a second copy.
@@ -66,6 +67,7 @@ function validateSpeciesFloating(
   submitted: Record<string, number>,
   fixedAbilities: Set<string>,
   base: Record<string, number>,
+  method: AbilityGenerationMethod | undefined,
 ): Fail | { chosen: Record<string, number> } {
   const entries = Object.entries(submitted);
   const invalid = entries.filter(([ability]) => fixedAbilities.has(ability));
@@ -79,7 +81,7 @@ function validateSpeciesFloating(
   if (!floatingSpreadShapeValid(entries.map(([, amount]) => amount))) {
     return { ok: false, status: 400, error: "speciesAbilities must be +2/+1 (two abilities) or +1/+1/+1 (three abilities)" };
   }
-  return abilityCapOverflowError(entries, base, "speciesAbilities") ?? { chosen: Object.fromEntries(entries) };
+  return abilityCapOverflowError(entries, base, "speciesAbilities", method) ?? { chosen: Object.fromEntries(entries) };
 }
 
 function resolveChosenIncreases(
@@ -88,6 +90,7 @@ function resolveChosenIncreases(
   submitted: Record<string, number> | undefined,
   fixedAbilities: Set<string>,
   base: Record<string, number>,
+  method: AbilityGenerationMethod | undefined,
 ): Fail | { chosen: Record<string, number> } {
   const needsChoice = chooseSpecs.length > 0 || floatingSpecs.length > 0;
   if (!needsChoice) {
@@ -100,9 +103,9 @@ function resolveChosenIncreases(
     return { ok: false, status: 400, error: "speciesAbilities required: this species grants a choice of ability increases" };
   }
   if (chooseSpecs.length > 0) {
-    return validateSpeciesChoose(chooseSpecs[0], submitted, fixedAbilities, base);
+    return validateSpeciesChoose(chooseSpecs[0], submitted, fixedAbilities, base, method);
   }
-  return validateSpeciesFloating(submitted, fixedAbilities, base);
+  return validateSpeciesFloating(submitted, fixedAbilities, base, method);
 }
 
 function speciesAbilitiesEditionGuard(
@@ -157,10 +160,17 @@ export async function resolveSpeciesGrants(
   const { fixedSpread, chooseSpecs, floatingSpecs } = splitAbilityIncreaseSpecs(specs);
 
   // Fixed increases are server-applied, so a cap-overflow error names the field "species" (not speciesAbilities), since the client never sent that field.
-  const fixedCapError = abilityCapOverflowError(Object.entries(fixedSpread), baseScores, "species");
+  const fixedCapError = abilityCapOverflowError(Object.entries(fixedSpread), baseScores, "species", input.abilityGenerationMethod);
   if (fixedCapError) return fixedCapError;
 
-  const chosenResult = resolveChosenIncreases(chooseSpecs, floatingSpecs, submitted, new Set(Object.keys(fixedSpread)), baseScores);
+  const chosenResult = resolveChosenIncreases(
+    chooseSpecs,
+    floatingSpecs,
+    submitted,
+    new Set(Object.keys(fixedSpread)),
+    baseScores,
+    input.abilityGenerationMethod,
+  );
   if ("ok" in chosenResult) return chosenResult;
 
   const fullSpread = { ...fixedSpread, ...chosenResult.chosen };

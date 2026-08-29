@@ -3,11 +3,6 @@ import type { AbilityGenerationConfig } from "@/types/character";
 
 type PointBuyConfig = AbilityGenerationConfig["pointBuy"];
 
-// The standard array, point-buy budget, and cost table are server-owned
-// (backend/src/lib/srd/ability-generation.ts — PHB'14's "Variant: Customizing
-// Ability Scores" sidebar, p.13 / PHB'24's standard method; the numbers agree
-// across both) and arrive over the wire as ReferenceData.abilityGeneration —
-// no local mirror of the numbers themselves lives here (#1383).
 export function pointBuyCost(config: PointBuyConfig, score: number): number {
   const cost = config.costs[score];
   if (cost === undefined) {

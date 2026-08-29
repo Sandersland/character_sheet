@@ -936,7 +936,7 @@ enum SpellSchool {
 // needed for a new row; only a new column needs one.
 model Action {
   id          String @id @default(uuid())
-  key         String // stable machine key, e.g. "rage" | "dodge"
+  key         String // stable machine key, e.g. "attack" | "dodge"
   name        String // display label
   description String
 

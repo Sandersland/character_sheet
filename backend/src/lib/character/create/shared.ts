@@ -1,10 +1,11 @@
 import type { Prisma } from "@/generated/prisma/client.js";
 import type { prisma } from "@/lib/core/prisma.js";
 import { ABILITY_CAP } from "@/lib/leveling/advancement.js";
+import { MANUAL_SCORE_CEILING } from "@/lib/srd/ability-generation.js";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
 import type { buildInventoryCreateFromCatalog } from "@/lib/inventory/inventory.js";
 import type { ChooseCantrip, ChooseSkills } from "@/lib/srd/species-trait-choices.js";
-import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
+import type { AbilityGenerationMethod, ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "@/lib/character/character-schemas.js";
 
 export type Fail = { ok: false; status: 400; error: string };
@@ -66,12 +67,39 @@ export type SpeciesGrants = {
   appliedIncreases: { ability: string; amount: number }[];
 };
 
+// PHB'14 p.13 "the highest that an ability score can normally be raised to
+// is 20" / SRD 5.2 Character Creation background-increase step, "none of
+// these increases can raise a score above 20" — the post-bonus cap for
+// standardArray/pointBuy, the two methods the rule text assumes (a fixed
+// baseline it's reasoning about). manual/roll/omitted have no such baseline
+// to reason from — manual exists to transcribe an existing or DM-fiat
+// character, and an omitted method (PATCH declares none) reuses the same
+// permissive bound — so they get the same MANUAL_SCORE_CEILING sanity
+// ceiling validateAbilityScores already applies pre-bonus, not ABILITY_CAP.
+export function postBonusAbilityCap(method: AbilityGenerationMethod | undefined): number {
+  switch (method) {
+    case "standardArray":
+    case "pointBuy":
+      return ABILITY_CAP;
+    case "roll":
+    case "manual":
+    case undefined:
+      return MANUAL_SCORE_CEILING;
+    default: {
+      const exhaustive: never = method;
+      throw new Error(`postBonusAbilityCap: unhandled method ${String(exhaustive)}`);
+    }
+  }
+}
+
 export function abilityCapOverflowError(
   entries: [string, number][],
   base: Record<string, number>,
   fieldName: string,
+  method: AbilityGenerationMethod | undefined,
 ): Fail | null {
-  const over = entries.find(([ability, amount]) => (base[ability] ?? 10) + amount > ABILITY_CAP);
+  const cap = postBonusAbilityCap(method);
+  const over = entries.find(([ability, amount]) => (base[ability] ?? 10) + amount > cap);
   if (!over) return null;
-  return { ok: false, status: 400, error: `${fieldName}: ${over[0]} would exceed ${ABILITY_CAP}` };
+  return { ok: false, status: 400, error: `${fieldName}: ${over[0]} would exceed ${cap}` };
 }

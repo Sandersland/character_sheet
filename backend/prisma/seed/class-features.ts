@@ -20,7 +20,7 @@ import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclas
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import { featImprovementSchema } from "../../src/lib/srd/feats.js";
 import { SKILL_KEYS } from "../../src/lib/srd/alignments.js";
-import type { EffectType } from "@character-sheet/shared-types";
+import type { EffectType, ResolutionKind } from "@character-sheet/shared-types";
 import type { SeedEdition } from "./edition.js";
 
 import { MONK_FEATURES } from "./monk-features.js";
@@ -381,14 +381,11 @@ type _ActionCostValuesCoverActionCost = ActionCost extends (typeof ACTION_COST_V
 const _actionCostValuesCoverActionCost: _ActionCostValuesCoverActionCost = true;
 void _actionCostValuesCoverActionCost;
 
-// Mirrors ResolutionKind (frontend/src/features/session/actionResolvers.ts) — resolverKind is
-// served on the wire and switched on there via ACTION_RESOLVERS/resolverFromRow. The two lists
-// are a coupling latch in BOTH directions: adding a ResolutionKind member without adding it here
-// means a seed row can never author it (rejected at seed time); adding a value here without
-// adding it to ResolutionKind means the frontend silently ignores a resolverKind it doesn't
-// recognize (see actionResolvers.ts's own reciprocal comment on ResolutionKind). No shared-types
-// migration in this slice (#1369 is the tracked follow-up) — cross-package TS types can't express
-// a two-way check the way ABILITY_VALUES/ACTION_COST_VALUES do above, so this stays prose-latched.
+// Mirrors ResolutionKind (shared-types) — resolverKind is served on the wire and switched on
+// there via ACTION_RESOLVERS/resolverFromRow, which `satisfies` this same shared type with its
+// own RESOLUTION_KINDS array. This validates ClassFeature.resolverKind at seed time: adding a
+// ResolutionKind member without adding it here means a seed row can never author it (rejected at
+// `prisma db seed`); adding a value here without adding it to ResolutionKind fails typecheck below.
 const RESOLVER_KIND_VALUES = [
   "attack-picker",
   "twf-picker",
@@ -401,7 +398,10 @@ const RESOLVER_KIND_VALUES = [
   "simple-confirm",
   "toggle",
   "slot-picker",
-] as const;
+] as const satisfies readonly ResolutionKind[];
+type _ResolverKindValuesCoverResolutionKind = ResolutionKind extends (typeof RESOLVER_KIND_VALUES)[number] ? true : never;
+const _resolverKindValuesCoverResolutionKind: _ResolverKindValuesCoverResolutionKind = true;
+void _resolverKindValuesCoverResolutionKind;
 
 // Mirrors AbilityCost's `kind` discriminant (src/lib/spellcasting/ability-cost.ts). Two-way
 // compile latch, same shape as ABILITY_VALUES above.

@@ -33,10 +33,11 @@ export interface RunCharacterTransactionOptions<S extends Prisma.CharacterSelect
 // without this lock, two concurrent transactions on the same character each read the pre-update
 // blob and the later write silently clobbers the earlier one.
 // COUPLING LATCH: every top-level transaction that writes Character must call this FIRST, before
-// any read — currently runCharacterTransaction (below), actionsRouter, and revertBatch. A new
-// Character-writing transaction that skips this reintroduces the race. bondWeapon/unbondWeapon and
-// applyAttune also call it, but re-entrantly from inside an already-locked runCharacterTransaction
-// — a harmless re-acquisition of the same lock, not a fourth entry point.
+// any read — currently runCharacterTransaction (below), actionsRouter, revertBatch, and
+// charactersRouter's PATCH /characters/:id handler. A new Character-writing transaction that skips
+// this reintroduces the race. bondWeapon/unbondWeapon and applyAttune also call it, but re-entrantly
+// from inside an already-locked runCharacterTransaction — a harmless re-acquisition of the same
+// lock, not a fifth entry point.
 export async function lockCharacterRow(tx: Prisma.TransactionClient, characterId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM "Character" WHERE id = ${characterId} FOR UPDATE`;
 }

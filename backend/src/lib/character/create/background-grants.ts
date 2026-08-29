@@ -9,7 +9,7 @@ import {
 } from "@/lib/rules/background-grants.js";
 import { resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 import { type AdvancementEntry, type FeatImprovement } from "@/lib/classes/resources.js";
-import type { RulesEdition } from "@character-sheet/shared-types";
+import type { AbilityGenerationMethod, RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "@/lib/character/character-schemas.js";
 import { abilityCapOverflowError, type BackgroundGrants, type Fail, type PhaseResult, type ResolvedBackground } from "./shared.js";
 
@@ -18,12 +18,14 @@ const MAGIC_INITIATE_CLASS_BY_BACKGROUND: Record<string, string> = {
   Sage: "Wizard",
 };
 
-// Ability scores are capped at 20 (SRD 5.2).
+// Post-bonus cap is method-aware (postBonusAbilityCap, shared.ts) — 20 for
+// standardArray/pointBuy, the wider manual-sanity ceiling otherwise.
 // floatingSpreadShapeValid is the SAME shared shape check validateSpeciesFloating uses — not a copy.
 function validateBackgroundSpread(
   spread: Record<string, number>,
   choices: string[],
   base: Record<string, number>,
+  method: AbilityGenerationMethod | undefined,
 ): Fail | null {
   const entries = Object.entries(spread);
   const invalid = entries.filter(([ability]) => !choices.includes(ability)).map(([a]) => a);
@@ -33,7 +35,7 @@ function validateBackgroundSpread(
   if (!floatingSpreadShapeValid(entries.map(([, amount]) => amount))) {
     return { ok: false, status: 400, error: "backgroundAbilities must be +2/+1 (two abilities) or +1/+1/+1 (three abilities)" };
   }
-  return abilityCapOverflowError(entries, base, "backgroundAbilities");
+  return abilityCapOverflowError(entries, base, "backgroundAbilities", method);
 }
 
 // Origin feats are a PHB'24-only mechanic (#1504).
@@ -78,7 +80,7 @@ export async function resolveBackgroundGrants(
     if (choices.length === 0) {
       return { ok: false, status: 400, error: "backgroundAbilities not allowed: this background has no ability spread" };
     }
-    const shapeError = validateBackgroundSpread(spread, choices, input.abilityScores);
+    const shapeError = validateBackgroundSpread(spread, choices, input.abilityScores, input.abilityGenerationMethod);
     if (shapeError) return shapeError;
   }
 

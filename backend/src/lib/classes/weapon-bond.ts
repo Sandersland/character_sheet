@@ -26,19 +26,14 @@ class WeaponBondLimitError extends InvalidWeaponBondOperationError {
 export const WEAPON_BOND_LEVEL = 3;
 export const WEAPON_BOND_LIMIT = 2;
 
-// Total-mapping per #1527 (mirrors subclassGateLevel) — never `=== EDITION_…`.
+// Total mapping per #1527 (mirrors subclassGateLevel) — never `=== EDITION_…`.
+// PHB'24 text is unverified/PARKED (#1531) — stays 2014-only until that lands.
+const EDITION_HAS_WEAPON_BOND: Record<RulesEdition, boolean> = {
+  EDITION_2014: true,
+  EDITION_2024: false,
+};
 export function weaponBondAvailable(edition: RulesEdition): boolean {
-  switch (edition) {
-    case "EDITION_2014":
-      return true;
-    case "EDITION_2024":
-      // PHB'24 text is unverified/PARKED (#1531) — stays 2014-only until that lands.
-      return false;
-    default: {
-      const exhaustive: never = edition;
-      throw new Error(`weaponBondAvailable: unhandled edition ${String(exhaustive)}`);
-    }
-  }
+  return EDITION_HAS_WEAPON_BOND[edition];
 }
 
 export function hasWeaponBond(entryLevel: number, isEldritchKnight: boolean, edition: RulesEdition): boolean {

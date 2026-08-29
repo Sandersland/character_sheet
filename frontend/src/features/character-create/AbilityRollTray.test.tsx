@@ -4,7 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import AbilityRollTray from "@/features/character-create/AbilityRollTray";
-import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmentPanel";
+import AbilityAssignmentPanel from "@/features/character-create/ability-assignment/AbilityAssignmentPanel";
 import { EMPTY_ASSIGNMENTS } from "@/lib/abilityAssignment";
 import { rollAbilityScoreSet } from "@/lib/abilityGen";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";

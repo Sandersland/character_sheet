@@ -9,19 +9,14 @@ export const ARCANE_CHARGE_LEVEL = 15;
 export const ARCANE_CHARGE_REMINDER =
   "Arcane Charge: teleport up to 30 ft to an unoccupied space you can see (before or after the additional action).";
 
-// Total-mapping per #1527 (mirrors weaponBondAvailable) — never `=== EDITION_…`.
+// Total mapping per #1527 (mirrors weaponBondAvailable) — never `=== EDITION_…`.
+// Eldritch Knight's PHB'24 text is unverified/PARKED (#1531) — same stance as weaponBondAvailable.
+const EDITION_HAS_ARCANE_CHARGE: Record<RulesEdition, boolean> = {
+  EDITION_2014: true,
+  EDITION_2024: false,
+};
 export function arcaneChargeAvailable(edition: RulesEdition): boolean {
-  switch (edition) {
-    case "EDITION_2014":
-      return true;
-    case "EDITION_2024":
-      // Eldritch Knight's PHB'24 text is unverified/PARKED (#1531) — same stance as weaponBondAvailable.
-      return false;
-    default: {
-      const exhaustive: never = edition;
-      throw new Error(`arcaneChargeAvailable: unhandled edition ${String(exhaustive)}`);
-    }
-  }
+  return EDITION_HAS_ARCANE_CHARGE[edition];
 }
 
 // `entryLevel` is the fighter entry's own effective level, never the character's total level (PHB'14 p.75 grants this at Fighter 15).

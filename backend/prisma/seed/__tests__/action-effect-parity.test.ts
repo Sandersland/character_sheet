@@ -3,9 +3,10 @@
 // then a ClassFeature row whose own resourceKey (or, for a "toggle" row, endActionKey(resourceKey))
 // equals key — see eligibleRowActions. A universal Action row or a DERIVED_ACTIONS entry has no
 // row to fall back to, so a key missing from ACTION_EFFECT_FN there is the runtime
-// UnknownActionError -> 400 that actions.ts's own module doc warns about. This test replaces the
-// ~23 hand-maintained `ACTION_EFFECT_FN.someKey).toBeUndefined()` pins that used to guard specific
-// cases in backend/src/lib/classes/__tests__/actions.test.ts.
+// UnknownActionError -> 400 that actions.ts's own module doc warns about. This test's reachability
+// check replaces most of the ~23 hand-maintained `ACTION_EFFECT_FN.someKey).toBeUndefined()` pins
+// that used to guard specific cases — 6 survive as ROW_ONLY_ACTION_KEYS, for keys with no
+// legitimate reason to ever be dual-homed.
 //
 // Lives prisma-side (not src/) because it imports CLASS_FEATURES/ACTIONS — a src file importing
 // anything under prisma/ is a TS6059 compile error (rootDir "src"); prisma files may import src.
@@ -17,8 +18,8 @@
 // apart from "an entry was carelessly re-added for a key the row path already owns", because
 // ACTION_EFFECT_FN is checked BEFORE eligibleRowActions (applyActionOpInTx) and would silently shadow
 // the row — skipping its level/edition gate, assertActivationRequirementsMet, and any server-rolled
-// dice — for whichever key gets the entry. backend/src/lib/classes/__tests__/actions.test.ts's
-// "row-only action keys" block pins the handful of keys with no legitimate reason to ever be dual-homed.
+// dice — for whichever key gets the entry. ROW_ONLY_ACTION_KEYS' own "row-only action keys" block
+// pins the handful of keys with no legitimate reason to ever be dual-homed.
 import { describe, expect, it } from "vitest";
 
 import { ACTION_EFFECT_FN, DERIVED_ACTIONS, NO_DISPATCH_ACTION_KEYS, endActionKey } from "@/lib/classes/actions.js";
