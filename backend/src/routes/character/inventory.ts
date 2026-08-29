@@ -54,10 +54,7 @@ const consumableDetailSchema = z.object({
   effectDescription: z.string().optional(),
 });
 
-// Discriminated on `category` so a weapon/armor custom item is required to
-// carry the minimal mechanical fields the matching *Detail table's columns
-// are NOT NULL for — see schema.prisma's ItemWeaponDetail/ItemArmorDetail.
-// consumable/gear have no such requirement.
+// Discriminated on `category` so a weapon/armor custom item must carry the fields ItemWeaponDetail/ItemArmorDetail's columns are NOT NULL for; consumable/gear have no such requirement.
 const customItemSchema = z.discriminatedUnion("category", [
   z.object({
     category: z.literal("weapon"),
@@ -117,8 +114,7 @@ const adjustQuantityOpSchema = z.object({
 const useOpSchema = z.object({
   type: z.literal("use"),
   inventoryItemId: z.string().min(1),
-  // Raw effect-die values, client-rolled for the 3D animation. Omit to have the
-  // server roll. Length/range are validated against the consumable in lib/.
+  // Raw effect-die values, client-rolled for the 3D animation. Omit to have the server roll; length/range are validated against the consumable in lib/.
   rolls: z.array(z.number().int().positive()).optional(),
 });
 

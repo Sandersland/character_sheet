@@ -30,7 +30,6 @@ describe("deriveFastMovement", () => {
   });
 
   it("light/medium/no armor all qualify (heavy is the only disqualifier)", () => {
-    // wearingHeavyArmor is false for light, medium, and unarmored alike.
     expect(bonus(5, false)).toBe(10);
   });
 

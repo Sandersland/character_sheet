@@ -1,22 +1,6 @@
-// Writes to InventoryCapabilityUse.used and InventoryItem.usesRemaining — the
-// SOLE home for this runtime state since #1649 dropped the InventoryCapability/
-// InventoryConsumableDetail tables these functions used to sit beside as a
-// dual-write mirror (#1648, epic #1644). Names kept as `mirror*` rather than
-// renamed: every call site already refers to them, and there is nothing left
-// to mirror against — read that prefix as historical, not descriptive.
-//
-// Each write is atomic (updateMany/increment) so a concurrent spender can't
-// race a read-modify-write. capabilityKey is a capability's stable snapshot
-// key (`capabilities[].key` in buildInventorySnapshot's output) — an opaque
-// string, not tied to any live row's id.
-//
-// These filter on capabilityKey ALONE while the unique constraint is
-// (inventoryItemId, capabilityKey): keys are per-acquisition UUIDs, so a key
-// identifies one row in practice, and the rest sweep's batch form is
-// deliberately cross-item. That is a deliberate trade, not an oversight — but
-// it means a caller that already knows its inventoryItemId should scope by it
-// rather than call these, which is why the spellcasting overdraw guard does
-// its own updateMany instead.
+// #1649: InventoryCapabilityUse.used/InventoryItem.usesRemaining are the SOLE home for this state; the `mirror*` names are historical (there's nothing left to mirror against).
+// Each write is atomic (updateMany/increment) so a concurrent spender can't race a read-modify-write.
+// These filter on capabilityKey ALONE (not the (inventoryItemId, capabilityKey) unique constraint) — deliberate, since capabilityKey is per-acquisition; a caller that already knows its inventoryItemId should scope by it instead (see the spellcasting overdraw guard).
 import type { Prisma } from "@/generated/prisma/client.js";
 
 export async function mirrorCapabilityUsedSet(
@@ -35,8 +19,7 @@ export async function mirrorCapabilityUsedIncrement(
   await tx.inventoryCapabilityUse.updateMany({ where: { capabilityKey }, data: { used: { increment: delta } } });
 }
 
-// Batch form of mirrorCapabilityUsedSet(..., 0) — the rest-sweep reset path
-// touches many capability rows in one pass.
+// Batch form of mirrorCapabilityUsedSet(..., 0) for the rest-sweep reset path.
 export async function mirrorCapabilityUsedResetMany(
   tx: Prisma.TransactionClient,
   capabilityKeys: string[],

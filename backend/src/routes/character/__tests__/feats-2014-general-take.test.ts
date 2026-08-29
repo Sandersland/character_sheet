@@ -1,9 +1,3 @@
-/**
- * #1310 acceptance criteria exercised over the REAL creation + advancement
- * transaction path — not fixture rows, and not resolveEditionRow called
- * directly — proving the 26-row 2014 general/origin catalog is actually
- * takeable, not merely present in a GET response.
- */
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -16,7 +10,8 @@ import { seededSpeciesAnchor } from "@/test-support/species.js";
 const OWNER_ID = "owner-feats-2014-general-take";
 let COOKIE: string;
 
-const XP_LVL_4 = 2700; // level 4 — 1 ASI slot (BASE_ASI_LEVELS, both editions)
+// Keep in sync with BASE_ASI_LEVELS.
+const XP_LVL_4 = 2700;
 
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
@@ -85,11 +80,7 @@ describe("a 2014 character takes a real 2014 general-category feat via an ASI sl
     expect(entry.abilityDeltas).toEqual({ strength: 1 });
   });
 
-  // NOTE: this is a level-1 character with ZERO ASI slots, so the 400 below
-  // comes from "no available ASI slot", not featOfferedForAsiSlot's `?? 4`
-  // category default — that proof (atThree=0/atFour=26, same character, an
-  // ASI slot present at both levels) lives in feats.test.ts's "2014
-  // general/origin feats" suite instead.
+  // This is a level-1 character with ZERO ASI slots, so the 400 comes from "no available ASI slot", not featOfferedForAsiSlot's `?? 4` category default.
   it("a 2014 character at level 1 has no ASI slot to take a feat", async () => {
     const sentinel2014 = await prisma.feat.findFirstOrThrow({
       where: { name: "Sentinel", edition: "EDITION_2014" },
@@ -106,7 +97,7 @@ describe("a 2014 character takes a real 2014 general-category feat via an ASI sl
         classes: [{ name: "Fighter" }],
         abilityScores: { strength: 15, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
         rulesEdition: "EDITION_2014",
-        experiencePoints: 0, // level 1 — no ASI slot at all
+        experiencePoints: 0,
       });
     expect(res.status).toBe(201);
     const id = res.body.id as string;

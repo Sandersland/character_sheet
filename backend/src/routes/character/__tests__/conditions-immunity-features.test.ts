@@ -1,13 +1,3 @@
-/**
- * Beguiling Defenses (Archfey Warlock L10) and Nature's Ward (Circle of the
- * Land Druid L10) — unconditional condition immunity (#1121), through the
- * real conditions route. Neither feature needs an active buff (contrast
- * Mindless Rage, actions-rage-mindless.test.ts): both are permanent once
- * their own level gate is met.
- *
- * Real Postgres in each test; supertest against the shared `app`.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 

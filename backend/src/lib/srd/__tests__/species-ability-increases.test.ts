@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { abilityIncreasesSchema } from "@/lib/srd/species-ability-increases.js";
 
-// Shape tests for the AbilityIncreaseSpec[] vocabulary — no DB needed. Pins
-// the three forms Species/SpeciesVariant.abilityIncreases must accept (#1679)
-// and rejects malformed rows the same way subclassSeedSchema does for SUBCLASSES.
 describe("abilityIncreasesSchema", () => {
   it("accepts a fixed increase (Dwarf's +2 CON)", () => {
     const result = abilityIncreasesSchema.safeParse([{ ability: "constitution", amount: 2 }]);

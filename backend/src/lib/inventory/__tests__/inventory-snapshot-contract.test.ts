@@ -1,11 +1,4 @@
-/**
- * The frozen/mutable line is the invariant the whole snapshot design rests on
- * (#1647, epic #1644): definition data goes in the JSON blob, runtime state
- * stays in columns. A schema that merely ACCEPTS the right shape is not enough
- * — zod v4 strips unknown keys by default, so a non-strict schema would take a
- * blob carrying `used` and silently discard it, surfacing as data loss in
- * #1648's dual-write. The reject cases are the real contract.
- */
+// #1647 (epic #1644): definition data lives in the JSON blob, runtime state in columns. Must use a strict schema — zod v4 silently strips unknown keys, so a non-strict schema would drop a stray `used` instead of rejecting it.
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
@@ -86,8 +79,6 @@ describe("snapshotCapabilitySchema (#1647)", () => {
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
   });
 
-  // The payoff of the union over a flat column mirror: this is unrepresentable
-  // rather than merely wrong. readCapability tolerates it as OpaqueCapability.
   it("rejects a charges entry with no maxCharges", () => {
     expect(snapshotCapabilitySchema.safeParse({ key: "c", kind: "charges", rechargeTrigger: "dawn" }).success).toBe(false);
   });
@@ -107,8 +98,6 @@ describe("snapshotCapabilitySchema (#1647)", () => {
   });
 });
 
-// A fully-populated blob: every optional branch present at once, so a field
-// accidentally required-by-omission shows up here rather than in #1648.
 const FULL = {
   version: 1,
   name: "Flame Tongue",
@@ -155,8 +144,7 @@ describe("inventorySnapshotSchema — frozen definition data only (#1647)", () =
     expect(inventorySnapshotSchema.safeParse({ version: 1, name: "Torch", category: "gear", capabilities: [] }).success).toBe(true);
   });
 
-  // The invariant. Each of these is a COLUMN; a blob carrying one means a
-  // writer confused frozen definition with runtime state.
+  // Each of these is a runtime COLUMN; a blob carrying one means a writer confused frozen definition with runtime state.
   it.each(["quantity", "equippedSlot", "attuned", "notes", "position", "activatedUsesSpent"])(
     "rejects the mutable field %s",
     (field) => {
@@ -189,8 +177,7 @@ describe("inventorySnapshotSchema — frozen definition data only (#1647)", () =
     expect(inventorySnapshotSchema.safeParse({ ...FULL, category: "relic" }).success).toBe(false);
   });
 
-  // A duplicate key would make an InventoryCapabilityUse row ambiguous about
-  // which capability it counts (#1648).
+  // A duplicate key would make an InventoryCapabilityUse row ambiguous about which capability it counts (#1648).
   it("rejects duplicate capability keys", () => {
     expect(inventorySnapshotSchema.safeParse({ ...FULL, capabilities: [PASSIVE, { ...PASSIVE, value: 2 }] }).success).toBe(false);
   });
@@ -204,18 +191,12 @@ describe("the tuples #1647 moved stay in step with their unions", () => {
     expectTypeOf<(typeof ITEM_RESOURCE_PERIODS)[number]>().toEqualTypeOf<ItemResourcePeriod>();
   });
 
-  // ITEM_RARITIES is a rules table, not a union — latch against its keys.
+  // ITEM_RARITIES is a rules table, not a union — latched against its keys.
   it("ITEM_RARITY_KEYS covers exactly the rarity tiers the rules table defines", () => {
     expect([...ITEM_RARITY_KEYS].sort()).toEqual(ITEM_RARITIES.map((r) => r.key).sort());
   });
 
-  // These six were HAND-TRANSCRIBED from schema.prisma's enum blocks — the one
-  // step in this change with no compiler behind it, and transcription is what
-  // went wrong twice while it was being designed. A tuple that silently loses a
-  // member makes inventorySnapshotSchema reject a legitimate value, surfacing as
-  // a parse failure in #1648's writer with nothing failing at the definition
-  // site. Compared against the GENERATED enum objects, which Prisma rebuilds
-  // from the schema, so drift cannot survive a migration unnoticed.
+  // These six tuples are hand-transcribed from schema.prisma's enum blocks; checked against Prisma's generated enum objects so drift can't survive a migration unnoticed.
   it("Prisma-transcribed tuples cover exactly their generated enums", () => {
     expect([...EQUIP_SLOTS].sort()).toEqual(Object.values(EquipSlot).sort());
     expect([...ITEM_CATEGORIES].sort()).toEqual(Object.values(ItemCategory).sort());

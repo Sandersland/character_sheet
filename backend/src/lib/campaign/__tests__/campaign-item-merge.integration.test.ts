@@ -1,13 +1,5 @@
-/**
- * The invariants the CampaignItem→Item merge has to preserve (#1646, epic
- * #1644). Scoped to rows this file creates: the worker DB is shared and other
- * suites leak throwaway Item rows with no cleanup.
- *
- * These are deliberately behavioural rather than structural — "two campaigns
- * can both hold a Sunblade" is the property that would break if scopeKey were
- * ever computed wrong, and it survives the table rename that a column-level
- * assertion would not.
- */
+// Scoped to rows this file creates — the worker DB is shared and other suites leak throwaway Item rows with no cleanup.
+// Deliberately behavioral, not structural: these assert the property that would break if scopeKey were computed wrong, not implementation details a table rename would invalidate.
 import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -96,11 +88,7 @@ describe("CampaignItem rows live in Item (#1646)", () => {
     await prisma.character.delete({ where: { id: character.id } });
   });
 
-  // GH #1646 review comment (PR #1650, added scope finding #1): Item.campaignId
-  // cascades from Campaign while InventoryItem.itemId only SetNulls, so deleting
-  // a campaign transitively drops provenance on every character holding one of
-  // its CAMPAIGN items. This is #1645's cascade shape, not new to this issue —
-  // pinning it here is what makes it a documented choice instead of a surprise.
+  // Item.campaignId cascades from Campaign while InventoryItem.itemId only SetNulls, so deleting a campaign transitively drops provenance on every character holding one of its CAMPAIGN items — a documented choice (#1645's cascade shape), not new here.
   it("survives a campaign deletion with itemId null (Item cascades, InventoryItem does not)", async () => {
     const campaign = await makeCampaign("Merge Campaign Cascade");
     const source = await makeCampaignItem(campaign.id, "Cascade Blade");

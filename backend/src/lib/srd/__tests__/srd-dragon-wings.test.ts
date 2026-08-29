@@ -5,12 +5,7 @@ import { deriveDragonWingsFlySpeed } from "@/lib/srd/srd.js";
 const fly = (draconicLevel: number, isUnarmored: boolean, walkingSpeed = 30, edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2014") =>
   deriveDragonWingsFlySpeed({ draconicLevel, isUnarmored, walkingSpeed }, edition);
 
-// PHB'14 p.107: passive, indefinite-duration flying speed equal to current
-// speed — this derived value is exact for 2014. PHB'24 p.148 (SRD 5.2
-// primary) is a genuinely different mechanic (flat 60ft, 1hr, resource-gated
-// `dragonWings` pool, already seeded) that #1123 explicitly scopes OUT
-// (while-active/toggled resources aren't derived here) — so 2024 gets no
-// value from this path at all, never a walking-speed guess.
+// PHB'14 p.107: passive fly speed = current speed. PHB'24 p.148 is a different, resource-gated mechanic; #1123 scopes 2024 out of this path.
 describe("deriveDragonWingsFlySpeed (#1123) — FORKS: 2014 passive derive, 2024 withheld (resource-gated, out of scope)", () => {
   describe("2014", () => {
     it("below L14 is absent even while unarmored", () => {

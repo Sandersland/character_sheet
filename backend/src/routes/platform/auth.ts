@@ -31,22 +31,11 @@ import {
   tokenColumns,
 } from "@/lib/auth/oauth/index.js";
 
-// Hand-rolled OAuth 2.0 + PKCE sign-in. This is the auth MECHANISM only:
-// per-route read/write enforcement (requireAuth) is deferred to #101, so every
-// endpoint here is public. Handlers stay thin — they wire HTTP to the OAuth
-// method (lib/auth/oauth) + session/cookie helpers, guarding with early returns
-// and letting unexpected throws reach the terminal errorHandler.
+// This is the auth mechanism only: per-route read/write enforcement (requireAuth) is separate, so every endpoint here is public.
 
 export const authRouter = Router();
 
-// Origin (scheme + host) of the incoming request, honoring the reverse-proxy
-// X-Forwarded-Proto/Host headers, then the Host header, falling back to the
-// configured APP_BASE_URL when no host is present. Used for USER-FACING URLs
-// (the SPA start link + the post-callback redirect) so the browser is sent back
-// to whatever origin it actually reached us on (compose/worktree stacks expose
-// the app on varying hosts/ports). NOTE: this is deliberately NOT used for the
-// OAuth redirect_uri — that must stay APP_BASE_URL-based (appRedirectUri) to
-// exactly match the URI registered with the provider.
+// Used for user-facing redirects only — never the OAuth redirect_uri, which must stay APP_BASE_URL-based to match what's registered with the provider.
 function requestOrigin(req: Request): string {
   const forwardedHost = req.headers["x-forwarded-host"];
   const host =
@@ -62,10 +51,7 @@ function requestOrigin(req: Request): string {
   return `${proto}://${host}`;
 }
 
-/**
- * GET /api/auth/providers
- * List the sign-in providers this deployment has configured.
- */
+/** GET /api/auth/providers — lists the sign-in providers this deployment has configured. */
 authRouter.get("/auth/providers", (req, res) => {
   const origin = requestOrigin(req);
   const providers = enabledProviders().map((provider) => ({
@@ -82,14 +68,7 @@ const DEV_USER = {
   name: "Dev User",
 } as const;
 
-/**
- * POST /api/auth/dev-login
- * Non-prod session primitive: mints a session for a fixed dev user WITHOUT a
- * real provider, so headless/worktree UI verification (and local scripts) can
- * authenticate without driving the OAuth dance. Guarded by config.ALLOW_DEV_LOGIN
- * (defaults off, hard-forced off in production), and returns the same 404 shape
- * as an unknown provider so it's invisible in normal/prod deploys.
- */
+/** POST /api/auth/dev-login — mints a session for a fixed dev user without a real provider, guarded by config.ALLOW_DEV_LOGIN; 404s like an unknown provider when disabled. */
 authRouter.post("/auth/dev-login", async (_req, res) => {
   if (!config.ALLOW_DEV_LOGIN) {
     res.status(404).json({ error: "Unknown or disabled provider" });
@@ -104,8 +83,7 @@ authRouter.post("/auth/dev-login", async (_req, res) => {
 
   const token = await createSession(user.id);
   setCookie(res, SESSION_COOKIE, token, SESSION_TTL_SECONDS);
-  // Reshape to the same SessionUser contract /auth/me returns (resolved
-  // preferences, not the raw Json column) rather than the raw Prisma row.
+  // Reshaped to the same SessionUser contract /auth/me returns (resolved preferences, not the raw Json column).
   res.json({
     token,
     user: {
@@ -118,11 +96,7 @@ authRouter.post("/auth/dev-login", async (_req, res) => {
   });
 });
 
-/**
- * GET /api/auth/:provider/start
- * Begin the OAuth dance: stash state+PKCE in a short-lived cookie, 302 to the
- * provider's authorize endpoint.
- */
+/** GET /api/auth/:provider/start — stashes state+PKCE in a short-lived cookie, then 302s to the provider's authorize endpoint. */
 authRouter.get("/auth/:provider/start", (req, res) => {
   const provider = getProvider(req.params.provider);
   if (!provider) {
@@ -144,11 +118,7 @@ authRouter.get("/auth/:provider/start", (req, res) => {
   res.redirect(302, buildAuthorizeUrl(provider, { state, challenge }));
 });
 
-/**
- * GET /api/auth/:provider/callback
- * Provider redirects back here with ?code&state (or ?error). Verify, exchange,
- * resolve the user, and mint a session.
- */
+/** GET /api/auth/:provider/callback — verifies state, exchanges the code, resolves the user, and mints a session. */
 authRouter.get("/auth/:provider/callback", async (req, res) => {
   // Read and immediately clear the transaction cookie — it's single-use.
   const tx = decodeTx(getCookie(req, OAUTH_TX_COOKIE));
@@ -206,8 +176,6 @@ authRouter.get("/auth/:provider/callback", async (req, res) => {
   const sessionToken = await createSession(userId);
   setCookie(res, SESSION_COOKIE, sessionToken, SESSION_TTL_SECONDS);
 
-  // Origin-relative: send the browser back to the origin it arrived on, not a
-  // hardcoded APP_BASE_URL. (The OAuth redirect_uri above stays APP_BASE_URL.)
   res.redirect(302, requestOrigin(req));
 });
 

@@ -1,12 +1,6 @@
-// Domain façade for the hit-points cluster. Concerns live in sibling modules
-// (hp-core / hp-context / hp-ops / advancing-hit-die / rest / concentration /
-// hp-in-tx / hp-transaction); this file re-exports the public surface so
-// import sites outside lib/combat/ never reference the internal split. New
-// same-domain code imports the concern module directly. The op shapes are NOT
-// here and no longer have a backend declaration at all: they are z.infer of the
-// route schemas in @character-sheet/contracts (#1390). Concentration result
-// types live in concentration.js.
-
+// A façade re-exporting the hit-points cluster's public surface so outside callers never reference
+// the internal module split; same-domain code imports the concern module directly.
+// Op shapes are not declared here; they're z.infer of the route schemas in @character-sheet/contracts.
 export {
   InvalidHitPointOperationError,
   normalizeHitPoints,
@@ -26,6 +20,5 @@ export { advancingHitDie } from "./advancing-hit-die.js";
 export { applyHitPointOperations, applyLevelUpHpInTx } from "./hp-transaction.js";
 
 export { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "./hp-in-tx.js";
-// Part of the public surface; current external callers infer this return type.
 // fallow-ignore-next-line unused-type -- public-surface re-export; external callers infer this return type
 export type { ConcentrationCheckResult } from "./concentration.js";

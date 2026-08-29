@@ -18,9 +18,6 @@ const itemInclude = {
 
 type ItemWithDetails = Prisma.ItemGetPayload<{ include: typeof itemInclude }>;
 
-// Same nested weapon/armor/consumable shape serializeInventoryItem builds for
-// an InventoryItem — see the shared serializeWeaponDetail/serializeArmorDetail/
-// serializeConsumableDetail.
 function serializeItem(row: ItemWithDetails) {
   return {
     id: row.id,
@@ -32,19 +29,11 @@ function serializeItem(row: ItemWithDetails) {
     weapon: row.weaponDetail ? serializeWeaponDetail(row.weaponDetail) : undefined,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
-    // Set only for the small set of rows that ARE tools (#1564) — the
-    // starting-equipment open-pick dropdown filters on it directly.
     toolCategory: row.toolCategory ?? undefined,
   };
 }
 
-// Feeds the inventory editor's "add from catalog" picker (Phase B) — kept
-// as its own endpoint rather than folded into GET /api/reference since the
-// consumer is the character sheet, not the creation form (see reference.ts).
 itemsRouter.get("/items", async (_req, res) => {
-  // GLOBAL only (#1645): this is the shared catalog, served to every client
-  // regardless of campaign. Once #1646 merges DM-authored rows into Item, an
-  // unpinned read would hand one campaign's homebrew to everyone.
   const items = await prisma.item.findMany({
     where: { scopeKey: "global" },
     orderBy: { name: "asc" },

@@ -1,10 +1,3 @@
-// #1120: serializeCharacter emits `critRange` — derived at read time from the
-// REAL seeded Champion "Improved Critical"/"Superior Critical" rows, never a
-// persisted column. Mirrors character-serialize-riders.test.ts's pattern:
-// points at the real seeded Fighter class + Champion subclass (read-only,
-// never mutated) rather than a bespoke Subclass row, since this suite has no
-// other reason to own its own class.
-
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -63,7 +56,7 @@ function championCharacter(id: string, level: number, hitDice = { total: level, 
       ...BASE,
       id,
       name: `Crit Range Fixture (${id})`,
-      experiencePoints: 0, // level/proficiency derive off classEntries[0].level for this suite's purposes, not experiencePoints
+      experiencePoints: 0, // level/proficiency derive off classEntries[0].level here, not experiencePoints
       hitDice,
       classEntries: {
         create: [
@@ -117,11 +110,7 @@ describe("serializeCharacter critRange (#1120) — real seeded Champion rows, ED
   });
 });
 
-// Edition-invariant proof (#1120 AC): the SAME level/threshold pairing holds
-// for a 2014 character as the EDITION_2024 default suite above already
-// pinned at L15 -> 18 — mutating deriveCritRange to fork on `edition` would
-// leave this fixture's 2024 sibling (crit-range-champion-l15) disagreeing
-// with this one at the identical level.
+// Edition-invariant: forking deriveCritRange on edition would break a 2014 Champion agreeing with 2024 at the same level.
 describe("serializeCharacter critRange (#1120) — 2014 Champion agrees with 2024 at the same level", () => {
   it("a 2014 level-15 Champion also crits on 18-20", async () => {
     await prisma.character.create({

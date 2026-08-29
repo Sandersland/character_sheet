@@ -1,15 +1,3 @@
-/**
- * Class transaction handler — post-creation subclass selection and future
- * class-related mutations (rename, multiclass additions).
- *
- * Today ships one op: `setSubclass` — the common case of choosing a subclass
- * when a character reaches the class's subclass-granting level (e.g. Fighter
- * at level 3 choosing Battle Master). This endpoint fills the gap that
- * PATCH /api/characters/:id doesn't cover (it's cosmetic field-patch only)
- * and that character creation doesn't cover (characters start at level 1,
- * before most classes grant their subclass).
- */
-
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel, subclassGateLevel } from "@/lib/leveling/effective-levels.js";
@@ -37,13 +25,11 @@ import {
 
 export class InvalidClassOperationError extends Error {}
 
-/** Set the character's subclass by catalog id. */
 export interface SetSubclassOperation {
   type: "setSubclass";
   subclassId: string;
 }
 
-/** Multiclass into a new class by catalog id — creates a level-1 entry. */
 export interface AddClassOperation {
   type: "addClass";
   classId: string;
@@ -55,8 +41,6 @@ export type ClassOperation =
   | SetSubclassOperation
   | AddClassOperation;
 
-// Transaction handler. Per-op context: the transaction client plus the batch/session ids stable
-// across the whole batch. Each helper re-reads the character with its own select.
 interface ClassOpContext {
   tx: Prisma.TransactionClient;
   characterId: string;
@@ -64,15 +48,10 @@ interface ClassOpContext {
   sessionId: string | null;
 }
 
-// setSubclass: choose a subclass once the owning class entry reaches its
-// subclass-granting level; drifts subclassId + name onto that entry. The target
-// entry is resolved BY the subclass's class (#1065) — each class appears at most
-// once among a character's entries (applyAddClass enforces uniqueness), so the
-// subclass id alone is unambiguous.
+// Each class appears at most once per character (uniqueness enforced by applyAddClass) — so resolving the entry by subclass.classId alone is unambiguous.
 async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): Promise<void> {
   const { tx, characterId, batchId, sessionId } = ctx;
 
-  // Re-read to get current state.
   const character = await tx.character.findUnique({
     where: { id: characterId },
     select: {
@@ -91,12 +70,9 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
     throw new InvalidClassOperationError("Character has no class entry");
   }
 
-  // Hoisted above the subclass lookup so both the guard below and the
-  // subclass-gate check further down resolve the SAME edition (never call
-  // editionOf twice for one op).
+  // Hoisted so both the guard below and the subclass-gate check resolve the SAME edition — never call editionOf twice for one op.
   const edition = editionOf(character);
 
-  // Look up the requested subclass.
   const subclass = await tx.subclass.findUnique({
     where: { id: op.subclassId },
     include: { class: { select: { id: true, name: true, subclassLevel: true } } },
@@ -105,12 +81,10 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
     throw new InvalidClassOperationError(`Subclass not found: ${op.subclassId}`);
   }
 
-  // Before class-membership: a wrong-edition row is "not in this character's
-  // catalog at all", the same treatment resolveEditionRow gives it (#1345).
+  // Runs before the class-membership check: a wrong-edition row is treated as not in this character's catalog at all, mirroring resolveEditionRow (#1345).
   const mismatch = crossEditionRejection(subclass, `Subclass "${subclass.name}"`, edition);
   if (mismatch) throw new InvalidClassOperationError(mismatch);
 
-  // Validate the character has levels in the subclass's class.
   const entry = character.classEntries.find((e) => e.classId === subclass.classId);
   if (!entry) {
     throw new InvalidClassOperationError(
@@ -118,14 +92,12 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
     );
   }
 
-  // Validate the entry's class level meets the subclass-granting level.
   const level = effectiveEntryLevel(
     entry.level,
     character.classEntries.length,
     levelForExperience(character.experiencePoints),
   );
-  // Same gate the reconciler and the clamp-on-read use — without this the write
-  // path would accept a subclass the sheet then refuses to show (#1285).
+  // Same gate the reconciler and the clamp-on-read use — without it the write path could accept a subclass the sheet then refuses to show (#1285).
   const required = subclassGateLevel(subclass.class.subclassLevel, edition);
   if (level < required) {
     throw new InvalidClassOperationError(
@@ -138,7 +110,6 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
     subclass: entry.subclass ?? null,
   };
 
-  // Write subclassId + drifting name to the class entry.
   await tx.characterClassEntry.update({
     where: { id: entry.id },
     data: {
@@ -165,26 +136,19 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
   });
 }
 
-// addClass: multiclass into a new class by spending a pending level-up — creates
-// a level-1 entry and rolls its HP so the entry stays coupled to hitDice.total.
-// Columns/relations re-read for an addClass op.
+// Adding a class entry bumps hitDice.total by 1 in the same op — the entry count and hitDice.total stay coupled.
 const ADD_CLASS_SELECT = {
   experiencePoints: true,
   abilityScores: true,
   hitPoints: true,
   hitDice: true,
-  // resources/conditions/rulesEdition (#1321): effectiveMaxHitPoints' inputs —
-  // a multiclass level-up bumps hp.max+current by the SAME gain, which at
-  // exhaustion 4+ can push current above the (proportionally smaller-growing)
-  // effective max. `class.extraAsiLevels`/`fightingStyleFeatLevel` mirror
-  // buildHpOpContext's own select.
+  // resources/conditions/rulesEdition are effectiveMaxHitPoints' inputs (exhaustion 4+ can push current above effective max after a flat HP gain); class.extraAsiLevels/fightingStyleFeatLevel mirror buildHpOpContext's own select — keep in sync.
   resources: true,
   conditions: true,
   rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    // subclass/subclassRef.slug/class.subclassLevel (#1123):
-    // draconicResilienceMaxHpTerm's identity inputs for the clamp below.
+    // subclass/subclassRef.slug/class.subclassLevel are draconicResilienceMaxHpTerm's identity inputs for the clamp below.
     select: {
       id: true,
       name: true,
@@ -193,8 +157,7 @@ const ADD_CLASS_SELECT = {
       classId: true,
       subclass: true,
       subclassRef: { select: { slug: true } },
-      // `class.name` (#1148): the CANONICAL class name — characterFightingStyleFeatSlots'
-      // resolveSubclassSlug input, same rationale as #1495's own class.name select.
+      // class.name is the canonical name characterFightingStyleFeatSlots'/resolveSubclassSlug needs — same rationale as #1495's own class.name select.
       class: { select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
     },
   },
@@ -202,21 +165,17 @@ const ADD_CLASS_SELECT = {
 
 type AddClassCharacter = Prisma.CharacterGetPayload<{ select: typeof ADD_CLASS_SELECT }>;
 
-// An explicit roll must be a legal face of the new class's hit die.
 function assertRollInRange(op: AddClassOperation, faces: number, hitDie: string): void {
   if (op.method === "roll" && (op.roll === undefined || op.roll < 1 || op.roll > faces)) {
     throw new InvalidClassOperationError(`Roll must be between 1 and ${faces} for a ${hitDie}`);
   }
 }
 
-// Validate the multiclass request (pending level-up, unique class, PHB prereqs,
-// roll bounds) and return the target class + rolled HP gain.
 async function resolveMulticlass(
   tx: Prisma.TransactionClient,
   character: AddClassCharacter,
   op: AddClassOperation,
 ): Promise<{ catalog: { id: string; name: string; hitDie: string }; faces: number; gain: number }> {
-  // Adding a class spends a pending level-up: a new entry bumps hitDice.total by 1.
   const derivedLevel = levelForExperience(character.experiencePoints);
   const appliedLevels = normalizeHitDice(character.hitDice).total;
   if (appliedLevels >= derivedLevel) {
@@ -231,14 +190,11 @@ async function resolveMulticlass(
     throw new InvalidClassOperationError(`Class not found: ${op.classId}`);
   }
 
-  // A class can only be taken once — extra levels go through the HP level-up.
   if (character.classEntries.some((e) => e.classId === catalog.id)) {
     throw new InvalidClassOperationError(`Character already has levels in ${catalog.name}`);
   }
 
-  // 5e multiclass ability prerequisite (PHB'14 p. 163) — same validator as level-up.
-  // `multiclassPrerequisites` (#1529): the catalog row's own Json column, cast
-  // once like every other opaque-Json Prisma field this codebase reads.
+  // PHB'14 p.163 — multiclass ability prerequisite, same validator as level-up.
   const abilityScores = character.abilityScores as Record<string, number>;
   const prereq = multiclassPrerequisitesMet(
     catalog.multiclassPrerequisites as MulticlassPrerequisiteOption[] | null,
@@ -248,7 +204,6 @@ async function resolveMulticlass(
     throw new InvalidClassOperationError(`Cannot multiclass into ${catalog.name}: requires ${prereq.description}`);
   }
 
-  // Roll HP so the class-entry level stays coupled to hitDice.total.
   const faces = hitDieFace(catalog.hitDie);
   assertRollInRange(op, faces, catalog.hitDie);
   const conMod = abilityModifier(abilityScores.constitution ?? 10);
@@ -273,18 +228,11 @@ async function applyAddClass(ctx: ClassOpContext, op: AddClassOperation): Promis
   const beforeHp = normalizeHitPoints(character.hitPoints);
   const beforeHd = normalizeHitDice(character.hitDice);
   const newMax = beforeHp.max + gain;
-  // #1321: at exhaustion 4+, raising the raw max by `gain` doesn't raise the
-  // effective max by the same amount — clamp current to the recomputed
-  // effective max rather than gain the full `gain` unconditionally (mirrors
-  // bumpHpForLevelUp's own reasoning, hp-ops.ts).
+  // At exhaustion 4+, raising raw max by `gain` doesn't raise effective max by the same amount — clamp current to the recomputed effective max rather than gaining the full `gain` (mirrors bumpHpForLevelUp).
   const derivedLevel = levelForExperience(character.experiencePoints);
   const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, derivedLevel, character.rulesEdition);
   const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, derivedLevel, fightingStyleSlotTotal);
-  // #1123: the Draconic term must see the POST-op multiclass shape (the new
-  // entry appended), not the pre-op list — for a single-class Draconic
-  // sorcerer multiclassing out, effectiveEntryLevel over the still-length-1
-  // pre-op list would read the XP-derived TOTAL level instead of the sorcerer
-  // entry's own (now lower) level, overstating the term by the pending level.
+  // Must use the POST-op class-entry list (new entry appended), not pre-op — else effectiveEntryLevel reads the XP-derived total level instead of the sorcerer's own (now lower) level, overstating the Draconic term.
   const entriesAfterAdd = [
     ...character.classEntries,
     { name: catalog.name, level: 1, subclass: null, subclassRef: null, class: null },
@@ -331,8 +279,7 @@ async function applyAddClass(ctx: ClassOpContext, op: AddClassOperation): Promis
   });
 }
 
-// Applies one setSubclass inside a caller-supplied tx/batchId so the unified
-// level-up endpoint (#885) can compose it with other domains (#895).
+// Runs inside a caller-supplied tx/batchId so the unified level-up endpoint can compose it with other domains.
 export async function setSubclassInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -347,9 +294,7 @@ export async function applyClassOperations(
   characterId: string,
   operations: ClassOperation[]
 ): Promise<void> {
-  // The scaffold's per-op row is only the existence check: each applier
-  // re-reads with its own domain select (see ClassOpContext) so it can also be
-  // composed under a caller-supplied tx (setSubclassInTx).
+  // The scaffold's own select is only the existence check — each applier re-reads with its own domain select (ClassOpContext), so it composes under a caller-supplied tx too (setSubclassInTx).
   await runCharacterTransaction(characterId, operations, {
     select: { id: true },
     notFound: (id) => new InvalidClassOperationError(`Character not found: ${id}`),

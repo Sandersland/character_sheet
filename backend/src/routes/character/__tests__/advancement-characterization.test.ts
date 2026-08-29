@@ -1,26 +1,3 @@
-/**
- * Characterization lock for the advancement transaction event stream (#682).
- *
- * The ~280-line applyOp in lib/leveling/advancement.ts is the sole emitter of
- * `advancement` audit events. Its `before` snapshot is what LIFO undo
- * (revertAdvancementEvent in lib/activity/activity.ts) restores wholesale, so
- * the payload shapes must stay byte-identical through the planned handler
- * decomposition. This oracle pins the EXACT emitted stream — event type,
- * category, summary, data, and full before/after — plus the exact
- * InvalidAdvancementOperationError message strings for the validation blocks
- * being deduplicated. It must be green now and stay green UNEDITED after the
- * refactor.
- *
- * The load-bearing risks it guards:
- *  - the 4-key before/after shape (abilityScores / hitPoints / initiativeBonus
- *    / resources) — since #818 resources is the canonical 6-key snapshotResources
- *    blob (incl. fightingStyle) so wholesale revert can't wipe it;
- *  - the AdvancementEntry field set written into resources.advancements
- *    (id/level/kind/abilityDeltas/hpDelta/initDelta + feat fields), which
- *    reverseAdvancementEffects and level reconciliation replay;
- *  - the near-duplicate catalog vs custom half-feat validation messages.
- */
-
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -37,7 +14,7 @@ let COOKIE: string;
 const BASE_ABILITY = { strength: 10, dexterity: 13, constitution: 13, intelligence: 10, wisdom: 10, charisma: 10 };
 const BASE = {
   alignment: "True Neutral",
-  initiativeBonus: 1, // DEX 13 → +1
+  initiativeBonus: 1,
   speed: 30,
   abilityScores: BASE_ABILITY,
   savingThrowProficiencies: [],
@@ -70,7 +47,6 @@ beforeAll(async () => {
   });
   fighterClassId = fighter.id;
 
-  // Half-feat: choosable +1 CON or WIS (Resilient-style), no improvements.
   const halfFeat = await upsertEditionRow(
     prisma.feat,
     { name: HALF_FEAT_NAME, edition: null },
@@ -84,8 +60,6 @@ beforeAll(async () => {
   );
   halfFeatId = halfFeat.id;
 
-  // Plain feat (no ability bump) with a structured improvement to pin the
-  // improvements snapshot inside the AdvancementEntry.
   const plainFeat = await upsertEditionRow(
     prisma.feat,
     { name: PLAIN_FEAT_NAME, edition: null },
@@ -106,9 +80,7 @@ afterEach(async () => {
   await prisma.character.deleteMany({ where: { name: { startsWith: "AdvChar" } } });
 });
 
-// Level-8 fighter (XP 34000) → 2 advancement slots on the base 4/8/12/16/19
-// schedule (fixture class name is not "fighter", so no extra slots).
-// 60/66 HP, 8 hit dice, CON 13 / DEX 13 (both one point below a modifier bump).
+// Extra advancement slots key off the classEntry NAME "fighter" specifically; this fixture's name isn't, so it gets none.
 async function createPlain(id: string, overrides: Record<string, unknown> = {}) {
   return prisma.character.create({
     data: {
@@ -152,7 +124,6 @@ describe("advancement transaction event-stream characterization (#682)", () => {
 
     const entryId = (ev.data as { entryId: string }).entryId;
     expect(entryId).toBeTruthy();
-    // CON 13→14 (+1→+2 mod) → hpDelta = 1 × 8 hit dice; DEX 13→14 → initDelta 1.
     expect(ev.data).toEqual({
       entryId,
       abilityDeltas: { constitution: 1, dexterity: 1 },
@@ -273,7 +244,7 @@ describe("advancement transaction event-stream characterization (#682)", () => {
       hpDelta: 0,
       initDelta: 0,
     });
-    // The persisted column snapshot is untouched (improvements apply at read).
+    // Improvements apply at read; the persisted column snapshot stays untouched.
     expect((ev.after as { initiativeBonus: number }).initiativeBonus).toBe(1);
     expect((ev.after as { resources: { advancements: unknown[] } }).resources.advancements).toEqual([{
       id: entryId,
@@ -335,9 +306,7 @@ describe("advancement transaction event-stream characterization (#682)", () => {
     expect(Object.keys(entry)).not.toContain("featId");
   });
 
-  // The batch semantics the decomposition most endangers: per-op re-read means
-  // op 2 sees op 1's results — the feat's CON 14→15 bump does NOT cross a
-  // modifier boundary, so its hpDelta is 0 (unlike the standalone half-feat test).
+  // Op 2 re-reads op 1's result: CON 14→15 doesn't cross a modifier boundary, so hpDelta is 0.
   it("ASI + feat batch then remove both: shared batchId, exact removal payloads, LIFO clamp", async () => {
     await createPlain("adv-round");
     const takeRes = await postAdvancement("adv-round", {
@@ -360,7 +329,6 @@ describe("advancement transaction event-stream characterization (#682)", () => {
       hpDelta: 0,
       initDelta: 0,
     });
-    // Op 2's before is op 1's after.
     expect(takeEvs[1].before).toEqual(takeEvs[0].after);
 
     const advancements: { id: string; kind: string }[] = takeRes.body.advancements;
@@ -382,17 +350,11 @@ describe("advancement transaction event-stream characterization (#682)", () => {
     const [, , removeFeat, removeAsi] = evs;
     expect(removeFeat.summary).toBe(`Removed advancement: Feat: ${HALF_FEAT_NAME}`);
     expect(removeFeat.data).toEqual({ entryId: featEntryId, label: `Feat: ${HALF_FEAT_NAME}` });
-    // Key order comes from the jsonb round-trip (shorter keys first), not the
-    // op's increases order — pinned as observed.
+    // Key order comes from the jsonb round-trip (shorter keys first), not the op's increases order.
     expect(removeAsi.summary).toBe("Removed advancement: ASI: dexterity +1, constitution +1");
     expect(removeAsi.data).toEqual({ entryId: asiEntryId, label: "ASI: dexterity +1, constitution +1" });
 
-    // Final state: scores/init restored; HP max AND current both back at the
-    // exact pre-take values (60/66) — reverseAdvancementEffects subtracts the
-    // stored hpDelta from current, mirroring the take side. Its old
-    // min-against-raw-max clamp instead left current at the restored max (66)
-    // here: a free 6-HP heal for a damaged character round-tripping a Con ASI,
-    // and destructive to feat/subclass headroom (#1123 write-seam fix).
+    // reverseAdvancementEffects subtracts the stored hpDelta from current — it must not clamp to max (#1123).
     expect(removeAsi.after).toEqual({
       abilityScores: BASE_ABILITY,
       hitPoints: { current: 60, max: 66, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -401,8 +363,6 @@ describe("advancement transaction event-stream characterization (#682)", () => {
     });
   });
 
-  // ── Error-message parity (exact strings, esp. the duplicated half-feat blocks) ──
-
   async function expect400(id: string, op: object, message: string) {
     const res = await postAdvancement(id, { operations: [op] });
     expect(res.status).toBe(400);
@@ -410,7 +370,6 @@ describe("advancement transaction event-stream characterization (#682)", () => {
   }
 
   it("pins the slot-exhausted and takeAsi validation messages", async () => {
-    // Level 1 (XP 0) → 0 slots.
     await createPlain("adv-err-slots", { experiencePoints: 0, classEntries: { create: [{ name: CLASS_NAME, classId: fighterClassId, position: 0, level: 1 }] } });
     await expect400("adv-err-slots",
       { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] },
@@ -427,7 +386,6 @@ describe("advancement transaction event-stream characterization (#682)", () => {
       { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] },
       "takeAsi: strength would exceed 20 (current 19, +2)");
 
-    // Failed ops roll back without logging anything.
     expect(await events("adv-err-asi")).toHaveLength(0);
   });
 

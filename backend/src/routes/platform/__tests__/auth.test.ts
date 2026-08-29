@@ -7,9 +7,7 @@ import { errorHandler } from "@/lib/core/error-handler.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authRouter } from "@/routes/platform/auth.js";
 
-// config is frozen at import, so ALLOW_DEV_LOGIN can't be flipped via env at
-// runtime. Mock the config module to read the flag from a hoisted, mutable
-// holder while passing everything else (APP_BASE_URL, appRedirectUri, …) through.
+// config is frozen at import, so ALLOW_DEV_LOGIN can't be flipped via env at runtime; mock it to read from a hoisted, mutable holder instead.
 const hoisted = vi.hoisted(() => ({ devLoginEnabled: false }));
 vi.mock("@/lib/core/config.js", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/core/config.js")>();
@@ -22,20 +20,12 @@ vi.mock("@/lib/core/config.js", async (importActual) => {
 });
 
 const DEV_USER_ID = "dev-user-local";
-// Track whether a test created the dev user so the disabled/no-DB path stays
-// free of Postgres calls (mirrors the cleanupSubs early-return guard).
 let devUserTouched = false;
 async function cleanupDevUser() {
   if (!devUserTouched) return;
-  // Cascade removes the dev user's sessions.
   await prisma.user.deleteMany({ where: { id: DEV_USER_ID } });
   devUserTouched = false;
 }
-
-// PG-backed router test. fetch (token exchange + userinfo) is mocked; creds are
-// set per-test so enabledProviders() reports google. The auth router is mounted
-// on a minimal app so this test is independent of the app.ts wiring (covered by
-// the mount in chunk 4 / the existing app tests).
 
 function buildApp() {
   const app = express();
@@ -45,7 +35,6 @@ function buildApp() {
   return app;
 }
 
-// Test fixtures: subs created during a test, cleaned (with cascade) afterward.
 const TEST_SUBS = new Set<string>();
 
 async function cleanupSubs() {
@@ -56,13 +45,11 @@ async function cleanupSubs() {
   });
   const userIds = [...new Set(accounts.map((a) => a.userId))];
   if (userIds.length > 0) {
-    // Cascade removes the account + any sessions.
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   }
   TEST_SUBS.clear();
 }
 
-// Mock fetch: route by URL to Google's token vs userinfo endpoints.
 function mockGoogleFetch(opts: {
   tokenStatus?: number;
   userinfoStatus?: number;
@@ -109,8 +96,6 @@ function mockGoogleFetch(opts: {
   });
 }
 
-// Drive /start and pull the state + tx cookie back out so a callback can be
-// built with a matching pair.
 async function beginFlow(agent: ReturnType<typeof supertest.agent>) {
   const start = await agent.get("/api/auth/google/start");
   expect(start.status).toBe(302);
@@ -136,8 +121,7 @@ describe("auth router", () => {
 
   describe("GET /auth/providers", () => {
     it("lists google with a startUrl origin-relative to the request", async () => {
-      // Hermetic: the expected origin is driven by the request's Host header, not
-      // ambient APP_BASE_URL (which varies in compose/worktree stacks — see #166).
+      // The expected origin is driven by the request's Host header, not ambient APP_BASE_URL, which varies across compose/worktree stacks (#166).
       const res = await supertest(buildApp())
         .get("/api/auth/providers")
         .set("Host", "sheet.example:8080");
@@ -199,8 +183,7 @@ describe("auth router", () => {
       expect(url.searchParams.get("state")).toBeTruthy();
       expect(url.searchParams.get("response_type")).toBe("code");
       expect(url.searchParams.get("client_id")).toBe("client-abc");
-      // Google's provider-specific params must reach the authorize URL (they
-      // are what make Google return a refresh token).
+      // access_type/prompt are what make Google return a refresh token.
       expect(url.searchParams.get("access_type")).toBe("offline");
       expect(url.searchParams.get("prompt")).toBe("consent");
 
@@ -355,8 +338,7 @@ describe("auth router", () => {
     });
 
     it("502s (not 500) when the token response is a malformed 200", async () => {
-      // 200 OK but the body fails tokenResponseSchema — must surface as 502, not
-      // a ZodError escaping to the 500 handler.
+      // 200 OK but the body fails tokenResponseSchema — must surface as 502, not a ZodError escaping to the 500 handler.
       mockGoogleFetch({ tokenBody: { unexpected: "shape" } });
       const agent = supertest.agent(buildApp());
       const { state } = await beginFlow(agent);
@@ -367,7 +349,7 @@ describe("auth router", () => {
     });
 
     it("502s (not 500) when the userinfo response is a malformed 200", async () => {
-      // 200 OK but missing `sub` — mapProfile's zod parse throws; must be 502.
+      // 200 OK but missing `sub` — mapProfile's zod parse throws; must surface as 502.
       mockGoogleFetch({ profile: { email: "x@y.z", email_verified: true } });
       const agent = supertest.agent(buildApp());
       const { state } = await beginFlow(agent);
@@ -381,19 +363,16 @@ describe("auth router", () => {
       TEST_SUBS.add("sub-link-a");
       TEST_SUBS.add("sub-link-b");
 
-      // User A already owns the (google, sub-link-a) link.
       const userA = await prisma.user.create({ data: { email: "owner-a@example.com" } });
       await prisma.authAccount.create({
         data: { userId: userA.id, provider: "google", providerAccountId: "sub-link-a" },
       });
 
-      // Sign in as a fresh user B via their own sub.
       mockGoogleFetch({ profile: googleProfile("sub-link-b") });
       const agent = supertest.agent(buildApp());
       const b1 = await beginFlow(agent);
       await agent.get(`/api/auth/google/callback?code=c&state=${b1.state}`);
 
-      // User B now completes a callback for the sub that belongs to user A.
       mockGoogleFetch({ profile: googleProfile("sub-link-a") });
       const b2 = await beginFlow(agent);
       await agent.get(`/api/auth/google/callback?code=c&state=${b2.state}`);
@@ -406,7 +385,6 @@ describe("auth router", () => {
           },
         },
       });
-      // Ownership stays with user A; only tokens are refreshed.
       expect(account?.userId).toBe(userA.id);
     });
   });

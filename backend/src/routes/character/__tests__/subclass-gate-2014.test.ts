@@ -1,11 +1,3 @@
-/**
- * 2014 subclass gate levels (#1308): CharacterClass.subclassLevel now holds the
- * PHB'14 gate for Cleric/Sorcerer/Warlock (1) and Druid/Wizard (2) — 2024 still
- * ignores the column (subclassGateLevel hardcodes 3). Exercised against the REAL
- * seeded Cleric/Wizard/Fighter + Life Domain/School of Evocation/subclass rows
- * (never a fixture class), per the issue's acceptance criteria.
- */
-
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -18,7 +10,6 @@ import { seededSpeciesAnchor } from "@/test-support/species.js";
 const OWNER_ID = "owner-1308-subclass-gate";
 let COOKIE: string;
 
-// XP thresholds (levelForExperience): L1=0, L2=300, L3=900.
 const XP_LVL_1 = 0;
 const XP_LVL_2 = 300;
 const XP_LVL_3 = 900;
@@ -37,8 +28,7 @@ beforeAll(async () => {
 
   const cleric = await prisma.characterClass.findUnique({ where: { name: "Cleric" }, select: { id: true } });
   if (!cleric) throw new Error("Cleric class not seeded — run `prisma db seed` before tests");
-  // findFirst, not findUnique: the classId_name compound-key shorthand can't
-  // express a null edition (#1306).
+  // findFirst, not findUnique: the classId_name compound-key shorthand can't express a null edition (#1306).
   const life = await prisma.subclass.findFirst({
     where: { classId: cleric.id, name: "Life Domain", edition: null },
     select: { id: true },
@@ -183,13 +173,7 @@ describe("2014 subclass gate — seeded Cleric (gate 1) and Wizard (gate 2), #13
   });
 });
 
-// #1308: character-create.ts's resolveSubclass HAD its OWN edition-blind gate
-// check (characterClass.subclassLevel <= 1 / > 1) — a fourth call site the
-// issue didn't name, found because it broke the instant the catalog column
-// stopped being uniformly 3, and fixed in the same PR to resolve through
-// subclassGateLevel(..., edition) like the rest. A brand-new character is
-// always level 1, so this governs whether a subclassId may be supplied AT
-// CREATION.
+// character-create.ts's resolveSubclass gates through subclassGateLevel(..., edition) — a brand-new character is always level 1, so this governs whether a subclassId may be supplied at creation.
 describe("character creation subclass gate (#1308)", () => {
   it("rejects a Life Domain subclassId at creation for a 2024 Cleric (gate 3, not creation)", async () => {
     const anchor = await seededSpeciesAnchor("EDITION_2024");

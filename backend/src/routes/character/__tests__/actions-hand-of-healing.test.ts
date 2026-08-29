@@ -1,7 +1,4 @@
-/**
- * PHB'24 p.92: Magic action, expend 1 Focus, heal a creature you touch for
- * one Martial Arts die + Wisdom modifier.
- */
+// PHB'24 p.92
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -18,7 +15,7 @@ const MONK_ID = "test-actions-hand-of-healing";
 const MONK_CATALOG_NAME = "Actions Hand Of Healing Test Monk";
 let monkClassId: string;
 
-const L3_XP = 900; // single-class monk level 3
+const L3_XP = 900;
 
 const MONK_BASE = {
   id: MONK_ID,
@@ -132,17 +129,17 @@ describe("POST /:id/actions/transactions — Hand of Healing (#1248)", () => {
   });
 
   it("handOfHealing spends 1 focus and heals the client-rolled amount (Martial Arts die + Wis mod)", async () => {
-    const res = await executeAction("handOfHealing", 6); // e.g. 1d6 rolled 4 + Wis +2
+    const res = await executeAction("handOfHealing", 6);
     expect(res.status).toBe(200);
-    expect(pool(res.body, "focus")).toMatchObject({ used: 1, remaining: 2 }); // level 3 → 3 total
-    expect(res.body.hitPoints.current).toBe(16); // 10 + 6
+    expect(pool(res.body, "focus")).toMatchObject({ used: 1, remaining: 2 });
+    expect(res.body.hitPoints.current).toBe(16);
   });
 
   it("handOfHealing without a roll: spends focus but heals nothing", async () => {
     const res = await executeAction("handOfHealing");
     expect(res.status).toBe(200);
     expect(pool(res.body, "focus")).toMatchObject({ used: 1, remaining: 2 });
-    expect(res.body.hitPoints.current).toBe(10); // unchanged
+    expect(res.body.hitPoints.current).toBe(10);
   });
 
   it("handOfHealing rejects a fourth use with no focus remaining (3 total at level 3)", async () => {
@@ -157,13 +154,13 @@ describe("POST /:id/actions/transactions — Hand of Healing (#1248)", () => {
     const res = await executeAction("handOfHealingFlurry", 6);
     expect(res.status).toBe(200);
     expect(pool(res.body, "focus")).toMatchObject({ used: 0, remaining: 3 });
-    expect(res.body.hitPoints.current).toBe(16); // 10 + 6
+    expect(res.body.hitPoints.current).toBe(16);
   });
 
   it("handOfHealingFlurry without a roll: heals nothing and spends nothing", async () => {
     const res = await executeAction("handOfHealingFlurry");
     expect(res.status).toBe(200);
     expect(pool(res.body, "focus")).toMatchObject({ used: 0, remaining: 3 });
-    expect(res.body.hitPoints.current).toBe(10); // unchanged
+    expect(res.body.hitPoints.current).toBe(10);
   });
 });

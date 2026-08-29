@@ -1,8 +1,3 @@
-// Pure (no DB) tests for buildAvailableActionsView's two #1435 additions:
-// the gated off-hand eligibility row, and the resolved Deflect Attacks /
-// Deflect Missiles roll specs attached to the served rows. The deflect roll
-// arithmetic itself is pinned in lib/srd/__tests__/deflect.test.ts; here we
-// assert the view attaches those specs to the right rows for the right edition.
 import { describe, expect, it } from "vitest";
 
 import { buildAvailableActionsView } from "@/lib/character/serialize/classes.js";
@@ -10,13 +5,6 @@ import type { CharacterWithRelations } from "@/lib/character/character-include.j
 
 type ClassEntries = CharacterWithRelations["classEntries"];
 
-// Deflect Attacks/Missiles moved off DERIVED_ACTIONS onto ClassFeature rows
-// (#1912) — buildAvailableActionsView reaches them through featureRowsOf's
-// class.features/subclassRef.features relations, so a bare {name, level}
-// entry (the pre-#1912 shape) no longer surfaces them at all. Minimal inline
-// mirrors of monk-features.ts's own base-class rows (not the whole
-// test-feature-rows.fixture.ts, which this deliberately-DB-free suite has
-// never depended on) — just the four rows this describe block asserts on.
 const MONK_DEFLECT_ROWS = [
   {
     name: "Deflect Attacks", level: 3, edition: "EDITION_2024", description: "",
@@ -36,10 +24,6 @@ const MONK_DEFLECT_ROWS = [
   },
 ];
 
-// featureRowsOf tolerates the absent class/subclassRef relations (returns
-// empty rows) for a non-monk entry; a "monk" entry gets the inline deflect
-// rows above so this suite's own assertions still exercise the real
-// row-driven path.
 function entries(list: { name: string; level: number }[]): ClassEntries {
   return list.map((e) =>
     e.name === "monk" ? { ...e, class: { features: MONK_DEFLECT_ROWS }, subclassRef: undefined } : e,
@@ -114,14 +98,10 @@ describe("Deflect specs attached to the served rows (#1435)", () => {
       [],
       0,
     );
-    // Dex +3 + Monk entry level 3 = 6 (not 3 + 13 = 16).
     expect(actions.find((a) => a.key === "deflectAttacks")?.effect?.dice).toEqual({ count: 1, faces: 10, modifier: 6 });
   });
 
   it("single-class: the reduction uses the XP-derived level, not a stale entry.level (effectiveEntryLevel)", () => {
-    // entry.level lags at 3 while the XP-derived level arg is 5. For a single
-    // class, effectiveEntryLevel returns the XP-derived level (the per-entry
-    // column self-heals lazily), so the reduction is Dex +3 + 5 = 8, not +3+3.
     const actions = buildAvailableActionsView(entries([{ name: "monk", level: 3 }]), 5, undefined, true, "EDITION_2024", DEX16, [], 0);
     expect(actions.find((a) => a.key === "deflectAttacks")?.effect?.dice).toEqual({ count: 1, faces: 10, modifier: 8 });
   });

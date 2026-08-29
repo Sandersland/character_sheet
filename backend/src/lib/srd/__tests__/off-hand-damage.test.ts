@@ -23,7 +23,6 @@ const mixedPair = [{ light: true }, { light: false }];
 
 describe("deriveOffHandDamage (PHB'14 p. 195 / SRD 5.2 Light property)", () => {
   it("drops the governing ability modifier without the Two-Weapon Fighting style", () => {
-    // STR 16 → +3, folded into damageModifier by deriveWeaponDamage.
     const damage = deriveWeaponDamage(shortsword, true, { strength: 16, dexterity: 10 });
     expect(damage.damageModifier).toBe(3);
 
@@ -38,7 +37,6 @@ describe("deriveOffHandDamage (PHB'14 p. 195 / SRD 5.2 Light property)", () => {
   });
 
   it("keeps a negative ability modifier — only a positive one is dropped", () => {
-    // STR 8 → −1. RAW: "unless that modifier is negative".
     const damage = deriveWeaponDamage(shortsword, true, { strength: 8, dexterity: 8 });
     expect(damage.abilityModifier).toBe(-1);
 
@@ -54,7 +52,7 @@ describe("deriveOffHandDamage (PHB'14 p. 195 / SRD 5.2 Light property)", () => {
 
   it("drops only the ability component, so a Rage melee-damage buff survives", () => {
     const damage = deriveWeaponDamage(shortsword, true, { strength: 16, dexterity: 10 }, 2);
-    expect(damage.damageModifier).toBe(5); // STR +3 + Rage +2
+    expect(damage.damageModifier).toBe(5);
 
     const offHand = deriveOffHandDamage(damage, false);
     expect(offHand.damageModifier).toBe(2);
@@ -115,8 +113,6 @@ describe("hasOffHandAbilityDamage (PHB'14 p. 195 + p. 72 / SRD 5.2 Light propert
     expect(hasOffHandAbilityDamage(twoWeaponFightingStyle, lightPair)).toBe(true);
   });
 
-  // The bug (#1640): the style improvement alone used to be enough — the Light
-  // property of the equipped weapons was never consulted.
   it("is false with the style but a NON-light pair — the style does not waive the Light requirement", () => {
     expect(hasOffHandAbilityDamage(twoWeaponFightingStyle, nonLightPair)).toBe(false);
   });

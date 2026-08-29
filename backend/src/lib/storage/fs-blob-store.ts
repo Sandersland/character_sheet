@@ -9,11 +9,7 @@ interface BlobMeta {
   contentType: string;
 }
 
-// Data lives under <dir>/objects/<key> and metadata under <dir>/meta/<key>.json
-// — parallel trees rather than a sidecar next to the object, because a sidecar
-// ("<key>.meta.json") would collide with a legitimate object of that name. The
-// meta file's presence is what defines existence; size comes from stat so it
-// can never drift from the actual bytes.
+// Data and metadata live under parallel trees (<dir>/objects, <dir>/meta) rather than a sidecar next to the object, since a sidecar suffix could collide with a legitimate object of that name. The meta file's presence defines existence; size comes from stat so it can never drift from the actual bytes.
 export function createFsBlobStore(dir: string): BlobStore {
   const dataPath = (key: string) => path.join(dir, "objects", ...key.split("/"));
   const metaPath = (key: string) =>
@@ -28,8 +24,7 @@ export function createFsBlobStore(dir: string): BlobStore {
     }
   }
 
-  // Write-tmp-then-rename so an overwrite is atomic: a concurrent get streams
-  // either the old bytes or the new, never a torn file.
+  // Write-tmp-then-rename: a concurrent get streams either the old bytes or the new, never a torn file.
   async function writeAtomic(target: string, contents: Buffer | string): Promise<void> {
     await mkdir(path.dirname(target), { recursive: true });
     const tmp = `${target}.${crypto.randomUUID()}.tmp`;
@@ -54,8 +49,7 @@ export function createFsBlobStore(dir: string): BlobStore {
       try {
         ({ size } = await stat(file));
       } catch (error) {
-        // A concurrent delete can land between readMeta and stat (meta-first
-        // delete order); the contract promises BlobNotFoundError, not ENOENT.
+        // A concurrent delete can land between readMeta and stat; the contract promises BlobNotFoundError, not a raw ENOENT.
         if ((error as NodeJS.ErrnoException).code === "ENOENT")
           throw new BlobNotFoundError(key);
         throw error;
@@ -69,11 +63,7 @@ export function createFsBlobStore(dir: string): BlobStore {
 
     async delete(key: string): Promise<void> {
       assertValidKey(key);
-      // Meta first — its presence defines existence, so the object is gone to
-      // callers the moment the first rm lands. A crash between the two rms
-      // then leaves only an orphaned, invisible data file; the reverse order
-      // would leave meta-without-data, where exists reports true and get
-      // rejects with a raw ENOENT instead of BlobNotFoundError.
+      // Meta first: a crash between the two rms leaves only an orphaned, invisible data file. The reverse order would leave meta-without-data, where exists reports true and get rejects with a raw ENOENT.
       await rm(metaPath(key), { force: true });
       await rm(dataPath(key), { force: true });
     },

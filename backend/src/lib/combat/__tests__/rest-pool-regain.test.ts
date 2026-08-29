@@ -3,12 +3,6 @@ import { describe, expect, it } from "vitest";
 import { restPoolRegain } from "@/lib/combat/rest.js";
 import type { DerivedResource } from "@/lib/classes/types.js";
 
-// #1221: the partial short-rest recharge model. No class declares
-// `shortRestRegain` yet (scope forbids authoring one here) — every AC below
-// exercises a synthetic pool, which is the whole reason `restPoolRegain` was
-// extracted as an exported pure function rather than left inline in
-// `resetRestResources`'s loop.
-
 function pool(overrides: Partial<DerivedResource> = {}): DerivedResource {
   return { key: "test", label: "Test", total: 4, recharge: "longRest", ...overrides };
 }
@@ -41,7 +35,6 @@ describe("restPoolRegain (#1221)", () => {
 
   it("onInitiative + shortRestRegain on the same pool are orthogonal: restPoolRegain ignores onInitiative entirely", () => {
     const p = pool({ shortRestRegain: 1, onInitiative: { amount: "all" } });
-    // restPoolRegain never reads onInitiative — same result as the plain shortRestRegain case.
     expect(restPoolRegain(p, 3, "short")).toEqual({ nextUsed: 2, restored: 1 });
   });
 });

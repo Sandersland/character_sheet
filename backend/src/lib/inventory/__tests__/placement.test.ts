@@ -7,10 +7,7 @@ import {
   type PlaceableItem,
 } from "@/lib/inventory/inventory-placement.js";
 
-// Pure unit tests — no DB. Pins the slot-legality and off-hand-lock rules now
-// that both are exported for reuse outside their defining module (#1432/#1433):
-// `serializeCharacter` serves them as `allowedSlots` / `offHandLocked`, so a
-// divergence here changes what the sheet renders, not just what a write rejects.
+// #1432/#1433: serializeCharacter serves these as `allowedSlots` / `offHandLocked`, so a divergence here changes what the sheet renders, not just what a write rejects.
 
 function placeable(overrides: Partial<PlaceableItem> = {}): PlaceableItem {
   return { category: "gear", slot: null, weaponDetail: null, armorDetail: null, ...overrides };
@@ -37,9 +34,7 @@ describe("allowedSlotsForItem", () => {
     expect(allowedSlotsForItem(item)).toEqual(["BODY"]);
   });
 
-  // A detail-less armor row falls to BODY rather than to the shield branch,
-  // which is what keeps `applySetEquipped` from rejecting armor whose detail row
-  // failed to load. Pinned here because the seeded fixtures never produce it.
+  // A detail-less armor row falls to BODY rather than the shield branch, keeping applySetEquipped from rejecting armor whose detail row failed to load.
   it("armor with no detail row falls back to body", () => {
     expect(allowedSlotsForItem(placeable({ category: "armor" }))).toEqual(["BODY"]);
   });

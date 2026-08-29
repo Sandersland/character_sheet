@@ -1,31 +1,8 @@
 import { z } from "zod";
 
-// The AbilityIncreaseSpec vocabulary for Species.abilityIncreases /
-// SpeciesVariant.abilityIncreases (#1679, epic #1518 design Part 3). Three
-// forms, because PHB'14 alone needs all three and a later-printing row (e.g.
-// Astral Elf) must slot in without a migration:
-//   - fixed:    a named ability always gets +amount (Dwarf's +2 CON).
-//   - choose:   pick `count` distinct abilities (optionally restricted to
-//               `from`) and add +amount to each (Half-Elf's "+1 to two of
-//               your choice").
-//   - floating: a raw point pool the player assigns however they like across
-//               distinct abilities, no fixed ability named at all (Astral
-//               Elf's +2/+1-or-+1/+1/+1 — the same shape #1572's background
-//               spread validator already handles, reused rather than
-//               reinvented in #1681).
-// Species and SpeciesVariant increases are ADDITIVE at creation (Hill Dwarf's
-// +1 WIS on top of Dwarf's own +2 CON) — merging the two levels is #1681's
-// job; this slice only validates and persists the spec, never applies it.
-//
-// [] for every EDITION_2024 row: 2024 ability increases come from backgrounds
-// only (#1572), never species — enforced by a negative test in both
-// directions (species-ability-increases.test.ts), not by this schema (an
-// empty array is valid for a 2014 row too, e.g. Human's six separate +1
-// fixed entries look nothing like "no increases", so the schema can't tell
-// "2024 species" apart from "2014 species with a genuinely empty spec").
-// Exported: character-create.ts's resolveSpeciesGrants (#1681) needs the full
-// six-name list as a choose spec's default eligible set when it carries no
-// `from` restriction (none does yet, but the schema allows it).
+// Three increase forms: fixed (named ability, +amount), choose (pick `count` of `from`/any ability, +amount each), floating (a raw point pool the player assigns across distinct abilities).
+// resolveSpeciesGrants (#1681) needs the full six-name list as a choose spec's default eligible set — kept exported even with no other cross-file consumer.
+// 2024 species rows are always []; enforced by a test, not by this schema (an empty array is also valid for a 2014 row).
 export const ABILITY_NAMES = [
   "strength",
   "dexterity",
@@ -48,10 +25,7 @@ const chooseIncreaseSchema = z
       .object({
         count: z.number().int().positive(),
         amount: z.number().int().positive(),
-        // Omitted = any of the six abilities is eligible. Half-Elf restricts
-        // this to the five NON-Charisma abilities (Charisma is already its
-        // fixed +2), so `from` exists from day one rather than being added
-        // when the first restricted-choose row lands.
+        // Omitted = any of the six abilities is eligible (e.g. Half-Elf restricts to the five non-Charisma abilities).
         from: z.array(z.enum(ABILITY_NAMES)).min(1).optional(),
       })
       .strict(),
@@ -64,9 +38,6 @@ const floatingIncreaseSchema = z
   })
   .strict();
 
-// Not exported: no cross-file consumer needs the single-entry schema, only
-// the array (abilityIncreasesSchema below) — same unused-export reasoning as
-// AbilityName above.
 const abilityIncreaseSpecSchema = z.union([
   fixedIncreaseSchema,
   chooseIncreaseSchema,
@@ -76,8 +47,5 @@ const abilityIncreaseSpecSchema = z.union([
 export const abilityIncreasesSchema = z.array(abilityIncreaseSpecSchema);
 
 export type AbilityIncreaseSpec = z.infer<typeof abilityIncreaseSpecSchema>;
-// resolveSpeciesGrants (character-create.ts, #1681) splits a merged spec array
-// by discriminant key ("ability" | "choose" | "floating") and needs this one
-// sub-shape by name — the fixed and floating forms are narrowed inline off
-// AbilityIncreaseSpec instead (no cross-file consumer needs them named).
+// resolveSpeciesGrants (#1681) needs this one sub-shape by name; the fixed/floating forms are narrowed inline off AbilityIncreaseSpec instead.
 export type ChooseIncrease = z.infer<typeof chooseIncreaseSchema>["choose"];

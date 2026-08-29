@@ -30,9 +30,7 @@ function getPlan(characterId: string, query = "", cookie = COOKIE) {
 
 async function makeFighter(opts: { id: string; xp: number; hitDiceTotal: number; entryLevel: number; subclass: string | null }): Promise<string> {
   const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-  // #1524: production always sets subclassId alongside the subclass string
-  // (routes/character/class.ts, level-up.ts); resolved here so this fixture
-  // matches that shape.
+  // #1524: production always pairs subclassId with the subclass string; resolved here so the fixture matches that shape.
   const subclassId = opts.subclass
     ? (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: opts.subclass } })).id
     : null;
@@ -103,15 +101,10 @@ async function makePaladin(opts: { id: string; hitDiceTotal: number; entryLevel:
   return entry.id;
 }
 
-// A Wizard whose persisted hitDice.die (d6) differs from the class the plan will
-// advance — `classId` is optional so the detached-entry fallback can be exercised.
 async function makeWizard(opts: { id: string; entryLevel: number; withClassId?: boolean }): Promise<string> {
   const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
   const detached = opts.withClassId === false;
-  // #1524: production always sets subclassId alongside the subclass string
-  // (routes/character/class.ts, level-up.ts) — but only when classId itself
-  // is set; the `withClassId: false` case deliberately keeps BOTH ids absent
-  // to exercise the detached-entry fallback (no catalog class row at all).
+  // #1524: subclassId pairs with the subclass string only when classId is set; withClassId:false deliberately keeps both absent to exercise the detached-entry fallback.
   const subclassId = detached ? null : (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
   await prisma.character.create({
     data: {
@@ -157,10 +150,7 @@ describe("GET /api/characters/:id/level-up/plan", () => {
 
     const res = await getPlan("lvplan-fighter-8");
     expect(res.status).toBe(200);
-    // #1509: casterModel is null for a non-caster target (a plain Fighter, no
-    // third-caster subclass) — served alongside className/subclass/newLevel.
-    // className is "Fighter" (#1148 review finding 1) — the CANONICAL catalog
-    // class.name, not this fixture's own lowercase entry.name column.
+    // casterModel is null for a non-caster target (#1509); className is the CANONICAL catalog class.name (#1148), not the fixture's lowercase entry.name.
     expect(res.body.target).toEqual({ className: "Fighter", subclass: "Champion", newLevel: 8, isPrimary: true, casterModel: null });
     expect(res.body.steps.map((s: { kind: string }) => s.kind)).toEqual(["hitPoints", "advancement", "review"]);
   });
@@ -187,8 +177,7 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     await makeCleric({ id: "lvplan-cleric-3", xp: 900, entryLevel: 2 });
     const atThree = await getPlan("lvplan-cleric-3");
     expect(atThree.status).toBe(200);
-    // className is "Cleric" (#1148 review finding 1) — the CANONICAL catalog
-    // class.name, not this fixture's own lowercase entry.name column.
+
     expect(atThree.body.target).toMatchObject({ className: "Cleric", subclass: null, newLevel: 3 });
     expect(atThree.body.steps.map((s: { kind: string }) => s.kind)).toContain("subclass");
 
@@ -199,11 +188,7 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect(atTwo.body.steps.map((s: { kind: string }) => s.kind)).not.toContain("subclass");
   });
 
-  // #1308: subclassStep reads an already edition-resolved subclassLevel — the
-  // catalog column is 2014-only, so a 2014 Cleric's plan must offer the
-  // subclass step reaching level 1 (its real gate), while a 2024 Cleric reaching
-  // the same level 1 must not (its gate stays 3, hardcoded, regardless of the
-  // catalog column now holding the 2014 value).
+  // subclassStep reads an already edition-resolved subclassLevel (#1308): the catalog column is 2014-only, so a 2014 Cleric's plan offers the subclass step at level 1, but a 2024 Cleric's gate stays 3 regardless.
   it("offers the cleric subclass step at level 1 for a 2014 Cleric, not for a 2024 Cleric (#1308)", async () => {
     await makeCleric({ id: "lvplan-cleric-2014-l1", xp: 0, entryLevel: 0, rulesEdition: "EDITION_2014" });
     const atOne2014 = await getPlan("lvplan-cleric-2014-l1");
@@ -224,22 +209,19 @@ describe("GET /api/characters/:id/level-up/plan", () => {
 
     const res = await getPlan("lvplan-multiclass", `?classId=${wizard.id}`);
     expect(res.status).toBe(200);
-    // A kind:"new" target reads className from the catalog row (capitalized),
-    // unlike kind:"existing" which reads the entry's persisted name.
+    // A kind:"new" target reads className from the catalog row (capitalized), unlike kind:"existing" which reads the entry's persisted name.
     expect(res.body.target).toMatchObject({ className: "Wizard", newLevel: 1, isPrimary: false });
   });
 
-  // #1380: the ceremony reads these numbers off the wire instead of rebuilding
-  // them from /api/reference plus the level-up target.
+  // #1380: the ceremony reads these numbers off the wire instead of rebuilding them from /api/reference plus the level-up target.
+
   it("carries the advancing class's HP meta on the hitPoints step", async () => {
     await makeFighter({ id: "lvplan-hp-meta", xp: 34000, hitDiceTotal: 7, entryLevel: 7, subclass: "Champion" });
     const res = await getPlan("lvplan-hp-meta");
     expect(res.status).toBe(200);
     const step = (res.body.steps as { kind: string; meta?: Record<string, number | string> }[])
       .find((s) => s.kind === "hitPoints");
-    // Fighter d10, Con 14 → +2. #1497: effectiveMaxAverage/effectiveMaxByRoll
-    // are ALSO served — unaffected here (2024, no exhaustion), so they're
-    // exactly the character's stored max (40) plus each outcome's gain.
+    // effectiveMaxAverage/effectiveMaxByRoll are also served (#1497); no exhaustion here, so they equal stored max (40) plus each outcome's gain.
     expect(step?.meta).toEqual({
       die: "d10",
       faces: 10,
@@ -274,9 +256,6 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect(step?.meta).toMatchObject({ die: "d6", faces: 6 });
   });
 
-  // EDITION_2014 explicitly (#1625): these are the PHB'14 oath-spell rows,
-  // currently seeded edition-shared. #1626 re-tags them and authors the 2024
-  // twins (Shield of Faith/Aid at this tier), which owns the 2024 assertion.
   it("lists the granted spells a gate level newly turns on, with level + school (#1139, #1159)", async () => {
     await makePaladin({ id: "lvplan-devotion-5", hitDiceTotal: 4, entryLevel: 4, subclass: "Oath of Devotion", rulesEdition: "EDITION_2014" });
     const res = await getPlan("lvplan-devotion-5");
@@ -297,7 +276,6 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect(res.body.grantedSpells).toEqual([]);
   });
 
-  // EDITION_2014 explicitly — same #1625/#1626 note as the gate-crossing test above.
   it("lists a re-planned subclass's ≤-level grants on a subclass-pick level (#1139)", async () => {
     const entryId = await makePaladin({ id: "lvplan-devotion-pick", hitDiceTotal: 2, entryLevel: 2, subclass: null, rulesEdition: "EDITION_2014" });
     const devotion = await prisma.subclass.findFirstOrThrow({ where: { name: "Oath of Devotion" } });
@@ -309,10 +287,6 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     ]);
   });
 
-  // Mechanism proof for #1625 on the plan route, independent of what #1626
-  // does to the seeded content: a fixture subclass carries a shared row plus a
-  // per-edition fork, and each edition's character is served exactly its own
-  // set through the ?subclassId= re-plan.
   describe("per-edition grant filtering on the plan route (#1625)", () => {
     const PROBE_SLUG = "zzz-plan-grant-probe-1625";
     let probeSubclassId: string;

@@ -1,9 +1,4 @@
-/**
- * Party-target healing (#462). Real Postgres, supertest against the shared `app`.
- * Fixtures: a campaign owned by DM (who also plays a healer character) with
- * PLAYER joined; PLAYER owns TARGET (opted in) and TARGET_OPTOUT (not opted in),
- * both attached to the campaign. The healer casts Cure Wounds at an ally's sheet.
- */
+
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -19,7 +14,7 @@ const PLAYER = "pth-player";
 const HEALER = "test-pth-healer";
 const TARGET = "test-pth-target";
 const TARGET_OPTOUT = "test-pth-target-optout";
-const LONER = "test-pth-loner"; // healer-owned char in no campaign
+const LONER = "test-pth-loner";
 
 const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
 
@@ -39,7 +34,7 @@ const BASE_CHAR = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-// Healer spellbook: a level-1 Cure Wounds (heal) so casts spend an L1 slot.
+
 const HEALER_SPELLCASTING = {
   slotsUsed: {},
   spells: [
@@ -130,7 +125,7 @@ describe("party-target healing (#462)", () => {
     await agent(cookiePlayer).post(`/api/campaigns/${campaignId}/characters`).send({ characterId: TARGET });
     await agent(cookiePlayer).post(`/api/campaigns/${campaignId}/characters`).send({ characterId: TARGET_OPTOUT });
 
-    // Target opts in; opt-out target leaves the default (false).
+
     await agent(cookiePlayer)
       .patch(`/api/characters/${TARGET}/campaign-preferences`)
       .send({ autoFriendlyHealing: true });
@@ -144,7 +139,7 @@ describe("party-target healing (#462)", () => {
   });
 
   beforeEach(async () => {
-    // Reset mutable HP + slot state between cases.
+
     await prisma.character.update({
       where: { id: HEALER },
       data: { hitPoints: { current: 10, max: 10, temp: 0 }, spellcasting: HEALER_SPELLCASTING as Prisma.InputJsonValue },
@@ -158,17 +153,17 @@ describe("party-target healing (#462)", () => {
     const res = await healerCast(TARGET, 5);
     expect(res.status).toBe(200);
 
-    // Caster's own HP is untouched; the slot was still spent.
+
     expect(res.body.hitPoints.current).toBe(10);
     const slot1 = res.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
     expect(slot1.used).toBe(1);
 
-    // Target's HP updated (3 → 8).
+
     const target = await prisma.character.findUniqueOrThrow({ where: { id: TARGET } });
     expect((target.hitPoints as { current: number }).current).toBe(8);
 
-    // Undoable audit event on the TARGET: category hitPoints, actor player,
-    // source = caster name, with before/after snapshots.
+
+
     const heals = await prisma.characterEvent.findMany({
       where: { characterId: TARGET, type: "heal" },
     });
@@ -186,9 +181,9 @@ describe("party-target healing (#462)", () => {
     expect(res.status).toBe(403);
 
     const target = await prisma.character.findUniqueOrThrow({ where: { id: TARGET_OPTOUT } });
-    expect((target.hitPoints as { current: number }).current).toBe(3); // unchanged
+    expect((target.hitPoints as { current: number }).current).toBe(3);
 
-    // The whole batch rolled back — the caster's slot is not spent.
+
     const healer = await prisma.character.findUniqueOrThrow({ where: { id: HEALER } });
     expect((healer.spellcasting as { slotsUsed: Record<string, number> }).slotsUsed["1"] ?? 0).toBe(0);
 
@@ -218,8 +213,8 @@ describe("party-target healing (#462)", () => {
   });
 
   it("leaves the self-heal path unchanged (heals the caster, no cross-sheet event)", async () => {
-    // Damage the caster first (10 → 6) via a self-damage cantrip-less op is
-    // unavailable here, so set HP directly, then self-heal 3 (6 → 9).
+
+
     await prisma.character.update({ where: { id: HEALER }, data: { hitPoints: { current: 6, max: 10, temp: 0 } } });
     const res = await agent(cookieDm)
       .post(`/api/characters/${HEALER}/spellcasting/transactions`)
@@ -230,9 +225,9 @@ describe("party-target healing (#462)", () => {
         }],
       });
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(9); // caster healed
+    expect(res.body.hitPoints.current).toBe(9);
 
-    // No heal event landed on any ally.
+
     const targetHeals = await prisma.characterEvent.findMany({ where: { characterId: TARGET, type: "heal" } });
     expect(targetHeals).toHaveLength(0);
   });

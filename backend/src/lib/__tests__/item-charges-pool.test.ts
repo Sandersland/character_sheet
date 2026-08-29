@@ -50,7 +50,6 @@ const BASE_CHAR = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-// Wand of Magic Missiles' pool: 7 charges, regains 1d6+1 daily at dawn.
 const WAND_POOL: CapabilityColumns = {
   kind: "charges",
   maxCharges: 7,
@@ -79,9 +78,6 @@ function chargesCast(
   };
 }
 
-// The item's charges-pool capability key, read off its snapshot (#1649) —
-// dynamic lookup, not a pre-known id, since a pool never needs to be
-// referenced by an entryId the way a castSpell capability does.
 async function poolCapabilityKey(itemId: string): Promise<string> {
   const item = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
   const pool = readInventorySnapshot(item).capabilities.find((c) => c.kind === "charges");
@@ -95,8 +91,6 @@ async function poolRow(itemId: string): Promise<{ id: string; used: number }> {
   return { id, used: use.used };
 }
 
-// Test-only backdoor to seed a pool's starting `used` state (simulating prior
-// spend) without going through a real cast/activation.
 async function setPoolUsed(itemId: string, used: number): Promise<void> {
   const id = await poolCapabilityKey(itemId);
   await prisma.inventoryCapabilityUse.updateMany({ where: { capabilityKey: id }, data: { used } });
@@ -120,9 +114,7 @@ describe("item charges pool (#555)", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
-    // upsertEditionRow, not .upsert(): Spell's business key is now (name,
-    // edition) (#1710), and this fixture spell is edition-neutral.
-    // catalogEntryId (#1796) is resolved first — required, no default.
+    // upsertEditionRow, not .upsert(): Spell's business key is (name, edition); this fixture spell is edition-neutral.
     const catalogEntryId = await makeCatalogEntry({ name: SPELL.name });
     const spell = await upsertEditionRow(
       prisma.spell,
@@ -144,9 +136,7 @@ describe("item charges pool (#555)", () => {
 
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { ownerId: OWNER_ID } });
-    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
-    // #1796) — the reverse cascade doesn't exist (the supertype stays
-    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    // Deleting the CatalogEntry cascades the Spell row; the reverse cascade doesn't exist, so deleting only the Spell would orphan the entry.
     await prisma.catalogEntry.deleteMany({ where: { name: SPELL.name, kind: "SPELL" } });
   });
 
@@ -176,7 +166,8 @@ describe("item charges pool (#555)", () => {
 
     expect((await poolRow(item.id)).used).toBe(3);
     const use = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: castCapId } });
-    expect(use.used).toBe(0); // the pool row carries the spend, not the cast row
+    // The pool row carries the spend, not the cast capability's own row.
+    expect(use.used).toBe(0);
 
     const ev = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "castSpell" } });
     const data = ev.data as Record<string, unknown>;
@@ -196,7 +187,7 @@ describe("item charges pool (#555)", () => {
     const ev = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "castSpell" } });
     const undone = await revertBatch(prisma, characterId, ev.batchId!);
     expect(undone.ok).toBe(true);
-    expect((await poolRow(item.id)).used).toBe(0); // the 3 spent charges are refunded
+    expect((await poolRow(item.id)).used).toBe(0);
   });
 
   it("blocks a cast whose cost exceeds the remaining charges", async () => {
@@ -210,14 +201,12 @@ describe("item charges pool (#555)", () => {
     const cheapEntry = await entryIdFor(item.id, cheapId);
     const dearEntry = await entryIdFor(item.id, dearId);
 
-    // 7 → 4 remaining; the 5-charge cast must be rejected and the pool untouched.
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId: cheapEntry, roll: 9 }], OWNER_ID);
     await expect(
       applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId: dearEntry, roll: 9 }], OWNER_ID),
     ).rejects.toThrow(/needs 5 charges/i);
     expect((await poolRow(item.id)).used).toBe(3);
 
-    // The cheap cast still works twice more (4 → 1 remaining), sharing the pool.
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId: cheapEntry, roll: 9 }], OWNER_ID);
     expect((await poolRow(item.id)).used).toBe(6);
     await expect(
@@ -248,17 +237,13 @@ describe("item charges pool (#555)", () => {
     const ev = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "activated" } });
     expect(ev.summary).toContain("5 charges left");
 
-    // LIFO undo of the activation restores the pool counter.
     const undone = await revertBatch(prisma, characterId, ev.batchId!);
     expect(undone.ok).toBe(true);
     expect((await poolRow(item.id)).used).toBe(0);
   });
 
   it("undo of an activation survives a delete/undo-delete cycle (capability ids changed)", async () => {
-    // LIFO seam (PR #579 round-2): activate → remove item → undo remove
-    // (recreates capability rows with NEW ids) → undo activate. The
-    // capabilityUsed restore must no-op on the vanished old id (updateMany),
-    // not throw RecordNotFound and fail the whole undo.
+    // The capabilityUsed restore must no-op (updateMany) on a vanished old capability id, not throw RecordNotFound.
     const item = await makeWand([
       WAND_POOL,
       {
@@ -278,12 +263,9 @@ describe("item charges pool (#555)", () => {
     await applyInventoryOperations(characterId, [{ type: "remove", inventoryItemId: item.id }]);
     const removeEv = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "removed" } });
 
-    // Undo the delete: the item is recreated from the snapshot — same item id,
-    // NEW capability row ids, `used` restored from the snapshot (spent state kept).
     expect((await revertBatch(prisma, characterId, removeEv.batchId!)).ok).toBe(true);
     expect((await poolRow(item.id)).used).toBe(2);
 
-    // Undo the activation: the old capability id no longer exists — must no-op, not fail.
     expect((await revertBatch(prisma, characterId, activateEv.batchId!)).ok).toBe(true);
   });
 
@@ -308,10 +290,7 @@ describe("item charges pool (#555)", () => {
   });
 
   it("concurrent casts cannot overdraw the pool (atomic conditional spend)", async () => {
-    // TOCTOU regression (PR #579 review): under READ COMMITTED, concurrent
-    // transactions can each snapshot the same `used` and all pass the derived
-    // remaining-check. The conditional increment (used <= max - cost) must let
-    // exactly two cost-3 casts through a 7-charge pool, never pushing used past 7.
+    // Under READ COMMITTED, concurrent transactions can each snapshot the same `used`; the conditional increment (used <= max - cost) must still let only two cost-3 casts through.
     const castCapId = randomUUID();
     const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3, id: castCapId })]);
     const entryId = await entryIdFor(item.id, castCapId);
@@ -322,7 +301,7 @@ describe("item charges pool (#555)", () => {
       ),
     );
     const succeeded = results.filter((r) => r.status === "fulfilled").length;
-    expect(succeeded).toBe(2); // 7 charges afford exactly two cost-3 casts
+    expect(succeeded).toBe(2);
     const used = (await poolRow(item.id)).used;
     expect(used).toBe(6);
   });
@@ -333,7 +312,6 @@ describe("item charges pool (#555)", () => {
 
     await applyHitPointOperations(characterId, [{ type: "longRest" }]);
     const used = (await poolRow(item.id)).used;
-    // Regained 1d6+1 ∈ [2,7] → used ∈ [0,5], never negative, never above max.
     expect(used).toBeGreaterThanOrEqual(0);
     expect(used).toBeLessThanOrEqual(5);
 
@@ -341,7 +319,6 @@ describe("item charges pool (#555)", () => {
     expect(ev.summary).toContain("item charges recharged");
     expect((ev.before as Record<string, unknown>).chargePools).toBeTruthy();
 
-    // Undoing the rest re-expends the pool to its pre-rest state.
     const undone = await revertBatch(prisma, characterId, ev.batchId!);
     expect(undone.ok).toBe(true);
     expect((await poolRow(item.id)).used).toBe(7);
@@ -364,8 +341,8 @@ describe("item charges pool (#555)", () => {
     await setPoolUsed(dawnItem.id, 3);
 
     await applyHitPointOperations(characterId, [{ type: "shortRest", rolls: [] }]);
-    expect((await poolRow(shortItem.id)).used).toBe(0); // refilled (dice-less)
-    expect((await poolRow(dawnItem.id)).used).toBe(3); // dawn waits for a long rest
+    expect((await poolRow(shortItem.id)).used).toBe(0);
+    expect((await poolRow(dawnItem.id)).used).toBe(3);
   });
 
   it("recharges a pool on an item that is neither equipped nor attuned (wand in the bag)", async () => {
@@ -398,12 +375,10 @@ describe("item charges pool (#555)", () => {
     const wire = sheet.inventory.find((i) => i.id === item.id)!;
     expect(wire.charges).toEqual({ max: 7, remaining: 5, recharge: "regains 1d6+1 at dawn" });
 
-    // The pool-backed spell mirrors the POOL's remaining/max + carries its cost.
     const sc = sheet.spellcasting as { spells?: SpellEntry[] } | undefined;
     const spell = sc?.spells?.find((s) => s.source === "item" && s.item?.inventoryItemId === item.id);
     expect(spell?.item).toMatchObject({ usesTotal: 7, usesRemaining: 5, chargeCost: 3 });
 
-    // The activated readout floors remaining/cost: 5 remaining / cost 2 → 2 uses.
     expect(wire.activated).toMatchObject({ maxUses: 3, remainingUses: 2 });
   });
 
@@ -415,13 +390,11 @@ describe("item charges pool (#555)", () => {
     expect((await poolRow(item.id)).used).toBe(3);
 
     await applyInventoryOperations(characterId, [{ type: "unattune", inventoryItemId: item.id }]);
-    expect((await poolRow(item.id)).used).toBe(3); // pool untouched
+    expect((await poolRow(item.id)).used).toBe(3);
     const sheet = await serialize(characterId);
-    // A non-caster with no remaining item spells has no spellcasting section at all.
     const sc = sheet.spellcasting as { spells?: SpellEntry[] } | undefined;
     expect(sc?.spells?.some((s) => s.item?.inventoryItemId === item.id) ?? false).toBe(false);
 
-    // Re-attune: the spend state is exactly where it was left.
     await applyInventoryOperations(characterId, [{ type: "attune", inventoryItemId: item.id }]);
     const sc2 = (await serialize(characterId)).spellcasting as { spells?: SpellEntry[] } | undefined;
     const spell = sc2?.spells?.find((s) => s.item?.inventoryItemId === item.id);

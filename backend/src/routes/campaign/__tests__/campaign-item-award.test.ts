@@ -1,9 +1,3 @@
-/**
- * DM item award/revoke (#381). Real Postgres, supertest against the shared `app`.
- * Fixtures: a campaign owned by OWNER with PLAYER joined; PLAYER owns a
- * character attached to the campaign, plus an OUTSIDER character in no campaign.
- */
-
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -94,7 +88,6 @@ describe("campaign item award/revoke (#381)", () => {
       { characterId: CHAR, characterName: "Bruenor", quantity: 2 },
     ]);
 
-    // Snapshot + detail landed on the sheet with provenance FK.
     const row = await prisma.inventoryItem.findFirst({
       where: { characterId: CHAR, itemId: id },
     });
@@ -102,17 +95,14 @@ describe("campaign item award/revoke (#381)", () => {
     expect(row?.quantity).toBe(2);
     expect(row && readInventorySnapshot(row).weapon?.damageDiceCount).toBe(2);
 
-    // Award auto-revealed the fronting entity.
     const entity = await prisma.campaignEntity.findUnique({ where: { id: entityId } });
     expect(entity?.visibility).toBe("REVEALED");
 
-    // Audit event on the TARGET character.
     const activity = await agent(cookiePlayer).get(`/api/characters/${CHAR}/activity?category=inventory`);
     const awarded = activity.body.find((e: { type: string }) => e.type === "awarded");
     expect(awarded).toBeDefined();
     expect(awarded.summary).toContain("Flametongue");
 
-    // Undo removes it cleanly.
     const revert = await agent(cookiePlayer).post(
       `/api/characters/${CHAR}/events/${awarded.batchId}/revert`,
     );
@@ -120,12 +110,7 @@ describe("campaign item award/revoke (#381)", () => {
     expect(await prisma.inventoryItem.findFirst({ where: { id: row!.id } })).toBeNull();
   });
 
-  // Since #1646, dmNotes lives on Item alongside seeded catalog rows — nothing
-  // about the TABLE keeps it private any more, so this pins the includeDmNotes
-  // flag as the sole guard on the two payloads a DM-list test wouldn't cover.
-  // Stringify-and-search is deliberately blunt: it catches the field at ANY
-  // nesting depth, including inside an inventory snapshot, which a keyed
-  // assertion on the top-level object would miss.
+  // Stringify-and-search catches dmNotes at any nesting depth, which a keyed assertion would miss.
   it("never carries dmNotes on the award response or the character sheet", async () => {
     const { id } = await createItem({ ...weaponItem, name: "Secret Sword", dmNotes: "only the DM should see this" });
 
@@ -156,7 +141,6 @@ describe("campaign item award/revoke (#381)", () => {
   });
 
   it("revokes a player-modified (renamed + equipped) snapshot, undoably", async () => {
-    // Unique so we can also assert the unique guard still fires after undo.
     const { id } = await createItem({ ...weaponItem, name: "Sunblade", isUnique: true });
     await agent(cookieOwner)
       .post(`/api/campaigns/${campaignId}/items/${id}/award`)
@@ -165,7 +149,6 @@ describe("campaign item award/revoke (#381)", () => {
     const row = await prisma.inventoryItem.findFirstOrThrow({
       where: { characterId: CHAR, itemId: id },
     });
-    // Player renames + equips the snapshot.
     await agent(cookiePlayer)
       .post(`/api/characters/${CHAR}/inventory/transactions`)
       .send({ operations: [
@@ -180,7 +163,6 @@ describe("campaign item award/revoke (#381)", () => {
     expect(revoke.body.holders).toEqual([]);
     expect(await prisma.inventoryItem.findFirst({ where: { id: row.id } })).toBeNull();
 
-    // Revoke is undoable — the row comes back.
     const activity = await agent(cookiePlayer).get(`/api/characters/${CHAR}/activity?category=inventory`);
     const revoked = activity.body.find((e: { type: string }) => e.type === "revoked");
     const revert = await agent(cookiePlayer).post(
@@ -189,29 +171,24 @@ describe("campaign item award/revoke (#381)", () => {
     expect(revert.status).toBe(200);
     const restored = await prisma.inventoryItem.findFirst({ where: { id: row.id } });
     expect(restored?.name).toBe("My Sword");
-    // The provenance FK must survive undo, or the row falls out of holder /
-    // unique-guard queries (create/cleanup asymmetry).
+    // The provenance FK must survive undo, or the row falls out of holder/unique-guard queries.
     expect(restored?.itemId).toBe(id);
 
-    // Holders + Codex card still see the restored row.
     const list = await agent(cookieOwner).get(`/api/campaigns/${campaignId}/items`);
     const listed = list.body.find((i: { id: string }) => i.id === id);
     expect(listed.holders).toEqual([{ characterId: CHAR, characterName: "Bruenor", quantity: 1 }]);
 
-    // Unique guard still fires — a second award stays blocked, naming the holder.
     const secondAward = await agent(cookieOwner)
       .post(`/api/campaigns/${campaignId}/items/${id}/award`)
       .send({ characterId: CHAR });
     expect(secondAward.status).toBe(409);
     expect(secondAward.body.error).toContain("Bruenor");
 
-    // And the restored row is still revocable (not orphaned).
     const reRevoke = await agent(cookieOwner)
       .post(`/api/campaigns/${campaignId}/items/${id}/revoke`)
       .send({ characterId: CHAR });
     expect(reRevoke.status).toBe(200);
 
-    // Cleanup for the next tests.
     await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
   });
 
@@ -307,7 +284,6 @@ describe("campaign item award/revoke (#381)", () => {
     const listed = list.body.find((i: { id: string }) => i.id === id);
     expect(listed.holders).toEqual([{ characterId: CHAR, characterName: "Bruenor", quantity: 3 }]);
 
-    // Award already revealed the entity, so the player can read the card + holders.
     const card = await agent(cookiePlayer).get(
       `/api/campaigns/${campaignId}/items/by-entity/${entityId}`,
     );
@@ -315,8 +291,6 @@ describe("campaign item award/revoke (#381)", () => {
     expect(card.body.holders).toEqual([{ characterId: CHAR, characterName: "Bruenor", quantity: 3 }]);
     await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
   });
-
-  // ── Session-threaded loot (#382) ──────────────────────────────────────────────
 
   it("threads an award onto an explicit active session: log entry + end-of-session loot", async () => {
     const { id } = await createItem({ ...weaponItem, name: "Session Blade" });
@@ -331,7 +305,6 @@ describe("campaign item award/revoke (#381)", () => {
       .send({ characterId: CHAR, quantity: 2, sessionId });
     expect(award.status).toBe(200);
 
-    // The loot event is threaded onto the session feed with item, recipient, qty.
     const detail = await agent(cookieOwner).get(
       `/api/campaigns/${campaignId}/sessions/${sessionId}`,
     );
@@ -341,7 +314,6 @@ describe("campaign item award/revoke (#381)", () => {
     expect(loot.data.quantityDelta).toBe(2);
     expect(loot.data.recipientName).toBe("Bruenor");
 
-    // End-of-session summary carries the Loot line-up (recap + per participant).
     const end = await agent(cookieOwner).post(
       `/api/campaigns/${campaignId}/sessions/${sessionId}/end`,
     );
@@ -362,7 +334,6 @@ describe("campaign item award/revoke (#381)", () => {
       .send({ characterId: CHAR });
     const sessionId = start.body.session.id as string;
 
-    // No sessionId in the body — #381 behaviour still tags the active session.
     await agent(cookieOwner)
       .post(`/api/campaigns/${campaignId}/items/${id}/award`)
       .send({ characterId: CHAR });
@@ -373,7 +344,6 @@ describe("campaign item award/revoke (#381)", () => {
     const loot = detail.body.events.find((e: { type: string }) => e.type === "awarded");
     expect(loot).toBeDefined();
 
-    // Undo during the session removes both the inventory row and the log entry.
     const row = await prisma.inventoryItem.findFirstOrThrow({
       where: { characterId: CHAR, itemId: id },
     });
@@ -408,7 +378,6 @@ describe("campaign item award/revoke (#381)", () => {
       .send({ characterId: CHAR, sessionId: foreignSession.id });
     expect(res.status).toBe(400);
     expect(res.body.error).toContain("does not belong");
-    // The award was rejected — nothing landed on the sheet.
     expect(
       await prisma.inventoryItem.findFirst({ where: { characterId: CHAR, itemId: id } }),
     ).toBeNull();

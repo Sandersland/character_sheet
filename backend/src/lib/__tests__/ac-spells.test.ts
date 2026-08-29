@@ -1,10 +1,3 @@
-/**
- * AC-granting spells (#363) — drives the real cast → serialize path against
- * Postgres for the three PHB shapes: flat +N (Shield of Faith), unarmored base
- * override (Mage Armor), and AC floor (Barkskin). Also covers the Mage Armor
- * true-end hooks (don body armor / dismiss / long rest). Requires DATABASE_URL.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -19,7 +12,6 @@ import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixt
 
 const OWNER_ID = "owner-ac-spells";
 
-// Wizard L3 (900 XP) → level-1 and level-2 slots; unarmored Dex 14 (+2) → AC 12.
 const BASE_CHAR = {
   name: "AC Spell Caster",
   alignment: "Neutral",
@@ -48,12 +40,7 @@ async function entryIdForSpell(spellId: string): Promise<string> {
   return sc.spells!.find((s) => s.spellId === spellId)!.id;
 }
 
-// Learn a catalog spell by name and (optionally) cast it at its base level.
-// BASE_CHAR never sets rulesEdition, so it takes Character's own default —
-// EDITION_2024 — and every assertion in this file (Barkskin's floor 17,
-// Mage Armor's base 13) is SRD 5.2 text; scoped explicitly so a same-named
-// 2014-fork row (e.g. Barkskin, #1716 — floor 16, a genuine edition
-// difference) can't win an edition-unfiltered findFirst by insertion order.
+// Filters to EDITION_2024 so a same-named 2014-fork row (e.g. Barkskin, #1716) can't win findFirst by insertion order.
 async function learnAndCast(spellName: string, cast = true): Promise<string> {
   const spell = await prisma.spell.findFirstOrThrow({ where: { name: spellName, edition: "EDITION_2024" } });
   await applySpellcastingOperations(characterId, [{ type: "learnSpell", spellId: spell.id }], OWNER_ID);
@@ -113,11 +100,10 @@ describe("AC-granting spells (#363)", () => {
   it("Mage Armor sets the unarmored base to 13 + Dex; dismiss reverts it", async () => {
     const entryId = await learnAndCast("Mage Armor");
     const view = await serialize();
-    expect(view.armorClass).toBe(15); // 13 + Dex 2
+    expect(view.armorClass).toBe(15);
     expect(view.armorClassBreakdown).toEqual(
       expect.arrayContaining([{ label: "Mage Armor", value: 13 }, { label: "Dex", value: 2 }]),
     );
-    // No "Unarmored 10" base line survives — Mage Armor replaced it.
     expect(view.armorClassBreakdown.some((p) => p.label === "Unarmored")).toBe(false);
 
     await applySpellcastingOperations(characterId, [{ type: "dismissBuff", entryId }], OWNER_ID);
@@ -128,11 +114,10 @@ describe("AC-granting spells (#363)", () => {
     await learnAndCast("Mage Armor");
     expect((await serialize()).armorClass).toBe(15);
 
-    const armor = await makeBodyArmor(); // leather 11 + Dex 2 = 13
+    const armor = await makeBodyArmor();
     await applyInventoryOperations(characterId, [{ type: "equip", inventoryItemId: armor.id, slot: "BODY" }]);
-    expect((await serialize()).armorClass).toBe(13); // Mage Armor gone, armor rules apply
+    expect((await serialize()).armorClass).toBe(13);
 
-    // Removing the armor does NOT bring Mage Armor back — it truly ended.
     await applyInventoryOperations(characterId, [{ type: "setEquipped", inventoryItemId: armor.id, equipped: false }]);
     expect((await serialize()).armorClass).toBe(12);
   });
@@ -147,24 +132,24 @@ describe("AC-granting spells (#363)", () => {
   it("Barkskin floors AC at 17 while unarmored, as a reconciling breakdown part", async () => {
     await learnAndCast("Barkskin");
     const view = await serialize();
-    expect(view.armorClass).toBe(17); // unarmored 12 floored up to 17 (SRD 5.2)
+    // SRD 5.2
+    expect(view.armorClass).toBe(17);
     expect(view.armorClassBreakdown).toContainEqual({ label: "Barkskin (floor 17)", value: 5 });
-    // Single-source-of-sum invariant: labeled parts sum to armorClass.
+    // Labeled armorClassBreakdown parts must sum to armorClass.
     expect(view.armorClassBreakdown.reduce((t, p) => t + p.value, 0)).toBe(17);
 
-    // 2024 Barkskin is non-concentration → ends on a long rest, not dropConcentration.
+    // 2024 Barkskin is non-concentration — ends on a long rest, not dropConcentration.
     await applyHitPointOperations(characterId, [{ type: "longRest" }]);
     expect((await serialize()).armorClass).toBe(12);
   });
 
   it("Barkskin adds a 0-value reminder when AC already meets the floor", async () => {
-    // Half plate 15 + Dex 2 (cap 2) = 17, already ≥ 17.
     const armor = await makeBodyArmor({ name: "Half Plate", armorCategory: "medium", baseArmorClass: 15, dexModifierMax: 2 });
     await applyInventoryOperations(characterId, [{ type: "equip", inventoryItemId: armor.id, slot: "BODY" }]);
     await learnAndCast("Barkskin");
 
     const view = await serialize();
-    expect(view.armorClass).toBe(17); // floor doesn't raise AC
+    expect(view.armorClass).toBe(17);
     expect(view.armorClassBreakdown).toContainEqual({ label: "Barkskin", value: 0, reminder: "floor 17" });
     expect(view.armorClassBreakdown.reduce((t, p) => t + p.value, 0)).toBe(17);
   });

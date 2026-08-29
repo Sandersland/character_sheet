@@ -1,9 +1,3 @@
-/**
- * Spellcasting route integration tests.
- * Mirrors inventory.test.ts: real Postgres in beforeEach, supertest against
- * the shared `app`. The fixture is a level-1 Wizard (2× L1 slots, INT 16).
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -17,8 +11,6 @@ import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-spellcasting";
 let COOKIE: string;
-
-// ── Catalog fixtures ─────────────────────────────────────────────────────────
 
 const TEST_SPELL = {
   name: "Spellcasting Test Fireball",
@@ -53,17 +45,13 @@ const TEST_CANTRIP = {
   cantripScaling: true,
 };
 
-// ── Character fixture ─────────────────────────────────────────────────────────
-// Level 1 Wizard (0 XP → 2× L1 spell slots derived at read time).
-// INT 16 → modifier +3 → spellSaveDC = 8+2+3 = 13, spellAttackBonus = 5.
-
 const FIXTURE_ID = "test-spellcasting-character-1";
 
 const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Spellcasting Test Wizard",
   alignment: "Neutral Good",
-  experiencePoints: 0,      // level 1 → 2 L1 slots
+  experiencePoints: 0,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 8, max: 8, temp: 0 },
@@ -72,7 +60,7 @@ const FIXTURE_BASE = {
     strength: 8,
     dexterity: 12,
     constitution: 12,
-    intelligence: 16,       // +3 modifier
+    intelligence: 16,
     wisdom: 10,
     charisma: 10,
   },
@@ -82,8 +70,6 @@ const FIXTURE_BASE = {
   currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
 };
 
-// Pre-seeded spells in the character's spellbook (compact format).
-// These don't reference catalog IDs so they work without the catalog.
 const FIXTURE_SPELLCASTING_JSON = {
   slotsUsed: {},
   spells: [
@@ -152,16 +138,11 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   let wizardClassId: string;
   let catalogSpellId: string;
 
-  // Use a unique class name that doesn't conflict with the seeded "Wizard" class
-  // used by characters.test.ts. The CharacterClassEntry *snapshot* name (stored
-  // as "wizard") is what deriveSpellcasting reads, so the catalog class can have
-  // any unique name as long as we set the entry's name field correctly below.
+  // The CharacterClassEntry snapshot name ("wizard") is what deriveSpellcasting reads — the catalog class name itself can be anything unique.
   const WIZARD_CATALOG_NAME = "Spellcasting Route Test Wizard";
 
   afterAll(async () => {
-    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
-    // #1796) — the reverse cascade doesn't exist (the supertype stays
-    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE) — the reverse cascade doesn't exist, so a plain spell.deleteMany alone would orphan the entry.
     await prisma.catalogEntry.deleteMany({ where: { name: { in: [TEST_SPELL.name, TEST_CANTRIP.name] }, kind: "SPELL" } });
     await prisma.characterClass.deleteMany({ where: { name: WIZARD_CATALOG_NAME } });
   });
@@ -169,7 +150,6 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
-    // Upsert a uniquely-named wizard class for this test suite.
     const cls = await prisma.characterClass.upsert({
       where: { name: WIZARD_CATALOG_NAME },
       create: {
@@ -184,11 +164,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     });
     wizardClassId = cls.id;
 
-    // Upsert catalog spells for learnSpell-from-catalog tests. upsertEditionRow,
-    // not .upsert(): Spell's business key is now (name, edition) (#1710), and
-    // these fixture spells are edition-neutral. makeCatalogEntry (#1796) is
-    // find-then-create, safe to call every beforeEach against a fixture only
-    // afterAll cleans up.
+    // upsertEditionRow, not .upsert(): Spell's business key is (name, edition), and these fixtures are edition-neutral; makeCatalogEntry is find-then-create, safe every beforeEach since only afterAll cleans up.
     const catalogEntryIdSpell = await makeCatalogEntry({ name: TEST_SPELL.name });
     const catalogSpell = await upsertEditionRow(
       prisma.spell,
@@ -205,8 +181,6 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
       TEST_CANTRIP,
     );
 
-    // Create the fixture character. The class entry's `name` snapshot is "wizard"
-    // (lowercase) — that's what deriveSpellcasting reads to look up the caster type.
     await prisma.character.create({
       data: {
         ...FIXTURE_BASE,
@@ -222,8 +196,6 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
   });
-
-  // ── 404 / 400 guards ──────────────────────────────────────────────────────
 
   it("404s for an unknown character", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
@@ -246,15 +218,12 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── castSpell ─────────────────────────────────────────────────────────────
-
   it("casting a cantrip rolls (non-zero total expected) and does NOT expend a slot", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "castSpell", entryId: "fixture-cantrip-1", roll: 7 }] });
 
     expect(res.status).toBe(200);
-    // Cantrip: no slots should have been used.
     const slots = res.body.spellcasting.slots as Array<{ level: number; used: number }>;
     slots.forEach((s) => expect(s.used).toBe(0));
   });
@@ -269,32 +238,25 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
       .find((s) => s.level === 1);
     expect(slot1).toBeDefined();
     expect(slot1!.used).toBe(1);
-    expect(slot1!.total).toBe(2); // level-1 wizard has 2 L1 slots
+    expect(slot1!.total).toBe(2);
   });
 
   it("400s when casting a leveled spell with all slots of that level exhausted", async () => {
     const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
 
-    // Use both L1 slots.
     await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 10 }] });
     await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 12 }] });
 
-    // Third cast should fail.
     const res = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 9 }] });
     expect(res.status).toBe(400);
   });
 
   it("400s when casting a spell with a slot level below the spell's level", async () => {
-    // Level 1 wizard has no L0 slots for leveled spells — only L1.
-    // We'll test an invalid pairing by using a high-level spell with a low slot.
-    // fixture-spell-1 is level 1, but slotLevel: 0 is invalid (must be >= spell.level).
     const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 0, roll: 5 }] });
     expect(res.status).toBe(400);
   });
-
-  // ── expendSlot / restoreSlot ──────────────────────────────────────────────
 
   it("expendSlot decrements available slots, restoreSlot increments them back", async () => {
     const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
@@ -324,8 +286,6 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── learnSpell ────────────────────────────────────────────────────────────
-
   it("learnSpell from catalog snapshots the spell into spells[]", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
@@ -340,13 +300,9 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(learned!.prepared).toBe(false);
   });
 
-  // #1440: the level-up path gates on class list (assertPickSpellEligibility);
-  // this manual/homebrew scribing path deliberately does not — see the why-comment
-  // on applyLearnSpellOp. This replaces the issue's proposed "existing test" AC,
-  // which turned out not to exist (the prior coverage used an ON-class spell).
+  // The level-up path gates on class list (assertPickSpellEligibility); this manual/homebrew scribing path deliberately does not (#1440).
   it("learnSpell accepts an OFF-CLASS catalog spell — the grimoire path is deliberately unfiltered (#1440)", async () => {
-    // Cure Wounds' classes (cleric/bard/druid/paladin/ranger) exclude wizard —
-    // the fixture character below is a wizard.
+    // Cure Wounds excludes wizard from its class list — the fixture character is a wizard.
     const cureWounds = await prisma.spell.findFirstOrThrow({ where: { name: "Cure Wounds" }, select: { id: true } });
     const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
@@ -372,8 +328,6 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(dup.status).toBe(400);
   });
 
-  // ── forgetSpell ───────────────────────────────────────────────────────────
-
   it("forgetSpell removes the spell from spells[]", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
@@ -391,19 +345,15 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── prepareSpell / unprepareSpell ─────────────────────────────────────────
-
   it("prepareSpell / unprepareSpell toggles prepared on a leveled spell", async () => {
     const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
 
-    // fixture-spell-1 starts prepared=true; unprepare it.
     const unprep = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "unprepareSpell", entryId: "fixture-spell-1" }] });
     expect(unprep.status).toBe(200);
     const afterUnprep = (unprep.body.spellcasting.spells as Array<{ id: string; prepared: boolean }>)
       .find((s) => s.id === "fixture-spell-1");
     expect(afterUnprep!.prepared).toBe(false);
 
-    // Prepare it again.
     const prep = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "prepareSpell", entryId: "fixture-spell-1" }] });
     expect(prep.status).toBe(200);
     const afterPrep = (prep.body.spellcasting.spells as Array<{ id: string; prepared: boolean }>)
@@ -418,27 +368,22 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(res.status).toBe(400);
   });
 
-  // ── Atomicity ─────────────────────────────────────────────────────────────
-
   it("a multi-op batch is atomic: a later failing op rolls back an earlier valid one", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({
         operations: [
-          { type: "expendSlot", level: 1 },               // valid
-          { type: "forgetSpell", entryId: "not-a-real-entry" }, // invalid — should roll back the expendSlot
+          { type: "expendSlot", level: 1 },
+          { type: "forgetSpell", entryId: "not-a-real-entry" },
         ],
       });
 
     expect(res.status).toBe(400);
 
-    // Verify the character is unchanged.
     const char = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     const slot1 = char.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
-    expect(slot1.used).toBe(0); // rolled back
+    expect(slot1.used).toBe(0);
   });
-
-  // ── castSpell self-apply (target: self) ───────────────────────────────────
 
   it("castSpell with apply:{self,damage} subtracts HP and expends the slot in one batch", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
@@ -454,7 +399,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(4); // 8 → 4
+    expect(res.body.hitPoints.current).toBe(4);
     const slot1 = res.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
     expect(slot1.used).toBe(1);
   });
@@ -462,12 +407,10 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   it("castSpell with apply:{self,heal} restores HP (after taking damage)", async () => {
     const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
 
-    // Take 5 self-damage first (8 → 3).
     await supertest.agent(app).set("Cookie", COOKIE).post(url).send({
       operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 5, apply: { target: "self", kind: "damage", amount: 5 } }],
     });
 
-    // Heal 3 (3 → 6).
     const heal = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({
       operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 3, apply: { target: "self", kind: "heal", amount: 3 } }],
     });
@@ -491,36 +434,25 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
       .send({
         operations: [
           { type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 4, apply: { target: "self", kind: "damage", amount: 4 } },
-          { type: "forgetSpell", entryId: "not-a-real-entry" }, // invalid — rolls back the cast + HP
+          { type: "forgetSpell", entryId: "not-a-real-entry" },
         ],
       });
     expect(res.status).toBe(400);
 
     const char = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
-    expect(char.body.hitPoints.current).toBe(8); // HP unchanged
+    expect(char.body.hitPoints.current).toBe(8);
     const slot1 = char.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
-    expect(slot1.used).toBe(0); // slot unchanged
+    expect(slot1.used).toBe(0);
   });
 
-  // ── Derived stats ─────────────────────────────────────────────────────────
-
   it("returns correct derived spellSaveDC and spellAttackBonus for a L1 INT-16 Wizard", async () => {
-    // No op needed — just read back the character via an expendSlot (or we could
-    // do a GET, but the route returns the full character on every mutating response).
-    // Use a GET instead to avoid touching state.
     const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
 
     expect(res.status).toBe(200);
-    // L1 proficiency bonus = 2; INT mod = +3. DC = 8+2+3 = 13. Attack = 2+3 = 5.
     expect(res.body.spellcasting.spellSaveDC).toBe(13);
     expect(res.body.spellcasting.spellAttackBonus).toBe(5);
     expect(res.body.spellcasting.ability).toBe("intelligence");
   });
-
-  // ── Concentration enforcement ──────────────────────────────────────────────
-  // Reuses the L1 Wizard fixture above (which now also knows two concentration
-  // spells: fixture-conc-1 "Fixture Bless" and fixture-conc-2 "Fixture Shield of
-  // Faith", both L1 so they fit in the wizard's two L1 slots).
 
   describe("concentration", () => {
     const hpUrl = `/api/characters/${FIXTURE_ID}/hp`;
@@ -638,14 +570,11 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
       await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
-      // Casting the second spell drops the first (this batch holds two events:
-      // concentrationDropped + castSpell).
+      // This batch holds two events: concentrationDropped + castSpell.
       await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-2", slotLevel: 1, roll: 0 }] });
 
-      // Undo the most recent batch (the second cast). Revert is LIFO + keyed by
-      // batchId; the full spellcasting JSON is restored from the before-snapshot.
       const activity = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/activity`);
       const events = activity.body as Array<{ type: string; reverted: boolean; batchId?: string }>;
       const latestCast = events.find((e) => e.type === "castSpell" && !e.reverted)!;
@@ -656,18 +585,13 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
         entryId: "fixture-conc-1",
         spellName: "Fixture Bless",
       });
-      // #1849: the displacing cast's slot must also be refunded — only the
-      // first cast's slot should still show spent.
+      // The displacing cast's slot must also be refunded — only the first cast's slot should still show spent (#1849).
       expect(undo.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(1);
     });
   });
 });
 
-// ── Subclass-granted spells (derived, non-persisted) ──────────────────────────
-// A Warrior of Shadow monk gains Minor Illusion at level 3 as a pure-derived grant.
-// The monk is a non-caster, so the whole spellcasting view exists only because
-// of the grant (slotless Wisdom view).
-
+// The monk is a non-caster — the whole spellcasting view exists only because of the granted spell (slotless Wisdom view).
 const MONK_ID = "test-monk-shadow-1";
 
 describe("subclass-granted spells", () => {
@@ -692,15 +616,10 @@ describe("subclass-granted spells", () => {
     });
     monkClassId = cls.id;
 
-    // Warrior of Shadow grants Minor Illusion at L3 as data (#898): a catalog Subclass
-    // row under this test class + a SubclassGrantedSpell → the seeded Minor Illusion.
-    // Warrior of the Open Hand exists as a catalog row but grants nothing.
     const shadow = await upsertEditionRow(
       prisma.subclass,
       { classId: monkClassId, name: "Warrior of Shadow", edition: null },
-      // Distinct from the real seeded slugs (#1277) — this test's Monk class
-      // is its own throwaway row, and (slug, edition) is unique catalog-wide
-      // regardless of classId.
+      // (slug, edition) is unique catalog-wide regardless of classId — distinct from the real seeded slugs (#1277).
       { classId: monkClassId, name: "Warrior of Shadow", description: "Test subclass", slug: "monk-warrior-of-shadow-spellcasting-test" },
       {},
     );
@@ -717,8 +636,7 @@ describe("subclass-granted spells", () => {
     );
     const minorIllusion = await prisma.spell.findFirst({ where: { name: "Minor Illusion" }, select: { id: true } });
     if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
-    // upsertEditionRow: the widened (subclassId, spellId, edition) shorthand
-    // can't express a null edition at runtime (#1625).
+    // The widened (subclassId, spellId, edition) shorthand can't express a null edition at runtime (#1625).
     await upsertEditionRow(
       prisma.subclassGrantedSpell,
       { subclassId: shadow.id, spellId: minorIllusion.id, edition: null },
@@ -732,8 +650,7 @@ describe("subclass-granted spells", () => {
   });
 
   const createMonk = async (opts: { xp: number; subclass: string | null; spells?: unknown[] }) => {
-    // Link the subclass FK (#898): granted spells resolve off subclassId, mirroring
-    // what setSubclass / creation write in production.
+    // Granted spells resolve off subclassId, mirroring what setSubclass/creation write in production (#898).
     const subclassId = opts.subclass
       ? (
           await prisma.subclass.findFirst({
@@ -774,7 +691,7 @@ describe("subclass-granted spells", () => {
     body.spellcasting?.spells ?? [];
 
   it("grants Minor Illusion to a Warrior of Shadow monk at level 3", async () => {
-    await createMonk({ xp: 900, subclass: "Warrior of Shadow" }); // L3
+    await createMonk({ xp: 900, subclass: "Warrior of Shadow" }); 
     const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
     expect(res.status).toBe(200);
     const minor = getSpells(res.body).find((s) => s.name === "Minor Illusion");
@@ -783,7 +700,7 @@ describe("subclass-granted spells", () => {
   });
 
   it("surfaces the granted view's casting ability + derived DC from that ability", async () => {
-    await createMonk({ xp: 900, subclass: "Warrior of Shadow" }); // L3, WIS 15 (+2), prof +2
+    await createMonk({ xp: 900, subclass: "Warrior of Shadow" }); 
     const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
     expect(res.status).toBe(200);
     expect(res.body.spellcasting.ability).toBe("wisdom");
@@ -792,13 +709,13 @@ describe("subclass-granted spells", () => {
   });
 
   it("does NOT grant Minor Illusion below level 3", async () => {
-    await createMonk({ xp: 300, subclass: "Warrior of Shadow" }); // L2
+    await createMonk({ xp: 300, subclass: "Warrior of Shadow" }); 
     const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
     expect(getSpells(res.body).find((s) => s.name === "Minor Illusion")).toBeUndefined();
   });
 
   it("does NOT grant Minor Illusion to a different subclass", async () => {
-    await createMonk({ xp: 900, subclass: "Warrior of the Open Hand" }); // L3
+    await createMonk({ xp: 900, subclass: "Warrior of the Open Hand" }); 
     const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
     expect(getSpells(res.body).find((s) => s.name === "Minor Illusion")).toBeUndefined();
   });
@@ -834,25 +751,18 @@ describe("subclass-granted spells", () => {
       .send({ operations: [{ type: "castSpell", entryId: "granted:warrior-of-shadow:minor-illusion", roll: 0 }] });
     expect(res.status).toBe(200);
 
-    // The response view still surfaces the re-derived grant.
     const minor = getSpells(res.body).find((s) => s.name === "Minor Illusion");
     expect(minor!.source).toBe("subclass");
 
-    // Nothing with a granted id / subclass source was persisted.
     const row = await prisma.character.findUnique({ where: { id: MONK_ID }, select: { spellcasting: true } });
     const stored = row?.spellcasting as { spells: Array<{ id: string; source?: string }> } | null;
     expect(stored?.spells.some((s) => s.source === "subclass" || s.id.startsWith("granted:"))).toBe(false);
 
-    // A castSpell event was logged.
     const activity = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}/activity`);
     const castEv = (activity.body as Array<{ type: string }>).find((e) => e.type === "castSpell");
     expect(castEv).toBeDefined();
   });
 });
-
-// ── Warlock Pact Magic + Mystic Arcanum ───────────────────────────────────────
-// Level-11 Warlock: 3 Pact slots at level 5, plus a 6th-level Mystic Arcanum
-// charge (1/long rest). Exercises arcanum cast routing and rest recharge.
 
 const WARLOCK_ID = "test-warlock-character-1";
 
@@ -860,14 +770,14 @@ const WARLOCK_BASE = {
   id: WARLOCK_ID,
   name: "Mystic Arcanum Test Warlock",
   alignment: "Chaotic Neutral",
-  experiencePoints: 85000, // level 11
+  experiencePoints: 85000,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 60, max: 60, temp: 0 },
   hitDice: { total: 11, die: "d8" },
   abilityScores: {
     strength: 10, dexterity: 12, constitution: 14,
-    intelligence: 10, wisdom: 10, charisma: 18, // CHA +4
+    intelligence: 10, wisdom: 10, charisma: 18,
   },
   savingThrowProficiencies: ["wisdom", "charisma"],
   skills: [],
@@ -875,7 +785,6 @@ const WARLOCK_BASE = {
   currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
 };
 
-// A 5th-level Pact spell and a 6th-level Mystic Arcanum spell in the spellbook.
 const WARLOCK_SPELLCASTING_JSON = {
   slotsUsed: {},
   arcanumUsed: {},
@@ -936,7 +845,6 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
     const slots = res.body.spellcasting.slots as Array<{ level: number; total: number }>;
     expect(slots).toEqual([{ level: 5, total: 3, used: 0 }]);
     expect(res.body.spellcasting.arcana).toEqual([{ level: 6, total: 1, used: 0 }]);
-    // CHA +4, L11 prof +4 → DC = 8+4+4 = 16.
     expect(res.body.spellcasting.spellSaveDC).toBe(16);
     expect(res.body.spellcasting.ability).toBe("charisma");
   });
@@ -949,7 +857,7 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
     const arcanum6 = res.body.spellcasting.arcana.find((a: { level: number }) => a.level === 6);
     expect(arcanum6.used).toBe(1);
     const pact = res.body.spellcasting.slots.find((s: { level: number }) => s.level === 5);
-    expect(pact.used).toBe(0); // no Pact slot consumed
+    expect(pact.used).toBe(0);
   });
 
   it("rejects a second arcanum cast of the same level until a long rest", async () => {
@@ -959,16 +867,15 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
   });
 
   it("recharges Pact slots on a short rest but NOT Mystic Arcanum", async () => {
-    // Spend a Pact slot (5th) and the 6th-level arcanum.
     await supertest.agent(app).set("Cookie", COOKIE).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "pact-spell-5", slotLevel: 5, roll: 12 }] });
     await supertest.agent(app).set("Cookie", COOKIE).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
 
     const rest = await supertest.agent(app).set("Cookie", COOKIE).post(hpUrl).send({ operations: [{ type: "shortRest", rolls: [5] }] });
     expect(rest.status).toBe(200);
     const pact = rest.body.spellcasting.slots.find((s: { level: number }) => s.level === 5);
-    expect(pact.used).toBe(0); // Pact slot recharged
+    expect(pact.used).toBe(0);
     const arcanum6 = rest.body.spellcasting.arcana.find((a: { level: number }) => a.level === 6);
-    expect(arcanum6.used).toBe(1); // arcanum still spent
+    expect(arcanum6.used).toBe(1);
   });
 
   it("recharges both Pact slots and Mystic Arcanum on a long rest", async () => {
@@ -986,15 +893,12 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
   });
 });
 
-// ── Prepared-spell cap (#883) ────────────────────────────────────────────────
-
 const PREPCAP_OWNER = "owner-prepcap";
 const PREPCAP_WIZARD_ID = "test-prepcap-wizard-8";
 const PREPCAP_SORCERER_ID = "test-prepcap-sorcerer-8";
 const PREPCAP_STALE_ID = "test-prepcap-stale-level";
 const PREPCAP_MULTI_ID = "test-prepcap-multi";
 
-// N level-1 spells; the first `preparedCount` are prepared, the rest unprepared.
 function leveledSpells(preparedCount: number, total: number) {
   return Array.from({ length: total }, (_, i) => ({
     id: `prep-${i + 1}`,
@@ -1049,7 +953,7 @@ describe("prepared-spell cap enforcement (#883)", () => {
     });
     clericClassId = cler.id;
 
-    // Wizard 8 / INT 18 → prepared limit 12. Seed 12 prepared + 1 unprepared + a cantrip.
+    // Wizard 8 / INT 18 → prepared limit 12; seeds 12 prepared + 1 unprepared + a cantrip, just over the cap.
     await prisma.character.create({
       data: {
         id: PREPCAP_WIZARD_ID, name: "PrepCap Wizard", alignment: "Neutral", ownerId: PREPCAP_OWNER,
@@ -1063,7 +967,7 @@ describe("prepared-spell cap enforcement (#883)", () => {
       },
     });
 
-    // Sorcerer 8 → prepared caster (SRD 5.2 table = 12). Seed 20 "prepared" leveled + 1 unprepared (over cap).
+    // Sorcerer 8 → prepared limit 12 (SRD 5.2 table); seeds 20 "prepared" + 1 unprepared, over the cap.
     await prisma.character.create({
       data: {
         id: PREPCAP_SORCERER_ID, name: "PrepCap Sorcerer", alignment: "Neutral", ownerId: PREPCAP_OWNER,
@@ -1077,8 +981,7 @@ describe("prepared-spell cap enforcement (#883)", () => {
       },
     });
 
-    // Single-class Wizard with a STALE classEntry.level=1 but XP for level 8 (INT 18).
-    // Enforcement must use the XP-derived level (limit 12), not the stale column (limit 6).
+    // Enforcement must use the XP-derived level (limit 12), not the stale classEntry.level column (limit 6).
     await prisma.character.create({
       data: {
         id: PREPCAP_STALE_ID, name: "PrepCap Stale", alignment: "Neutral", ownerId: PREPCAP_OWNER,
@@ -1157,8 +1060,7 @@ describe("prepared-spell cap enforcement (#883)", () => {
   });
 
   it("single-class enforcement uses the XP-derived level, not a stale classEntry.level", async () => {
-    // Stale column would cap at 6 (already exceeded); the XP-derived cap is 12, so
-    // a 9th prepared spell must be accepted and the limit reported as 12.
+    // The stale column would cap at 6 (already exceeded); the XP-derived cap is 12, so the 9th prepared spell must be accepted.
     const url = `/api/characters/${PREPCAP_STALE_ID}/spellcasting/transactions`;
     const res = await supertest.agent(app).set("Cookie", COOKIE).post(url)
       .send({ operations: [{ type: "prepareSpell", entryId: "prep-9" }] });
@@ -1178,10 +1080,7 @@ describe("prepared-spell cap enforcement (#883)", () => {
   });
 });
 
-// #1507: a 2014 Bard reads the SRD 5.1 Spells Known table (a "known" caster,
-// D5) where a 2024 Bard reads the SRD 5.2 Prepared Spells table ("prepared").
-// GET AC from the issue: 2014 Bard 5 -> preparedSpellLimit 8, casterModel
-// "known"; 2024 Bard 5 -> 9, "prepared".
+// 2014 Bard reads the SRD 5.1 Spells Known table ("known" caster); 2024 Bard reads the SRD 5.2 Prepared Spells table ("prepared").
 describe("GET /api/characters/:id — casterModel + edition-forked preparedSpellLimit (#1507)", () => {
   const BARD_CATALOG_NAME = "Spellcasting Route Test Bard";
   const BARD_2014_ID = "test-spellcasting-bard-2014";
@@ -1193,7 +1092,7 @@ describe("GET /api/characters/:id — casterModel + edition-forked preparedSpell
     name: `Spellcasting Test Bard (${rulesEdition})`,
     alignment: "Neutral Good",
     rulesEdition,
-    experiencePoints: 6500, // level 5
+    experiencePoints: 6500,
     initiativeBonus: 1,
     speed: 30,
     hitPoints: { current: 30, max: 30, temp: 0 },
@@ -1266,8 +1165,7 @@ describe("GET /api/characters/:id — casterModel + edition-forked preparedSpell
     expect(res.body.spellcasting.casterModel).toBe("prepared");
   });
 
-  // #1511 D4: the grimoire/meter nouns ride alongside casterModel — served,
-  // never composed client-side.
+  // The grimoire/meter nouns ride alongside casterModel — served, never composed client-side (#1511).
   it("2014 Bard 5 serves the known-caster labels", async () => {
     const res = await supertest(app).get(`/api/characters/${BARD_2014_ID}`).set("Cookie", COOKIE);
     expect(res.body.spellcasting.preparedLabel).toBe("Spells known");

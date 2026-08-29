@@ -1,9 +1,3 @@
-// #1526: serializeCharacter emits `assassinate: true` only for a 2014
-// Assassin at rogue level 3+ — mirrors character-serialize-crit-range.test.ts's
-// shape (own bespoke Rogue/Assassin catalog rows; assassinateEligible is a
-// pure level+slug gate, not feature-row-driven, so no real seeded content is
-// needed the way deriveCritRange's Champion fixture needs one).
-
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -97,9 +91,6 @@ describe("serializeCharacter assassinate rider (#1526)", () => {
     expect((await serialize("assassinate-2014-thief")).assassinate).toBeUndefined();
   });
 
-  // Mutation-proof (#1526 AC): dropping the edition check in
-  // assassinateEligible would hand a 2024 Assassin a mechanic PHB'24 deleted
-  // — this is the ONLY thing standing between that and shipping.
   it("a 2024 Assassin at L3 gets NO rider — SRD 5.2/PHB'24 deleted the auto-crit clause", async () => {
     await rogueCharacter("assassinate-2024-l3", 3, "Assassin", "EDITION_2024");
     expect((await serialize("assassinate-2024-l3")).assassinate).toBeUndefined();

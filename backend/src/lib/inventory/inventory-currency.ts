@@ -1,9 +1,6 @@
 import { Prisma } from "@/generated/prisma/client.js";
 
-// Same {cp,sp,gp,pp} shape as Character.currency and Item/InventoryItem.cost.
-// The index signature is just to satisfy Prisma's InputJsonObject structural
-// requirement when this gets written to a Json column — every real field is
-// still named and typed above it.
+// The index signature only satisfies Prisma's InputJsonObject structural requirement for the Json column write — every real field is still named and typed above it.
 export interface Currency {
   cp: number;
   sp: number;
@@ -19,8 +16,7 @@ export class InsufficientCurrencyError extends Error {
 export class InvalidInventoryOperationError extends Error {
   status = 400;
 }
-// Attunement cap breach — overrides to an explicit 409 (conflict) so the central
-// `errorHandler` surfaces it distinctly from a plain 400 validation error.
+// Overrides to an explicit 409 so the central `errorHandler` surfaces an attunement cap breach distinctly from a plain 400.
 export class AttunementLimitError extends InvalidInventoryOperationError {
   status = 409;
 }
@@ -38,9 +34,7 @@ function applyCurrencyDelta(current: Currency, delta: Currency, sign: 1 | -1): C
   return next;
 }
 
-// No cross-denomination "making change" — the frontend always edits the
-// same 4 fields it prefilled from the catalog's `cost`, so a debit/credit
-// is applied per-denomination, not as a single fungible total.
+// No cross-denomination "making change": a debit/credit is applied per-denomination, not as a single fungible total.
 export function currencyDebit(current: Currency, amount: Currency): Currency {
   return applyCurrencyDelta(current, amount, -1);
 }
@@ -64,12 +58,7 @@ export function asCurrency(json: Prisma.JsonValue | null): Currency | null {
 
 const ZERO_CURRENCY: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
 
-/**
- * A purse read straight off the Json column, empty when it holds null. The
- * null-coalescing lives HERE rather than at each call site so a reader like
- * serializeCharacter takes no branch for it — that function sits right under
- * CI's ratcheted cyclomatic ceiling, and one inline `??` pushed it over.
- */
+// Null-coalescing lives HERE rather than at each call site so a reader like serializeCharacter takes no extra branch for it — that function sits right under CI's ratcheted cyclomatic ceiling.
 export function currencyOrEmpty(json: Prisma.JsonValue | null): Currency {
   return asCurrency(json) ?? ZERO_CURRENCY;
 }
@@ -90,7 +79,7 @@ export async function setCharacterCurrency(tx: Prisma.TransactionClient, charact
   await tx.character.update({ where: { id: characterId }, data: { currency } });
 }
 
-/** Formats a currency delta as "+7 gp" / "−5 gp 2 sp" for event summaries. */
+// Formats a currency delta as "+7 gp" / "−5 gp 2 sp" for event summaries.
 export function formatCurrencyForSummary(delta: Currency | null | undefined): string | null {
   if (!delta) return null;
   const parts: string[] = [];

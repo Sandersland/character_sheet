@@ -6,9 +6,6 @@ import { BlobStoreConfigError } from "./blob-store.js";
 import { createFsBlobStore } from "./fs-blob-store.js";
 import { createS3BlobStore } from "./s3-blob-store.js";
 
-// Public surface of the storage domain: consumers import the port type, the
-// normalized errors, and the env-driven factory from here — the drivers stay
-// internal so no call site can couple to one (#1614).
 // fallow-ignore-next-line unused-type -- PutOptions completes the port's public surface (BlobStore.put's options shape); in-tree callers pass it inline, so only an out-of-tree driver/consumer would import it
 export type { BlobObject, BlobStore, PutOptions } from "./blob-store.js";
 // fallow-ignore-next-line unused-export -- BlobKeyError completes the port's error surface (assertValidKey throws it); in-tree routes only ever build valid server-generated keys, so nothing catches it yet
@@ -19,13 +16,7 @@ function readEnv(name: string): string | undefined {
   return value ? value : undefined;
 }
 
-/**
- * Selects a driver from `BLOB_STORE_DRIVER` (`s3` | `fs`). LAZY like
- * enabledProviders: reads LIVE env at call time and nothing at import time, so
- * the backend boots with no storage env at all — outside production the driver
- * defaults to `fs` under `BLOB_FS_DIR` (default: a tmpdir path, outside the
- * repo tree); in production an unset driver is a misconfiguration and throws.
- */
+// Reads env at call time, not import time, so the backend boots with no storage env at all — outside production the driver defaults to `fs`; in production an unset driver is a misconfiguration and throws.
 export function createBlobStore(): BlobStore {
   const driver =
     readEnv("BLOB_STORE_DRIVER") ??
@@ -51,13 +42,10 @@ export function createBlobStore(): BlobStore {
     return createS3BlobStore({
       endpoint: readEnv("S3_ENDPOINT"),
       bucket: readEnv("S3_BUCKET") as string,
-      // "auto" is R2's region and a valid signing region for MinIO/B2/Spaces;
-      // real AWS S3 needs S3_REGION set explicitly.
+      // "auto" is R2's region and a valid signing region for MinIO/B2/Spaces; real AWS S3 needs S3_REGION set explicitly.
       region: readEnv("S3_REGION") ?? "auto",
       accessKeyId: readEnv("S3_ACCESS_KEY_ID") as string,
       secretAccessKey: readEnv("S3_SECRET_ACCESS_KEY") as string,
-      // Path-style stays the default (R2/MinIO); only "false" opts a real-AWS
-      // target into virtual-hosted addressing.
       forcePathStyle: readEnv("S3_FORCE_PATH_STYLE")?.toLowerCase() !== "false",
     });
   }
@@ -68,20 +56,12 @@ export function createBlobStore(): BlobStore {
 
 let _store: BlobStore | undefined;
 
-/**
- * The process-wide store: production call sites go through here rather than
- * createBlobStore so the s3 driver's S3Client — and its pooled TCP/TLS
- * connections — is constructed once per process instead of per request
- * (#1657). Lazy on purpose: the memo fills on first call, preserving
- * createBlobStore's nothing-at-import-time invariant.
- */
+// #1657: the process-wide store — production call sites go through here rather than createBlobStore so the s3 driver's S3Client and its pooled connections are constructed once per process instead of per request.
 export function getBlobStore(): BlobStore {
   return (_store ??= createBlobStore());
 }
 
-// Route tests stub BLOB_FS_DIR per test/suite; without a reset the memo would
-// pin the first tmpdir for the rest of the process (same idiom as
-// __setQueryClientForTests).
+// Route tests stub BLOB_FS_DIR per test/suite; without a reset the memo would pin the first tmpdir for the rest of the process.
 export function __resetBlobStoreForTests(): void {
   _store = undefined;
 }

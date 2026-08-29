@@ -1,23 +1,3 @@
-/**
- * Advancement transaction handler — Ability Score Improvements and Feats.
- *
- * What is persisted: `advancements` array inside Character.resources JSON,
- * plus the side-effected columns `abilityScores`, `hitPoints`, and
- * `initiativeBonus` (which are updated atomically in the same transaction).
- *
- * What is derived at read time: the total slot count (characterAdvancementSlots
- * in srd/srd.ts) and the clamped display values in serializeCharacter.
- *
- * Design notes:
- *   - Each AdvancementEntry records the exact deltas applied so reversal
- *     subtracts the stored values rather than recomputing from ability scores,
- *     which may have changed since (LIFO undo / reconcile are exact).
- *   - CON increase: +1 max HP per character level applied (hitDice.total).
- *   - DEX increase: initiativeBonus updates by the net change in DEX modifier.
- *   - Undo rides the new `advancement` category in activity.ts, which
- *     restores abilityScores, hitPoints, initiativeBonus, and resources.
- */
-
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -52,11 +32,6 @@ export const ABILITY_CAP = 20;
 // PHB'24: Epic Boon feats raise an ability score to a maximum of 30, not 20.
 const ABILITY_CAP_EPIC_BOON = 30;
 
-/**
- * Computes the effect of applying `abilityDeltas` to `scores`.
- * Returns the new scores and the delta amounts to add to hitPoints.max/current
- * and initiativeBonus. All side-effects on persisted columns derive from here.
- */
 function computeAdvancementEffect(
   scores: Record<string, number>,
   hitDiceTotal: number,
@@ -67,12 +42,10 @@ function computeAdvancementEffect(
     newScores[ability] = (newScores[ability] ?? 10) + delta;
   }
 
-  // CON: each +1 to CON modifier adds +1 HP per level applied.
   const oldConMod = abilityModifier(scores.constitution ?? 10);
   const newConMod = abilityModifier(newScores.constitution ?? 10);
   const hpDelta = (newConMod - oldConMod) * hitDiceTotal;
 
-  // DEX: each +1 to DEX modifier adds +1 to initiative.
   const oldDexMod = abilityModifier(scores.dexterity ?? 10);
   const newDexMod = abilityModifier(newScores.dexterity ?? 10);
   const initDelta = newDexMod - oldDexMod;
@@ -80,19 +53,7 @@ function computeAdvancementEffect(
   return { newScores, hpDelta, initDelta };
 }
 
-/**
- * Reverses a list of AdvancementEntry values against the current column values,
- * subtracting each entry's stored deltas in LIFO order. Returns the restored
- * column values (does not write anything).
- *
- * Deliberately does NOT clamp `current` — the raw `max` column excludes feat
- * (Tough) and Draconic Resilience (#1123) bonuses, so a legal `current` can sit
- * ABOVE it and a raw-max Math.min here would destroy that headroom (min only
- * lowers; a later effective-max clamp can't restore). Every caller clamps
- * against effectiveMaxHitPoints instead: reconcileAdvancements,
- * applyAdvancementOpInTx's shared tail, and serializeCharacter's own
- * `Math.min(current, effectiveMaxHp)` after applyAdvancementClamp.
- */
+// Deliberately doesn't clamp `current` — callers clamp via effectiveMaxHitPoints instead (reconcileAdvancements, applyAdvancementOpInTx, serializeCharacter).
 export function reverseAdvancementEffects(
   scores: Record<string, number>,
   hitPoints: { current: number; max: number; temp: number; deathSaves: { successes: number; failures: number } },
@@ -107,7 +68,6 @@ export function reverseAdvancementEffects(
   let newHp = { ...hitPoints, deathSaves: { ...hitPoints.deathSaves } };
   let newInit = initiativeBonus;
 
-  // Apply in reverse order (LIFO).
   for (const entry of [...entriesToReverse].reverse()) {
     for (const [ability, delta] of Object.entries(entry.abilityDeltas)) {
       newScores[ability] = (newScores[ability] ?? 10) - delta;
@@ -115,8 +75,7 @@ export function reverseAdvancementEffects(
     newHp = {
       ...newHp,
       max: newHp.max - entry.hpDelta,
-      // Exact mirror of the take side (`current: hp.current + hpDelta`),
-      // floored at 0 for a low-current character losing a Con-raising entry.
+      // Mirrors the take side (hp.current + hpDelta), floored at 0 for a low-current character losing a Con-raising entry.
       current: Math.max(0, newHp.current - entry.hpDelta),
     };
     newInit = newInit - entry.initDelta;
@@ -128,40 +87,28 @@ export function reverseAdvancementEffects(
 // fallow-ignore-next-line code-duplication -- advancement operation types intentionally mirror the frontend wire types (types/character/leveling.ts); cross-workspace clone, shared-types consolidation is #820
 export interface TakeAsiOperation {
   type: "takeAsi";
-  /** One or two increases summing to exactly 2, each capped at 1 or 2. */
   increases: { ability: string; amount: 1 | 2 }[];
 }
 
 export interface TakeFeatOperation {
   type: "takeFeat";
-  /** Catalog Feat.id — omit for custom feats. */
   featId?: string;
-  /** Custom feat payload when featId is absent. */
   custom?: {
     name: string;
     description: string;
     improvements?: FeatImprovement[];
-    /**
-     * Half-feat style: list of ability names the player may choose to bump.
-     * When provided (non-empty), `abilityChoice` must be set at the operation level.
-     */
+    // Non-empty abilityOptions requires `abilityChoice` at the operation level.
     abilityOptions?: string[];
-    /** Amount to increase the chosen ability (default 1). */
+    // Defaults to 1 if omitted.
     abilityIncrease?: number;
   };
-  /** Required when taking a half-feat (catalog or custom) with abilityOptions. */
   abilityChoice?: string;
-  /**
-   * Fighting Style feat channel (#1137): when "fightingStyle", the feat consumes
-   * a fightingStyle slot (its own cap), requires category fighting_style or a
-   * custom feat, and dedups against styles already taken. Absent ⇒ ASI slot.
-   */
+  // #1137: "fightingStyle" consumes its own slot cap (not the ASI slot) and dedups against styles already taken; absent means ASI slot.
   slot?: "fightingStyle";
 }
 
 export interface RemoveAdvancementOperation {
   type: "removeAdvancement";
-  /** Per-character entry UUID (AdvancementEntry.id). */
   entryId: string;
 }
 
@@ -170,37 +117,25 @@ export type AdvancementOperation =
   | TakeFeatOperation
   | RemoveAdvancementOperation;
 
-/** Normalized per-op inputs handed to each advancement op handler. */
 interface AdvancementOpContext {
   tx: Prisma.TransactionClient;
   scores: Record<string, number>;
   hp: HitPoints;
   hitDice: HitDice;
   initBonus: number;
-  /** Mutable — handlers push/splice `state.advancements` in place. */
+  // Mutable — handlers push/splice `state.advancements` in place.
   state: ResourcesMutableState;
   level: number;
   totalSlots: number;
-  /** Fighting Style feat cap across all class entries (#1137). */
+  // Fighting Style feat cap across all class entries (#1137).
   fightingStyleSlotTotal: number;
-  /**
-   * Names of class entries that grant the Fighting Style feature (#1495) —
-   * `class.fightingStyleFeatLevel != null` — fed to
-   * fightingStyleFeatOfferedForClasses so a multiclass character's offered
-   * set is the union across every style-granting entry, not just the
-   * primary. `[]` for a homebrew-only character, which offers unrestricted
-   * (empty-classes) rows only under the 2014 branch and everything under 2024.
-   */
+  // #1495: names of class entries that have earned Fighting Style, fed to fightingStyleFeatOfferedForClasses; union across a multiclass, `[]` for homebrew-only.
   fightingStyleClassNames: string[];
-  /** This character's edition — gates a client-supplied featId (#1345). */
+  // This character's edition — gates a client-supplied featId (#1345).
   edition: RulesEdition;
 }
 
-/**
- * What every op handler returns: the audit-event fields plus the new column
- * values the shared tail writes. The handler has already mutated
- * `ctx.state.advancements`; the tail serializes that same state.
- */
+// Handlers already mutate `ctx.state.advancements` in place; the shared tail serializes that same state.
 interface AdvancementOpOutcome {
   summary: string;
   eventType: "abilityScoreImprovement" | "featTaken" | "advancementRemoved";
@@ -210,11 +145,7 @@ interface AdvancementOpOutcome {
   newInitBonus: number;
 }
 
-/**
- * Deep-clones the advancement-relevant column state for the audit event's
- * before/after payloads. Undo (revertAdvancementEvent) restores exactly these
- * four keys wholesale — the shape is a compatibility contract with stored events.
- */
+// Shape is a compatibility contract: revertAdvancementEvent restores exactly these four keys from stored events.
 function snapshotAdvancementState(
   scores: Record<string, number>,
   hp: HitPoints,
@@ -230,9 +161,7 @@ function snapshotAdvancementState(
   };
 }
 
-// Gates the correct partition: an ASI/general feat against totalSlots, a Fighting
-// Style feat (#1137) against its own fightingStyleSlotTotal. Origin feats occupy
-// neither cap (#1130).
+// Gates the correct partition: ASI/general feats against totalSlots, Fighting Style feats (#1137) against fightingStyleSlotTotal; Origin feats (#1130) occupy neither cap.
 function assertSlotAvailable(ctx: AdvancementOpContext, isFightingStyleSlot: boolean): void {
   const { usedSlots, usedFightingStyleSlots } = splitAdvancementsBySlotCap(
     ctx.state.advancements,
@@ -252,12 +181,6 @@ function assertSlotAvailable(ctx: AdvancementOpContext, isFightingStyleSlot: boo
   }
 }
 
-/**
- * Validates a half-feat ability bump (shared by the catalog and custom takeFeat
- * paths) and returns the resulting abilityDeltas — empty when the feat has no
- * abilityOptions. The missing-choice message is the only wording difference
- * between the two paths, so the caller supplies it.
- */
 function resolveHalfFeatBump(args: {
   featName: string;
   abilityOptions: string[];
@@ -265,7 +188,7 @@ function resolveHalfFeatBump(args: {
   abilityChoice: string | undefined;
   scores: Record<string, number>;
   missingChoiceMessage: string;
-  /** Score ceiling — 20 for General/custom half-feats, 30 for Epic Boons (PHB'24). */
+  // Score ceiling — 20 for General/custom half-feats, 30 for Epic Boons (PHB'24).
   cap?: number;
 }): Record<string, number> {
   const { featName, abilityOptions, abilityIncrease, abilityChoice, scores, missingChoiceMessage } = args;
@@ -291,7 +214,6 @@ function resolveHalfFeatBump(args: {
   return abilityDeltas;
 }
 
-/** Validates a takeAsi op's increases (count, sum, ability names, per-ability cap). */
 // fallow-ignore-next-line complexity -- pre-existing guard-clause validator, untouched by and out of scope for #1495
 function validateAsiIncreases(op: TakeAsiOperation, scores: Record<string, number>): void {
   if (!op.increases || op.increases.length === 0 || op.increases.length > 2) {
@@ -361,7 +283,6 @@ function applyTakeAsi(ctx: AdvancementOpContext, op: TakeAsiOperation): Advancem
   };
 }
 
-/** The catalog-vs-custom resolution result consumed by applyTakeFeat's shared tail. */
 interface ResolvedFeat {
   featName: string;
   featDescription: string;
@@ -370,12 +291,6 @@ interface ResolvedFeat {
   abilityDeltas: Record<string, number>;
 }
 
-// Slot eligibility for a catalog feat (#1137/#1310/#1495): a fightingStyle-slot
-// op must be a fighting_style feat offered to one of the character's
-// style-granting classes; an ASI-slot op must satisfy featOfferedForAsiSlot at
-// `level`. Split out of resolveCatalogFeat so that function's own branching
-// stays around the fetch/cross-edition/half-feat-resolution steps, not this
-// block's two independent throw-shaped rules.
 function assertFeatSlotEligible(
   catalogFeat: { name: string; category: FeatCategory; classes: readonly string[]; levelPrerequisite: number | null },
   isFightingStyleSlot: boolean,
@@ -384,17 +299,12 @@ function assertFeatSlotEligible(
   fightingStyleClassNames: readonly string[],
 ): void {
   if (isFightingStyleSlot) {
-    // The fightingStyle slot (#1137) takes only fighting_style feats — never a
-    // General/Origin/Epic Boon feat routed through it.
     if (catalogFeat.category !== "fighting_style") {
       throw new InvalidAdvancementOperationError(
         `takeFeat: "${catalogFeat.name}" (${catalogFeat.category}) is not a Fighting Style feat`,
       );
     }
-    // Hard enforcement (#1495): PHB'14's per-class subset applies at the write
-    // path too, not just the GET /api/feats?classes= picker filter — a client
-    // can't originate the rule, so a non-conforming pick 400s here even if the
-    // caller bypassed the query param entirely.
+    // #1495: enforced at the write path too, not just the GET /api/feats picker filter — a client can't originate this rule.
     if (!fightingStyleFeatOfferedForClasses(catalogFeat, fightingStyleClassNames, edition)) {
       throw new InvalidAdvancementOperationError(
         `takeFeat: "${catalogFeat.name}" is not an offered Fighting Style for ${fightingStyleClassNames.join("/") || "this character"}`,
@@ -402,9 +312,7 @@ function assertFeatSlotEligible(
     }
     return;
   }
-  // Edition-invariant (#1310): only General/Epic Boon feats the character's
-  // level satisfies may be taken via an ASI slot — Origin (backgrounds) and
-  // Fighting Style (class) can't, in either edition.
+  // #1310: edition-invariant — only General/Epic Boon feats satisfying `level` may use an ASI slot; Origin and Fighting Style can't.
   if (!featOfferedForAsiSlot(catalogFeat, level)) {
     throw new InvalidAdvancementOperationError(
       `takeFeat: "${catalogFeat.name}" (${catalogFeat.category}) is not available at level ${level}`,
@@ -427,11 +335,7 @@ async function resolveCatalogFeat(
       `Feat not found in catalog: ${op.featId}`,
     );
   }
-  // Before the category/level gates below: a cross-edition row should report
-  // its edition mismatch, not whichever gate it also happens to trip (#1345).
-  // This snapshot is baked verbatim into AdvancementEntry (below) and never
-  // re-validated, so this is prevention, not just admission — the only
-  // defense against a wrong-edition rule getting permanently persisted.
+  // #1345: checked before the category/level gates so a cross-edition row reports its edition mismatch, not whichever gate it also trips.
   const mismatch = crossEditionRejection(catalogFeat, `Feat "${catalogFeat.name}"`, edition);
   if (mismatch) throw new InvalidAdvancementOperationError(`takeFeat: ${mismatch}`);
   const category = catalogFeat.category as FeatCategory;
@@ -446,8 +350,7 @@ async function resolveCatalogFeat(
     featName: catalogFeat.name,
     featDescription: catalogFeat.description,
     featId: catalogFeat.id,
-    // Snapshot the catalog's improvements so removal/derivation never
-    // depend on the catalog row being present or unchanged.
+    // Snapshotted so removal/derivation never depend on the catalog row being present or unchanged.
     improvements: (catalogFeat.improvements as unknown as FeatImprovement[]) ?? [],
     abilityDeltas: resolveHalfFeatBump({
       featName: catalogFeat.name,
@@ -461,21 +364,8 @@ async function resolveCatalogFeat(
   };
 }
 
-// #1495: a custom feat placed in the fightingStyle slot whose NAME matches a
-// catalog Fighting Style row is a pick of that style through the custom
-// channel, not genuine homebrew — the class gate must apply identically, or
-// a rejected catalog pick could be routed around by retyping it as `custom`.
-// A name matching no catalog row is untouched (real homebrew is unaffected).
-//
-// findMany (unfiltered by edition) + resolveEditionRow, not a findFirst with
-// an `OR: [{edition},{edition:null}]` where clause: the SAME name can carry
-// BOTH an exact-edition row and a shared/other-edition row (e.g. "Great
-// Weapon Fighting" is tagged both EDITION_2014 and EDITION_2024, with
-// different `classes`) — an unordered findFirst leaves Postgres free to
-// return either one, silently admitting the wrong edition's (and wrong
-// class-scope's) row. resolveEditionRow is the SAME exact-then-null-fallback
-// resolution GET /api/feats itself runs (resolveEditionCatalog), so this
-// reads the same row that route would ultimately have offered.
+// #1495: a custom feat matching a catalog Fighting Style row must pass the same class gate, or the catalog check could be bypassed by retyping it as custom.
+// findMany + resolveEditionRow, not findFirst: the same name can carry both an exact-edition and a shared/other-edition row with different `classes`; resolveEditionRow mirrors GET /api/feats' resolveEditionCatalog.
 async function assertCustomFightingStyleNameEligible(
   tx: Prisma.TransactionClient,
   featName: string,
@@ -512,9 +402,7 @@ async function resolveCustomFeat(
   return {
     featName,
     featDescription: c.description ?? "",
-    // Custom feats may supply structured improvements directly.
     improvements: c.improvements ?? [],
-    // Custom half-feat: optional ability bump, same rules as catalog half-feats.
     abilityDeltas: resolveHalfFeatBump({
       featName,
       abilityOptions: c.abilityOptions ?? [],
@@ -532,7 +420,6 @@ async function applyTakeFeat(ctx: AdvancementOpContext, op: TakeFeatOperation): 
 
   assertSlotAvailable(ctx, isFightingStyleSlot);
 
-  // Exactly one of featId or custom.
   if (Boolean(op.featId) === Boolean(op.custom)) {
     throw new InvalidAdvancementOperationError(
       "takeFeat: provide exactly one of featId or custom",
@@ -544,8 +431,7 @@ async function applyTakeFeat(ctx: AdvancementOpContext, op: TakeFeatOperation): 
       ? await resolveCatalogFeat(tx, op, scores, level, isFightingStyleSlot, ctx.edition, ctx.fightingStyleClassNames)
       : await resolveCustomFeat(tx, op, scores, isFightingStyleSlot, ctx.edition, ctx.fightingStyleClassNames);
 
-  // A character can't hold the same Fighting Style twice (#1137) — dedup by
-  // catalog id, else by snapshot name (custom / migrated styles carry no featId).
+  // #1137: dedup by catalog id, else by snapshot name (custom/migrated styles carry no featId) — a character can't hold the same style twice.
   if (isFightingStyleSlot) {
     const duplicate = state.advancements.some(
       (a) =>
@@ -606,15 +492,13 @@ function applyRemoveAdvancement(ctx: AdvancementOpContext, op: RemoveAdvancement
 
   const removed = state.advancements[idx];
 
-  // Origin feats are background grants, not player-taken advancements (#1130) —
-  // they're removed by changing the background at creation, never via this route.
+  // #1130: Origin feats are background grants, not player-taken advancements — removed by changing the background, never via this route.
   if (removed.origin) {
     throw new InvalidAdvancementOperationError(
       `Cannot remove an Origin feat (${removed.featName ?? "background grant"})`,
     );
   }
 
-  // Reverse the single entry's effects on scores, HP, and initiative.
   const reversed = reverseAdvancementEffects(scores, hp, initBonus, [removed]);
 
   state.advancements.splice(idx, 1);
@@ -647,8 +531,7 @@ function dispatchAdvancementOp(
   }
 }
 
-// Columns/relations applyAdvancementOpInTx re-reads per op; the batch wrapper's
-// scaffold row is an existence-only { id: true } check.
+// applyAdvancementOpInTx re-reads these columns/relations per op; the batch wrapper's scaffold row is an existence-only { id: true } check.
 const ADVANCEMENT_SELECT = {
   resources: true,
   abilityScores: true,
@@ -657,22 +540,14 @@ const ADVANCEMENT_SELECT = {
   initiativeBonus: true,
   experiencePoints: true,
   rulesEdition: true,
-  // conditions (#1321): effectiveMaxHitPoints' exhaustion input for the
-  // shared-tail HP clamp in applyAdvancementOpInTx.
+  // conditions (#1321): effectiveMaxHitPoints' exhaustion input for the shared-tail HP clamp.
   conditions: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    // All entries (name + level) — both the fs-slot cap (#1137) and the ASI/feat
-    // slot cap (#1073) sum entitlement per class entry, not just the primary.
-    // `class` (#1529): a seventh reconciler/clamp-on-read query site beyond the
-    // issue's own enumerated six — found via the signature change + typecheck,
-    // resolving the SAME extraAsiLevels/fightingStyleFeatLevel columns.
-    // subclass/subclassRef.slug/class.subclassLevel (#1123):
-    // draconicResilienceMaxHpTerm's identity inputs for the shared-tail clamp.
-    // `class.name` (#1495): the canonical catalog class name, read by
-    // fightingStyleGrantingClassNames — never the entry's own `name` column,
-    // which is a free-to-diverge display name (see CharacterClassEntry's own
-    // schema comment), the wrong source for a rule keyed on Feat.classes.
+    // name/level (#1137/#1073): fs-slot and ASI/feat-slot caps sum entitlement per class entry, not just the primary.
+    // class (#1529): resolves extraAsiLevels/fightingStyleFeatLevel for the reconciler/clamp-on-read.
+    // subclass/subclassRef.slug/class.subclassLevel (#1123): draconicResilienceMaxHpTerm's identity inputs for the shared-tail clamp.
+    // class.name (#1495): the canonical class name for fightingStyleGrantingClassNames, never the entry's own display name.
     select: {
       name: true,
       level: true,
@@ -685,13 +560,7 @@ const ADVANCEMENT_SELECT = {
   },
 } satisfies Prisma.CharacterSelect;
 
-/**
- * Applies one advancement op inside a caller-supplied transaction/batchId, so the
- * unified level-up endpoint (#885) can compose advancement with other domains
- * under one batchId. Reads fresh state via `tx` on every call — a batch of 2 ASIs
- * must see each other's results — then dispatches → writes back → logs its own
- * event (same phases as the wrapper's applyOp, now the single copy of the logic).
- */
+// Reads fresh state via `tx` on every call so a batch of multiple ops sees each other's results (composes under the #885 unified level-up endpoint).
 export async function applyAdvancementOpInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -720,12 +589,9 @@ export async function applyAdvancementOpInTx(
     state: normalizeResourcesMutable(character.resources),
     level,
     totalSlots: characterAdvancementSlots(character.classEntries, level),
-    // edition (#1148): Champion's Additional Fighting Style second slot forks
-    // 7 (2024) vs 10 (2014).
+    // #1148: Champion's Additional Fighting Style second slot forks 7 (2024) vs 10 (2014).
     fightingStyleSlotTotal: characterFightingStyleFeatSlots(character.classEntries, level, edition),
-    // #1495: only entries that have actually EARNED the Fighting Style feature
-    // (not merely belong to a granting class — a Fighter1/Ranger1 multiclass
-    // hasn't reached Ranger's own L2 grant yet) feed the offered-style union.
+    // #1495: only entries that have actually earned Fighting Style (not merely belong to a granting class) feed the offered-style union.
     fightingStyleClassNames: fightingStyleGrantingClassNames(character.classEntries, level, edition),
     edition,
   };
@@ -733,16 +599,9 @@ export async function applyAdvancementOpInTx(
   const before = snapshotAdvancementState(ctx.scores, ctx.hp, ctx.initBonus, ctx.state);
   const outcome = await dispatchAdvancementOp(ctx, op);
 
-  // #1321: one shared-tail clamp covers takeAsi/takeFeat (which raise max+current
-  // by the same hpDelta — at exhaustion 4+ the effective max grows by LESS) and
-  // removeAdvancement (which lowers max — reverseAdvancementEffects subtracts
-  // exact deltas without clamping, so this is the ONLY clamp on that path).
-  // ctx.state.advancements already
-  // reflects the op's push/splice, so the feat-slot-cap dance below sees the
-  // POST-op advancement list — a just-taken Tough immediately counts.
+  // #1321: one shared-tail clamp covers takeAsi/takeFeat and removeAdvancement — the only clamp on this path; sees the POST-op advancements list.
   const { kept: inCapForHpClamp } = splitAdvancementsBySlotCap(ctx.state.advancements, ctx.totalSlots, ctx.fightingStyleSlotTotal);
-  // #1123: the Draconic Resilience term joins the feat bonus via the ONE
-  // shared function, matching serializeCharacter's applyFeatLayer composition.
+  // #1123: joins the Draconic Resilience term via the same shared function as serializeCharacter's applyFeatLayer composition.
   const maxHpBonusForClamp =
     deriveFeatBonuses(inCapForHpClamp, ctx.hitDice.total).maxHp +
     draconicResilienceMaxHpTerm(character.classEntries, ctx.level, ctx.edition);
@@ -775,16 +634,7 @@ export async function applyAdvancementOpInTx(
   });
 }
 
-/**
- * Applies a batch of advancement operations atomically in one Prisma transaction.
- * Mirrors applyResourceOperations / applySpellcastingOperations exactly:
- *   - one batchId per request groups ops on the activity timeline
- *   - any throw rolls back the entire batch
- *   - CharacterEvent logged per op with before/after snapshot for undo symmetry
- *
- * The scaffold's per-op row is only the existence check: applyAdvancementOpInTx
- * re-reads its own state via ADVANCEMENT_SELECT so it composes under a caller tx.
- */
+// Mirrors applyResourceOperations/applySpellcastingOperations: one batchId per request, any throw rolls back the whole batch, CharacterEvent logged per op for undo symmetry.
 export async function applyAdvancementOperations(
   characterId: string,
   operations: AdvancementOperation[],

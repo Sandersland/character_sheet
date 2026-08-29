@@ -10,16 +10,7 @@ export interface BlobObject {
   size: number;
 }
 
-/**
- * Vendor-agnostic blob storage port (#1614). Signatures use Node primitives
- * only — no provider SDK type may appear here or escape a driver.
- *
- * Semantics every driver must honor (pinned by runBlobStoreContract):
- * - `get` of a missing key rejects with `BlobNotFoundError`.
- * - `delete` of a missing key is idempotent — it resolves without error, the
- *   native behavior of both S3 DeleteObject and `fs.rm` with force.
- * - Keys are `/`-separated segment paths, validated by `assertValidKey`.
- */
+// #1614: vendor-agnostic blob storage port — signatures use Node primitives only, no provider SDK type may appear here or escape a driver. Semantics every driver must honor, pinned by runBlobStoreContract: `get` of a missing key rejects BlobNotFoundError; `delete` of a missing key is idempotent; keys are `/`-separated segments validated by assertValidKey.
 export interface BlobStore {
   put(key: string, body: Buffer, options: PutOptions): Promise<void>;
   get(key: string): Promise<BlobObject>;
@@ -34,8 +25,7 @@ export class BlobNotFoundError extends Error {
   }
 }
 
-// Deliberately no `status` field on either error: a missing blob is not
-// inherently an HTTP 404 — the route consuming the store maps it (#1615).
+// #1615: no `status` field on either error — a missing blob is not inherently an HTTP 404, the route consuming the store maps it.
 export class BlobStoreConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -50,9 +40,7 @@ export class BlobKeyError extends Error {
   }
 }
 
-// S3 would happily treat "../x" or "/x" as an opaque key, but the fs driver
-// maps keys onto real paths — so the PORT defines the stricter rule and every
-// driver enforces it, or the drivers would diverge on which keys are legal.
+// The fs driver maps keys onto real paths, so the port defines this stricter rule and every driver enforces it, or drivers would diverge on legal keys.
 export function assertValidKey(key: string): void {
   const segments = key.split("/");
   const valid =

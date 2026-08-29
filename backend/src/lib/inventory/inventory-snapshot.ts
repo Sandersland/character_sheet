@@ -12,8 +12,6 @@ import { type Currency, asCurrency, toJsonInput } from "./inventory-currency.js"
 import type { InventoryItemWithDetails, CatalogItemWithDetails } from "./inventory-types.js";
 import { buildInventorySnapshot } from "./inventory-snapshot-build.js";
 
-// Damage-roll fields of a weapon detail block, defaulted the same way as
-// their sibling groups below (see normalizeWeaponDetail).
 function normalizeWeaponDamageProfile(input: WeaponDetailInput) {
   return {
     damageDiceCount: input.damageDiceCount,
@@ -25,7 +23,6 @@ function normalizeWeaponDamageProfile(input: WeaponDetailInput) {
   };
 }
 
-// Grip-related boolean properties (how the weapon is wielded).
 function normalizeWeaponGripProperties(input: WeaponDetailInput) {
   return {
     finesse: input.finesse ?? false,
@@ -35,7 +32,6 @@ function normalizeWeaponGripProperties(input: WeaponDetailInput) {
   };
 }
 
-// Engagement-related boolean properties (how the weapon reaches its target).
 function normalizeWeaponEngagementProperties(input: WeaponDetailInput) {
   return {
     reach: input.reach ?? false,
@@ -44,8 +40,7 @@ function normalizeWeaponEngagementProperties(input: WeaponDetailInput) {
   };
 }
 
-// Range + open-pick classification fields (see WeaponClass/WeaponRange in
-// schema.prisma — nullable so homebrew weapons can omit classification).
+// Nullable so homebrew weapons can omit classification.
 function normalizeWeaponClassification(input: WeaponDetailInput) {
   return {
     rangeNormal: input.rangeNormal ?? null,
@@ -55,12 +50,7 @@ function normalizeWeaponClassification(input: WeaponDetailInput) {
   };
 }
 
-// Fills in every optional field's default explicitly — a custom item's
-// detail block comes from a Zod-validated but otherwise free-form object
-// (`WeaponDetailInput` etc., all-optional past the required fields), and
-// Prisma's nested `create` input wants concrete values, not `undefined`,
-// for fields the schema defaults (damageModifier, finesse, ...) or allows
-// null (versatileDiceCount, rangeNormal, ...).
+// Fills in every optional field's default explicitly — Prisma's nested `create` input wants concrete values, not `undefined`, for fields the schema defaults or allows null.
 export function normalizeWeaponDetail(input: WeaponDetailInput) {
   return {
     ...normalizeWeaponDamageProfile(input),
@@ -94,37 +84,17 @@ export function normalizeConsumableDetail(input: ConsumableDetailInput) {
   };
 }
 
-// Reads a catalog Item's (already-included) weapon/armor/consumable detail
-// rows and builds the nested-create payload for a new InventoryItem's own
-// copy — the live-DB counterpart to prisma/seed.ts's itemDetailCreateFields,
-// which does the same thing from a seed-time literal instead of a DB read.
+// The live-DB counterpart to itemDetailCreateFields, which does the same thing from a seed-time literal instead of a DB read.
 export function snapshotItemDetail(item: CatalogItemWithDetails) {
   return snapshotDetailCreate(item);
 }
 
-// Undo snapshot.
-//
-// When an op DELETES an InventoryItem row (full sell, remove, adjust-to-zero)
-// the row is gone, so `before`/`after` alone can't reconstruct it on undo. We
-// stash a self-contained snapshot under `data.deletedItem` (NOT `before` —
-// `before`/`after` feed diffToFields and would spray spurious field-diff rows;
-// `data` is never diffed). On revert, revertInventoryEvent recreates the row
-// from this snapshot reusing the original id.
-//
-// #1649 simplified this: the frozen half (weapon/armor/consumable/
-// capabilities) is captured verbatim as the already-persisted `snapshot`
-// blob rather than re-derived field by field from four detail tables that no
-// longer exist — recreate just writes it straight back. `capabilityUses`
-// (runtime `used` counters, keyed by the snapshot's stable `capabilities[].key`)
-// is the only piece that still needs its own array, since it lives in a
-// separate table from the snapshot.
+// When an op DELETES a row, `before`/`after` alone can't reconstruct it, so a self-contained snapshot is stashed under `data.deletedItem` instead (`data` is never diffed, unlike `before`/`after` which feed diffToFields). revertInventoryEvent recreates the row from this snapshot, reusing the original id.
+// #1649: the frozen half is captured verbatim as the already-persisted `snapshot` blob; `capabilityUses` (runtime `used` counters, keyed by `capabilities[].key`) is the only piece needing its own array, since it lives in a separate table.
 export interface DeletedInventoryItemSnapshot {
   id: string;
   itemId: string | null;
-  // LEGACY, read-only (#1646): the pre-merge name for the same provenance FK.
-  // Audit blobs are append-only, so pre-merge snapshots still carry this key
-  // instead of itemId; resolveSnapshotRefs falls back to it on undo. No writer
-  // sets it any more — snapshotInventoryItemForUndo below only writes itemId.
+  // #1646: LEGACY, read-only — the pre-merge name for the same provenance FK, still carried by append-only audit blobs written before the merge; resolveSnapshotRefs falls back to it. No writer sets it any more.
   campaignItemId?: string | null;
   name: string;
   category: ItemCategory;
@@ -147,10 +117,6 @@ export interface DeletedInventoryItemSnapshot {
   capabilityUses: { capabilityKey: string; used: number }[];
 }
 
-// Serializes an already-fetched InventoryItemWithDetails into the
-// `data.deletedItem` snapshot, reading from an InventoryItem (live row) rather
-// than a catalog Item and keeping the scalar item columns alongside the
-// already-persisted frozen blob.
 export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): DeletedInventoryItemSnapshot {
   return {
     id: item.id,
@@ -173,24 +139,13 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
     position: item.position,
     usesRemaining: item.usesRemaining,
     snapshot: item.snapshot as Prisma.InputJsonValue,
-    // `used` included (unlike snapshotCampaignItemCapabilityCreates's award
-    // path): undo-of-delete restores the row verbatim, spend state included.
+    // `used` is included, unlike snapshotCampaignItemCapabilityCreates's award path: undo-of-delete restores the row verbatim, spend state included.
     capabilityUses: item.capabilities.map((c) => ({ capabilityKey: c.id, used: c.used })),
   };
 }
 
-// Builds the nested-create payload for an InventoryItem from a catalog Item
-// that has already been fetched with catalogItemDetailInclude. Used by
-// charactersRouter to create starting-equipment rows atomically inside
-// prisma.character.create, without going through applyInventoryOperations
-// (which would write ledger rows — starting gear is a character's genesis
-// state, not an economic event; same reasoning as prisma/seed.ts).
-//
-// `weaponDetail`/`armorDetail` on the RETURNED object are NOT persisted
-// columns (#1649 dropped those tables) — they're carried here only so
-// selectAutoEquip/autoEquipSlot can read them before the auto-equip pass
-// assigns equippedSlot; stripInventoryCreateForWrite below drops them from
-// the actual `inventoryItems: { create: [...] }` payload.
+// Used to create starting-equipment rows atomically inside prisma.character.create, without going through applyInventoryOperations — starting gear is a character's genesis state, not an economic event.
+// #1649: `weaponDetail`/`armorDetail` on the RETURNED object are NOT persisted columns — carried here only so selectAutoEquip/autoEquipSlot can read them before the auto-equip pass assigns equippedSlot; stripInventoryCreateForWrite drops them before the actual write.
 export function buildInventoryCreateFromCatalog(
   item: CatalogItemWithDetails,
   opts: { quantity: number; position: number }
@@ -208,16 +163,9 @@ export function buildInventoryCreateFromCatalog(
     equippedSlot: null as EquipSlot | null,
     slot: item.slot,
     position: opts.position,
-    // Promoted out of InventoryConsumableDetail (#1648) — same freshCopy value
-    // the nested consumableDetail create below carries.
+    // #1648: same freshCopy value the nested consumableDetail create below carries.
     usesRemaining: detail.consumableDetail?.create.usesRemaining ?? null,
-    // catalogItemDetailInclude doesn't fetch capabilities (starting gear is
-    // catalog-only content, never a capability-bearing DM award), so this is
-    // always built with capabilities: []. rarity/requiresAttunement/
-    // attunementPrereqKind/Value are NOT snapshotted from the catalog item
-    // here (pre-existing behaviour, unchanged by #1648): this create doesn't
-    // set those columns either, so the snapshot must agree with what the row
-    // actually persists, not with the catalog's values.
+    // rarity/requiresAttunement/attunementPrereqKind/Value are NOT snapshotted from the catalog item: this create doesn't set those columns either, so the snapshot must agree with what the row actually persists.
     snapshot: buildInventorySnapshot({
       name: item.name,
       category: item.category,
@@ -239,10 +187,7 @@ export function buildInventoryCreateFromCatalog(
   };
 }
 
-// Drops the auto-equip-only `weaponDetail`/`armorDetail` fields
-// buildInventoryCreateFromCatalog's result carries (see its comment) before
-// the array reaches `inventoryItems: { create: [...] }` — those keys aren't
-// valid InventoryItem create fields since #1649.
+// #1649: weaponDetail/armorDetail aren't valid InventoryItem create fields.
 export function stripInventoryCreateForWrite<T extends { weaponDetail: unknown; armorDetail: unknown }>(
   create: T,
 ): Omit<T, "weaponDetail" | "armorDetail"> {
@@ -251,10 +196,7 @@ export function stripInventoryCreateForWrite<T extends { weaponDetail: unknown; 
   return rest;
 }
 
-// Minimal shape selectAutoEquip needs to decide what to equip — a subset of
-// what buildInventoryCreateFromCatalog returns. Kept structural (not tied to
-// that function's exact return type) so the rule stays unit-testable from a
-// hand-written literal with no DB.
+// Kept structural, not tied to buildInventoryCreateFromCatalog's exact return type, so the rule stays unit-testable from a hand-written literal with no DB.
 export interface AutoEquipCandidate {
   category: ItemCategory;
   position: number;
@@ -262,19 +204,7 @@ export interface AutoEquipCandidate {
   armorDetail?: { create: { armorCategory: ArmorCategory } } | undefined;
 }
 
-// 5e starting-equipment auto-equip rule, kept here in lib/ so it stays out of
-// the creation route body. Given the InventoryItem create payloads for a new
-// character's starting gear, returns the indices that should be marked
-// `equipped: true`. Mirrors the same off-hand/two-handed constraints the read
-// path derives (characters.ts): at most 2 weapons and 1 shield equipped; a
-// two-handed weapon precludes a shield and a second weapon.
-//
-// Choices:
-//   - Primary weapon = first weapon by position. Always equipped.
-//   - If primary weapon is two-handed: no shield, no second weapon.
-//   - Otherwise: also equip a shield (first armor with armorCategory "shield"),
-//     at most one.
-//   - Body armor (first non-shield armor) is equipped regardless of weapon grip.
+// Mirrors the off-hand/two-handed constraints the read path derives (characters.ts): primary weapon (first by position) is always equipped; if it's two-handed, no shield and no second weapon; otherwise a shield also equips; body armor equips regardless of weapon grip.
 export function selectAutoEquip(items: AutoEquipCandidate[]): number[] {
   const byPosition = (a: number, b: number) => items[a].position - items[b].position;
 
@@ -313,9 +243,7 @@ export function selectAutoEquip(items: AutoEquipCandidate[]): number[] {
   return selected;
 }
 
-// The paper-doll slot an auto-equipped starting-gear candidate occupies (#565).
-// selectAutoEquip only ever picks one weapon (MAIN_HAND), one shield (OFF_HAND),
-// and one body armor (BODY), so this mapping is unambiguous.
+// #565: selectAutoEquip only ever picks one weapon, one shield, and one body armor, so this mapping is unambiguous.
 export function autoEquipSlot(item: AutoEquipCandidate): EquipSlot {
   if (item.category === "weapon") return "MAIN_HAND";
   if (item.armorDetail?.create.armorCategory === "shield") return "OFF_HAND";

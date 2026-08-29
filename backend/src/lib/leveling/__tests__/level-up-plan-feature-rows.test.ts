@@ -1,21 +1,4 @@
-// #1546 Part B-i proved the featureRows carrier reaches deriveResources by
-// spying on the call (a plan-output assertion was vacuous by construction
-// then: nothing in buildLevelUpPlan's candidate steps read anything the
-// carrier fed, since Battle Master's ClassExtras were still code —
-// SubclassDefinition.deriveExtras). #1546 Part B-ii retires that spy:
-// Combat Superiority/Student of War's maneuverChoiceCount/toolProfChoiceCount
-// are now ROW-driven (registry.ts's deriveRowExtras), so choiceCountStep
-// genuinely reads them — the carrier's arrival is observable through REAL
-// plan output now, and a standing `vi.mock` of a domain module is no longer
-// needed (nor wanted as precedent — this was the first one in backend/src).
-//
-// Uses BATTLE_MASTER_ROWS (test-feature-rows.fixture.ts) — the same rows
-// prisma/seed/fighter-features.ts seeds — rather than a test-only inert row,
-// because the whole point now is proving the ceremony's maneuvers/
-// toolProficiency steps survive the code -> rows flip end to end, on both
-// the persisted-subclass FK path (CharacterClassEntry.subclassRef) and the
-// not-yet-committed `?subclassId=` re-plan FK path (Subclass.findUnique) —
-// the exact two carriers B-i threaded (level-up-transaction.ts).
+// #1546 Part B-ii: uses BATTLE_MASTER_ROWS (the same rows prisma/seed/fighter-features.ts seeds), not an inert fixture, so this proves the ceremony's maneuvers/toolProficiency steps survive the code → rows flip end to end, on both the persisted-subclass FK path and the not-yet-committed `?subclassId=` re-plan FK path.
 import type { RulesEdition } from "@character-sheet/shared-types";
 import { describe, expect, it } from "vitest";
 
@@ -37,11 +20,7 @@ function stepsByKind(steps: LevelUpStep[], kind: LevelUpStep["kind"]): LevelUpSt
 
 describe.each(EDITIONS)("buildLevelUpPlan — the PERSISTED subclass FK path carries real Battle Master rows (%s, #1546 Part B-ii)", (edition) => {
   it("fighter 2 -> 3: subclass already persisted at the grant level still gets maneuvers 3 + toolProficiency 1", () => {
-    // Edge case for the persisted FK (CharacterClassEntry.subclassRef) — the
-    // common flow chooses the subclass VIA the re-plan below, but
-    // resolveLevelUpContext's TARGET_ENTRY_SELECT carries subclassRef.features
-    // regardless of what level the persisted subclass happens to be at, so
-    // this must resolve correctly too.
+    // Edge case for the persisted FK path — resolveLevelUpContext's TARGET_ENTRY_SELECT carries subclassRef.features regardless of what level the persisted subclass happens to be at.
     const target: TargetClassEntry = {
       name: "fighter",
       newLevel: 3,
@@ -52,8 +31,7 @@ describe.each(EDITIONS)("buildLevelUpPlan — the PERSISTED subclass FK path car
     };
     const steps = buildLevelUpPlan(char(2, edition, "battle master"), target);
 
-    // #1516: canSwap rides the "maneuvers" step unconditionally whenever it
-    // exists (PHB'14 Battle Master p.73 / SRD 5.2 equivalent).
+    // #1516: canSwap rides the "maneuvers" step unconditionally whenever it exists (PHB'14 Battle Master p.73 / SRD 5.2 equivalent).
     expect(stepsByKind(steps, "maneuvers")).toEqual({ kind: "maneuvers", count: 3, meta: { canSwap: true } });
     expect(stepsByKind(steps, "toolProficiency")).toEqual({ kind: "toolProficiency", count: 1 });
   });
@@ -76,9 +54,7 @@ describe.each(EDITIONS)("buildLevelUpPlan — the PERSISTED subclass FK path car
 
 describe.each(EDITIONS)("resolveLevelUpPlan — the ?subclassId= RE-PLAN FK path carries the PICKED Battle Master rows (%s, #1546 Part B-ii)", (edition) => {
   it("fighter 2 -> 3 with no subclass chosen yet: the re-plan splices subclass + maneuvers 3 + toolProficiency 1, in canonical order", () => {
-    // No subclassFeatureRows on target — "not yet chosen" is exactly what
-    // that absence means; the PICKED rows travel as resolveLevelUpPlan's own
-    // parameter (pickedSubclassFeatureRows), never baked onto target.
+    // No subclassFeatureRows on target — the PICKED rows travel as resolveLevelUpPlan's own parameter (pickedSubclassFeatureRows), never baked onto target.
     const target: TargetClassEntry = {
       name: "fighter",
       newLevel: 3,
@@ -92,8 +68,7 @@ describe.each(EDITIONS)("resolveLevelUpPlan — the ?subclassId= RE-PLAN FK path
     expect(kinds).toContain("subclass");
     expect(stepsByKind(steps, "maneuvers")).toEqual({ kind: "maneuvers", count: 3, meta: { canSwap: true } });
     expect(stepsByKind(steps, "toolProficiency")).toEqual({ kind: "toolProficiency", count: 1 });
-    // Canonical order (KIND_ORDER, level-up-submission.ts): subclass before
-    // maneuvers/toolProficiency, both before review.
+    // Canonical order (KIND_ORDER, level-up-submission.ts): subclass before maneuvers/toolProficiency, both before review.
     expect(kinds.indexOf("subclass")).toBeLessThan(kinds.indexOf("maneuvers"));
     expect(kinds.indexOf("maneuvers")).toBeLessThan(kinds.indexOf("toolProficiency"));
   });
@@ -114,14 +89,7 @@ describe.each(EDITIONS)("resolveLevelUpPlan — the ?subclassId= RE-PLAN FK path
   });
 });
 
-// The non-vacuity proof B-i's spy used to carry: an absent carrier (no
-// resolveLevelUpContext caller, e.g. a bare pure-function call) must never
-// throw, and a class/subclass with nothing row-driven still plans cleanly.
-// See derivedAt's own comment (level-up-plan.ts) for the null-flip
-// consequence #1546 Part B-ii introduces for Battle Master specifically —
-// derive-resources-null-flip.test.ts covers that at the deriveResources layer
-// directly (an empty carrier now genuinely returns null for Battle Master,
-// where it used to return a code-authored object regardless of the carrier).
+// An absent carrier (no resolveLevelUpContext caller) must never throw, and a class/subclass with nothing row-driven still plans cleanly. derive-resources-null-flip.test.ts covers the null-flip consequence at the deriveResources layer directly.
 describe("buildLevelUpPlan — an absent carrier never throws and grants nothing (no regression from #1546 Part B-i's threading)", () => {
   it("a target with no classFeatureRows/subclassFeatureRows at all still plans a non-Battle-Master level-up cleanly", () => {
     const target: TargetClassEntry = { name: "fighter", newLevel: 2, subclass: null, hitDie: ANY_DIE };

@@ -1,9 +1,3 @@
-// Served attack rows (#1434): serializeCharacter emits one row per way the
-// character can swing, with the numbers already resolved — including the
-// Two-Weapon Fighting off-hand row, whose ability-modifier subtraction used to
-// happen on the client. Composed from the already-serialized inventory, so a row
-// can never disagree with the `inventory[].weapon` values rendered beside it.
-
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -18,7 +12,7 @@ const OWNER_ID = "owner-serialize-attack-rows";
 const BASE = {
   ownerId: OWNER_ID,
   alignment: "Neutral",
-  experiencePoints: 0, // level 1, proficiency +2
+  experiencePoints: 0,
   initiativeBonus: 0,
   speed: 30,
   savingThrowProficiencies: [] as string[],
@@ -31,7 +25,6 @@ const BASE = {
 
 const SCORES = { strength: 16, dexterity: 10, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 };
 
-/** Two-Weapon Fighting fighting style, as the advancement entry #1137 stores. */
 const TWF_STYLE = {
   advancements: [
     {
@@ -62,14 +55,9 @@ type WeaponFixture = {
 };
 
 const createdIds: string[] = [];
-// #1529: weapon/armor proficiency AND the Fighting Style feat slot cap both
-// resolve via the class FK relation now — this fixture must link classId to
-// the real seeded Fighter row, or (a) the Longsword proficiency bonus goes
-// missing and (b) TWF_STYLE's advancement gets clamped out as over-cap
-// (fightingStyleSlotTotal 0 for a homebrew entry).
+// classId must link to the real seeded Fighter row, or the Longsword proficiency bonus goes missing and TWF_STYLE's advancement gets clamped out as over-cap (#1529).
 let fighterClassId: string;
 
-/** The while-active Rage buff, present only when a bonus is requested. */
 function meleeDamageBuffData(modifier: number | undefined) {
   if (!modifier) return {};
   return {
@@ -81,7 +69,6 @@ function meleeDamageBuffData(modifier: number | undefined) {
   };
 }
 
-/** The weapon fixture's WeaponDetailInput, split out of weaponItemData to keep its complexity down. */
 function weaponDetailFixture(w: WeaponFixture): WeaponDetailInput {
   return {
     damageDiceCount: 1,
@@ -96,7 +83,6 @@ function weaponDetailFixture(w: WeaponFixture): WeaponDetailInput {
   };
 }
 
-/** The single on-hit damage-rider capability a fixture's `riderDice` describes, or none. */
 function riderCapabilities(riderDice: WeaponFixture["riderDice"]) {
   if (!riderDice) return [];
   return [
@@ -111,7 +97,6 @@ function riderCapabilities(riderDice: WeaponFixture["riderDice"]) {
   ];
 }
 
-/** One weapon fixture's InventoryItem create data, position-ordered. */
 function weaponItemData(characterId: string, position: number, w: WeaponFixture) {
   return inventoryItemFixtureData({
     characterId,
@@ -186,8 +171,7 @@ describe("serializeCharacter attackRows — equipped weapons", () => {
     const [row] = weaponRows(payload);
     expect(row.kind).toBe("weapon");
     expect(row.name).toBe("Longsword");
-    // Absolute numbers, so an upstream regression in the attack/damage
-    // derivations is caught here and not just latched against itself.
+    // Absolute numbers so an upstream regression in the derivations is caught here, not just latched against itself.
     expect(row.attackSpec).toEqual({ count: 1, faces: 20, modifier: 5 });
     expect(row.damageSpec).toEqual({ count: 1, faces: 8, modifier: 3 });
     expect(row.damageType).toBe("slashing");
@@ -196,7 +180,7 @@ describe("serializeCharacter attackRows — equipped weapons", () => {
     expect(row.magical).toBe(false);
     expect(row.damageRiders).toEqual([]);
 
-    // …and the latch that the row is COMPOSED from the served item, not re-derived.
+    // Latches that the row is composed from the served item, not re-derived.
     const item = payload.inventory.find((i) => i.id === row.id)!;
     expect(row.attackSpec.modifier).toBe(item.weapon!.attackBonus);
     expect(row.damageSpec).toEqual({
@@ -270,10 +254,7 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     expect(offHandRow(await serialize(id))!.name).toBe("Dagger");
   });
 
-  // The off-hand row's subtraction is against ITS OWN weapon's served ability
-  // modifier — not against the main-hand row's modifier. A STR Longsword (+3)
-  // beside a finesse Dagger that picks DEX 18 (+4) is where the two answers
-  // differ, and the main-hand-relative reading would emit −1.
+  // The off-hand row subtracts ITS OWN weapon's ability modifier, not the main hand's — a STR Longsword (+3) beside a DEX 18 finesse Dagger (+4) is where a main-hand-relative reading would wrongly emit −1.
   it("drops the OFF-HAND weapon's own ability modifier, not the main hand's", async () => {
     const id = await createFighter(
       [
@@ -286,8 +267,8 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
 
     const mainHand = weaponRows(payload).find((r) => r.name === "Longsword")!;
     const dagger = payload.inventory.find((i) => i.name === "Dagger")!;
-    expect(mainHand.damageSpec.modifier).toBe(3); // STR +3
-    expect(dagger.weapon!.damage.abilityModifier).toBe(4); // finesse → max(STR +3, DEX +4)
+    expect(mainHand.damageSpec.modifier).toBe(3);
+    expect(dagger.weapon!.damage.abilityModifier).toBe(4);
 
     const offHand = offHandRow(payload)!;
     expect(offHand.damageSpec.modifier).toBe(
@@ -298,8 +279,7 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
   });
 
   it("keeps the ability modifier with the Two-Weapon Fighting style AND a light pair, matching the main hand", async () => {
-    // Same-ability pair (two finesse light Shortswords) so "equals the main-hand
-    // row's modifier" is a meaningful assertion rather than a coincidence.
+    // Same-ability pair so "equals the main-hand row's modifier" is meaningful, not a coincidence.
     const pair: WeaponFixture[] = [
       { name: "Shortsword", equippedSlot: "MAIN_HAND", damageDiceFaces: 6, damageType: "piercing", finesse: true, light: true },
       { name: "Shortsword", equippedSlot: "OFF_HAND", damageDiceFaces: 6, damageType: "piercing", finesse: true, light: true },
@@ -317,10 +297,7 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     expect(offHandRow(withoutStyle)!.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 0, ability: "strength" });
   });
 
-  // #1640: hasOffHandAbilityDamage used to gate on the style's marker ALONE — a
-  // non-Light pair with the style still kept the full ability modifier. Both
-  // editions require a light weapon in each hand (PHB'14 p. 195 + p. 72 / SRD 5.2),
-  // and the style does not waive it (#1496).
+  // PHB'14 p. 195 + p. 72 / SRD 5.2: both editions require a light weapon in each hand (#1496).
   it("drops the ability modifier with the Two-Weapon Fighting style but a NON-light pair (#1640)", async () => {
     const nonLightPair: WeaponFixture[] = [
       { name: "Longsword", equippedSlot: "MAIN_HAND", damageDiceFaces: 8, damageType: "slashing", light: false },
@@ -332,10 +309,6 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     expect(offHandRow(withStyle)!.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 0, ability: "strength" });
   });
 
-  // #1435 eligibility latch (end-to-end): the served offHandAttack row's
-  // `enabled` is the two-Light-weapon rule alone — the Two-Weapon Fighting
-  // style, present here via TWF_STYLE advancements, never enables a non-Light
-  // pair. Restores the guarantee the deleted frontend canTwoWeaponFight test held.
   it("serves offHandAttack disabled for a non-Light pair even WITH the Two-Weapon Fighting style, but enabled for a Light pair (#1435/#1496)", async () => {
     const nonLightPair: WeaponFixture[] = [
       { name: "Longsword", equippedSlot: "MAIN_HAND", damageDiceFaces: 8, damageType: "slashing", light: false },
@@ -378,7 +351,7 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     );
     const payload = await serialize(id);
 
-    expect(weaponRows(payload)[0].damageSpec.modifier).toBe(5); // STR +3 + Rage +2
+    expect(weaponRows(payload)[0].damageSpec.modifier).toBe(5);
     const offHand = offHandRow(payload)!;
     expect(offHand.damageSpec.modifier).toBe(2);
     expect(offHand.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 2, ability: "strength" });

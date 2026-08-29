@@ -1,5 +1,3 @@
-// Ported verbatim from the retired frontend/src/lib/encumbrance.test.ts (#1377):
-// the rule moved backend, so its coverage moved with it. No DB.
 import { describe, expect, it } from "vitest";
 
 import { carriedWeight, carryingCapacity, coinWeight } from "@/lib/srd/encumbrance.js";
@@ -35,8 +33,7 @@ describe("coinWeight", () => {
   });
 
   it("scales fractionally with coin count", () => {
-    // Pins the float result exactly: the sheet formats this with toFixed(1),
-    // which would hide a divide-then-round drift here.
+    // Pins the exact float; toFixed(1) display would hide drift.
     expect(coinWeight({ cp: 100, sp: 20, gp: 10, pp: 7 })).toBe(2.74);
     expect(coinWeight({ cp: 25, sp: 0, gp: 0, pp: 0 })).toBe(0.5);
   });

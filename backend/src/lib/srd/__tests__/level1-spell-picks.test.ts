@@ -3,9 +3,6 @@ import { describe, it, expect } from "vitest";
 import { level1SpellPicksFor } from "@/lib/srd/srd.js";
 import { ELDRITCH_KNIGHT } from "./third-caster.fixture.js";
 
-// #1510: level1SpellPicksFor owns the whole level-1 creation-picks object for
-// BOTH the reference route and the creation gate (D4) — pin the full table for
-// each edition here as the pure, no-Postgres source of truth.
 describe("level1SpellPicksFor — EDITION_2014", () => {
   it("known casters: fixed personal list from SRD 5.1", () => {
     expect(level1SpellPicksFor("Bard", null, "EDITION_2014")).toEqual({ cantrips: 2, spells: 4, maxSpellLevel: 1 });
@@ -38,11 +35,7 @@ describe("level1SpellPicksFor — EDITION_2014", () => {
   });
 });
 
-// The 2024 branch must reproduce today's values byte-identically — this pin,
-// plus reference.test.ts's untouched 2024 route test, is the no-regression gate.
-// Wizard is the deliberate exception (#1513, see the dedicated describe below):
-// its `spells`/`spellbookSize` moved from the prepared count (4) to the
-// spellbook size (6), which pre-#1510/#1513 output did not distinguish.
+// Wizard is the deliberate exception (#1513): spellbookSize is 6, not the prepared count of 4.
 describe("level1SpellPicksFor — EDITION_2024 (byte-identical to pre-#1510 output, Wizard excepted)", () => {
   it("full and third-tier casters", () => {
     expect(level1SpellPicksFor("Bard", null, "EDITION_2024")).toEqual({ cantrips: 2, spells: 4, maxSpellLevel: 1 });
@@ -71,12 +64,7 @@ describe("level1SpellPicksFor — EDITION_2024 (byte-identical to pre-#1510 outp
   });
 });
 
-// #1513 mutation proof, asserted for both editions from one test: spellbookSize
-// must not collapse back into a class's prepared/known pick count, and it must
-// exist ONLY for the Wizard. SRD 5.1, Wizard, "Your Spellbook": "At 1st level,
-// you have a spellbook containing six 1st-level wizard spells of your choice."
-// SRD 5.2, Wizard level 1, Spellcasting: the spellbook starts with six level-1
-// wizard spells; the Prepared Spells column (4 at level 1) is separate.
+// SRD 5.1 / SRD 5.2: Wizard's spellbook (6) is separate from the prepared-spells count (4).
 describe("level1SpellPicksFor — spellbookSize is Wizard-only, both editions (#1513)", () => {
   it("Wizard's spellbookSize (and spells) is 6 in EDITION_2014 and EDITION_2024", () => {
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {

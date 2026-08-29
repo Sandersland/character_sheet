@@ -1,12 +1,4 @@
-/**
- * GET /api/editions (#1436) — the edition list + copy the picker renders.
- *
- * The interesting property is a NEGATIVE one: this route is edition-independent,
- * so `?edition=` must be neither honoured nor validated. Both are asserted (a
- * bare 200, and byte-equality against a param-bearing call), because "ignores
- * the param" and "400s on the param" are indistinguishable from a single
- * successful bare request.
- */
+// This route is edition-independent: ?edition= must be neither honoured nor validated — byte-equality against a param-bearing call is asserted, not just a bare 200.
 import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -38,8 +30,6 @@ describe("GET /api/editions", () => {
     expect(res.body.defaultEdition).toBe("EDITION_2024");
   });
 
-  // #1372 ungates 2014: both rows are the same shape and neither carries
-  // unavailableReason — the field #1371 added and this issue removes.
   it("serves both editions selectable, with no unavailableReason on either (#1372)", async () => {
     const res = await supertest(app).get("/api/editions").set("Cookie", COOKIE);
     const [twentyFour, fourteen] = res.body.editions;

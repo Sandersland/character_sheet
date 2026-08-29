@@ -1,14 +1,4 @@
-/**
- * Latch for the executeAction op schema migrated into
- * @character-sheet/contracts (#1390).
- *
- * `expectTypeOf` is erased at runtime (there is no vitest `typecheck` block), so
- * the z.input/z.output half is gated by `npm run typecheck`, not by `vitest
- * run`. The safeParse assertions are the half vitest can fail: the route's own
- * tests assert `res.status`, and an unknown action key answers 400 from
- * `assertKnownActionKeys` just as a malformed body does, so dropping
- * `.min(1)`/`.int()`/`.positive()` here would leave them green.
- */
+// expectTypeOf is erased at runtime; only `npm run typecheck`, not vitest, catches drift in the z.input/z.output assertions below (#1390).
 import { executeActionOpSchema, type ActionOperation, type ExecuteActionOperation } from "@character-sheet/contracts";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { z } from "zod";

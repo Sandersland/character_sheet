@@ -103,7 +103,6 @@ describe("readCapability", () => {
 
   it("reads a malformed passiveBonus (missing op) as opaque", () => {
     expect(readCapability({ kind: "passiveBonus", target: "skill", value: 2 }).kind).toBe("passiveBonus");
-    // no op → falls through to opaque, value dropped
     const cap = readCapability({ kind: "passiveBonus", target: "skill", value: 2 });
     expect("value" in cap).toBe(false);
   });
@@ -363,14 +362,12 @@ describe("grant capabilities (#529)", () => {
       { name: "Amulet", equipped: false, attuned: true, requiresAttunement: true, capabilities: [immFire] },
     ]);
     expect(set.has("fire")).toBe(true);
-    // Inactive item contributes nothing.
     expect(itemImmuneDamageTypes([
       { name: "Amulet", equipped: false, attuned: false, requiresAttunement: true, capabilities: [immFire] },
     ]).size).toBe(0);
   });
 
   it("drops a stale skill/ability qualifier from a whole-axis (initiative/attack) advantage", () => {
-    // A grant mis-authored with a leftover skill value on an initiative axis.
     const staleInit: CapabilityColumns = {
       kind: "grant",
       grantType: "advantage",
@@ -389,7 +386,6 @@ describe("grant capabilities (#529)", () => {
 });
 
 describe("charges pool (#555)", () => {
-  // Wand of Magic Missiles: 7 charges, regains 1d6+1 daily at dawn.
   const wandPool: CapabilityColumns = {
     kind: "charges",
     maxCharges: 7,
@@ -427,7 +423,6 @@ describe("charges pool (#555)", () => {
       maxCharges: 7,
       recharge: { trigger: "dawn", dice: { count: 1, faces: 6 }, bonus: 1 },
     });
-    // Dice-less full-refill pool: recharge carries only the trigger.
     expect(serializeCapability({ kind: "charges", maxCharges: 3, rechargeTrigger: "long" })).toEqual({
       kind: "charges",
       maxCharges: 3,
@@ -442,7 +437,6 @@ describe("charges pool (#555)", () => {
       chargeCost: 2,
     });
     expect(serializeCapability({ ...castSpellRow, castResource: "charges" })).toMatchObject({ chargeCost: 1 });
-    // Non-charges resources don't carry a chargeCost.
     expect("chargeCost" in serializeCapability(castSpellRow)).toBe(false);
   });
 
@@ -451,7 +445,6 @@ describe("charges pool (#555)", () => {
     const pool = chargePoolOf(rows);
     expect(pool?.cap.maxCharges).toBe(7);
     expect((pool?.row as { id?: string })?.id).toBe("cap-pool");
-    // Malformed charges rows don't count as a pool.
     expect(chargePoolOf([{ kind: "charges" } as CapabilityColumns])).toBeNull();
     expect(chargePoolOf([scalarSkill])).toBeNull();
   });
@@ -524,9 +517,7 @@ describe("attunement prerequisites", () => {
     expect(meetsAttunementPrereq({ kind: "class", value: "Fighter" }, subject)).toBe(false);
   });
 
-  // One phrasing serves both the attune rejection message and the served
-  // attunementPrereqText, so every kind is pinned here (#1382) — the client no
-  // longer has a copy of this switch to fall back on.
+  // #1382: describeAttunementPrereq backs both the attune-rejection message and the served attunementPrereqText; every kind is pinned here.
   it("describes the prerequisite for the error message", () => {
     expect(describeAttunementPrereq({ kind: "spellcaster", value: null })).toBe("a spellcaster");
     expect(describeAttunementPrereq({ kind: "class", value: "Wizard" })).toBe("a Wizard");
@@ -536,10 +527,9 @@ describe("attunement prerequisites", () => {
 
   it("agrees the article with the value's initial letter (#1485)", () => {
     expect(describeAttunementPrereq({ kind: "class", value: "Artificer" })).toBe("an Artificer");
-    // The article agrees with the interposed value, never with the trailing noun.
+    // The article agrees with the interposed value, not the trailing noun.
     expect(describeAttunementPrereq({ kind: "alignment", value: "Evil" })).toBe("an Evil creature");
-    // Pinned as current behaviour, not as correct English: the heuristic reads the
-    // initial letter, so a consonant-sounding vowel initial comes out wrong.
+    // Pinned as current behaviour, not correct English: a consonant-sounding vowel initial comes out wrong.
     expect(describeAttunementPrereq({ kind: "class", value: "Unicorn Rider" })).toBe("an Unicorn Rider");
   });
 

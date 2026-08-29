@@ -4,9 +4,6 @@ import { multiclassPrerequisitesMet, type MulticlassPrerequisiteOption } from "@
 
 const BASE = { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 };
 
-// #1529: multiclassPrerequisitesMet now takes the resolved
-// CharacterClass.multiclassPrerequisites option array directly (no more
-// className lookup) — every caller already holds the catalog row.
 describe("multiclassPrerequisitesMet", () => {
   it("single-ability class (Wizard): met only at INT 13+", () => {
     const wizard = [{ intelligence: 13 }];

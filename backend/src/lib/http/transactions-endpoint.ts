@@ -1,7 +1,4 @@
-// Shared scaffold behind every uniform POST …/transactions endpoint: assert edit
-// access, zod-validate the body (400), apply ops (domain-error → 400, else
-// rethrow), then re-fetch with characterInclude and return serializeCharacter.
-// Per-domain code supplies its ops schema, apply closure, and error classes.
+// Shared scaffold behind every POST …/transactions endpoint: assert edit access, zod-validate the body (400), apply ops (domain-error → 400, else rethrow), then re-fetch and return serializeCharacter.
 import type { Request, Response, Router } from "express";
 import type { z } from "zod";
 
@@ -11,37 +8,23 @@ import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 type DomainErrorClass = new (...args: never[]) => Error;
-// Awaited<>, not a bare ReturnType: serializeCharacter is async (#1798, epic
-// #1795 3/6 — it now resolves catalog entitlement for spells) but every
-// `respond` implementation across the ABILITY_REGISTRY domains receives the
-// already-resolved character below, so their own signatures stay unchanged.
+// Awaited<>, not a bare ReturnType: serializeCharacter is async (#1798).
 type SerializedCharacter = Awaited<ReturnType<typeof serializeCharacter>>;
 
-/**
- * The per-domain half of a transactions endpoint, independent of how it is
- * routed: one router owns it via makeTransactionsEndpoint, or ABILITY_REGISTRY
- * stores many and the shared ability endpoint dispatches on a URL key (#1275).
- *
- * `apply`/`respond` are method shorthand, not arrow properties: TS checks method
- * parameters bivariantly, which is what lets heterogeneous <Schema, Result> pairs
- * live in one erased `Record<string, TransactionHandler>` without a cast.
- */
+// One router owns this via makeTransactionsEndpoint, or ABILITY_REGISTRY stores many and the shared ability endpoint dispatches on a URL key (#1275).
+// `apply`/`respond` are method shorthand, not arrow properties: TS checks method parameters bivariantly, letting heterogeneous <Schema, Result> pairs live in one erased Record<string, TransactionHandler> without a cast.
 export interface TransactionHandler<Schema extends z.ZodTypeAny = z.ZodTypeAny, Result = unknown> {
   schema: Schema;
-  // Applies the parsed body atomically; the returned value is passed to respond.
-  // `userId` is the authenticated caller — needed by domains that mutate a second
-  // sheet under consent (e.g. party-target healing #462).
+  // `userId` is the authenticated caller — needed by domains that mutate a second sheet under consent (e.g. party-target healing #462).
   apply(characterId: string, data: z.infer<Schema>, userId: string): Promise<Result>;
   // Errors mapped to 400 { error: message }; anything else rethrows (→ 500).
   domainErrors: DomainErrorClass[];
-  // Shapes the response; defaults to the serialized character itself.
   respond?(character: SerializedCharacter, result: Result): unknown;
 }
 
 interface TransactionsEndpointConfig<Schema extends z.ZodTypeAny, Result>
   extends TransactionHandler<Schema, Result> {
   router: Router;
-  // Route sub-path — defaults to "/transactions" (experience mounts on "/").
   path?: string;
 }
 
@@ -65,8 +48,7 @@ export async function runTransaction<Schema extends z.ZodTypeAny, Result>(
     result = await apply(req.params.id, parseResult.data, req.user!.id);
   } catch (error) {
     if (domainErrors.some((ErrorClass) => error instanceof ErrorClass)) {
-      // A domain error may carry an explicit HTTP status (e.g. attunement-cap
-      // breach → 409); default to 400 for plain validation failures.
+      // A domain error may carry an explicit status (e.g. attunement-cap breach → 409); defaults to 400 for plain validation failures.
       const status = typeof (error as { status?: unknown }).status === "number"
         ? (error as { status: number }).status
         : 400;

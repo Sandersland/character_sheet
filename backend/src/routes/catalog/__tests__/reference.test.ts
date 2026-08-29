@@ -32,7 +32,6 @@ describe("GET /api/reference", () => {
       expect.arrayContaining(["Lawful Good", "True Neutral", "Chaotic Evil"])
     );
 
-    // Artisan tools — the flat list feeding the sheet's Proficiencies-card dropdown.
     expect(response.body).toHaveProperty("artisanTools");
     expect(Array.isArray(response.body.artisanTools)).toBe(true);
     expect(response.body.artisanTools).toEqual(
@@ -40,31 +39,24 @@ describe("GET /api/reference", () => {
         expect.objectContaining({ name: "Smith's Tools", category: "artisan" }),
       ])
     );
-    // Only artisan tools ship — the duplicate all/byCategory payload is gone.
     expect(response.body).not.toHaveProperty("tools");
     expect(response.body.artisanTools.every((t: { category: string }) => t.category === "artisan")).toBe(true);
 
-    // Classes expose tool proficiency fields.
     const fighter = response.body.classes.find((c: { name: string }) => c.name === "Fighter");
     expect(fighter).toBeDefined();
     expect(Array.isArray(fighter.toolProficiencies)).toBe(true);
     expect(Array.isArray(fighter.toolChoices)).toBe(true);
     expect(typeof fighter.toolChoiceCount).toBe("number");
 
-    // Backgrounds expose granted tool profs + the 2024 ability spread + Origin feat (#1130).
     const criminal = response.body.backgrounds.find((b: { name: string }) => b.name === "Criminal");
     expect(criminal).toBeDefined();
     expect(criminal.toolProficiencies).toEqual(["Thieves' Tools"]);
     expect(criminal.abilityChoices).toEqual(["dexterity", "constitution", "intelligence"]);
     expect(criminal.skillProficiencies).toEqual(["sleightOfHand", "stealth"]);
     expect(criminal.originFeat).toMatchObject({ name: "Alert", category: "origin" });
-    // #1779: no phantom tool choice on a background with only a fixed grant.
     expect(criminal.toolChoices).toEqual([]);
     expect(criminal.toolChoiceCount).toBe(0);
 
-    // #1779: Soldier/Noble grant a Gaming Set CHOICE (PHB'14/PHB'24), not a
-    // pre-granted "Dice Set" — toolProficiencies is empty and toolChoices
-    // carries all four SRD gaming sets with a count of 1.
     const soldier2024 = response.body.backgrounds.find((b: { name: string }) => b.name === "Soldier");
     expect(soldier2024.toolProficiencies).toEqual([]);
     expect(soldier2024.toolChoices).toEqual(
@@ -77,19 +69,9 @@ describe("GET /api/reference", () => {
     expect(noble2024.toolProficiencies).toEqual([]);
     expect(noble2024.toolChoiceCount).toBe(1);
 
-    // Folk Hero is absent from the 2024 list entirely (#1570) — PHB'24 has no
-    // Folk Hero, and offering it here is what silently cost a 2024 character
-    // their ability spread and Origin feat. Its 2014 half is asserted below.
     expect(response.body.backgrounds.map((b: { name: string }) => b.name)).not.toContain("Folk Hero");
   });
 
-  // #1504/#1572: Origin feats and the ability spread are both PHB'24-only
-  // mechanics — the SAME Criminal/Soldier rows that grant both above (#1130)
-  // must serve neither under EDITION_2014, proving the gate is on the
-  // requesting edition and not merely on which rows are edition-tagged
-  // (Soldier's Savage Attacker is edition-tagged the same as Alert since
-  // #1310 — a real EDITION_2014 row exists and IS reachable by 2014 in every
-  // other respect, but still suppressed here).
   it("suppresses the ability spread and origin feat for every background under EDITION_2014 (#1504, #1572)", async () => {
     const response = await supertest
       .agent(app)
@@ -105,15 +87,11 @@ describe("GET /api/reference", () => {
     expect(soldier).toBeDefined();
     expect(soldier.abilityChoices).toEqual([]);
     expect(soldier.originFeat).toBeNull();
-    // #1779: unlike abilityChoices/originFeat above, the tool CHOICE is
-    // edition-invariant — PHB'14 Soldier grants the same "one type of gaming
-    // set" choice as PHB'24, so this is NOT suppressed under EDITION_2014.
+    // PHB'14 Soldier grants the same gaming-set choice as PHB'24 — toolChoiceCount isn't suppressed under EDITION_2014, unlike abilityChoices/originFeat (#1779).
     expect(soldier.toolChoiceCount).toBe(1);
     expect(soldier.toolChoices).toHaveLength(4);
   });
 
-  // #1131: each class carries its level-1 creation pick counts (or null for a
-  // non-caster) so the frontend never re-encodes the SRD 5.2 tables.
   it("ships level1SpellPicks per class (cantrips + spells, null for non-casters)", async () => {
     const response = await supertest
       .agent(app)
@@ -123,15 +101,10 @@ describe("GET /api/reference", () => {
 
     expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2, maxSpellLevel: 1 });
     expect(byName("Paladin").level1SpellPicks).toEqual({ cantrips: 0, spells: 2, maxSpellLevel: 1 });
-    // Wizard is the one class where the served `spells` count is the spellbook
-    // size (6), not the prepared count (4) — #1513, spellbookSize marks the split.
+    // Wizard's `spells` count is the spellbook size (6), not the prepared count (4) — spellbookSize marks the split (#1513).
     expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 });
     expect(byName("Fighter").level1SpellPicks).toBeNull();
 
-    // #1377: maxSpellLevel replaces the client's hardcoded 1. It resolves to 1 for
-    // EVERY seeded class that reaches this branch — full casters, half-casters and
-    // Pact Magic alike — so this locks provenance, not variation. Its value is
-    // that the picker now sends a served number as ?maxLevel= instead of a literal.
     const casters = response.body.classes.filter((c: { level1SpellPicks: unknown }) => c.level1SpellPicks !== null);
     expect(casters.length).toBeGreaterThan(0);
     for (const caster of casters) {
@@ -139,12 +112,7 @@ describe("GET /api/reference", () => {
     }
   });
 
-  // #1507/carried #1508 AC + #1510: a 2014 Paladin/Ranger has no Spellcasting
-  // feature until level 2 (PHB'14 p. 84/92), so level1SpellPicks must be null
-  // — never `{ spells: n > 0, maxSpellLevel: 0 }`, the incoherent shape #1508
-  // flagged. The rest of this pins level1SpellPicksFor's fixed SRD 5.1 table
-  // (#1510) via the live route, alongside the pure unit test in
-  // lib/srd/__tests__/level1-spell-picks.test.ts.
+  // PHB'14 p. 84/92 (#1507/#1508/#1510): a 2014 Paladin/Ranger has no Spellcasting until level 2, so level1SpellPicks is null.
   it("serves level1SpellPicks per the SRD 5.1 table (#1510), null for a 2014 Paladin/Ranger", async () => {
     const response = await supertest
       .agent(app)
@@ -155,21 +123,14 @@ describe("GET /api/reference", () => {
     expect(byName("Bard").level1SpellPicks).toEqual({ cantrips: 2, spells: 4, maxSpellLevel: 1 });
     expect(byName("Sorcerer").level1SpellPicks).toEqual({ cantrips: 4, spells: 2, maxSpellLevel: 1 });
     expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2, maxSpellLevel: 1 });
-    // #1513: spellbookSize marks the Wizard's spellbook (6) as distinct from its
-    // prepared count (4) — both editions serve the same six-spell spellbook.
     expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 });
-    // Cleric/Druid: no creation-time list exists in SRD 5.1 (prepared from the
-    // full class list, capped by WIS mod + level on the sheet) — 0 spells,
-    // cantrips only, and maxSpellLevel 0 alongside it (#1510's micro-decision).
+    // SRD 5.1 Cleric/Druid prepare from the full class list, so 0 spells, cantrips only, maxSpellLevel 0 (#1510).
     expect(byName("Cleric").level1SpellPicks).toEqual({ cantrips: 3, spells: 0, maxSpellLevel: 0 });
     expect(byName("Druid").level1SpellPicks).toEqual({ cantrips: 2, spells: 0, maxSpellLevel: 0 });
     expect(byName("Paladin").level1SpellPicks).toBeNull();
     expect(byName("Ranger").level1SpellPicks).toBeNull();
   });
 
-  // #1513 AC: spellbookSize asserted for both editions from one test, plus
-  // byte-identity for a known caster (Bard), another prepared caster (Cleric),
-  // and a non-caster (Fighter) — the wire proof that only Wizard changed.
   it("spellbookSize is 6 for Wizard in both editions; Bard/Cleric/Fighter are byte-identical (#1513)", async () => {
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
@@ -192,8 +153,6 @@ describe("GET /api/reference", () => {
     expect(byName(res2014.body, "Fighter").level1SpellPicks).toBeNull();
   });
 
-  // #1161: each class carries its PHB'24 primary ability/abilities so the
-  // creation ability panel can flag recommended rows without re-encoding the rules.
   it("ships primaryAbility per class", async () => {
     const response = await supertest
       .agent(app)
@@ -204,11 +163,7 @@ describe("GET /api/reference", () => {
     expect(byName("Fighter").primaryAbility).toEqual(["strength", "dexterity"]);
   });
 
-  // #1325: `?edition=` resolves subclassGateLevel (wire field, renamed from the
-  // raw-column-shaped `subclassLevel`) through subclassGateLevel (the rule
-  // function) for the REQUESTED edition, not a baked-in default — 2014 exposes
-  // each class's real PHB'14 gate (Cleric/Sorcerer/Warlock 1, Druid/Wizard 2,
-  // rest 3); 2024 flattens every class to 3 (SRD 5.2).
+  // subclassGateLevel resolves for the REQUESTED edition, not a baked-in default: PHB'14 per-class gate vs flat 3 for SRD 5.2 (#1325).
   it("resolves subclassGateLevel for the requested edition (2014 per-class gate vs 2024's flat 3)", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
     const byName = (body: any, name: string) => body.classes.find((c: { name: string }) => c.name === name);
@@ -241,22 +196,13 @@ describe("GET /api/reference", () => {
     expect(response.body.error).toContain("EDITION_1974");
   });
 
-  // #1325 (C4): edition is required in the final state — an omitted-edition
-  // default IS the hardcode this issue removes, so a caller that forgets it
-  // gets a 400, not a silent 2024 fallback.
   it("400s when edition is omitted", async () => {
     const response = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference");
     expect(response.status).toBe(400);
     expect(response.body.error).toContain("edition");
   });
 
-  // #1325/#1348/#1504: Background.originFeatId is a raw FK baked onto the 2024
-  // Feat row at seed time (resolveOriginFeatId) — resolving it BY NAME through
-  // resolveEditionCatalog, gated by backgroundGrantsOriginFeat, makes this
-  // preview agree with what buildOriginEntry actually grants a character. An
-  // Origin feat is a PHB'24-only mechanic (#1504), so EVERY background —
-  // Alert's textually-forked pair included — serves `null` under EDITION_2014,
-  // not a 2014-flavored feat.
+  // originFeatId is resolved BY NAME through resolveEditionCatalog, matching what buildOriginEntry actually grants a character (#1348/#1504).
   it("resolves a background's origin feat for the requested edition, null under 2014 (#1348, #1504)", async () => {
     const criminal2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const criminal2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
@@ -267,33 +213,19 @@ describe("GET /api/reference", () => {
     expect(alert2024.name).toBe("Alert");
     expect(alert2024.description).toMatch(/Proficiency Bonus/);
 
-    // The resolved row must be projected back to OriginFeatOption's four fields:
-    // `edition` is selected only to drive resolveEditionCatalog and would
-    // otherwise ride along on the wire, widening the contract silently.
+    // `edition` drives resolveEditionCatalog only — it must not ride along on the wire (OriginFeatOption's four fields).
     expect(Object.keys(alert2024).sort()).toEqual(["category", "description", "id", "name"]);
 
-    // 2014: no Origin feat at all, even though Alert's 2014-tagged row exists
-    // in the catalog (buildOriginEntry would resolve it if the gate weren't
-    // there first) — this is the live bug #1504 found: 2014 must not see
-    // EITHER edition's Alert text.
     expect(byName(criminal2014.body, "Criminal").originFeat).toBeNull();
 
-    // Folk Hero: 2014 only (#1570); still null, for the same reason as every
-    // other 2014 background, not merely because Folk Hero itself has no feat.
     expect(byName(criminal2014.body, "Folk Hero").originFeat).toBeNull();
     expect(byName(criminal2024.body, "Folk Hero")).toBeUndefined();
 
-    // Soldier: Savage Attacker is edition-tagged (#1310, both an EDITION_2014
-    // and EDITION_2024 row exist) — reachable by 2014 in every OTHER respect,
-    // but still suppressed here: the gate is on the REQUESTING edition, not
-    // on whether the feat row is edition-tagged.
+    // Gate is on the REQUESTING edition, not on whether the feat row itself is edition-tagged (Savage Attacker is tagged both ways, #1310).
     expect(byName(criminal2014.body, "Soldier").originFeat).toBeNull();
     expect(byName(criminal2024.body, "Soldier").originFeat.name).toBe("Savage Attacker");
   });
 
-  // #1322: the 14 conditions' resolved {key,label,description} rows, edition-
-  // aware — catalog content identical for every character of an edition, so it
-  // rides /reference rather than the character payload.
   it("ships conditions resolved for the requested edition (#1322)", async () => {
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
@@ -303,15 +235,13 @@ describe("GET /api/reference", () => {
     expect(res2014.body.conditions).toHaveLength(14);
     expect(res2024.body.conditions).toHaveLength(14);
 
-    // rollEffects never reaches the wire — shipping the raw grants would ship the rule.
+    // rollEffects never reaches the wire — shipping raw grants would ship the rule.
     for (const row of res2024.body.conditions) {
       expect(Object.keys(row).sort()).toEqual(["description", "key", "label"]);
     }
 
-    // Labels alphabetical, first is Blinded.
     expect(res2024.body.conditions[0]).toMatchObject({ key: "blinded", label: "Blinded" });
 
-    // One of #1309's nine divergent conditions, forked both ways.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
     const findCond = (body: any, key: string) => body.conditions.find((c: { key: string }) => c.key === key);
     const grappled2014 = findCond(res2014.body, "grappled");
@@ -320,16 +250,11 @@ describe("GET /api/reference", () => {
     expect(grappled2014.description).toContain("The condition ends if the grappler is incapacitated");
     expect(grappled2024.description).toContain("other than the grappler");
 
-    // 2014's incapacitated is the short, exact PHB'14 sentence.
     expect(findCond(res2014.body, "incapacitated").description).toBe("Can't take actions or reactions.");
 
-    // One of the five edition-invariant conditions resolves identically.
     expect(findCond(res2014.body, "poisoned").description).toBe(findCond(res2024.body, "poisoned").description);
   });
 
-  // #1430: the universal turn actions, forked per edition — the client held this
-  // copy in turnRules.ts until this slice, so these assertions are what stops it
-  // regressing to one edition's text for both.
   it("ships universal actions resolved for the requested edition (#1430)", async () => {
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
@@ -340,7 +265,6 @@ describe("GET /api/reference", () => {
     const byKey = (body: any, key: string) => body.universalActions.find((a: { key: string }) => a.key === key);
     const keys = (body: { universalActions: { key: string }[] }) => body.universalActions.map((a) => a.key);
 
-    // The 2024-only pair, and its absence from 2014.
     expect(keys(res2024.body)).toContain("study");
     expect(keys(res2024.body)).toContain("influence");
     expect(keys(res2014.body)).not.toContain("study");
@@ -352,19 +276,16 @@ describe("GET /api/reference", () => {
     expect(byKey(res2024.body, "castSpell").name).toBe("Magic");
     expect(byKey(res2014.body, "castSpell").name).toBe("Cast a Spell");
 
-    // `edition` must not reach the wire — same rule as originFeatByName.
+    // `edition` must not reach the wire.
     for (const row of [...res2024.body.universalActions, ...res2014.body.universalActions]) {
       expect(Object.keys(row).sort()).toEqual(["cost", "description", "key", "name"]);
     }
 
-    // Ordered by NAME after resolution, not by the findMany — a name-ordered
-    // query would leave 2024's "Magic" at "Cast a Spell"'s alphabetical slot.
+    // Ordered by NAME after resolution, not by the underlying findMany.
     const names2024: string[] = res2024.body.universalActions.map((a: { name: string }) => a.name);
     expect(names2024).toEqual([...names2024].sort((a, b) => a.localeCompare(b)));
     expect(names2024).toContain("Magic");
 
-    // The live rules bug this fork fixes: the client shipped SRD 5.1's contest
-    // to every character, 2024 ones included.
     for (const key of ["grapple", "shove"]) {
       expect(byKey(res2014.body, key).description).toContain("Strength (Athletics) check contested by");
       expect(byKey(res2024.body, key).description).toContain(
@@ -374,16 +295,13 @@ describe("GET /api/reference", () => {
       expect(byKey(res2024.body, key).description).not.toContain("Athletics");
     }
 
-    // Both cost partitions are served, so ActionSlot and ReactionSlot each have rows.
     const costs = (body: { universalActions: { cost: string }[] }) =>
       [...new Set(body.universalActions.map((a) => a.cost))].sort();
     expect(costs(res2014.body)).toEqual(["action", "bonusAction", "reaction"]);
     expect(costs(res2024.body)).toEqual(["action", "bonusAction", "reaction"]);
   });
 
-  // #1437: the six magic-item rarity tiers with their standard gp values. Unlike
-  // conditions above this is edition-INVARIANT, so the last assertion is a latch:
-  // it fails the day someone routes ITEM_RARITIES through resolveEditionCatalog.
+  // Edition-invariant — the last assertion fails if ITEM_RARITIES is ever routed through resolveEditionCatalog (#1437).
   it("ships the item rarity tiers, identically for both editions (#1437)", async () => {
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
@@ -409,13 +327,7 @@ describe("GET /api/reference", () => {
     expect(res2024.body.itemRarities).toEqual(res2014.body.itemRarities);
   });
 
-  // #1336: the write path (character-create.ts, level-up-transaction.ts)
-  // already rejects a cross-edition subclass/background id via
-  // crossEditionRejection — these fixture-seeded forked rows prove the read
-  // path (this endpoint) no longer offers what the write path would refuse.
-  // No real forked Subclass/Background row is seeded yet (that's #1559), so
-  // fixtures stand in, same discipline as catalog-edition-constraints.test.ts
-  // and subclass-in-tx.integration.test.ts.
+  // Mirrors crossEditionRejection's write-path rejection — the read path must not offer what the write path refuses (#1336, until #1559).
   describe("edition-scoping backgrounds and subclasses (#1336)", () => {
     const FIGHTER = "Fighter";
     const FORKED_SUBCLASS = "Zzz Fixture Forked Subclass (#1336)";
@@ -485,9 +397,6 @@ describe("GET /api/reference", () => {
         ],
       });
 
-      // Background has no free-text field to carry a probe value, so
-      // toolProficiencies (a plain string array with no seeded overlap risk)
-      // stands in as the distinguishing marker between fixture rows.
       await prisma.background.createMany({
         data: [
           { name: FORKED_BACKGROUND, skillProficiencies: [], toolProficiencies: ["2014 fork tool"], edition: "EDITION_2014" },
@@ -516,9 +425,6 @@ describe("GET /api/reference", () => {
     });
 
     afterAll(async () => {
-      // Never touch the real seeded catalog — delete only the Zzz-prefixed
-      // fixture rows this block created, so sibling tests in this file still
-      // see the unmodified Fighter roster and background list.
       await prisma.subclass.deleteMany({ where: { name: { in: SUBCLASS_NAMES } } });
       await prisma.background.deleteMany({ where: { name: { in: BACKGROUND_NAMES } } });
     });
@@ -543,8 +449,7 @@ describe("GET /api/reference", () => {
       expect(forked2024[0].description).toBe("2024 fork text");
     });
 
-    // withEditionOrShared's whole contract: a null-edition row is not
-    // exclusive to either edition.
+    // withEditionOrShared's contract: a null-edition row is not exclusive to either edition.
     it("returns a shared (edition: null) subclass and background to both editions", async () => {
       const { res2014, res2024, fighter2014, fighter2024 } = await fetchBoth();
 
@@ -563,9 +468,7 @@ describe("GET /api/reference", () => {
       expect(bg2024.toolProficiencies).toEqual(["shared tool"]);
     });
 
-    // resolveEditionCatalog's job, distinct from the shared-row case above: an
-    // exact-edition row must win over a same-name shared twin, not merely
-    // coexist with it.
+    // resolveEditionCatalog: an exact-edition row must win over a same-name shared twin, not merely coexist.
     it("resolves the exact-edition row over a shared same-name twin", async () => {
       const { res2014, res2024, fighter2014, fighter2024 } = await fetchBoth();
 
@@ -586,8 +489,7 @@ describe("GET /api/reference", () => {
       expect(bg2024.toolProficiencies).toEqual(["shared fallback tool"]);
     });
 
-    // resolveEditionRow's documented "not in the catalog" semantics: a row
-    // tagged for the other edition with no shared twin is simply absent.
+    // resolveEditionRow: a row tagged for the other edition with no shared twin is simply absent.
     it("omits a subclass or background tagged only for the other edition", async () => {
       const { res2014, res2024, fighter2014, fighter2024 } = await fetchBoth();
 
@@ -624,13 +526,7 @@ describe("GET /api/reference", () => {
     });
   });
 
-  // #1565/#1570: background startingEquipment resolves by (backgroundId,
-  // edition) exactly like a class's — asserted against real BOOK VALUES, never
-  // "differs from 2014" (which would pass on any wrong transcription just as
-  // readily as a correct one). 2014 Charlatan/Criminal/Noble/Sage/Soldier get
-  // no package (SRD 5.1 ships only Acolyte, and PHB'14 equipment for the rest
-  // is unscoped) — asserting null for those pairs is the other half of the
-  // scope finding.
+  // SRD 5.1 ships equipment packages only for Acolyte; the rest are unscoped, so 2014 Charlatan/Criminal/Noble/Sage/Soldier serve null (#1565).
   describe("background starting-equipment (#1565)", () => {
     it("each EDITION_2024 background carries its own option-A GP and a null package-level gold", async () => {
       const response = await supertest
@@ -658,8 +554,7 @@ describe("GET /api/reference", () => {
         expect(options[1]).toEqual({ label: "(B) 50 GP", gold: 50 });
       }
 
-      // Folk Hero is not served under 2024 at all (#1570), so there is no row
-      // here to carry a package — asserted as absence, not a null package.
+      // Folk Hero isn't served under 2024 at all — asserted as absence, not a null package (#1570).
       expect(byName("Folk Hero"), "Folk Hero 2024").toBeUndefined();
     });
 
@@ -678,11 +573,7 @@ describe("GET /api/reference", () => {
       expect(acolyte.startingEquipment.groups[0].options).toHaveLength(1);
       expect(acolyte.startingEquipment.groups[0].options[0].gold).toBe(15);
 
-      // PHB'14 Folk Hero (#1570) — a fixed list like Acolyte's, plus the one
-      // open pick a 2014 background carries: "artisan's tools of your choice".
-      // Unbound, unlike Soldier's/Noble's "same as above" gaming set, and the
-      // assertion on toolCategory is what pins the dropdown's pool to the
-      // seventeen artisan Items rather than every tool in the catalog.
+      // PHB'14 Folk Hero's open pick is unbound, unlike Soldier's/Noble's gaming-set choice — toolCategory pins the dropdown to the seventeen artisan Items (#1570).
       const folkHero = byName("Folk Hero");
       expect(folkHero.startingEquipment).not.toBeNull();
       expect(folkHero.startingEquipment.gold).toBeNull();
@@ -703,31 +594,9 @@ describe("GET /api/reference", () => {
         expect(byName(name).startingEquipment, `${name} 2014`).toBeNull();
       }
     });
-
-    // Mutation proof: drop the edition filter (change the query below to
-    // exact-match EDITION_2014 unconditionally, mirroring what a broken
-    // reference.ts would serve) and the 2024 test above goes red — its four
-    // backgrounds would report null instead of their real SRD 5.2 packages.
-    // Confirmed by temporarily hardcoding the `edition` variable passed to
-    // the startingEquipmentPackage.findMany query to "EDITION_2014" in
-    // reference.ts and re-running this file (see this PR's report for the
-    // red output), then reverting.
   });
 
-  // #1308: CharacterClass has no edition column by design — one row serves
-  // both editions, and subclassGateLevel is an edition-divergent field on it.
-  // `subclasses` is excluded because #1336 makes THAT field edition-filtered
-  // on purpose (the describe block above); `startingEquipment` is excluded
-  // because #1535 makes IT genuinely edition-divergent content too (a real
-  // PHB'24 package, not the pre-#1535 2014 copy) via the same exact
-  // (classId, edition) resolution as subclasses, not a fallback. `level1SpellPicks`
-  // is excluded because #1507 threads `edition` into preparedSpellCountAt/
-  // maxSpellLevelForClass — genuinely null for a 2014 Paladin/Ranger (no
-  // Spellcasting feature until level 2) where it is non-null for 2024, and a
-  // 2014 Bard/Sorcerer/Ranger spell count reads the SRD 5.1 Spells Known table
-  // instead of the SRD 5.2 Prepared Spells one. This latch guards every OTHER
-  // class field against a future "for symmetry" filter, same shape as this
-  // file's itemRarities latch (edition-invariant, not edition-resolved).
+  // CharacterClass carries no edition column — subclassGateLevel/subclasses/startingEquipment/level1SpellPicks are the genuinely edition-divergent fields; every other field must stay identical (#1308/#1535/#1507).
   it("classes (apart from subclassGateLevel/subclasses/startingEquipment/level1SpellPicks) are identical between editions (#1308/#1535/#1507)", async () => {
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
@@ -743,16 +612,9 @@ describe("GET /api/reference", () => {
     expect(res2014.body.classes.map(stripEditionDivergentFields)).toEqual(
       res2024.body.classes.map(stripEditionDivergentFields),
     );
-    // species (unlike classes) is DELIBERATELY edition-divergent (#1684's own
-    // compat-gap fix) — reference-species.test.ts pins the roster differences.
   });
 
-  // #1559: proves #1336's edition-scoping and #1559's Subclass tag compose —
-  // the REAL seeded Path of the Totem Warrior row (never the Zzz fixtures
-  // above, which stand in for a forked row no real subclass has yet), tagged
-  // EDITION_2014 because SRD 5.2 replaces it with Path of the Wild Heart
-  // rather than retabbing it. A 2024 Barbarian must no longer be offered a
-  // subclass with zero features in its own edition.
+  // SRD 5.2 replaces Path of the Totem Warrior with Path of the Wild Heart, so a 2024 Barbarian must not see a subclass with zero features in its own edition (#1559).
   it("no longer offers the real Path of the Totem Warrior to a 2024 Barbarian, but still offers it to a 2014 one (#1559)", async () => {
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
@@ -769,8 +631,7 @@ describe("GET /api/reference", () => {
     expect(totemWarrior2014).toBeDefined();
     expect(totemWarrior2024).toBeUndefined();
 
-    // Berserker is edition: null (shared) — still offered to both, so this
-    // isn't "2024 Barbarian sees no subclasses", only Totem Warrior's absence.
+    // Berserker (edition: null, shared) still appears for both — confirms only Totem Warrior is absent, not every subclass.
     expect(barbarian2024.subclasses.map((s: { name: string }) => s.name)).toContain("Berserker");
   });
 });

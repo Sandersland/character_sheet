@@ -32,8 +32,6 @@ import {
 } from "./inventory-snapshot.js";
 import { buildInventorySnapshot } from "./inventory-snapshot-build.js";
 
-// The resolved item facts an acquire creates its row from — catalog snapshot
-// or homebrew custom, unified so applyAcquire's create is source-agnostic.
 interface AcquireSource {
   itemId: string | null;
   name: string;
@@ -45,7 +43,6 @@ interface AcquireSource {
   detail: ReturnType<typeof snapshotItemDetail>;
 }
 
-// Snapshots a catalog Item into acquire item-facts; throws on an unknown id.
 async function catalogAcquireSource(
   tx: Prisma.TransactionClient,
   itemId: string,
@@ -69,7 +66,6 @@ async function catalogAcquireSource(
   };
 }
 
-// Homebrew acquire item-facts, with the weapon/armor/consumable nested-create.
 function customAcquireSource(custom: CustomItemInput): AcquireSource {
   return {
     itemId: null,
@@ -87,8 +83,6 @@ function customAcquireSource(custom: CustomItemInput): AcquireSource {
   };
 }
 
-// Resolves an acquire op to its item facts: catalog snapshot (itemId) or
-// homebrew (custom) — exactly one; throws when neither is supplied.
 async function resolveAcquireSource(
   tx: Prisma.TransactionClient,
   op: AcquireOperation,
@@ -98,8 +92,7 @@ async function resolveAcquireSource(
   throw new InvalidInventoryOperationError("acquire requires either itemId or custom");
 }
 
-// "Add & equip": auto-place a freshly-created row into the first free compatible
-// slot (#565). Silent — a fresh acquire that can't be slotted stays in the bag.
+// #565: silent — a fresh acquire that can't be slotted stays in the bag.
 async function autoEquipAcquired(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -123,8 +116,7 @@ async function autoEquipAcquired(
   }
 }
 
-// Applies the acquire's currency debit (the "Buy" path) and returns the signed
-// delta stored on the event (negated debit), or null for a plain "Add".
+// Returns the negated debit as the signed delta stored on the event, or null for a plain "Add".
 async function applyAcquireCurrency(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -162,13 +154,9 @@ export async function applyAcquire(
       slot: source.slot,
       notes: op.notes,
       position,
-      // Promoted out of InventoryConsumableDetail (#1648): a fresh charged
-      // consumable starts full, same value the nested consumableDetail create
-      // below carries.
+      // #1648: promoted out of InventoryConsumableDetail — same value the nested consumableDetail create below carries.
       usesRemaining: source.detail.consumableDetail?.create.usesRemaining ?? null,
-      // #1648, epic #1644: neither acquire source ever populates capabilities
-      // (custom items can't author them; catalogItemDetailInclude doesn't
-      // fetch a catalog Item's), so this is always built with capabilities: [].
+      // #1648: neither acquire source ever populates capabilities, so this is always built with capabilities: [].
       snapshot: buildInventorySnapshot({
         name: source.name,
         category: source.category,

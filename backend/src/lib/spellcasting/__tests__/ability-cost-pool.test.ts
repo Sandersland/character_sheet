@@ -1,5 +1,4 @@
-// Needs Postgres — the pool branch delegates to applySpendResourceInTx, which
-// reads the character and derives the pool from class/level.
+// Needs Postgres — the pool branch delegates to applySpendResourceInTx, which reads the character and derives the pool from class/level.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -11,7 +10,6 @@ import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
 
 const OWNER_ID = "owner-ability-cost-pool";
 
-// XP 6500 puts this Monk at level 5 (focus total 5).
 const MONK_L5 = {
   name: "Ability Cost Pool Test Monk",
   alignment: "Lawful Neutral",
@@ -32,8 +30,7 @@ describe("payAbilityCostInTx — pool branch (DB-backed)", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
-    // Focus resolves through the real Monk class's ClassFeature rows — a
-    // classId-less entry would see no pools at all.
+    // Focus resolves through the real Monk class's ClassFeature rows — a classId-less entry would see no pools at all.
     const monkClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } })).id;
     const character = await prisma.character.create({
       data: {

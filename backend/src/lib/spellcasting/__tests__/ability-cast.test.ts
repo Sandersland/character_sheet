@@ -1,11 +1,3 @@
-/**
- * DB-backed tests for castAbilityInTx.
- *
- * castAbilityInTx pays a cost, formats the summary, drops/sets concentration,
- * and applies a self-effect — some branches log events and touch HP, so a real
- * Postgres transaction is needed. Styled after ability-cost-pool.test.ts.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -21,7 +13,7 @@ const OWNER_ID = "owner-ability-cast";
 const CHAR = {
   name: "Ability Cast Test Caster",
   alignment: "Neutral Good",
-  experiencePoints: 6500, // level 5
+  experiencePoints: 6500,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 20, max: 20, temp: 0 },
@@ -169,7 +161,7 @@ describe("castAbilityInTx (DB-backed)", () => {
       )
     );
     let row = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
-    expect((row.hitPoints as { current: number }).current).toBe(14); // 20 → 14
+    expect((row.hitPoints as { current: number }).current).toBe(14);
 
     await prisma.$transaction((tx) =>
       castAbilityInTx(
@@ -180,6 +172,6 @@ describe("castAbilityInTx (DB-backed)", () => {
       )
     );
     row = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
-    expect((row.hitPoints as { current: number }).current).toBe(18); // 14 → 18
+    expect((row.hitPoints as { current: number }).current).toBe(18);
   });
 });

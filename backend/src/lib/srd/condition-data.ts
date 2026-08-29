@@ -1,14 +1,3 @@
-// The 14 standard 5e status conditions, for both editions: CONDITIONS is the
-// SRD 5.2 baseline and CONDITIONS_2014_OVERRIDES varies the nine that differ,
-// resolved by conditionDefinition. This is the single source of truth for
-// condition rules data — labels are edition-invariant presentation metadata
-// the frontend may keep client-side, but descriptions are resolved here and
-// served over the wire (conditionRulesText, on GET /api/reference; #1322), so
-// no frontend module holds rules text of its own.
-// Exhaustion is intentionally NOT in this list: it is a single 0–6 level handled
-// as a special case (see EXHAUSTION_MAX below and exhaustionEffectText for its
-// display text), not a boolean presence in the active-conditions list.
-
 export type ConditionKey =
   | "blinded"
   | "charmed"
@@ -33,7 +22,7 @@ export interface ConditionDefinition {
   key: ConditionKey;
   label: string;
   description: string;
-  /** State-driven advantage/disadvantage grants (#486). Merged into rollModifiers on read. */
+  // Merged into rollModifiers on read (#486).
   rollEffects?: RollEffect[];
 }
 
@@ -61,14 +50,7 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     label: "Frightened",
     description:
       "Has disadvantage on ability checks and attack rolls while the source of its fear is within line of sight. Can't willingly move closer to the source of its fear.",
-    // Initiative is a Dexterity check (SRD 5.2 / PHB'14 p. 189, Combat →
-    // Initiative — RollModeKind just splits `initiative` out of `check` as its
-    // own kind), so the "disadvantage on ability checks" clause above already
-    // covers it; this entry makes that explicit per the convention documented
-    // at EXHAUSTION_ROLL_KINDS. The line-of-sight qualifier already goes
-    // unmodeled for the attack/check grants above (engine has no
-    // line-of-sight concept — self-or-announce), so extending it to
-    // Initiative is the existing approximation, not a new one (#1327).
+    // Initiative is a Dexterity check (SRD 5.2 / PHB'14 p. 189), so this makes the ability-check disadvantage above explicit (#1327).
     rollEffects: [
       { mode: "disadvantage", kind: "attack" },
       { mode: "disadvantage", kind: "check" },
@@ -104,7 +86,7 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     label: "Paralyzed",
     description:
       "Has the Incapacitated condition, and its Speed is 0 and can't increase. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage, and any attack that hits it from within 5 feet is a critical hit.",
-    // Conditions that include Incapacitated inherit its initiative disadvantage; buildRollModifiers does no inheritance walk, so it's flattened per-condition (SRD 5.2).
+    // Incapacitated's initiative disadvantage is flattened per-condition here; buildRollModifiers does no inheritance walk (SRD 5.2).
     rollEffects: [{ mode: "disadvantage", kind: "initiative" }],
   },
   {
@@ -118,12 +100,7 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     key: "poisoned",
     label: "Poisoned",
     description: "Has disadvantage on attack rolls and ability checks.",
-    // Same Initiative-is-a-Dexterity-check reasoning as frightened above.
-    // Decision A (#1327): the description is NOT edited to say "(including
-    // Initiative)" — SRD 5.2 and PHB'14 p. 292 both say only "ability
-    // checks"; that already includes Initiative as a matter of rules, so
-    // adding words to the transcription would fabricate text. The grant
-    // changes; the prose doesn't.
+    // SRD 5.2 / PHB'14 p. 292 say only "ability checks" — description stays unedited; the rollEffects grant covers Initiative anyway (#1327).
     rollEffects: [
       { mode: "disadvantage", kind: "attack" },
       { mode: "disadvantage", kind: "check" },
@@ -166,30 +143,15 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
   },
 ];
 
-/** Maximum exhaustion level (level 6 = death). */
+// Level 6 = death.
 export const EXHAUSTION_MAX = 6;
 
-/** Returns true if `key` is a known standard condition key. */
 export function isKnownCondition(key: string): key is ConditionKey {
   return CONDITIONS.some((c) => c.key === key);
 }
 
-/**
- * PHB'14 pp. 290-292 (Appendix A) overrides for the 9 conditions that diverge
- * from SRD 5.2's text: charmed, grappled, incapacitated, invisible,
- * paralyzed, petrified, prone, stunned, unconscious (#1309, restoring the
- * 2014 half of what #1135's SRD-5.2 retranscription replaced). Sparse on
- * purpose — the other 5 conditions (blinded, deafened, frightened, poisoned,
- * restrained) are byte-identical across editions and must resolve through
- * the single CONDITIONS row below, not a duplicated one. Both editions'
- * Incapacitated is inherited by paralyzed/petrified/stunned/unconscious
- * (PHB'14 p. 291 says so explicitly, same as SRD 5.2) — the difference is
- * that PHB'14's Incapacitated carries no d20-roll effect to inherit (it's
- * just "can't take actions or reactions"), while SRD 5.2's adds disadvantage
- * on Initiative. So the inheritance is real in both editions; it just
- * produces nothing in 2014. An explicit `rollEffects: undefined` below
- * clears that 2024-only initiative grant.
- */
+// PHB'14 pp. 290-292 overrides for the 9 conditions that diverge from SRD 5.2; the other 5 are byte-identical across editions and resolve through the single CONDITIONS row (#1309).
+// `rollEffects: undefined` on an override is explicit, not omitted — {...base, ...override} needs it to clear base's 2024-only initiative grant.
 const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: string; rollEffects?: RollEffect[] }>> = {
   charmed: {
     description:
@@ -207,10 +169,6 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
   invisible: {
     description:
       "Impossible to see without the aid of magic or a special sense. For the purpose of hiding, the creature is heavily obscured. Attack rolls against it have disadvantage, and its attack rolls have advantage.",
-    // The pre-cutover row had no rollEffects at all, despite its own description
-    // promising advantage on its attacks — a transcription gap, not a 2014 rule.
-    // This is a deliberate fix, not a restore: don't drop it chasing byte-parity
-    // with history.
     rollEffects: [{ mode: "advantage", kind: "attack" }],
   },
   paralyzed: {
@@ -219,10 +177,7 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
     rollEffects: undefined,
   },
   petrified: {
-    // PHB'14 p. 291: the auto-failed saves and advantage-to-hit clauses are
-    // real Appendix A text a prior transcription dropped — restored here, not
-    // added. "Attack rolls against it" targets another creature, so per the
-    // self-or-announce rule it's description text only, not a rollEffects entry.
+    // PHB'14 p. 291. "Attack rolls against it" targets another creature — self-or-announce keeps that as description text only, not a rollEffects entry.
     description:
       "Transformed, along with nonmagical objects it is wearing or carrying, into a solid inanimate substance; its weight increases by a factor of ten, and it ceases aging. Incapacitated, can't move or speak, and is unaware of its surroundings. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage. Resistant to all damage; immune to poison and disease.",
     rollEffects: undefined,
@@ -239,33 +194,14 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
   unconscious: {
     description:
       "Incapacitated, can't move or speak, and is unaware of its surroundings. Drops whatever it's holding and falls prone. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage, and any attack that hits from within 5 feet is a critical hit.",
-    // Both editions' Unconscious inherits Prone (falls prone) as well as
-    // Incapacitated. 2014 Prone still grants disadvantage on attack (see
-    // `prone` above, unchanged from 2024), so that flattens through here too —
-    // only the Incapacitated-sourced initiative grant is 2024-only. Mechanically
-    // moot (an unconscious creature can't attack) but keeps both editions
-    // modeling the same inheritance instead of one silently dropping it.
+    // Unconscious inherits Prone's attack disadvantage in both editions (unlike the Incapacitated-sourced initiative grant, which is 2024-only).
     rollEffects: [{ mode: "disadvantage", kind: "attack" }],
   },
 };
 
-/**
- * The one lookup for a condition's rules text/effects (#1309) — every call
- * site that needs edition-sensitive data resolves through here, so a future
- * edition fork only has to touch this function. Reading CONDITIONS directly
- * stays correct for the edition-invariant fields (keys, labels).
- * `key` is guaranteed present in CONDITIONS by the ConditionKey type, so the
- * lookup below always succeeds.
- * `label` never forks: CONDITIONS_2014_OVERRIDES' value type has no `label`
- * field, so `tsc` itself rejects an attempt to override it — a caller that
- * only needs a condition's label (e.g. `conditionLabel`) can stay edition-free
- * by construction, not by convention.
- */
+// `key` is guaranteed present in CONDITIONS by the ConditionKey type.
 export function conditionDefinition(key: ConditionKey, edition: RulesEdition): ConditionDefinition {
   const base = CONDITIONS.find((c) => c.key === key)!;
-  // Exhaustive switch, not `if (edition !== "EDITION_2014") return base` (#1527):
-  // the if/else shape let an unrecognized third edition silently take the SRD
-  // 5.2 branch instead of failing loudly.
   switch (edition) {
     case "EDITION_2024":
       return base;
@@ -280,25 +216,15 @@ export function conditionDefinition(key: ConditionKey, edition: RulesEdition): C
   }
 }
 
-/** One resolved condition row served on the wire (GET /api/reference, #1322). */
+// Served on GET /api/reference (#1322).
 export interface ConditionRulesTextRow {
   key: ConditionKey;
   label: string;
   description: string;
 }
 
-/**
- * All 14 conditions resolved for `edition`, projected to the fields a client
- * needs to render the chip strip + picker. `rollEffects` is deliberately
- * dropped: the client already receives resolved `rollModifiers` (see
- * buildRollModifiers), so shipping the raw per-condition grants here would be
- * shipping the rule itself, not just its text.
- *
- * Sorted by label rather than trusting CONDITIONS' declaration order: the
- * client renders this list as-is, so a new condition declared out of order
- * would reorder the picker silently — the frontend's own CONDITION_ORDER
- * sorts for the same reason, and the two must not disagree.
- */
+// rollEffects is deliberately dropped — client already gets resolved rollModifiers (buildRollModifiers).
+// Sorted by label to match the frontend's CONDITION_ORDER — the two must not disagree.
 export function conditionRulesText(edition: RulesEdition): ConditionRulesTextRow[] {
   return CONDITIONS.map(({ key }) => {
     const { label, description } = conditionDefinition(key, edition);
@@ -306,18 +232,11 @@ export function conditionRulesText(edition: RulesEdition): ConditionRulesTextRow
   }).sort((a, b) => a.label.localeCompare(b.label));
 }
 
-// The four d20 Test categories a flat exhaustion penalty binds to. Initiative is
-// a Dex check, so it's an explicit entry (SRD 5.2 "d20 Tests" cover it).
+// SRD 5.2 "d20 Tests" include Initiative as a Dex check, hence its own entry.
 const EXHAUSTION_ROLL_KINDS: RollModeKind[] = ["attack", "check", "save", "initiative"];
 
-// PHB'14 p. 291 (Appendix A): cumulative disadvantage tiers, not a flat
-// modifier. Tier 1's "disadvantage on ability checks" must also cover
-// Initiative here — RollModeKind splits `initiative` out as its own kind (it
-// isn't folded into `check`), but under 2014 Initiative *is* a Dexterity
-// check (PHB'14 p. 189), so a `check`-only effect would silently miss it.
-// Tier 4 (HP max halved) and tier 5 (Speed 0) have no roll-effect shape and
-// are handled elsewhere (tier 5 in exhaustionSpeedPenalty; tier 4 in
-// exhaustionMaxHpPenalty, #1321 — it touches derived max HP, not rolls).
+// PHB'14 p. 291: cumulative disadvantage tiers. Tier 1 covers Initiative too (a Dexterity check under 2014, PHB'14 p. 189) since RollModeKind splits it out from `check`.
+// Tiers 4/5 have no roll-effect shape — see exhaustionMaxHpPenalty/exhaustionSpeedPenalty.
 function exhaustionRollEffects2014(level: number): RollEffect[] {
   const effects: RollEffect[] = [];
   if (level >= 1) {
@@ -329,21 +248,8 @@ function exhaustionRollEffects2014(level: number): RollEffect[] {
   return effects;
 }
 
-/**
- * Synthetic roll-effect grants for a given exhaustion level (#1136/#1307),
- * mirroring the standard conditions' `rollEffects` shape without a
- * `ConditionDefinition` entry of its own (exhaustion is a numeric level, not a
- * boolean condition — see the module comment above). 2024 (SRD 5.2): each
- * exhaustion level applies a flat −2 to every d20 Test (attack rolls, ability
- * checks, saving throws, Initiative), so the penalty is −2×level. 2014
- * (PHB'14): tiered disadvantage instead of a flat number — see
- * exhaustionRollEffects2014. Either way, the Speed reduction (see
- * exhaustionSpeedPenalty) and death at level 6 are handled elsewhere.
- */
+// 2024 (SRD 5.2): flat −2×level on every d20 Test. 2014 (PHB'14): tiered disadvantage — see exhaustionRollEffects2014.
 export function exhaustionRollEffects(level: number, edition: RulesEdition): RollEffect[] {
-  // Exhaustive switch (#1527): the prior `if (edition === "EDITION_2014")
-  // … else …` let an unrecognized third edition silently fall to the 2024
-  // flat-penalty branch instead of failing loudly.
   switch (edition) {
     case "EDITION_2014":
       return exhaustionRollEffects2014(level);
@@ -359,18 +265,9 @@ export function exhaustionRollEffects(level: number, edition: RulesEdition): Rol
   }
 }
 
-/**
- * Speed reduction (feet) from exhaustion. 2024 (SRD 5.2): −5 ft per level.
- * 2014 (PHB'14 p. 291): 0 below level 2; levels 2-4 halve current Speed
- * (base + all bonuses), rounded down (PHB'14 p. 7, "Round Down") like Prone's
- * half-Speed; level 5+ floors to exactly 0. Returns the amount SUBTRACTED, not
- * the result — so a round-down result needs subtracting ceil(currentSpeed/2),
- * not floor (floor would round the result UP for an odd Speed, e.g. 25 → 13
- * instead of 12).
- */
+// 2024 (SRD 5.2): −5 ft per level. 2014 (PHB'14 p. 291): 0 below level 2; levels 2-4 halve current Speed rounded down (PHB'14 p. 7); level 5+ floors to 0.
+// Returns the amount SUBTRACTED, not the result — use ceil(currentSpeed/2), not floor, or an odd Speed rounds the result up.
 export function exhaustionSpeedPenalty(level: number, currentSpeed: number, edition: RulesEdition): number {
-  // Exhaustive switch (#1527): see exhaustionRollEffects' comment on why an
-  // if/else fallthrough is the anti-pattern here.
   switch (edition) {
     case "EDITION_2014": {
       if (level < 2) return 0;
@@ -386,27 +283,13 @@ export function exhaustionSpeedPenalty(level: number, currentSpeed: number, edit
   }
 }
 
-/**
- * Hit point maximum penalty from exhaustion (#1321). PHB'14 p. 291 (Appendix
- * A) tier 4: "Hit point maximum halved" — a direct structural sibling of
- * exhaustionSpeedPenalty above, including its shape: returns the amount
- * SUBTRACTED, not the result, so a round-down result (PHB'14 p. 7, "Round
- * Down") needs subtracting ceil(currentMax/2), not floor. `currentMax` is the
- * max AFTER any feat bonus (e.g. Tough) is added — see effectiveMaxHitPoints
- * (hp-core.ts), which composes feat-bonus-then-penalty in that order. SRD 5.2
- * has no hit-point-maximum exhaustion tier at all — 2024 always returns 0.
- */
+// PHB'14 p. 291 tier 4: hit point maximum halved. Returns the amount SUBTRACTED (ceil(currentMax/2), not floor — PHB'14 p. 7, "Round Down").
+// `currentMax` must already include any feat bonus — see effectiveMaxHitPoints, which composes feat-bonus-then-penalty in that order. SRD 5.2 has no such tier; 2024 always returns 0.
 export function exhaustionMaxHpPenalty(level: number, currentMax: number, edition: RulesEdition): number {
-  // Exhaustive switch (#1527, applied here for consistency with this file's
-  // other exhaustion rules even though this function postdates #1527's
-  // original 11-site audit — #1321 landed after the issue was filed and
-  // reintroduced the same if/else fallthrough shape).
   switch (edition) {
     case "EDITION_2014":
       return level >= 4 ? Math.ceil(currentMax / 2) : 0;
     case "EDITION_2024":
-      // SRD 5.2 has no hit-point-maximum exhaustion tier at all — a
-      // deliberate 0, not a fallthrough default.
       return 0;
     default: {
       const exhaustive: never = edition;
@@ -415,42 +298,23 @@ export function exhaustionMaxHpPenalty(level: number, currentMax: number, editio
   }
 }
 
-// PHB'14 p. 291's tiers are cumulative, so the sentence for a given level
-// re-states every clause active at or below it, not just the newest one.
-// Wording and clause order are lifted verbatim from summarizeRollModifiers'
-// categoryPhrase/KIND_ORDER (attack → check → save → initiative) — that
-// function renders exhaustionRollEffects2014's grant right beside this text
-// in ConditionRollBanner, so the two must never be able to disagree.
+// Clause order matches summarizeRollModifiers' categoryPhrase/KIND_ORDER — both render beside exhaustionRollEffects2014's grant in ConditionRollBanner and must agree.
 function exhaustionEffectText2014(level: number): string {
   const disadvantageCategories =
     level >= 3 ? "attack rolls, ability checks, saving throws, and initiative" : "ability checks and initiative";
   const clauses = [`Disadvantage on ${disadvantageCategories}`];
   if (level >= 5) clauses.push("Speed 0");
   else if (level >= 2) clauses.push("Speed halved");
-  // Tier 4 (HP maximum halved, PHB'14 p. 291) — enforced by
-  // exhaustionMaxHpPenalty/effectiveMaxHitPoints (#1321), same as the
-  // disadvantage/Speed clauses above.
+  // Enforced by exhaustionMaxHpPenalty/effectiveMaxHitPoints (#1321).
   if (level >= 4) clauses.push("HP maximum halved");
   return `${clauses.join("; ")}.`;
 }
 
-/**
- * Display text for the CURRENT exhaustion level (#1322), authored in this
- * module — not the frontend — so the sentence can never drift from the
- * numbers above: exhaustionRollEffects / exhaustionSpeedPenalty.
- *
- * Carried forward from the deleted frontend `exhaustionEffect` (SRD 5.2,
- * #1136), now edition-aware: 2024 is a flat −2×level on every d20 Test and
- * −5 ft×level Speed (unchanged from #1136); 2014 (PHB'14 p. 291, Appendix A)
- * is cumulative tiered disadvantage — see exhaustionEffectText2014. Both
- * editions agree that level 6 is death.
- */
+// Kept in this module (not the frontend) so this text can't drift from exhaustionRollEffects/exhaustionSpeedPenalty. PHB'14 p. 291 (2014) is cumulative tiered disadvantage — see exhaustionEffectText2014.
 export function exhaustionEffectText(level: number, edition: RulesEdition): string {
   const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, Math.trunc(level)));
   if (clamped === 0) return "No exhaustion.";
   if (clamped === EXHAUSTION_MAX) return "Death.";
-  // Exhaustive switch (#1527): see exhaustionRollEffects' comment on why an
-  // if/else fallthrough is the anti-pattern here.
   switch (edition) {
     case "EDITION_2014":
       return exhaustionEffectText2014(clamped);

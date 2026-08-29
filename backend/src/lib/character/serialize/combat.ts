@@ -22,14 +22,9 @@ import { editionOf } from "@/lib/rules/edition.js";
 import { draconicBloodlineEntry, draconicBloodlineLevel } from "@/lib/classes/draconic-bloodline.js";
 import type { TargetModifierMap } from "./effects.js";
 
-// The best equipped body armor snapshot (or null when unarmored) in the shape
-// deriveArmorClassParts consumes.
 type BestBodyArmor = Parameters<typeof deriveArmorClassParts>[0];
 
-// AC is derived, not persisted: best equipped body armor + Dex (per category)
-// + shield. The BODY slot holds one body armor (#565), so "best" is defensive.
-// bestArmor/hasShield also feed speed (Unarmored/Fast Movement) and the Monk
-// unarmed strike, so they're selected once here and threaded to those builders.
+// The BODY slot holds one body armor (#565), so "best" is defensive. bestArmor/hasShield also feed speed (Unarmored/Fast Movement) and the Monk unarmed strike, so they're selected once here and threaded to those builders.
 export function selectEquippedBodyArmor(
   row: CharacterWithRelations,
   effectiveScores: Record<string, number>,
@@ -56,13 +51,7 @@ export function selectEquippedBodyArmor(
   return { bestArmor, hasShield };
 }
 
-// Draconic Resilience (Draconic Bloodline L1, #1122): the character's Sorcerer
-// class entry resolved onto the subclass slug vocabulary (#1277) via
-// draconicBloodlineEntry — the one slug-gated resolution this,
-// draconicWingsFlySpeed below, and draconicResilienceMaxHpTerm all share. No
-// level gate here: the seeded subclassLevel gate (isSubclassActive, #1576)
-// already gates when the subclass itself becomes choosable, and the AC clause
-// carries no separate one.
+// draconicBloodlineEntry is the one slug-gated resolution this, draconicWingsFlySpeed below, and draconicResilienceMaxHpTerm all share. No level gate here: the seeded subclassLevel gate (isSubclassActive, #1576) already gates when the subclass itself becomes choosable, and the AC clause carries no separate one.
 function draconicResilienceOverride(
   classEntries: CharacterWithRelations["classEntries"],
   edition: RulesEdition,
@@ -70,15 +59,7 @@ function draconicResilienceOverride(
   return draconicBloodlineEntry(classEntries) ? draconicResilienceBase(edition) : undefined;
 }
 
-// Dragon Wings (Draconic Bloodline L14, #1123): same slug-gated resolution as
-// draconicResilienceOverride above. `edition` gates here because
-// deriveDragonWingsFlySpeed itself withholds 2024 (flat 60ft, 1hr,
-// resource-gated — out of this derived-value's scope; see that function's own
-// header). draconicBloodlineLevel is the SAME entry+level resolution the HP
-// half (draconicResilienceMaxHpTerm) uses — XP-derived, not the raw
-// `classEntry.level` column, which can lag behind a pending level-up ceremony
-// and would otherwise let the HP bonus and flySpeed disagree about whether
-// L14 has been reached.
+// draconicBloodlineLevel is the SAME entry+level resolution draconicResilienceMaxHpTerm uses — XP-derived, not the raw classEntry.level column, which can lag behind a pending level-up ceremony and would otherwise let the HP bonus and flySpeed disagree about whether L14 has been reached.
 function draconicWingsFlySpeed(
   classEntries: CharacterWithRelations["classEntries"],
   isUnarmored: boolean,
@@ -91,13 +72,7 @@ function draconicWingsFlySpeed(
   return deriveDragonWingsFlySpeed({ draconicLevel: resolved.level, isUnarmored, walkingSpeed }, edition);
 }
 
-// AC assembly: labeled addends whose exact sum is armorClass (single source of
-// the base formula in srd/srd.ts). Layered in order: base parts (armor/Dex/shield/
-// Unarmored Defense/Mage Armor/Draconic Resilience best-of) → Defense Fighting
-// Style feat → feat AC → per-source "ac" buffs → the acFloor (Barkskin)
-// reconciling part last.
-// The branchiness is inherent to the 5e AC layering (each optional source is a
-// conditional addend), not accidental complexity.
+// Labeled AC addends whose exact sum is armorClass, layered: base parts (armor/Dex/shield/Unarmored Defense/Mage Armor/Draconic Resilience best-of) → Defense Fighting Style feat → feat AC → per-source "ac" buffs → acFloor (Barkskin) last.
 // fallow-ignore-next-line complexity -- inherent 5e AC layering (one conditional addend per source), not accidental complexity
 export function buildArmorClassView(
   row: CharacterWithRelations,
@@ -110,38 +85,29 @@ export function buildArmorClassView(
   edition: RulesEdition,
 ): { armorClass: number; armorClassBreakdown: ReturnType<typeof deriveArmorClassParts> } {
   const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
-  // Feeds Unarmored Defense (Barbarian/Monk) when no body armor is equipped.
   const unarmoredDefense = {
     classNames: row.classEntries.map((e) => e.name),
     conMod: abilityModifier(effectiveScores.constitution ?? 10),
     wisMod: abilityModifier(effectiveScores.wisdom ?? 10),
   };
-  // Mage Armor (#363): a spell buff sets the unarmored base to 13 + Dex — the
-  // highest-valued `acUnarmoredBase` buff becomes a best-of candidate in the
-  // unarmored formula (ignored while wearing body armor; the equip hook true-ends it).
+  // Mage Armor (#363): the highest-valued acUnarmoredBase buff becomes a best-of candidate in the unarmored formula; ignored while wearing body armor.
   const mageArmor = (buffTargets.acUnarmoredBase ?? []).reduce<{ label: string; value: number } | undefined>(
     (best, c) => (best && best.value >= c.modifier ? best : { label: c.source, value: c.modifier }),
     undefined,
   );
   const draconicResilience = draconicResilienceOverride(row.classEntries, edition);
-  // Labeled AC addends; armorClass below is their exact sum (single source in srd/srd.ts).
   const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense, mageArmor, draconicResilience);
   // Defense Fighting Style feat only applies while wearing body armor (SRD 5.2, #1137).
   if (bestArmor !== null) {
     for (const part of deriveArmoredArmorClassParts(clampedAdvancements)) acParts.push(part);
   }
   if (featBonuses.armorClass !== 0) acParts.push({ label: "Feats", value: featBonuses.armorClass });
-  // Active-item AC bonuses (#383) + flat AC spell buffs (Shield of Faith +2, #363):
-  // each labeled per source. v1 applies only unconditional bonuses; a conditional
-  // one surfaces as reminder text (value 0) rather than being silently added.
+  // v1 applies only unconditional AC bonuses; a conditional one surfaces as reminder text (value 0) rather than being silently added.
   for (const c of buffTargets.ac ?? []) {
     if (c.condition) acParts.push({ label: c.source, value: 0, reminder: c.condition });
     else acParts.push({ label: c.source, value: c.modifier });
   }
-  // Barkskin (#363): AC can't drop below the floor while active — applied last,
-  // stacking over armor/Dex/buffs. Kept in the breakdown as a reconciling part so
-  // the labeled parts still sum to armorClass (a 0-value reminder when AC already
-  // meets the floor). Highest floor wins if several are active.
+  // Barkskin acFloor is applied last as a reconciling part so labeled parts still sum to armorClass; highest floor wins if several are active.
   const acFloor = (buffTargets.acFloor ?? []).reduce<{ source: string; value: number } | undefined>(
     (best, c) => (best && best.value >= c.modifier ? best : { source: c.source, value: c.modifier }),
     undefined,
@@ -160,22 +126,12 @@ export function buildArmorClassView(
   };
 }
 
-// Per-class level lookup (0 when the class isn't in the mix) — multiclass-safe
-// inputs for the class-level-scaled speed/unarmed terms.
 function classEntryLevel(row: CharacterWithRelations, className: string): number {
   return row.classEntries.find((e) => e.name.toLowerCase() === className)?.level ?? 0;
 }
 
-// Speed is the persisted racial base plus additive terms only (never merged
-// into each other): feat speed bonuses, Monk Unarmored Movement (monk class
-// level, unarmored & unshielded), Barbarian Fast Movement (barbarian class
-// level 5+, not in heavy armor), and any active "speed"-targeted buff
-// (e.g. Boots of Speed, #543), then reduced by exhaustion — 2024: −5 ft×level
-// (SRD 5.2); 2014: halved at levels 2-4, floored to 0 at level 5+ (PHB'14
-// p. 291) — either way floored at 0 here as a final non-negative clamp.
-// `flySpeed` (#1123) rides alongside as an optional sibling — Dragon Wings
-// equals the character's own final walking speed (post-exhaustion, the same
-// number served as `speed`), never a second independent derivation.
+// Speed is racial base plus additive terms only (feat bonuses, Monk Unarmored Movement, Barbarian Fast Movement, active speed buffs), then reduced by exhaustion — 2024: −5 ft×level (SRD 5.2); 2014: halved at levels 2-4, floored to 0 at level 5+ (PHB'14 p. 291) — floored at 0 here either way.
+// flySpeed (#1123) equals the character's own final walking speed (post-exhaustion) — never a second independent derivation.
 export function buildSpeedView(
   row: CharacterWithRelations,
   bestArmor: BestBodyArmor,
@@ -183,9 +139,6 @@ export function buildSpeedView(
   featBonuses: ReturnType<typeof deriveFeatBonuses>,
   buffTargets: TargetModifierMap,
   exhaustionLevel: number,
-  // XP-derived total level (#1123) — draconicWingsFlySpeed's L14 gate needs
-  // it, same as draconicResilienceMaxHpTerm; see draconicBloodlineLevel's
-  // comment for why the raw classEntry.level column isn't enough.
   totalLevel: number,
   edition: RulesEdition,
 ): { speed: number; flySpeed?: number } {
@@ -209,11 +162,7 @@ export function buildSpeedView(
   return { speed, flySpeed };
 }
 
-// Unarmed strike + improvised weapon rows. Derived from the same clamped
-// advancements slice so Tavern Brawler's upgrades are automatically excluded
-// when the character is over-cap. A Monk (unarmored & unshielded) swaps in
-// max(Dex, Str) + the level-scaled Martial Arts die, off the monk class-entry
-// level for multiclass correctness.
+// Derived from the same clamped advancements slice so Tavern Brawler's upgrades are automatically excluded when the character is over-cap.
 export function buildUnarmedAttacksView(
   row: CharacterWithRelations,
   effectiveScores: Record<string, number>,

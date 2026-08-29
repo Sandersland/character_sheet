@@ -28,11 +28,9 @@ export function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult
   if (op.amount <= 0) {
     throw new InvalidHitPointOperationError("damage amount must be positive");
   }
-  // Auto-halve against active resistances (#456) / zero against item immunities
-  // (#529) unless the player declined: cast-buff resistances (Rage) unioned with
-  // item-granted resistances; item immunities zero the matching type.
+  // Cast-buff resistances (Rage) union with item-granted resistances; item immunities zero the matching type.
   const resisted = activeResistedDamageTypes(normalizeActiveEffectsMutable(row.activeEffects));
-  // Map the paper-doll placement to the boolean "worn" flag the grant helpers expect (#565).
+  // Maps the paper-doll placement to the boolean "worn" flag the grant helpers expect.
   const itemsForGrants = (row.inventoryItems ?? []).map((i) => ({ ...i, equipped: i.equippedSlot != null }));
   for (const t of itemResistedDamageTypes(itemsForGrants)) resisted.add(t);
   const immune = itemImmuneDamageTypes(itemsForGrants);
@@ -129,16 +127,9 @@ export function applyStabilizeOp(ctx: HpOpContext): HpOpResult {
   return { summary: "Stabilized", eventData: {} };
 }
 
-// applyLevelUpOp dispatches on the op's target: a NEW class (multiclass), an
-// EXISTING class entry, or the no-target position-0 self-heal. All three share
-// the roll validation + HP/hit-dice bump and the same eventData shape, which
-// stores enough to exactly reverse the level-up (Phase 4 undo, and the
-// auto-reverse in experience-ops.ts when XP is lowered).
+// eventData stores enough to exactly reverse the level-up (LIFO undo, and the auto-reverse when XP is lowered).
 
-/**
- * Validate the client roll against the CHOSEN class's die (may differ from
- * the position-0 die stored in hd.die once multiclassing is in play).
- */
+// The chosen class's die may differ from the position-0 die stored in hd.die once multiclassing is in play.
 function requireLevelUpRoll(op: LevelUpOperation, dieFaces: number): void {
   if (op.method === "roll" && (op.roll === undefined || op.roll < 1 || op.roll > dieFaces)) {
     throw new InvalidHitPointOperationError(
@@ -147,13 +138,9 @@ function requireLevelUpRoll(op: LevelUpOperation, dieFaces: number): void {
   }
 }
 
-/**
- * Apply the shared HP/hit-dice bump for a given die face count; returns the
- * gain. #1321: at exhaustion 4+ (PHB'14 p. 291), raising the raw max by `gain`
- * doesn't raise the EFFECTIVE max by the same amount (the halving grows too),
- * so current must clamp to the recomputed effective max rather than gain the
- * same `gain` current gets — never above it, never below what it already was.
- */
+// At exhaustion tier 4+ (PHB'14 p.291), raising the raw max by `gain` doesn't raise the effective max
+// by the same amount (the halving grows too), so current must clamp to the recomputed effective max,
+// never simply gain the same amount current gets.
 function bumpHpForLevelUp(ctx: HpOpContext, op: LevelUpOperation, dieFaces: number): number {
   const gain = levelUpHpGain(dieFaces, ctx.conMod, op.method, op.roll);
   ctx.hd.total += 1;
@@ -163,7 +150,6 @@ function bumpHpForLevelUp(ctx: HpOpContext, op: LevelUpOperation, dieFaces: numb
   return gain;
 }
 
-/** The reversal-grade eventData every level-up variant shares. */
 function levelUpEventData(
   op: LevelUpOperation,
   conMod: number,
@@ -181,7 +167,6 @@ function levelUpEventData(
   };
 }
 
-/** Level up into a NEW class (multiclass): prereq-gated, creates a level-1 entry. */
 async function applyNewClassLevelUp(
   ctx: HpOpContext,
   op: LevelUpOperation,
@@ -201,7 +186,6 @@ async function applyNewClassLevelUp(
     );
   }
   const abilityScores = row.abilityScores as Record<string, number>;
-  // `multiclassPrerequisites` (#1529): the catalog row's own Json column.
   const prereq = multiclassPrerequisitesMet(
     catalog.multiclassPrerequisites as MulticlassPrerequisiteOption[] | null,
     abilityScores,
@@ -231,7 +215,6 @@ async function applyNewClassLevelUp(
   };
 }
 
-/** Level up a CHOSEN existing class entry, rolling that entry's own die. */
 async function applyExistingClassLevelUp(
   ctx: HpOpContext,
   op: LevelUpOperation,
@@ -260,13 +243,9 @@ async function applyExistingClassLevelUp(
   };
 }
 
-/**
- * No target — position-0 self-heal (backward-compatible path). Only valid for
- * single-class characters. A multiclass character has no unambiguous
- * position-0 to self-heal: this path would set that entry's level to
- * `hd.total` (the *total* character level), inflating it (#124). Callers with
- * more than one entry must pass an explicit target instead.
- */
+// Multiclass has no unambiguous position-0 to self-heal: this path would set that entry's level to
+// hd.total (the total character level), inflating it — callers with more than one entry must pass an
+// explicit target.
 async function applySelfHealLevelUp(ctx: HpOpContext, op: LevelUpOperation): Promise<HpOpResult> {
   const { tx, row, hd, conMod, faces, primaryEntry, beforeClassLevel } = ctx;
   if (row.classEntries.length > 1) {
@@ -277,9 +256,8 @@ async function applySelfHealLevelUp(ctx: HpOpContext, op: LevelUpOperation): Pro
   requireLevelUpRoll(op, faces);
   const gain = bumpHpForLevelUp(ctx, op, faces);
 
-  // Repair the position-0 class entry's `level` to match the newly-applied
-  // total. The seed defaults all entries to level 1 even for level-7 chars;
-  // this self-heals that on the first real level-up.
+  // Repairs the position-0 class entry's `level` to match the newly-applied total; the seed defaults
+  // all entries to level 1 even for level-7 chars.
   if (primaryEntry) {
     await tx.characterClassEntry.update({
       where: { id: primaryEntry.id },

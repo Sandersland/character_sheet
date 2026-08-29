@@ -23,10 +23,7 @@ const BASE_CHARACTER = {
   toolProficiencies: [],
 };
 
-// consumableDetail's maxUses is a frozen snapshot field; usesRemaining is the
-// runtime counter and is a plain InventoryItem column (#1649) — this reads
-// both off the one InventoryItem row so call sites keep their `?.usesRemaining`
-// / `?.maxUses` shape unchanged.
+// #1649: consumableDetail.maxUses is a frozen snapshot field; usesRemaining is a plain InventoryItem column — both read off the one row.
 async function getConsumableDetail(inventoryItemId: string) {
   const item = await prisma.inventoryItem.findUnique({ where: { id: inventoryItemId } });
   if (!item) return null;
@@ -96,7 +93,6 @@ describe("use consumable", () => {
     const character = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
     expect((character.hitPoints as { current: number }).current).toBe(11);
 
-    // One consumed event carrying the roll; plus the heal event through HP domain.
     const consumed = await prisma.characterEvent.findMany({
       where: { characterId, category: "inventory", type: "consumed" },
     });
@@ -142,10 +138,8 @@ describe("use consumable", () => {
     await applyInventoryOperations(characterId, [{ type: "use", inventoryItemId: item.id, rolls: [2] }]);
     expect((await getConsumableDetail(item.id))?.usesRemaining).toBe(0);
 
-    // Row survives at 0 charges.
     expect(await prisma.inventoryItem.findUnique({ where: { id: item.id } })).not.toBeNull();
 
-    // Use at 0 is rejected.
     await expect(
       applyInventoryOperations(characterId, [{ type: "use", inventoryItemId: item.id, rolls: [3] }]),
     ).rejects.toThrow();

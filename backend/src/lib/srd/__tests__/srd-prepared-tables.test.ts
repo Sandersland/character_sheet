@@ -12,8 +12,7 @@ import {
 } from "@/lib/srd/srd.js";
 import { ELDRITCH_KNIGHT, ARCANE_TRICKSTER } from "./third-caster.fixture.js";
 
-// SRD 5.2 prepared-spell counts (2024). Spot checks at L1/5/12/17/20 per class,
-// plus the third-caster (EK/AT) column keyed by subclass from class level 3.
+// SRD 5.2 prepared-spell counts (2024).
 describe("preparedSpellCountAt — per-class SRD 5.2 tables", () => {
   it("full casters that share the Bard/Cleric/Druid column", () => {
     for (const cls of ["bard", "cleric", "druid"]) {
@@ -61,7 +60,7 @@ describe("preparedSpellCountAt — per-class SRD 5.2 tables", () => {
 
   it("Eldritch Knight / Arcane Trickster (third caster, keyed by subclassRef from L3)", () => {
     for (const sub of [ELDRITCH_KNIGHT, ARCANE_TRICKSTER]) {
-      expect(preparedSpellCountAt("fighter", 2, sub, {}, "EDITION_2024")).toBeNull(); // subclass not active yet
+      expect(preparedSpellCountAt("fighter", 2, sub, {}, "EDITION_2024")).toBeNull();
       expect(preparedSpellCountAt("fighter", 3, sub, {}, "EDITION_2024")).toBe(3);
       expect(preparedSpellCountAt("fighter", 5, sub, {}, "EDITION_2024")).toBe(4);
       expect(preparedSpellCountAt("fighter", 12, sub, {}, "EDITION_2024")).toBe(8);
@@ -90,9 +89,7 @@ describe("preparedSpellCountAt — per-class SRD 5.2 tables", () => {
   });
 });
 
-// #1507: SRD 5.1 "known" caster tables (Bard/Sorcerer/Ranger) and the
-// Cleric/Druid/Wizard/Paladin ability-mod formula, plus the Warlock/EK/AT
-// no-fork identity proofs.
+// SRD 5.1 (2014) known-caster tables and ability-mod formula (#1507).
 describe("preparedSpellCountAt — SRD 5.1 (2014) tables and formulas", () => {
   it("Bard/Sorcerer/Ranger 5 (both editions per the AC table)", () => {
     expect(preparedSpellCountAt("bard", 5, null, {}, "EDITION_2014")).toBe(8);
@@ -126,21 +123,20 @@ describe("preparedSpellCountAt — SRD 5.1 (2014) tables and formulas", () => {
   });
 
   it("Cleric/Druid/Wizard use ability modifier + level, minimum 1", () => {
-    expect(preparedSpellCountAt("cleric", 3, null, { wisdom: 16 }, "EDITION_2014")).toBe(6); // +3 + 3
-    expect(preparedSpellCountAt("cleric", 1, null, { wisdom: 8 }, "EDITION_2014")).toBe(1); // -1 + 1 = 0, floored to 1
-    expect(preparedSpellCountAt("druid", 5, null, { wisdom: 14 }, "EDITION_2014")).toBe(7); // +2 + 5
-    expect(preparedSpellCountAt("wizard", 5, null, { intelligence: 14 }, "EDITION_2014")).toBe(7); // +2 + 5
+    expect(preparedSpellCountAt("cleric", 3, null, { wisdom: 16 }, "EDITION_2014")).toBe(6);
+    expect(preparedSpellCountAt("cleric", 1, null, { wisdom: 8 }, "EDITION_2014")).toBe(1);
+    expect(preparedSpellCountAt("druid", 5, null, { wisdom: 14 }, "EDITION_2014")).toBe(7);
+    expect(preparedSpellCountAt("wizard", 5, null, { intelligence: 14 }, "EDITION_2014")).toBe(7);
   });
 
   it("Paladin uses ability modifier + half class level (floored), minimum 1, and is null at level 1", () => {
     expect(preparedSpellCountAt("paladin", 1, null, { charisma: 20 }, "EDITION_2014")).toBeNull();
-    expect(preparedSpellCountAt("paladin", 5, null, { charisma: 14 }, "EDITION_2014")).toBe(4); // +2 + 2
+    expect(preparedSpellCountAt("paladin", 5, null, { charisma: 14 }, "EDITION_2014")).toBe(4);
   });
 });
 
 describe("cantripsKnownAtLevel — SRD 5.2 cantrip columns (data only, #1131 wires the step)", () => {
   const cases: Array<[string, number, number, number]> = [
-    // [class, atL1, atL4, atL10]
     ["bard", 2, 3, 4],
     ["cleric", 3, 4, 5],
     ["druid", 2, 3, 4],

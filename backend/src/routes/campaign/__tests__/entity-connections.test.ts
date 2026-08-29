@@ -108,7 +108,6 @@ describe("entity connections (#839)", () => {
     monasteryC = await createEntity({ type: "LOCATION", name: "Candlekeep Monastery" });
     hiddenD = await createEntity({ type: "NPC", name: "Secret Patron", visibility: "HIDDEN" });
 
-    // B co-mentioned with Leosin x3, C x1, hidden D x1.
     await seedEntry({ characterId: CHAR_OWNER, authorUserId: OWNER, body: "co 1", entityIds: [leosin, cultB] });
     await seedEntry({ characterId: CHAR_OWNER, authorUserId: OWNER, body: "co 2", entityIds: [leosin, cultB] });
     await seedEntry({ characterId: CHAR_PLAYER, authorUserId: PLAYER, body: "co 3", entityIds: [leosin, cultB, monasteryC] });
@@ -148,7 +147,6 @@ describe("entity connections (#839)", () => {
       entityIds: [leosin, secret],
     });
 
-    // Invisible to the owner (no DM bypass) but present for its author.
     const owner = await connectionsFor(leosin, cookieOwner);
     expect(owner.some((c) => c.entity.id === secret)).toBe(false);
     const author = await connectionsFor(leosin, cookiePlayer);
@@ -166,7 +164,6 @@ describe("entity connections (#839)", () => {
       .post(`/api/campaigns/${campaignId}/entities/merges/${prepared.body.id}/execute`)
       .set("Cookie", cookieOwner);
 
-    // One entry tags Leosin + old identity, one dual-tags old identity AND survivor.
     await seedEntry({ characterId: CHAR_OWNER, authorUserId: OWNER, body: "old co", entityIds: [leosin, oldId] });
     await seedEntry({ characterId: CHAR_OWNER, authorUserId: OWNER, body: "dual co", entityIds: [leosin, oldId, survivor] });
 

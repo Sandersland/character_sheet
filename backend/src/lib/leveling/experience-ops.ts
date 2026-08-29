@@ -26,20 +26,6 @@ import { recomputeSummaries } from "@/lib/session/sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
 
-/**
- * Rolls back HP/hit-dice/class-entry-level when XP drops the derived level
- * below the number of level-ups already applied (hitDice.total).
- *
- * The reversal is exact when prior `levelUp` CharacterEvent rows carry the
- * `hpGain` field — those events are read newest-first and popped until the
- * applied-level matches the new XP-derived level. Falls back to the fixed
- * average gain (fixedAverageForDie + conMod) for levels with no event record
- * (e.g. characters seeded before the event log existed).
- */
-// Compute the post-level-down HP/HD by subtracting each reversed level's HP gain
-// (exact from the levelUp event's `hpGain`, else the average-for-die fallback),
-// returning the mutated hp/hd plus their before-snapshots and the single-class
-// primary entry to repair. Pure — no writes; the caller persists + logs.
 function computeLevelDownState(
   character: {
     hitPoints: Prisma.JsonValue;
@@ -53,15 +39,13 @@ function computeLevelDownState(
       name: string;
       subclass: string | null;
       subclassRef: { slug: string } | null;
-      // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
-      // input — the CANONICAL class name, same #1495 rationale as elsewhere.
+      // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug input — the canonical class name (#1495).
       class: { name: string; extraAsiLevels: number[]; fightingStyleFeatLevel: number | null; subclassLevel: number } | null;
     }[];
   },
   levelUpEvents: { data: Prisma.JsonValue }[],
   levelsToReverse: number,
-  // #1321: the post-reversal advancement-slot cap and exhaustion's halving
-  // are both evaluated at the character's FINAL (post-reversal) state.
+  // #1321: the post-reversal advancement-slot cap and exhaustion's halving are both evaluated at the character's FINAL (post-reversal) state.
   targetLevel: number,
   edition: RulesEdition,
 ) {
@@ -70,32 +54,17 @@ function computeLevelDownState(
   const abilityScores = character.abilityScores as Record<string, number>;
   const conMod = abilityModifier(abilityScores.constitution ?? 10);
   const faces = hitDieFace(hd.die);
-  // Only single-class characters get the position-0 self-heal here; multiclass
-  // per-entry levels reconcile via reconcileClassEntryLevels (the registry).
+  // Only single-class characters get the position-0 self-heal here; multiclass per-entry levels reconcile via reconcileClassEntryLevels (the registry).
   const primaryEntry = character.classEntries.length === 1 ? character.classEntries[0] : undefined;
 
   const beforeHp = { ...hp };
   const beforeHd = { ...hd };
 
-  // #1321: current must clamp to the EFFECTIVE (exhaustion-halved) max, not
-  // the raw hp.max column — the ticket's checklist names this exact line.
-  // The feat-bonus half of that composition is evaluated once, at the FINAL
-  // (post-reversal) advancement-slot cap, mirroring how deriveFeatBonuses'
-  // appliedLevel argument tracks hd.total inside the loop below.
+  // #1321: current clamps to the EFFECTIVE (exhaustion-halved) max, evaluated once at the FINAL (post-reversal) advancement-slot cap.
   const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, targetLevel, edition);
   const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, targetLevel, fightingStyleSlotTotal);
   const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
-  // #1123: Draconic Resilience joins the feat bonus in the clamp's pre-halving
-  // composition via the ONE shared function. This runs BEFORE the reconciler
-  // chain, so the rows still hold PRE-level-down per-entry levels — a
-  // multiclass sorcerer's term must not read the stale column, so entries are
-  // PROJECTED through levelDownEntryLevels (the exact allocation
-  // reconcileClassEntryLevels persists right after; a 0 projection matches
-  // its delete) and the derived total covers single-class via
-  // effectiveEntryLevel. The feat-cap reads above intentionally stay on the
-  // live rows: an over-cap advancement kept by a stale cap is trimmed and
-  // re-clamped by reconcileAdvancements later in the same transaction,
-  // whereas nothing downstream re-clamps the Draconic term.
+  // #1123: runs BEFORE the reconciler chain, so classEntries still hold PRE-level-down levels — projected via levelDownEntryLevels (the same allocation reconcileClassEntryLevels persists next) so the Draconic Resilience term doesn't read stale levels.
   const projectedLevels = levelDownEntryLevels(character.classEntries.map((e) => e.level), targetLevel);
   const projectedEntries = character.classEntries
     .map((entry, i) => ({ ...entry, level: projectedLevels[i] }))
@@ -108,7 +77,7 @@ function computeLevelDownState(
     const hpGain =
       typeof eventData.hpGain === "number"
         ? eventData.hpGain
-        : Math.max(1, fixedAverageForDie(faces) + conMod); // best-effort fallback
+        : Math.max(1, fixedAverageForDie(faces) + conMod);
 
     hp.max = Math.max(1, hp.max - hpGain);
     hd.total = Math.max(0, hd.total - 1);
@@ -132,8 +101,6 @@ async function revertLevelUps(
   const levelsToReverse = currentHdTotal - targetLevel;
   if (levelsToReverse <= 0) return;
 
-  // Fetch the most recent levelUp events newest-first (up to levelsToReverse)
-  // to get exact per-level HP gains when available.
   const levelUpEvents = await tx.characterEvent.findMany({
     where: { characterId, type: "levelUp", reverted: false },
     orderBy: { createdAt: "desc" },
@@ -146,23 +113,19 @@ async function revertLevelUps(
       hitPoints: true,
       hitDice: true,
       abilityScores: true,
-      // resources/conditions (#1321): effectiveMaxHitPoints' inputs — see
-      // computeLevelDownState's own comment. `fightingStyleFeatLevel`:
-      // characterFightingStyleFeatSlots' fs-cap arg.
+      // resources/conditions (#1321): effectiveMaxHitPoints' inputs. fightingStyleFeatLevel: characterFightingStyleFeatSlots' fs-cap arg.
       resources: true,
       conditions: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        // name/subclass/subclassRef.slug/class.subclassLevel (#1123):
-        // draconicResilienceMaxHpTerm's identity inputs.
+        // name/subclass/subclassRef.slug/class.subclassLevel (#1123): draconicResilienceMaxHpTerm's identity inputs.
         select: {
           id: true,
           level: true,
           name: true,
           subclass: true,
           subclassRef: { select: { slug: true } },
-          // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
-          // input — the CANONICAL class name, same #1495 rationale as elsewhere.
+          // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug input — the canonical class name (#1495).
           class: { select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
         },
       },
@@ -178,7 +141,6 @@ async function revertLevelUps(
     edition,
   );
 
-  // Repair the position-0 class entry's level to match the new hd.total.
   if (primaryEntry && primaryEntry.level !== hd.total) {
     await tx.characterClassEntry.update({
       where: { id: primaryEntry.id },
@@ -207,10 +169,6 @@ async function revertLevelUps(
   });
 }
 
-/**
- * Resolves the target XP total + event type for one op. Award applies a signed
- * delta clamped at 0; set takes an exact non-negative value (rejects negatives).
- */
 export function resolveXpChange(
   op: ExperienceOperation,
   prevXp: number,
@@ -224,7 +182,6 @@ export function resolveXpChange(
   return { newXp: op.value, eventType: "xpSet" };
 }
 
-/** The undoable timeline summary for one XP event. */
 export function xpEventSummary(
   eventType: "xpAward" | "xpSet",
   prevXp: number,
@@ -244,19 +201,13 @@ type XpTxContext = CharacterTxContext<
   ExperienceOperation
 >;
 
-/**
- * Applies one XP op inside the batch transaction: persist the new total, log the
- * undoable event, auto-reverse HP/hit-dice if the derived level dropped below the
- * applied level, then reconcile all level-gated state. State is re-read per op so
- * a multi-op batch sees each prior result.
- */
+// State is re-read per op so a multi-op batch sees each prior result.
 async function applyExperienceOp(ctx: XpTxContext): Promise<void> {
   const { tx, row, op, characterId, batchId, sessionId } = ctx;
   const prevXp = row.experiencePoints;
   const hd = normalizeHitDice(row.hitDice);
   const { newXp, eventType } = resolveXpChange(op, prevXp);
 
-  // Apply the XP change first.
   await tx.character.update({
     where: { id: characterId },
     data: { experiencePoints: newXp },
@@ -274,41 +225,21 @@ async function applyExperienceOp(ctx: XpTxContext): Promise<void> {
     sessionId,
   });
 
-  // Auto-reverse HP if the new XP drops derived level below applied level.
-  // This fixes the stranded-HP bug: lowering XP now rolls HP/hit-dice back.
   const newDerivedLevel = levelForExperience(newXp);
   if (newDerivedLevel < hd.total) {
     await revertLevelUps(tx, characterId, hd.total, newDerivedLevel, editionOf(row), batchId, sessionId);
   }
 
-  // Reconcile all level-gated state (subclass choice, maneuvers known, …) in the
-  // registered order. Runs unconditionally so it catches characters who gained a
-  // subclass via XP alone (no HP level-ups applied yet) and self-heals those
-  // already in an invalid state on their next XP op.
+  // Runs unconditionally so a subclass gained via XP alone (no HP level-up yet) is caught, and any character already in an invalid state self-heals.
   await reconcileLevelGatedState({ tx, characterId, newDerivedLevel, edition: editionOf(row), batchId });
 }
 
-/**
- * Applies a batch of XP operations atomically. Each op writes a
- * `CharacterEvent` (category: "experience"). If the resulting XP drops the
- * derived level below the number of HP level-ups already applied
- * (hitDice.total), auto-reverses those HP gains in the same transaction —
- * fixing the stranded-HP bug described in the plan.
- *
- * `explicitSessionId` (optional) tags the resulting events to a SPECIFIC
- * session instead of the currently-active one. This powers the retroactive
- * "add XP to a past (ended) session" flow: when supplied, the targeted
- * session's stored `Session.summary` is recomputed + re-persisted in the same
- * transaction so its `xpGained` reflects the new award immediately. The session
- * must belong to the character (validated before any mutation).
- */
 export async function applyExperienceOperations(
   characterId: string,
   operations: ExperienceOperation[],
   explicitSessionId?: string,
 ): Promise<void> {
-  // Domain guard: an explicit session must belong to the character. Runs before
-  // the transaction so a non-participant throws with no mutation.
+  // An explicit session must belong to the character; checked before the transaction so a non-participant throws with no mutation.
   if (explicitSessionId) {
     const participant = await prisma.sessionParticipant.findUnique({
       where: { sessionId_characterId: { sessionId: explicitSessionId, characterId } },
@@ -330,9 +261,7 @@ export async function applyExperienceOperations(
       // undefined → scaffold falls back to the active session; string → tag verbatim.
       sessionId: explicitSessionId,
       applyOp: applyExperienceOp,
-      // Retroactive path: recompute + re-persist the targeted (ended) session's
-      // stored summary so its xpGained reflects the award. Mirrors endSession's
-      // compute-and-persist (sessions.ts); skipped for the active-session path.
+      // Retroactive path: recomputes + re-persists the targeted (ended) session's stored summary so xpGained reflects the award immediately. Mirrors endSession's compute-and-persist (sessions.ts).
       afterOps: explicitSessionId
         ? async ({ tx }) => {
             const session = await tx.session.findUnique({

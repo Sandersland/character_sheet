@@ -15,9 +15,9 @@ import { __resetBlobStoreForTests, createBlobStore } from "@/lib/storage/index.j
 import { PORTRAIT_CACHE_CONTROL, PORTRAIT_FIELD } from "@/lib/storage/portrait-http.js";
 
 // Unique fixture ids for this file (parallel-safe on the shared dev DB).
-const OWNER = "owner-entities-owner"; // campaign OWNER
-const PLAYER = "owner-entities-player"; // a member (PLAYER role)
-const OUTSIDER = "owner-entities-outsider"; // not a member
+const OWNER = "owner-entities-owner";
+const PLAYER = "owner-entities-player";
+const OUTSIDER = "owner-entities-outsider";
 const CHAR_OWNER = "test-entities-char-owner";
 const CHAR_PLAYER = "test-entities-char-player";
 
@@ -228,7 +228,6 @@ describe("campaign entities (#248)", () => {
     expect(ok.status).toBe(200);
     expect(ok.body.visibility).toBe("HIDDEN");
 
-    // A player editing a basic field on the now-hidden entity 404s (invisible).
     const basicEdit = await supertest(app)
       .patch(`/api/campaigns/${campaignId}/entities/${id}`)
       .set("Cookie", cookiePlayer)
@@ -255,7 +254,6 @@ describe("campaign entities (#248)", () => {
   });
 
   it("returns backlinks but excludes another member's PRIVATE notes", async () => {
-    // Both characters belong to this campaign so their notes can tag entities.
     await prisma.character.update({ where: { id: CHAR_OWNER }, data: { campaignId } });
     await prisma.character.update({ where: { id: CHAR_PLAYER }, data: { campaignId } });
 
@@ -265,8 +263,6 @@ describe("campaign entities (#248)", () => {
       .send({ type: "NPC", name: "Backlink Target" });
     const entityId = entity.body.id as string;
 
-    // Seed refs directly so this route is tested independent of the journal-write
-    // derivation (Chunk 4): the owner's own note and a player's PRIVATE note.
     const ownerEntry = await prisma.journalEntry.create({
       data: {
         characterId: CHAR_OWNER,
@@ -339,14 +335,12 @@ describe("campaign entities (#248)", () => {
       return (res.body as { entry: { body: string } }[]).map((b) => b.entry.body);
     }
 
-    // Player sees the owner's CAMPAIGN note plus everything they authored.
     const playerBodies = await bodiesFor(cookiePlayer);
     expect(playerBodies).toContain("owner shared note");
     expect(playerBodies).toContain("player shared note");
     expect(playerBodies).toContain("player secret note");
     expect(playerBodies).not.toContain("owner secret note");
 
-    // The OWNER/DM has no bypass: another member's PRIVATE note stays invisible.
     const ownerBodies = await bodiesFor(cookieOwner);
     expect(ownerBodies).toContain("player shared note");
     expect(ownerBodies).toContain("owner shared note");
@@ -358,9 +352,7 @@ describe("campaign entities (#248)", () => {
     const UUID_RE = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
     beforeAll(async () => {
-      // fs blob root isolated per run: the routes go through getBlobStore's
-      // memo, so the reset after stubbing makes its first fill read this
-      // tmpdir instead of any store memoized before the stubs applied.
+      // Reset after stubbing so getBlobStore's memo re-fills from this tmpdir, not a store memoized earlier.
       vi.stubEnv("BLOB_STORE_DRIVER", "fs");
       vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "entity-portrait-test-")));
       __resetBlobStoreForTests();
@@ -368,12 +360,10 @@ describe("campaign entities (#248)", () => {
 
     afterAll(() => {
       vi.unstubAllEnvs();
-      // A later suite in this file would otherwise inherit a store memoized
-      // on this suite's now-unstubbed tmpdir.
+      // Otherwise a later suite in this file would inherit a store memoized on this suite's now-unstubbed tmpdir.
       __resetBlobStoreForTests();
     });
 
-    // Fixture images are generated with sharp at runtime — no binaries in-repo.
     async function pngFixture(): Promise<Buffer> {
       return sharp({ create: { width: 64, height: 64, channels: 4, background: "#1a8b2a" } })
         .png()
@@ -637,7 +627,6 @@ describe("campaign entities (#248)", () => {
     const bodies = (ownerView.body as { entry: { body: string } }[]).map((b) => b.entry.body);
     expect(bodies).not.toContain("shared, then departed");
 
-    // The author still sees their own entry regardless of campaign membership.
     const playerView = await supertest(app)
       .get(`/api/campaigns/${campaignId}/entities/${entityId}/backlinks`)
       .set("Cookie", cookiePlayer);

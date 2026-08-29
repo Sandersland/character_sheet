@@ -7,13 +7,7 @@ import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 
-// Manual monkeypatch, not vi.spyOn/mockRestore (used below to simulate a
-// race by hijacking one Prisma delegate call): Prisma's model delegates
-// don't restore cleanly through vi.spyOn's own save/restore bookkeeping —
-// `mockRestore()` was observed leaving the SAME method permanently
-// "not a function" for every later test in this file. Capturing the real
-// bound method up front and reassigning it back in `finally` sidesteps that
-// entirely.
+// Manual monkeypatch, not vi.spyOn: Prisma model delegates don't restore cleanly through vi.spyOn's save/restore, leaving the method permanently broken for later tests.
 function patchMethod<T extends object, K extends keyof T>(
   target: T,
   key: K,
@@ -25,12 +19,6 @@ function patchMethod<T extends object, K extends keyof T>(
     target[key] = original;
   };
 }
-
-// Grant CRUD (#1799, epic #1795 4/6): share a USER-scope homebrew CatalogEntry
-// into a campaign the owner belongs to. Real Postgres, supertest against the
-// shared `app`. Fixtures: OWNER owns campaignA (auto-member) and a homebrew
-// catalog entry; OUTSIDER joins campaignA (a non-owner member) but also owns
-// campaignC, which OWNER never joins (the owner-not-a-member case).
 
 const OWNER = "owner-grants-owner";
 const OUTSIDER = "owner-grants-outsider";
@@ -143,10 +131,7 @@ describe("POST /api/catalog/entries/:entryId/grants", () => {
     expect(res.status).toBe(404);
   });
 
-  // #1815 review finding 6: the P2002 idempotency handler used to re-fetch
-  // the conflicting row with findUniqueOrThrow — if it's gone by the time
-  // that re-fetch runs (a concurrent DELETE, simulated here as a side effect
-  // of the mocked read), findUniqueOrThrow throws an uncaught P2025 (500).
+  // The P2002 idempotency handler re-fetches the conflicting row with findUniqueOrThrow; if it's gone by then (concurrent DELETE), that throws P2025 (#1815).
   it("does not 500 when the conflicting grant is deleted between the P2002 catch and the re-fetch (concurrent DELETE race)", async () => {
     const entry = await makeOwnerSpellEntry("Racy Grant Bolt");
     const first = await agent(cookieOwner)
@@ -176,15 +161,7 @@ describe("POST /api/catalog/entries/:entryId/grants", () => {
     expect(rows).toHaveLength(1);
   });
 
-  // Coordinator follow-up on finding 6: the P2002 catch's own fallback
-  // `create` (reached when the re-fetch above found nothing) can ITSELF hit
-  // P2002 under a double-race — a THIRD concurrent POST wins the create
-  // between the null re-fetch and this fallback create. That must resolve
-  // the same idempotent way, not 500. Simulated by lying "gone" on only the
-  // FIRST findUnique call (the outer catch's re-fetch) while leaving the
-  // real row in place — the fallback create then hits a REAL P2002 (the row
-  // never actually left), and the second, unpatched findUnique call (inside
-  // the new nested catch) resolves it.
+  // The P2002 catch's own fallback create can itself hit P2002 under a double-race — that must resolve the same idempotent way, not 500 (#1815).
   it("does not 500 on a double concurrent-create race (P2002 on both the original create and the idempotent fallback create)", async () => {
     const entry = await makeOwnerSpellEntry("Double Racy Grant Bolt");
     const first = await agent(cookieOwner)
@@ -251,13 +228,7 @@ describe("DELETE /api/catalog/entries/:entryId/grants/:campaignId", () => {
     expect(res.status).toBe(404);
   });
 
-  // #1815 review finding 9: assertGrantEntryOwnership used to check only
-  // `ownerUserId === userId`, not `scope === "USER"` too. Today's CHECK
-  // constraint (schema.prisma's own CatalogEntry comment) means a non-USER
-  // entry never actually carries an ownerUserId, so this can't currently
-  // diverge from an ownerUserId-only check — this test forces the shape
-  // defensively (a real CAMPAIGN row can't have an ownerUserId) to prove the
-  // CODE enforces scope independently, not merely the data happening to.
+  // assertGrantEntryOwnership must enforce scope === "USER" independently of ownerUserId, not rely on the CHECK constraint alone (#1815).
   it("403s a DELETE on an entry the code observes as scope !== USER, even if ownerUserId happens to match", async () => {
     const entry = await makeOwnerSpellEntry("Scope Guard Bolt");
     await agent(cookieOwner).post(`/api/catalog/entries/${entry}/grants`).send({ campaignId: campaignA });

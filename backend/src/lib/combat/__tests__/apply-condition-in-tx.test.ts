@@ -1,20 +1,3 @@
-/**
- * applyConditionInTx (#1121 review findings 2 & 3) — the internal self-apply
- * helper an ability effect uses (Channel Divinity: Cloak of Shadows,
- * shadow-arts.ts's Cloak of Shadows) to grant itself a condition without
- * opening its own transaction. Findings 2/3 caught it lacking the immunity
- * guard AND a suspended-state dedup the public conditions endpoint
- * (resolveApplyCondition) already had — an internal caller could otherwise
- * push a SECOND "charmed" into `active` while an older one sits suspended by
- * Mindless Rage, permanently stranding the restore.
- *
- * A raging 2014 Berserker L6 with a suspended Frightened is the fixture: it
- * simultaneously exercises the suspended-dedup half (Frightened) and the
- * immunity-guard half (Charmed, immune but never suspended) in one setup.
- *
- * Real Postgres; requires DATABASE_URL (docker compose up db).
- */
-
 import { randomUUID } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -40,7 +23,7 @@ async function createRagingBerserkerWithSuspendedFrightened() {
       name: "applyConditionInTx Test Barbarian",
       alignment: "Chaotic Neutral",
       rulesEdition: "EDITION_2014",
-      experiencePoints: 14000, // level 6 — Mindless Rage's own grant level
+      experiencePoints: 14000,
       ownerId: OWNER_ID,
       initiativeBonus: 2,
       speed: 40,
@@ -92,16 +75,11 @@ describe("applyConditionInTx (#1121 review findings 2 & 3)", () => {
   it("finding 2a: does not re-apply a condition that is currently SUSPENDED (not just active)", async () => {
     await prisma.$transaction((tx) => applyConditionInTx(tx, BARB_ID, "frightened", "test self-apply", randomUUID(), null));
     const conditions = await readConditions();
-    // Frightened must stay suspended-only — never duplicated into `active`
-    // (which would strand a second copy once Rage ends and the ORIGINAL
-    // suspended entry restores).
     expect(conditions.active).toEqual([]);
     expect(conditions.suspended).toEqual([expect.objectContaining({ key: "frightened" })]);
   });
 
   it("finding 2b: does not apply a condition the character is currently IMMUNE to (mirrors the public write-guard)", async () => {
-    // Charmed is immune while raging (Mindless Rage) but was never suspended
-    // — a from-scratch immunity check, not just the suspended-dedup above.
     await prisma.$transaction((tx) => applyConditionInTx(tx, BARB_ID, "charmed", "test self-apply", randomUUID(), null));
     const conditions = await readConditions();
     expect(conditions.active).toEqual([]);

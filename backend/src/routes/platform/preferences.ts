@@ -10,14 +10,7 @@ import {
 
 export const preferencesRouter = Router();
 
-/**
- * PATCH /api/preferences
- * Account-synced player preferences (#1178: theme, dice-roll style,
- * auto-roll concentration). Deliberately a plain field-patch, NOT a
- * …/transactions endpoint — the CLAUDE.md transactions rule governs mutable
- * CHARACTER-SHEET domains; these are account settings, scoped to the signed-in
- * user, not sheet state, so a thin PATCH is the correct shape here.
- */
+/** PATCH /api/preferences — deliberately a plain field-patch, not a …/transactions endpoint, since these are account settings, not character-sheet state. */
 preferencesRouter.patch("/preferences", async (req, res) => {
   const parseResult = preferencesPatchSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -27,20 +20,12 @@ preferencesRouter.patch("/preferences", async (req, res) => {
 
   const userId = req.user!.id;
 
-  // Read-modify-write under a row lock. Unlocked, two tabs patching DIFFERENT
-  // keys both read the same base and the later write drops the earlier key.
-  // The lock (not a plain `$transaction`, which under the default READ
-  // COMMITTED still lets both reads see the pre-write row) is what makes
-  // "patching key K never clobbers key L" true. A single SQL `||` jsonb merge
-  // would also be atomic but skips mergePreferencesPatch's sanitization of the
-  // stored base — pinned by the hostile-stored-base test.
+  // Read-modify-write under a row lock (FOR UPDATE), not a plain $transaction: under READ COMMITTED, two tabs patching different keys would otherwise both read the same base and the later write would drop the earlier key.
   const merged = await prisma.$transaction(async (tx) => {
     const [row] = await tx.$queryRaw<{ preferences: unknown }[]>`
       SELECT preferences FROM "User" WHERE id = ${userId} FOR UPDATE
     `;
-    // mergePreferencesPatch returns a plain object shaped by validated data
-    // (preferencesPatchSchema) merged onto whatever the driver handed back as
-    // Json — safe to hand back to Prisma as InputJsonValue.
+    // Safe to hand back to Prisma as InputJsonValue: mergePreferencesPatch returns a plain object, not raw Json.
     const next = mergePreferencesPatch(row?.preferences, parseResult.data) as Prisma.InputJsonValue;
     await tx.user.update({ where: { id: userId }, data: { preferences: next } });
     return next;

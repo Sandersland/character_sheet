@@ -1,11 +1,4 @@
-/**
- * #1501 AC: a 2024 character attempting to select the 2014 "Way of the Open
- * Hand" subclass is rejected by crossEditionRejection, and vice versa for a
- * 2014 character picking 2024's "Warrior of the Open Hand" — asserted at the
- * setSubclass WRITE path (class.ts's crossEditionRejection call), not just
- * what the picker happens to list. Exercised against the real seeded
- * catalog, mirroring subclass-active-edition-1291.test.ts's pattern.
- */
+
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";

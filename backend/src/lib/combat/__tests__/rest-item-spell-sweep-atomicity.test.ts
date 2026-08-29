@@ -1,9 +1,4 @@
-// Pins the rest sweep's atomicity (#1649 AC): resetItemSpellUsesOnRest collects
-// every qualifying capability's key across ALL items first, then resets them in
-// ONE inventoryCapabilityUse.updateMany call — never a per-item loop. A per-item
-// loop would pass every behavioural assertion in this file while reintroducing
-// the race the side table (InventoryCapabilityUse) exists to prevent, so the
-// CALL COUNT is the assertion, not just the resulting `used` values.
+// resetItemSpellUsesOnRest must reset all qualifying capabilities in ONE updateMany call, not a per-item loop, or it reintroduces the race InventoryCapabilityUse exists to prevent.
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -50,9 +45,6 @@ describe("rest sweep atomicity (#1649)", () => {
     });
     characterIds.push(character.id);
 
-    // Three separate items, each attuned with a spent castSpell capability
-    // whose resource recharges on a short rest — the sweep must reset all
-    // three keys in a single updateMany, not one call per item.
     for (const name of ["Ring A", "Ring B", "Ring C"]) {
       await prisma.inventoryItem.create({
         data: inventoryItemFixtureData({
@@ -81,8 +73,6 @@ describe("rest sweep atomicity (#1649)", () => {
 
     await applyHitPointOperations(character.id, [{ type: "shortRest", rolls: [6] }]);
 
-    // The one assertion that matters: exactly one call resets all three items'
-    // capabilities together, not three separate calls.
     expect(spy).toHaveBeenCalledTimes(1);
 
     const items = await prisma.inventoryItem.findMany({

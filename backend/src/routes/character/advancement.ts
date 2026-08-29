@@ -1,6 +1,3 @@
-// Owns POST /characters/:id/advancement/transactions (take/remove ASIs + feats).
-// Mutation-router contract: apply ops atomically in the lib layer, then
-// re-fetch with characterInclude and return serializeCharacter(updated).
 import { Router } from "express";
 import { z } from "zod";
 
@@ -32,14 +29,12 @@ export const takeFeatOpSchema = z
         name: z.string().min(1),
         description: z.string(),
         improvements: z.array(featImprovementSchema).optional(),
-        /** Ability names the player may choose for a half-feat-style bump. */
         abilityOptions: z.array(z.string()).optional(),
-        /** Amount to apply to the chosen ability (default 1). */
         abilityIncrease: z.number().int().min(1).optional(),
       })
       .optional(),
     abilityChoice: z.string().optional(),
-    /** #1137: routes a Fighting Style feat through its own slot partition. */
+    // Routes a Fighting Style feat through its own slot partition.
     slot: z.literal("fightingStyle").optional(),
   })
   .refine((op) => Boolean(op.featId) !== Boolean(op.custom), {
@@ -63,13 +58,8 @@ const transactionsRequestSchema = z.object({
 
 /**
  * POST /api/characters/:id/advancement/transactions
- * Intent-bearing batch mutation for Ability Score Improvements and Feats.
- * Operations:
- *   takeAsi             — raise one ability by +2, or two abilities by +1 each
- *   takeFeat            — spend a slot on a catalog or custom feat
- *   removeAdvancement   — reverse a previously taken ASI or feat by entry id
- *
- * Returns the full updated character on success.
+ * Operations: takeAsi (raise one ability by +2, or two by +1 each), takeFeat (spend a slot on a catalog or custom feat),
+ * removeAdvancement (reverse a previously taken ASI or feat by entry id).
  */
 makeTransactionsEndpoint({
   router: advancementRouter,

@@ -1,18 +1,3 @@
-/**
- * Integration round-trip for #1688's declarative activation constraints
- * (`activationRequires`) through the real HTTP stack (POST
- * /api/characters/:id/actions/transactions) — mirrors actions-toggle-row.test.ts's
- * fixture-catalog-row pattern. Two bespoke rows: "Test Bladesong" (a "toggle"
- * row gated by armor/shield literals, Bladesong's own shape) and "Test Song
- * Of Defense" (a non-toggle row gated by `requiresActiveBuff`, proving the
- * gate is enforced for ANY row-driven activation, not only a toggle's own).
- *
- * Acceptance (#1688): armor/shield literals 400 the toggle's OWN activation
- * while the condition holds (medium/heavy armor, a shield) and let light
- * armor through; `requiresActiveBuff` 400s until the named buff is active,
- * then succeeds; a toggle's END half is never gated by either axis.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -215,7 +200,6 @@ describe("POST /:id/actions/transactions — declarative activation constraints 
   it("noBodyArmor: 400s while wearing LIGHT armor — the composite any-body-armor gate blocks every category", async () => {
     const id = "test-activation-requires-body";
     await createCharacter(id);
-    // Light armor passes noMediumArmor/noHeavyArmor but must trip noBodyArmor.
     await equipArmor(id, "light");
     const res = await executeAction(id, "testBodyGate");
     expect(res.status).toBe(400);
@@ -241,8 +225,6 @@ describe("POST /:id/actions/transactions — declarative activation constraints 
     const id = "test-activation-requires-end-unaffected";
     await createCharacter(id);
     await equipArmor(id, "medium");
-    // Never activated (activation itself would 400 in medium armor) — ending
-    // is still legal, a safe no-op, exactly like every other toggle's end.
     const res = await executeAction(id, "endTestBladesong");
     expect(res.status).toBe(200);
   });

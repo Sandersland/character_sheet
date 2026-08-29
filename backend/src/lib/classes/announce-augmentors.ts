@@ -1,22 +1,4 @@
-/**
- * Announce-augmentor registry (#1910, epic #1903 decision 2): a feature that
- * augments ANOTHER feature's already-served action (Deflect Attacks' resolved
- * roll spec, Arcane Charge's reminder append) is a descriptor object here,
- * not a bespoke `.map()` bolted onto deriveEntryScopedActions. Adding a new
- * announce-rider is one descriptor file + one line in ANNOUNCE_AUGMENTORS,
- * never a pipeline edit — deriveEntryScopedActions (actions.ts) carries no
- * feature-specific code for any of them.
- *
- * Self-or-announce replaceability (owner, 2026-08-10 — deferred, not never,
- * per #416): a descriptor returns a STRUCTURED payload and never mutates or
- * concatenates onto the action itself — applyAnnounceAugmentors below is the
- * only place that folds a payload onto an action. A future target model
- * attaches at this same registry and consumes the same payload shape.
- *
- * #1912 adds four monk-only descriptors (epic #1903's four R entries):
- * Heightened Focus, Improved Shadow Step, Physician's Touch, Deflect Energy —
- * see ANNOUNCE_AUGMENTORS below for the full six-entry registry.
- */
+// Adding a new announce-rider: one descriptor file + one entry in ANNOUNCE_AUGMENTORS; applyAnnounceAugmentors is the only place that folds a payload on.
 import type { EffectSpec } from "@/lib/combat/effects.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
@@ -28,18 +10,7 @@ import { heightenedFocusAugmentor } from "./heightened-focus.js";
 import { improvedShadowStepAugmentor } from "./improved-shadow-step.js";
 import { physiciansTouchAugmentor } from "./physicians-touch.js";
 
-/**
- * Per-entry context an augmentor's `appliesTo`/`augment` reads — resolved
- * once per class entry by deriveEntryScopedActions' own per-entry loop,
- * which already has the entry's resolved subclass slug and effective level
- * (the one fold point with both in scope). `abilityMods` is supplied ONLY by
- * buildAvailableActionsView (serialize/classes.ts, which has
- * effectiveScores) — the cast-guard callers (shadow-arts.ts, disciplines.ts,
- * warrior-of-elements.ts) call deriveEntryScopedActions with pools:[] to read
- * gates only, never announce text, and omit it. An augmentor that needs
- * ability modifiers must treat `abilityMods === undefined` as "no-op", never
- * throw or fall back to a default score.
- */
+// `abilityMods` may be undefined (gate-only callers pass pools: []); an augmentor needing it must treat that as no-op, never throw or default the score.
 export interface AugmentorContext {
   slug: SubclassSlug | undefined;
   entryLevel: number;
@@ -47,12 +18,7 @@ export interface AugmentorContext {
   abilityMods?: Readonly<Record<string, number>>;
 }
 
-/**
- * A descriptor's resolved augmentation — folded onto the action by
- * applyAnnounceAugmentors, never applied by the descriptor itself.
- * `reminderAppend` is the text to ADD, not the final combined string; the
- * pipeline owns the "existing ? `${existing} ${addition}` : addition" join.
- */
+// `reminderAppend` is text to ADD, not the final string — the pipeline owns the join.
 export type AugmentPayload = {
   reminderAppend?: string;
   count?: number;
@@ -61,11 +27,9 @@ export type AugmentPayload = {
 };
 
 export interface AnnounceAugmentor {
-  /** Served action keys this feature may augment — data, greppable. */
   targetKeys: readonly string[];
-  /** Gate: subclass slug + entry level + edition (total-mapping per #1527 — no `=== "EDITION_…"`). */
+  // Total-mapping per #1527 — never `=== "EDITION_…"`.
   appliesTo(ctx: AugmentorContext): boolean;
-  /** Structured augmentation; null = no change. */
   augment(action: AvailableAction, ctx: AugmentorContext): AugmentPayload | null;
 }
 
@@ -78,18 +42,6 @@ export const ANNOUNCE_AUGMENTORS: readonly AnnounceAugmentor[] = [
   physiciansTouchAugmentor,
 ];
 
-/**
- * The ONE fold point (deriveEntryScopedActions, actions.ts): for each
- * registered augmentor whose targetKeys includes this action's key and whose
- * appliesTo(ctx) gate passes, folds the returned payload onto the action —
- * appending reminder text, setting count/damageTypeClause/effect. Descriptors
- * never touch the action directly; this is the only place that happens.
- *
- * `augmentors` defaults to the real ANNOUNCE_AUGMENTORS registry — the
- * production call site never passes it — and exists as a parameter only so
- * announce-augmentors.test.ts can pin the fold semantics against a synthetic
- * augmentor, independent of the two real descriptors' own gates.
- */
 export function applyAnnounceAugmentors(
   action: AvailableAction,
   ctx: AugmentorContext,
@@ -105,9 +57,6 @@ export function applyAnnounceAugmentors(
   return result;
 }
 
-// Folds one payload onto one action — split out of applyAnnounceAugmentors'
-// loop (fallow cognitive-complexity gate) so the loop and the field-by-field
-// merge each stay simple on their own.
 function foldPayload(action: AvailableAction, payload: AugmentPayload): AvailableAction {
   const next = { ...action };
   if (payload.reminderAppend) {

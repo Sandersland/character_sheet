@@ -1,13 +1,3 @@
-/**
- * Session-doorway read tests (#942): GET /api/characters/:id/sessions/doorway.
- * The doorway distills a character's session state into the frozen contract the
- * SessionDoorway bar renders. Only the live kinds (none/liveJoined/liveNotJoined)
- * are reachable pre-scheduling; the scheduled kinds arrive with #951.
- *
- * Fixtures mirror sessions.test.ts: a campaign with an OWNER + a PLAYER, each
- * owning one character attached to the campaign, plus a solo character.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -51,7 +41,6 @@ async function makeChar(id: string, name: string, ownerId: string) {
   });
 }
 
-// Campaign owned by OWNER, PLAYER joined, both party characters attached.
 async function setupCampaign(): Promise<string> {
   const created = await agent(cookieOwner).post("/api/campaigns").send({ name: "Phandalin" });
   const { id: campaignId, inviteCode } = created.body as { id: string; inviteCode: string };

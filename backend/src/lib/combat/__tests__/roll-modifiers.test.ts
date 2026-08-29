@@ -144,9 +144,6 @@ describe("buildRollModifiers (#486)", () => {
   });
 });
 
-// #1309: the 2014 half of what #1135 replaced. Only the 9 conditions with a
-// real PHB'14 delta are asserted here — the other 5 are byte-identical and
-// already covered by the EDITION_2024 tests above (same shared row).
 describe("buildRollModifiers — 2014 divergent conditions (#1309, PHB'14 pp. 290-292 Appendix A)", () => {
   it("charmed: no roll effects (description-only divergence, same as 2024)", () => {
     expect(buildRollModifiers(condition("charmed"), noEffects, "EDITION_2014")).toEqual([]);
@@ -196,8 +193,7 @@ describe("buildRollModifiers exhaustion — 2024 flat penalty (#1136)", () => {
     return { active: [], exhaustion: level, suspended: [] };
   }
 
-  // 2024 (SRD 5.2): each exhaustion level is a flat −2 to every d20 Test —
-  // attack rolls, ability checks, saving throws, and Initiative (a Dex check).
+  // SRD 5.2: each exhaustion level is a flat -2 to every d20 Test.
   function flatAtLevel(level: number) {
     const modifier = -2 * level;
     return (["attack", "check", "save", "initiative"] as const).map((kind) => ({
@@ -243,9 +239,7 @@ describe("buildRollModifiers exhaustion — 2024 flat penalty (#1136)", () => {
   });
 });
 
-// #1307: the 2014 half of what #1136 replaced. A persisted exhaustion level's
-// *meaning* forks on Character.rulesEdition — same stored number, different
-// roll effects — so both editions are asserted here side by side.
+// A persisted exhaustion level's meaning forks on rulesEdition — same stored number, different roll effects.
 describe("buildRollModifiers exhaustion — 2014 tiered disadvantage (#1307, PHB'14 p. 291)", () => {
   function exhaustion(level: number): ConditionsMutableState {
     return { active: [], exhaustion: level, suspended: [] };

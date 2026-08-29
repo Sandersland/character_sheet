@@ -11,12 +11,7 @@ import {
 } from "@/lib/srd/srd.js";
 import type { AdvancementEntry, FeatImprovement } from "@/lib/classes/resources.js";
 
-// SRD 5.2: the Fighting Style feature grants a Fighting Style feat — Fighter at
-// level 1, Paladin and Ranger at level 2. Champion's extra style is #1148: L7
-// in 2024 (SRD 5.2 p.82), L10 in 2014 (PHB'14 p.72) — the grant level forks by
-// edition even though the feature exists in both.
-// #1529: fightingStyleFeatSlots now takes the class's resolved
-// fightingStyleFeatLevel (CharacterClass column) directly, not a className.
+// SRD 5.2 p.82 / PHB'14 p.72: Fighting Style grants Fighter L1, Paladin/Ranger L2; Champion's extra style (#1148) is L7 in 2024, L10 in 2014.
 describe("fightingStyleFeatSlots", () => {
   it("Fighter's grant level (1): a slot from level 1 on", () => {
     expect(fightingStyleFeatSlots(1, 1, undefined, "EDITION_2024")).toBe(1);
@@ -33,8 +28,6 @@ describe("fightingStyleFeatSlots", () => {
     expect(fightingStyleFeatSlots(1, 0, undefined, "EDITION_2024")).toBe(0);
   });
 
-  // #1148: Champion's Additional Fighting Style — a SECOND slot on top of
-  // Fighter's base grant, at a threshold that forks by edition.
   describe("fighter-champion", () => {
     it("2024: 1 slot below L7, 2 slots from L7 on", () => {
       expect(fightingStyleFeatSlots(1, 6, "fighter-champion", "EDITION_2024")).toBe(1);
@@ -46,10 +39,7 @@ describe("fightingStyleFeatSlots", () => {
       expect(fightingStyleFeatSlots(1, 10, "fighter-champion", "EDITION_2014")).toBe(2);
       expect(fightingStyleFeatSlots(1, 20, "fighter-champion", "EDITION_2014")).toBe(2);
     });
-    // Mutation proof (#1148 AC): sharing ONE threshold between the two
-    // editions makes one of these two go red — a 2024 Champion at L9 (past
-    // 2014's L10... no, below it) must NOT get credit for 2014's L10 gate,
-    // and a 2014 Champion at L7 must NOT get credit for 2024's L7 gate.
+    // Mutation proof: sharing ONE threshold between editions would make one of these two assertions go red (#1148).
     it("a 2024 Champion below 2014's L10 threshold already has 2 (its own L7 gate applies)", () => {
       expect(fightingStyleFeatSlots(1, 9, "fighter-champion", "EDITION_2024")).toBe(2);
     });
@@ -68,13 +58,7 @@ describe("fightingStyleFeatSlots", () => {
   });
 });
 
-// #1529: characterFightingStyleFeatSlots reads each entry's `class` relation
-// (fightingStyleFeatLevel) instead of looking up by `name` — a homebrew entry
-// (`class` absent/null) resolves via the `?? null` fallback to "never granted".
-// `class.name`/`subclass`/`subclassRef` (#1148) feed the per-entry
-// resolveSubclassSlug resolution shared with fightingStyleGrantingClassNames
-// below (fightingStyleFeatSlotsForEntry) — a #1495 review finding folded in
-// here: the two functions used to copy-paste this predicate.
+// class.name/subclass/subclassRef feed the shared per-entry fightingStyleFeatSlotsForEntry resolution used by both this function and fightingStyleGrantingClassNames below (#1148/#1495) — never copy-pasted.
 describe("characterFightingStyleFeatSlots", () => {
   const FIGHTER = { name: "Fighter", fightingStyleFeatLevel: 1 };
   const PALADIN = { name: "Paladin", fightingStyleFeatLevel: 2 };
@@ -111,9 +95,7 @@ describe("characterFightingStyleFeatSlots", () => {
     expect(characterFightingStyleFeatSlots([], 0, "EDITION_2024")).toBe(0);
   });
 
-  // #1148 AC: a 2024 Champion has 1 slot at L6, 2 at L7; a 2014 Champion has
-  // 1 at L9, 2 at L10 — resolved via resolveSubclassSlug off subclass/
-  // subclassRef/class.name, never a raw string comparison.
+  // Resolved via resolveSubclassSlug off subclass/subclassRef/class.name, never a raw string comparison (#1148).
   it("2024 Champion: 1 slot at L6, 2 at L7", () => {
     expect(characterFightingStyleFeatSlots([champion(6)], 6, "EDITION_2024")).toBe(1);
     expect(characterFightingStyleFeatSlots([champion(7)], 7, "EDITION_2024")).toBe(2);
@@ -128,13 +110,7 @@ describe("characterFightingStyleFeatSlots", () => {
   });
 });
 
-// #1495: fightingStyleGrantingClassNames feeds the offered-Fighting-Style
-// union (fightingStyleFeatOfferedForClasses) — the class NAMES that have
-// actually earned the feature at derivedLevel, not merely belong to a
-// granting class. Uses the CANONICAL class.name (never the entry's own
-// drifting display name, CharacterClassEntry.name) and the same per-entry
-// evaluation characterFightingStyleFeatSlots already makes
-// (fightingStyleFeatSlotsForEntry, #1148's dedup of the #1495 predicate).
+// Feeds fightingStyleFeatOfferedForClasses' offered-style union, using canonical class.name (never the entry's drifting display name) and the same fightingStyleFeatSlotsForEntry evaluation as characterFightingStyleFeatSlots (#1495).
 describe("fightingStyleGrantingClassNames", () => {
   const FIGHTER = { name: "Fighter", fightingStyleFeatLevel: 1 };
   const PALADIN = { name: "Paladin", fightingStyleFeatLevel: 2 };
@@ -181,19 +157,14 @@ describe("fightingStyleGrantingClassNames", () => {
     expect(fightingStyleGrantingClassNames([], 0, "EDITION_2024")).toEqual([]);
   });
 
-  // A Champion with 2 slots still reports "Fighter" once — this function
-  // returns granting CLASS NAMES, not a slot count (characterFightingStyleFeatSlots
-  // is the count; this stays a set of names regardless of how many slots
-  // the class earned).
+  // Returns granting CLASS NAMES (a set), not a slot count — characterFightingStyleFeatSlots is the count.
   it("a 2024 Champion at L7 (2 slots) still reports Fighter once, not twice", () => {
     const champion7 = { level: 7, subclass: "Champion", subclassRef: null, class: FIGHTER };
     expect(fightingStyleGrantingClassNames([champion7], 7, "EDITION_2024")).toEqual(["Fighter"]);
   });
 });
 
-// PHB'24 p.163: ASI/feat slots accrue per class level (#1073), not
-// primary-class × total level. #1529: characterAdvancementSlots reads each
-// entry's `class` relation (extraAsiLevels) instead of looking up by `name`.
+// PHB'24 p.163: ASI/feat slots accrue per class level (#1073), not primary-class × total level.
 describe("characterAdvancementSlots", () => {
   const FIGHTER = { extraAsiLevels: [6, 14] };
   const WIZARD = { extraAsiLevels: [] };
@@ -243,11 +214,8 @@ describe("deriveRangedAttackRollBonus", () => {
   });
 });
 
-// #1137: Archery's +2 now arrives as a rangedAttackRollBonus number (from feat
-// improvements), applied to ranged weapons only — replacing the former
-// fightingStyle-key param.
 describe("deriveWeaponAttackBonus rangedAttackRollBonus", () => {
-  const scores = { strength: 10, dexterity: 16 }; // +3 DEX, +0 STR
+  const scores = { strength: 10, dexterity: 16 };
   const noGrants: ReadonlyArray<{ name: string }> = [];
   const ranged = { name: "Longbow", finesse: false, weaponRange: "ranged" };
   const melee = { name: "Longsword", finesse: false, weaponRange: "melee" };

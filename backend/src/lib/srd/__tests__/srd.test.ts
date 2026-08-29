@@ -5,14 +5,11 @@ import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fi
 import { deriveSpellcasting, type DerivedSpellcastingInfo } from "@/lib/srd/srd.js";
 import { ELDRITCH_KNIGHT, ARCANE_TRICKSTER } from "./third-caster.fixture.js";
 
-// Ability scores with distinct INT/WIS/CHA mods so tests can assert the right
-// governing ability is used: INT 12 (+1), WIS 14 (+2), CHA 16 (+3).
 const CASTER_SCORES = {
   strength: 10, dexterity: 10, constitution: 10,
   intelligence: 12, wisdom: 14, charisma: 16,
 };
 
-/** Flattens slotTotals into a { [level]: total } map for terse assertions. */
 function slotMap(info: DerivedSpellcastingInfo | null): Record<number, number> {
   return Object.fromEntries((info?.slotTotals ?? []).map((s) => [s.level, s.total]));
 }
@@ -22,9 +19,7 @@ const ABILITY_SCORES = {
   intelligence: 10, wisdom: 10, charisma: 10,
 };
 const PROF_2 = 2;
-const PROF_3 = 3; // proficiency at level 5+
-
-// ── Unknown / empty classes ────────────────────────────────────────────────────
+const PROF_3 = 3;
 
 describe("deriveResources — unknown class", () => {
   it("returns null for a completely unknown class with no subclass", () => {
@@ -36,14 +31,9 @@ describe("deriveResources — unknown class", () => {
   });
 });
 
-// ── Battle Master subclass layer gating ───────────────────────────────────────
-// After the base-class merge, Fighter always has features (Second Wind, etc.)
-// even below grant level 3. These tests verify the *subclass* layer specifically.
-
 describe("deriveResources — Battle Master subclass gating", () => {
   it("does not include superiorityDice below grant level 3", () => {
     const result = deriveResources("fighter", "battle master", 2, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
-    // Fighter L2 has base features + pools (Second Wind, Action Surge)
     expect(result).not.toBeNull();
     const poolKeys = result!.resources.map((r) => r.key);
     expect(poolKeys).not.toContain("superiorityDice");
@@ -59,20 +49,13 @@ describe("deriveResources — Battle Master subclass gating", () => {
   it("still returns non-null for a Fighter below subclass grant level (base pools present)", () => {
     const result = deriveResources("fighter", "battle master", 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(result).not.toBeNull();
-    // Asserts on `.resources`, not `.features` (#1227): testFeatureRowsFor's
-    // TS-sourced fixture always returns EMPTY feature rows for Fighter now —
-    // its text lives in literal seed data (prisma/seed/fighter-features.ts),
-    // which this src-side fixture can't import (rootDir boundary, see the
-    // fixture's own header). Non-null here comes from the base pools
-    // (Second Wind, at minimum) resourceFn still returns unconditionally.
+    // testFeatureRowsFor returns empty feature rows for Fighter (its text lives in seed data this fixture can't import); non-null comes from base pools (#1227)
     expect(result!.resources.length).toBeGreaterThan(0);
   });
 
   it("returns null for a fully unknown subclass on a known class only if class has no data", () => {
-    // Fighter has base data, so a purple dragon knight returns non-null (base Fighter features)
     const result = deriveResources("fighter", "purple dragon knight", 5, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "purple dragon knight"), "EDITION_2024");
     expect(result).not.toBeNull();
-    // But the unrecognised subclass itself contributes nothing
     const poolKeys = result!.resources.map((r) => r.key);
     expect(poolKeys).not.toContain("superiorityDice");
   });
@@ -80,17 +63,12 @@ describe("deriveResources — Battle Master subclass gating", () => {
   it("sets maneuverChoiceCount and announcedSaveDC at level 3", () => {
     const result = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(result!.maneuverChoiceCount).toBe(3);
-    // STR mod +3, DEX mod 0, prof 2 → DC = 8 + 2 + 3 = 13
     expect(result!.announcedSaveDC).toBe(13);
     expect(result!.toolProfChoiceCount).toBe(1);
   });
 });
 
-// EDITION_2014's wildShape pool is row-driven (#906/#1226, druid.ts deleted):
-// flat 2, then a >10 "unlimited" sentinel at level 20. The EDITION_2024
-// sibling below asserts the real 2/3/4 SRD 5.2 tier table, authored onto its
-// own Wild Shape row.
-
+// EDITION_2014's wildShape pool is flat 2, then an unlimited sentinel at level 20; EDITION_2024 below uses the SRD 5.2 2/3/4 tier table (#906/#1226).
 describe("deriveResources — Druid Wild Shape, EDITION_2014", () => {
   it("returns no wildShape pool below level 2", () => {
     const result = deriveResources("druid", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", undefined), "EDITION_2014");
@@ -115,18 +93,16 @@ describe("deriveResources — Druid Wild Shape, EDITION_2014", () => {
   it("returns sentinel value at level 20 (Archdruid)", () => {
     const result = deriveResources("druid", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("druid", undefined), "EDITION_2014");
     const ws = result!.resources.find((r) => r.key === "wildShape");
-    expect(ws!.total).toBeGreaterThan(10); // unlimited sentinel
+    expect(ws!.total).toBeGreaterThan(10);
   });
 
   it("Circle of the Moon shares the base wildShape pool (no duplicate)", () => {
     const result = deriveResources("druid", "circle of the moon", 6, ABILITY_SCORES, PROF_3, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2014");
     const wsPools = result!.resources.filter((r) => r.key === "wildShape");
-    expect(wsPools.length).toBe(1); // exactly one — no duplicate from subclass
+    expect(wsPools.length).toBe(1);
   });
 
-  // Level 3 is above the gate, not at it: EDITION_2014's Circle of the Moon
-  // grants at 2 (the seeded CharacterClass.subclassLevel, PHB'14 p.66).
-  // druid-wildshape-cr.test.ts owns the level-2 boundary itself.
+  // EDITION_2014's Circle of the Moon grants at level 2 (PHB'14 p.66).
   it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) above its level-2 grant (#1128)", () => {
     const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2014");
     const featureNames = result!.features.map((f) => f.name);
@@ -184,16 +160,7 @@ describe("deriveResources — Druid Wild Shape, EDITION_2024 (#1226): 2/3/4 tier
   });
 });
 
-// ── Barbarian — Rage ──────────────────────────────────────────────────────────
-// #1223: the level 1-19 tier table is IDENTICAL in both editions, but level 20
-// forks — SRD 5.1 keeps the 99 "unlimited" sentinel (long rest only, no
-// shortRestRegain); SRD 5.2 p.20 caps at 6 (the level-17 tier still applies)
-// and adds shortRestRegain: 1 on every tier. Before this issue, both editions
-// resolved barbarian.ts's single edition-blind resourceFn, so a 2024
-// character's level-20 sheet wrongly showed "Unlimited uses at level 20" —
-// the headline bug this test used to encode as EXPECTED (>10) rather than
-// catch; it now asserts the fixed, edition-split values instead.
-
+// #1223: level 20 forks — SRD 5.1 keeps the unlimited sentinel, SRD 5.2 p.20 caps at 6 (level-17 tier still applies) and adds shortRestRegain: 1 on every tier.
 describe("deriveResources — Barbarian Rage (both editions agree on levels 1-19)", () => {
   const PROF_4 = 4;
 
@@ -222,20 +189,15 @@ describe("deriveResources — Barbarian Rage (both editions agree on levels 1-19
 
   it("EDITION_2014 level 20: unlimited sentinel (SRD 5.1 p.21 — unaffected by the 2024 fix)", () => {
     const result = deriveResources("barbarian", undefined, 20, ABILITY_SCORES, PROF_4, testFeatureRowsFor("barbarian", undefined), "EDITION_2014");
-    // 99, not just "> 10": the sibling EDITION_2024 case above pins its value
-    // exactly, and a loose bound on the one number this whole issue turns on
-    // would still pass if the 2014 tier were silently rewritten to any other
-    // large total.
+    // Pinned exactly, not just > 10, so a silently rewritten 2014 tier would fail.
     expect(result!.resources.find((r) => r.key === "rage")!.total).toBe(99);
   });
 });
 
-// ── Bard — Bardic Inspiration ─────────────────────────────────────────────────
-
 const PROF_4 = 4;
 
 describe("deriveResources — Bard Bardic Inspiration", () => {
-  const HIGH_CHA = { ...ABILITY_SCORES, charisma: 16 }; // +3 modifier
+  const HIGH_CHA = { ...ABILITY_SCORES, charisma: 16 };
 
   it("die is d6 before level 5", () => {
     const result = deriveResources("bard", undefined, 3, HIGH_CHA, PROF_2, testFeatureRowsFor("bard", undefined), "EDITION_2024");
@@ -269,18 +231,16 @@ describe("deriveResources — Bard Bardic Inspiration", () => {
   });
 
   it("total = max(1, Cha modifier)", () => {
-    const result = deriveResources("bard", undefined, 3, HIGH_CHA, PROF_2, testFeatureRowsFor("bard", undefined), "EDITION_2024"); // Cha +3
+    const result = deriveResources("bard", undefined, 3, HIGH_CHA, PROF_2, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.total).toBe(3);
   });
 
   it("total minimum 1 with Cha modifier ≤ 0", () => {
-    const lowCha = { ...ABILITY_SCORES, charisma: 8 }; // -1 modifier
+    const lowCha = { ...ABILITY_SCORES, charisma: 8 };
     const result = deriveResources("bard", undefined, 3, lowCha, PROF_2, testFeatureRowsFor("bard", undefined), "EDITION_2024");
     expect(result!.resources.find((r) => r.key === "bardicInspiration")!.total).toBe(1);
   });
 });
-
-// ── Fighter — multi-pool ───────────────────────────────────────────────────────
 
 describe("deriveResources — Fighter base pools", () => {
   it("has secondWind at level 1", () => {
@@ -314,8 +274,6 @@ describe("deriveResources — Fighter base pools", () => {
   });
 });
 
-// ── Monk — Focus (2024 rename of Ki, #1222) ───────────────────────────────────
-
 describe("deriveResources — Monk Focus", () => {
   it("no focus pool below level 2", () => {
     const result = deriveResources("monk", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("monk", undefined), "EDITION_2024");
@@ -334,11 +292,6 @@ describe("deriveResources — Monk Focus", () => {
     expect(result!.resources.find((r) => r.key === "focus")!.recharge).toBe("short-or-long");
   });
 });
-
-// ── Monk — Warrior of the Elements (2024) ─────────────────────────────────────
-// The Elemental Attunement/Elemental Burst level gates moved off DerivedClassInfo
-// booleans onto DERIVED_ACTIONS rows (#1315) — see actions.test.ts's "Warrior of
-// the Elements" describe block for that gating coverage.
 
 describe("deriveResources — Warrior of the Elements", () => {
   it("surfaces all four fixed features by level 17", () => {
@@ -361,11 +314,7 @@ describe("deriveResources — Warrior of the Elements", () => {
   });
 });
 
-// ── Monk — Warrior of Shadow (2024 rewrite, PHB'24 p.91, #1246) ──────────────
-// The Shadow Arts/Cloak of Shadows level gates moved off DerivedClassInfo
-// booleans onto DERIVED_ACTIONS rows (#1315) — see actions.test.ts's "Warrior
-// of Shadow" describe block for that gating coverage.
-
+// PHB'24 p.91.
 describe("deriveResources — Warrior of Shadow", () => {
   it("describes the 1-focus Darkness cast plus Minor Illusion + Darkvision at level 3", () => {
     const result = deriveResources("monk", "warrior of shadow", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("monk", "warrior of shadow"), "EDITION_2024");
@@ -381,7 +330,6 @@ describe("deriveResources — Warrior of Shadow", () => {
     expect(below!.features.some((f) => f.name === "Improved Shadow Step")).toBe(false);
     const result = deriveResources("monk", "warrior of shadow", 11, ABILITY_SCORES, PROF_4, testFeatureRowsFor("monk", "warrior of shadow"), "EDITION_2024");
     expect(result!.features.some((f) => f.name === "Improved Shadow Step")).toBe(true);
-    // Cloak of Shadows hasn't unlocked yet at L11 — it moved to L17.
     expect(result!.features.some((f) => f.name === "Cloak of Shadows")).toBe(false);
   });
 
@@ -398,10 +346,8 @@ describe("deriveResources — Warrior of Shadow", () => {
   });
 });
 
-// ── Paladin — multi-pool ───────────────────────────────────────────────────────
-
 describe("deriveResources — Paladin base pools", () => {
-  const CHA_16 = { ...ABILITY_SCORES, charisma: 16 }; // +3 modifier
+  const CHA_16 = { ...ABILITY_SCORES, charisma: 16 };
 
   it("layOnHands total = 5 × level, both editions", () => {
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
@@ -412,12 +358,10 @@ describe("deriveResources — Paladin base pools", () => {
     }
   });
 
-  // #1229: 2024 removed Divine Sense as its own resource pool (its job moves
-  // to the "Channel Divinity: Divine Sense" catalog option, spending the
-  // channelDivinity pool instead) — a 2014 Paladin still has it.
+  // #1229: 2024 folds Divine Sense into the channelDivinity pool; a 2014 Paladin keeps it as its own pool.
   it("divineSense total = 1 + Cha modifier, EDITION_2014 only", () => {
-    const result2014 = deriveResources("paladin", undefined, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2014"); // +3 Cha
-    expect(result2014!.resources.find((r) => r.key === "divineSense")!.total).toBe(4); // 1+3
+    const result2014 = deriveResources("paladin", undefined, 5, CHA_16, PROF_3, testFeatureRowsFor("paladin", undefined), "EDITION_2014");
+    expect(result2014!.resources.find((r) => r.key === "divineSense")!.total).toBe(4);
   });
 
   it("divineSense is absent for EDITION_2024", () => {
@@ -459,8 +403,6 @@ describe("deriveResources — Paladin base pools", () => {
   });
 });
 
-// ── Sorcerer — Sorcery Points ─────────────────────────────────────────────────
-
 describe("deriveResources — Sorcerer Sorcery Points", () => {
   it("no sorcery points before level 2", () => {
     const result = deriveResources("sorcerer", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("sorcerer", undefined), "EDITION_2024");
@@ -475,13 +417,7 @@ describe("deriveResources — Sorcerer Sorcery Points", () => {
   });
 });
 
-// ── Cleric — Channel Divinity ─────────────────────────────────────────────────
-
-// #1225: these totals are 2024's own SRD 5.2 progression (2/3/4 at L2/6/18),
-// NOT 2014's (1/2/3) — before this issue's retab, a 2024 Cleric's pool still
-// came from lib/classes/cleric.ts's edition-blind resourceFn, so a level-2
-// 2024 Cleric derived only 1 use instead of the real 2. This suite used to
-// pin that bug; it now pins the fix.
+// SRD 5.2 progression: 2/3/4 uses at L2/6/18 (NOT 2014's 1/2/3) (#1225).
 describe("deriveResources — Cleric Channel Divinity", () => {
   it("no channelDivinity at level 1", () => {
     const result = deriveResources("cleric", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("cleric", undefined), "EDITION_2024");
@@ -514,22 +450,8 @@ describe("deriveResources — Cleric Channel Divinity", () => {
   });
 });
 
-// ── Features-only classes (Ranger, Wizard, Warlock) ─────────────────────────
-// Rogue's own case moved out of this synchronous, TS-fixture-driven suite in
-// #1231 commit 4: `lib/classes/rogue.ts` is deleted, so `testFeatureRowsFor(
-// "rogue", ...)` now yields an EMPTY carrier (Rogue is no longer in
-// TEST_CLASSES) and `deriveResources` correctly returns null for it here —
-// the same absent-class shape Fighter's and Barbarian's own deletions never
-// exercised in this file (neither was ever listed above). Rogue's real
-// "features but no resource pools" behaviour is covered DB-backed instead,
-// by rogue-unregistered.test.ts's own resource-pool-emptiness check.
-
 describe("deriveResources — features-only classes", () => {
-  // #1230: the base class gained a real pool (Favored Enemy, L1) once its
-  // 2024 content and resource columns were authored — this class is no
-  // longer "features-only" at level 5 EDITION_2024 (or any level >= 1 under
-  // 2024). EDITION_2014 stays features-only — Favored Enemy's 2014 row
-  // carries no resourceKey at all.
+  // #1230: Favored Enemy is a real pool under 2024 from level 1; 2014's Favored Enemy row carries no resourceKey.
   it("Ranger has features and the Favored Enemy pool from level 1 (#1230)", () => {
     const result = deriveResources("ranger", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("ranger", undefined), "EDITION_2024");
     expect(result).not.toBeNull();
@@ -551,10 +473,7 @@ describe("deriveResources — features-only classes", () => {
     expect(result!.features.length).toBeGreaterThan(0);
   });
 
-  // #1233: the base class gained a real pool (Magical Cunning, L2) once its
-  // 2024 content and resource columns were authored — this class is no
-  // longer "features-only" at level 5 EDITION_2024. Below level 2 it still
-  // has none.
+  // #1233: Magical Cunning is a real pool under 2024 from level 2 on.
   it("Warlock has features and, from level 2 on, the Magical Cunning pool (#1233)", () => {
     const result = deriveResources("warlock", undefined, 5, ABILITY_SCORES, PROF_3, testFeatureRowsFor("warlock", undefined), "EDITION_2024");
     expect(result).not.toBeNull();
@@ -569,8 +488,6 @@ describe("deriveResources — features-only classes", () => {
   });
 });
 
-// ── Feature level gating ──────────────────────────────────────────────────────
-
 describe("deriveResources — feature level gating", () => {
   it("does not surface features above current level", () => {
     const result = deriveResources("fighter", undefined, 1, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", undefined), "EDITION_2024");
@@ -581,9 +498,9 @@ describe("deriveResources — feature level gating", () => {
   it("surfaces features up to and including current level", () => {
     const result = deriveResources("monk", undefined, 7, ABILITY_SCORES, PROF_3, testFeatureRowsFor("monk", undefined), "EDITION_2024");
     const names = result!.features.map((f) => f.name);
-    expect(names).toContain("Evasion");       // level 7
-    expect(names).toContain("Stunning Strike"); // level 5
-    expect(names).not.toContain("Diamond Soul"); // level 14
+    expect(names).toContain("Evasion");
+    expect(names).toContain("Stunning Strike");
+    expect(names).not.toContain("Diamond Soul");
   });
 
   it("features are sorted by level ascending", () => {
@@ -595,17 +512,14 @@ describe("deriveResources — feature level gating", () => {
   });
 });
 
-// ── Proficiency bonus constants used above ────────────────────────────────────
 const PROF_5 = 5;
 const PROF_6 = 6;
-
-// ── deriveSpellcasting — full casters (regression) ────────────────────────────
 
 describe("deriveSpellcasting — full casters", () => {
   it("derives wizard slots and INT-based DC, with no Mystic Arcanum", () => {
     const info = deriveSpellcasting("wizard", 1, CASTER_SCORES, PROF_2, undefined, "EDITION_2024")!;
     expect(info.ability).toBe("intelligence");
-    expect(info.spellSaveDC).toBe(8 + PROF_2 + 1); // INT +1
+    expect(info.spellSaveDC).toBe(8 + PROF_2 + 1);
     expect(slotMap(info)).toEqual({ 1: 2 });
     expect(info.arcana).toEqual([]);
   });
@@ -614,8 +528,6 @@ describe("deriveSpellcasting — full casters", () => {
     expect(deriveSpellcasting("fighter", 5, CASTER_SCORES, PROF_3, undefined, "EDITION_2024")).toBeNull();
   });
 });
-
-// ── deriveSpellcasting — half-casters (Paladin / Ranger) ──────────────────────
 
 describe("deriveSpellcasting — half-casters", () => {
   it("casts from level 1 with two 1st-level slots (SRD 5.2)", () => {
@@ -642,10 +554,10 @@ describe("deriveSpellcasting — half-casters", () => {
   it("uses CHA for Paladin and WIS for Ranger", () => {
     const pal = deriveSpellcasting("paladin", 5, CASTER_SCORES, PROF_3, undefined, "EDITION_2024")!;
     expect(pal.ability).toBe("charisma");
-    expect(pal.spellSaveDC).toBe(8 + PROF_3 + 3); // CHA +3
+    expect(pal.spellSaveDC).toBe(8 + PROF_3 + 3);
     const rng = deriveSpellcasting("ranger", 5, CASTER_SCORES, PROF_3, undefined, "EDITION_2024")!;
     expect(rng.ability).toBe("wisdom");
-    expect(rng.spellSaveDC).toBe(8 + PROF_3 + 2); // WIS +2
+    expect(rng.spellSaveDC).toBe(8 + PROF_3 + 2);
   });
 
   it("never grants Mystic Arcanum", () => {
@@ -653,13 +565,11 @@ describe("deriveSpellcasting — half-casters", () => {
   });
 });
 
-// ── deriveSpellcasting — Warlock Pact Magic ───────────────────────────────────
-
 describe("deriveSpellcasting — Warlock Pact Magic", () => {
   it("grants a single 1st-level slot at level 1 (CHA-based)", () => {
     const info = deriveSpellcasting("warlock", 1, CASTER_SCORES, PROF_2, undefined, "EDITION_2024")!;
     expect(info.ability).toBe("charisma");
-    expect(info.spellSaveDC).toBe(8 + PROF_2 + 3); // CHA +3
+    expect(info.spellSaveDC).toBe(8 + PROF_2 + 3);
     expect(slotMap(info)).toEqual({ 1: 1 });
   });
 
@@ -676,8 +586,6 @@ describe("deriveSpellcasting — Warlock Pact Magic", () => {
     }
   });
 });
-
-// ── deriveSpellcasting — Mystic Arcanum ───────────────────────────────────────
 
 describe("deriveSpellcasting — Mystic Arcanum", () => {
   it("has no arcanum below level 11", () => {
@@ -699,8 +607,6 @@ describe("deriveSpellcasting — Mystic Arcanum", () => {
     ]);
   });
 });
-
-// ── deriveSpellcasting — third-caster subclasses (regression) ─────────────────
 
 describe("deriveSpellcasting — third casters", () => {
   it("derives Eldritch Knight slots at level 3 (INT-based, no arcanum), resolved off subclassRef", () => {

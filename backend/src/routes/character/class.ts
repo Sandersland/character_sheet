@@ -32,13 +32,8 @@ const transactionsRequestSchema = z.object({
 
 /**
  * POST /api/characters/:id/class/transactions
- * Intent-bearing batch mutation for class-level choices:
- *   setSubclass       — choose a subclass when the character's level meets the
- *                       class's threshold (e.g. Fighter L3 → Battle Master).
- *   addClass          — multiclass into a new class (level-1 entry at the next
- *                       position), validated against 5e ability prerequisites.
- *
- * Returns the full updated character on success.
+ * Operations: setSubclass (choose a subclass once level meets the class's threshold),
+ * addClass (multiclass into a new class, validated against 5e ability prerequisites).
  */
 makeTransactionsEndpoint({
   router: classRouter,

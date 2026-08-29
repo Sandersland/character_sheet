@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { selectAutoEquip, type AutoEquipCandidate } from "@/lib/inventory/inventory-snapshot.js";
 
-// Pure unit tests — no DB. selectAutoEquip decides which starting-equipment
-// InventoryItem create payloads get `equipped: true` on character creation.
-
 function weapon(position: number, opts: { twoHanded?: boolean } = {}): AutoEquipCandidate {
   return {
     category: "weapon",

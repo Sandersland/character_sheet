@@ -22,28 +22,19 @@ import {
   itemBuffKey,
 } from "./inventory-types.js";
 
-// The (first) activatedEffect capability on a live inventory row, or null.
 function activatedCapabilityOf(item: InventoryItemWithDetails): ActivatedEffectCapability | null {
   for (const col of item.capabilities) {
     const cap = readCapability(col);
-    // Type-predicate guard (not a bare kind check): an opaque row with
-    // kind="activatedEffect" but no activation must not be returned as a
-    // malformed ActivatedEffectCapability — applyActivate would seed a buff
-    // with target/modifier undefined.
+    // Type-predicate guard, not a bare kind check: an opaque row with kind="activatedEffect" but no activation must not slip through, or applyActivate would seed a buff with target/modifier undefined.
     if (cap.kind === "activatedEffect" && "activation" in cap) return cap;
   }
   return null;
 }
 
-// The charges pool + cost for a #555 charges-costed activation, sitting on the
-// item's shared capability rows; typed off the live include so the pool row
-// carries its runtime `used` counter.
+// #555: typed off the live include so the pool row carries its runtime `used` counter.
 type ChargePool = { cap: ChargesCapability; row: InventoryItemWithDetails["capabilities"][number] };
 
-// Throws if the item can't currently activate: not equipped/attuned, already
-// active, or out of uses. The already-active guard comes FIRST (before the uses
-// check) so an active last-charge item reports "already active", not "no uses".
-// A second activation of a seeded buff would dedupe in-place but still waste a charge.
+// The already-active guard comes FIRST, before the uses check, so an active last-charge item reports "already active", not "no uses" — a second activation would dedupe the buff but still waste a charge.
 async function assertActivatable(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -64,9 +55,7 @@ async function assertActivatable(
   }
 }
 
-// The pool + cost for a charges-costed activation (#555), or nulls when the
-// activation spends the per-item use counter instead. Throws when the pool is
-// missing or holds fewer charges than the cost.
+// #555: nulls when the activation spends the per-item use counter instead of a pool.
 function resolveActivationCharges(
   item: InventoryItemWithDetails,
   cap: ActivatedEffectCapability,
@@ -86,10 +75,7 @@ function resolveActivationCharges(
   return { pool, chargeCost };
 }
 
-// Atomically spends chargeCost from the pool row (TOCTOU guard, same as
-// applyCastItemSpellOp): the WHERE re-evaluates under the row's write lock so
-// concurrent spenders can't push `used` past maxCharges; a loser's batch rolls
-// back. Returns the pre/post `used` counter for the event snapshot.
+// TOCTOU guard, same as applyCastItemSpellOp: the WHERE re-evaluates under the row's write lock so concurrent spenders can't push `used` past maxCharges; a loser's batch rolls back.
 async function spendActivationCharges(
   tx: Prisma.TransactionClient,
   item: InventoryItemWithDetails,
@@ -113,7 +99,6 @@ async function spendActivationCharges(
   return { after: fresh.used, before: fresh.used - chargeCost };
 }
 
-// Seeds the item's while-active / until-rest self-buff (#543).
 async function seedActivationBuff(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -141,8 +126,6 @@ async function seedActivationBuff(
   );
 }
 
-// Uses left to report after an activation: pool charges remaining when
-// charges-costed, else the per-item use budget, else null (unlimited).
 function activationRemaining(
   pool: ChargePool | null,
   chargeCost: number | null,
@@ -154,7 +137,6 @@ function activationRemaining(
   return maxUses !== null ? maxUses - nextSpent : null;
 }
 
-// Event summary for an activation: names the charges/uses left, or neither.
 function activateSummary(itemName: string, hasPool: boolean, remaining: number | null): string {
   if (hasPool && remaining !== null) {
     return `Activated ${itemName} (${remaining} charge${remaining === 1 ? "" : "s"} left)`;
@@ -163,8 +145,7 @@ function activateSummary(itemName: string, hasPool: boolean, remaining: number |
   return `Activated ${itemName}`;
 }
 
-// The activatedUsesSpent (+ optional charges-pool) snapshot for an activate
-// event's before/after — capabilityUsed only when the spend came from a pool.
+// capabilityUsed is included only when the spend came from a pool.
 function activationSnapshot(
   spent: number,
   pool: ChargePool | null,
@@ -177,8 +158,6 @@ function activationSnapshot(
   };
 }
 
-// Spends a use of an item's activatedEffect and seeds its self-buff (#543). Gated
-// on the item being equipped/attuned and on remaining uses.
 export async function applyActivate(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -201,8 +180,7 @@ export async function applyActivate(
   if (maxUses !== null) {
     await tx.inventoryItem.update({ where: { id: item.id }, data: { activatedUsesSpent: nextSpent } });
   }
-  // Charges path: spend the pool row (capabilityUsed before/after makes the
-  // revert restore the pool, symmetric with the activatedUsesSpent snapshots).
+  // capabilityUsed before/after makes the revert restore the pool, symmetric with the activatedUsesSpent snapshots.
   let poolUsedBefore: number | null = null;
   let poolUsedAfter: number | null = null;
   if (pool && chargeCost != null) {
@@ -227,8 +205,7 @@ export async function applyActivate(
   });
 }
 
-// Toggles off an active item effect (#543). Clears the buff; the spent use stays
-// spent until the recharge rest.
+// The spent use stays spent until the recharge rest.
 export async function applyDeactivate(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -246,8 +223,7 @@ export async function applyDeactivate(
     summary: `Deactivated ${item.name}`,
     entityType: "InventoryItem",
     entityId: item.id,
-    // Non-null empty snapshots: the buff re-applies via the paired effects-event
-    // revert, so this inventory event is a no-op on undo (must not read as a create).
+    // Non-null empty snapshots: the buff re-applies via the paired effects-event revert, so this inventory event is a no-op on undo (must not read as a create).
     before: {},
     after: {},
     data: { itemName: item.name },

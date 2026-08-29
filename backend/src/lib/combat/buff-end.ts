@@ -1,17 +1,6 @@
-/**
- * The ONLY way a buff ends (#1121). Every exported clear* function funnels
- * through clearBuffsMatchingInTx, which — after removing the matched buffs —
- * always restores any suspended condition whose immunity no longer holds
- * (restoreSuspendedConditionsForBuffEndInTx). Keeping the clear + restore
- * fused in one private core is the structural invariant: a caller cannot end
- * a buff and strand a condition 2014 Mindless Rage suspended against it
- * (PHB'14 p.49), no matter which path — voluntary toggle-end, falling
- * unconscious, a rest, dismissing a spell buff, unequipping an item — did the
- * clearing. Lives apart from active-effects.ts because the restore needs
- * deriveImmuneConditions (conditions.ts), which itself reads buff state from
- * active-effects.ts — folding the restore in there would be an import cycle.
- */
-
+// clearBuffsMatchingInTx is the ONLY way a buff ends; every exported clear* function funnels through it
+// so the clear and the suspended-condition restore stay fused, never separable by a caller.
+// Mindless Rage's suspended-condition restore — PHB'14 p.49.
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import {
@@ -22,27 +11,16 @@ import {
 } from "./active-effects.js";
 import { restoreSuspendedConditionsForBuffEndInTx } from "./conditions.js";
 
-// Plural buff count phrase, e.g. "1 buff" / "3 buffs".
 function buffCount(n: number): string {
   return `${n} buff${n !== 1 ? "s" : ""}`;
 }
 
-// Builds the `buffCleared` event's summary + data from the buffs it dropped.
 interface BuffClearDescribe {
   summary: (dropped: ActiveBuff[]) => string;
   data: (dropped: ActiveBuff[]) => Record<string, unknown>;
 }
 
-/**
- * Shared core for every clear* wrapper: read → filter by `predicate` → (no-op +
- * no event when nothing matches) → write → log one `buffCleared` event under the
- * "effects" category → restore any suspended condition no longer covered by an
- * immunity (restoreSuspendedConditionsForBuffEndInTx — which re-derives the
- * immune set AFTER this write, so a condition another still-active buff keeps
- * immune stays suspended). `describe` supplies the wrapper-specific summary +
- * data keys so the exact event payload each caller has always written is
- * preserved. Returns the dropped buffs' own `key`s (empty when nothing matched).
- */
+// Restores suspended conditions AFTER writing the buff removal, so a condition another still-active buff keeps immune stays suspended.
 async function clearBuffsMatchingInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -85,12 +63,6 @@ async function clearBuffsMatchingInTx(
   return dropped.map((b) => b.key);
 }
 
-/**
- * Clear every buff granted by `sourceEntryId` (the concentration that just
- * ended). No-op + no event when none match. Logs a `buffCleared` event under
- * the "effects" category so batch revert restores the dropped buffs. Returns
- * the cleared buffs' own keys (empty when none matched).
- */
 export async function clearBuffsForSourceInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -99,8 +71,6 @@ export async function clearBuffsForSourceInTx(
   sessionId: string | null,
   reason: string,
 ): Promise<string[]> {
-  // Only concentration-duration buffs clear when a concentration ends; durable
-  // (while-active / until-rest) buffs survive concentration changes (#455).
   return clearBuffsMatchingInTx(
     tx,
     characterId,
@@ -114,12 +84,6 @@ export async function clearBuffsForSourceInTx(
   );
 }
 
-/**
- * Clear the buff with the given `key` (toggle off a durable self-buff, e.g. end
- * Rage). No-op + no event when none match. Logs a `buffCleared` event under the
- * "effects" category so batch revert restores it. Returns the cleared key
- * wrapped in an array (empty when nothing matched).
- */
 export async function clearBuffByKeyInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -128,9 +92,7 @@ export async function clearBuffByKeyInTx(
   sessionId: string | null,
   reason: string,
 ): Promise<string[]> {
-  // Durable-only toggle: never clear a concentration buff (those end via
-  // clearBuffsForSourceInTx). Dedup-by-key keeps one buff per key today, but the
-  // guard makes the "durable only" contract machine-readable if that ever relaxes.
+  // Durable-only: concentration buffs end via clearBuffsForSourceInTx instead.
   return clearBuffsMatchingInTx(
     tx,
     characterId,
@@ -144,12 +106,6 @@ export async function clearBuffByKeyInTx(
   );
 }
 
-/**
- * Clear every "while-active" durable buff (e.g. Rage). Called when a blanket
- * event ends all combat self-buffs — falling unconscious (0 HP) or a long rest.
- * No-op + no event when none match. Logs a `buffCleared` event under "effects".
- * Returns the cleared buffs' own keys (empty when none matched).
- */
 export async function clearWhileActiveBuffsInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -170,12 +126,6 @@ export async function clearWhileActiveBuffsInTx(
   );
 }
 
-/**
- * Clear every "until-rest" buff the given rest ends. A long rest clears both
- * "short" and "long" restType buffs; a short rest clears only "short". No-op +
- * no event when none match. Logs a `buffCleared` event under "effects".
- * Returns the cleared buffs' own keys (empty when none matched).
- */
 export async function clearBuffsForRestInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -186,6 +136,7 @@ export async function clearBuffsForRestInTx(
   return clearBuffsMatchingInTx(
     tx,
     characterId,
+    // A long rest clears both "short" and "long" restType buffs; a short rest clears only "short".
     (b) => b.duration === "until-rest" && (restType === "long" || b.restType === "short"),
     {
       summary: (dropped) => `Cleared ${buffCount(dropped.length)} (${restType} rest)`,

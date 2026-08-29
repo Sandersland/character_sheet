@@ -9,8 +9,7 @@ import {
 import type { SubclassCasterRef } from "@/lib/srd/spellcasting-tables.js";
 import { ELDRITCH_KNIGHT, ARCANE_TRICKSTER } from "@/lib/srd/__tests__/third-caster.fixture.js";
 
-// #1531 test fixture only — mirrors what resolveLevelUpContext resolves off
-// the Subclass row in production; production code never name-keys this.
+// #1531: test fixture only, mirroring what resolveLevelUpContext resolves off the Subclass row — production code never name-keys this.
 const THIRD_CASTER_TEST_REF: Record<string, SubclassCasterRef> = {
   "eldritch knight": ELDRITCH_KNIGHT,
   "arcane trickster": ARCANE_TRICKSTER,
@@ -27,13 +26,10 @@ function char(
   return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], edition };
 }
 
-// hitDie is required (#1380) but irrelevant to kinds-only assertions here.
-// Adding an HP-meta assertion to a kinds-only test must pass the real die —
-// this default would silently give a Wizard the Fighter's d10.
+// hitDie is required (#1380) but irrelevant to kinds-only assertions here. Adding an HP-meta assertion to a kinds-only test must pass the real die — this default would silently give a Wizard the Fighter's d10.
 const ANY_DIE = "d10";
 
-// Mirrors what resolveLevelUpContext resolves from CharacterClass columns in
-// production (#1529).
+// Mirrors what resolveLevelUpContext resolves from CharacterClass columns in production (#1529).
 const CLASS_TABLE_DEFAULTS: Record<string, { extraAsiLevels: number[]; fightingStyleFeatLevel: number | null }> = {
   fighter: { extraAsiLevels: [6, 14], fightingStyleFeatLevel: 1 },
   rogue: { extraAsiLevels: [10], fightingStyleFeatLevel: null },
@@ -98,8 +94,7 @@ describe("buildLevelUpPlan — hitPoints meta", () => {
     expect(hitPointsMeta(6, "d6")).toMatchObject({ conMod: -2, fixedAverage: 4, averageGain: 2, minRoll: 1, maxRoll: 4 });
   });
 
-  // fixedAverage is served because the max(1, …) floor makes it unrecoverable
-  // as averageGain − conMod (that reads 6 here, but the d6 fixed average is 4).
+  // fixedAverage is served because the max(1, …) floor makes it unrecoverable as averageGain − conMod (that reads 6 here, but the d6 fixed average is 4).
   it("floors averageGain at 1 while still serving the unfloored fixed average (d6, Con 1)", () => {
     expect(hitPointsMeta(1, "d6")).toMatchObject({ conMod: -5, fixedAverage: 4, averageGain: 1, minRoll: 1, maxRoll: 1 });
   });
@@ -109,9 +104,7 @@ describe("buildLevelUpPlan — hitPoints meta", () => {
   });
 });
 
-// #1497: served so neither HitPointsStep nor buildLevelUpLedger has to add
-// the level-up gain to the already-halved max — wrong once halving itself
-// grows with the new max (PHB'14 p. 291 exhaustion tier 4, #1321).
+// #1497: served so neither HitPointsStep nor buildLevelUpLedger has to add the level-up gain to the already-halved max — wrong once halving itself grows with the new max (PHB'14 p. 291 exhaustion tier 4, #1321).
 describe("buildLevelUpPlan — hitPoints meta — effective post-level max (#1497)", () => {
   function effectiveMaxMeta(
     hpBaseline: { rawMax: number; maxHpBonus: number; exhaustionLevel: number },
@@ -145,7 +138,7 @@ describe("buildLevelUpPlan — hitPoints meta — effective post-level max (#149
   it("serves a per-roll effective-max array, indexed 1..faces, each independently halved (2014, exhaustion 4, rawMax 31)", () => {
     const meta = effectiveMaxMeta({ rawMax: 31, maxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2014", "d6", 14);
     const byRoll = meta.effectiveMaxByRoll as number[];
-    expect(byRoll[0]).toBe(0); // index 0 is unused padding, never a roll value.
+    expect(byRoll[0]).toBe(0);
     for (let roll = 1; roll <= 6; roll++) {
       const gain = Math.max(1, roll + 2);
       const newRawMax = 31 + gain;
@@ -211,9 +204,7 @@ describe("buildLevelUpPlan — subclass", () => {
 
 describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/toolProficiency)", () => {
   it("Battle Master 6→7 grants 2 maneuvers", () => {
-    // maneuverChoiceCount is row-driven (Combat Superiority's derivedStat) —
-    // subclassFeatureRows mirrors what resolveLevelUpContext resolves via
-    // TARGET_ENTRY_SELECT in production.
+    // maneuverChoiceCount is row-driven (Combat Superiority's derivedStat) — subclassFeatureRows mirrors what resolveLevelUpContext resolves via TARGET_ENTRY_SELECT in production.
     const plan = buildLevelUpPlan(char("fighter", 6, "battle master"), { ...target("fighter", 7, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });
     expect(kinds(plan)).toEqual(["hitPoints", "maneuvers", "review"]);
     expect(plan.find((s) => s.kind === "maneuvers")?.count).toBe(2);
@@ -238,8 +229,7 @@ describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/too
     expect(kinds(buildLevelUpPlan(char("fighter", 4, "champion"), target("fighter", 5, "champion")))).not.toContain("fightingStyleFeat");
   });
 
-  // Champion's Additional Fighting Style forks by edition (SRD 5.2 p.82 L7 /
-  // PHB'14 p.72 L10, #1148).
+  // Champion's Additional Fighting Style forks by edition (SRD 5.2 p.82 L7 / PHB'14 p.72 L10, #1148).
   it("2024 Champion 6→7 grants a second fighting-style feat", () => {
     const plan = buildLevelUpPlan(char("fighter", 6, "champion", "EDITION_2024"), target("fighter", 7, "champion"));
     expect(kinds(plan)).toContain("fightingStyleFeat");
@@ -252,10 +242,7 @@ describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/too
     expect(plan.find((s) => s.kind === "fightingStyleFeat")?.count).toBe(1);
   });
 
-  // fightingStyleFeatStep resolves the target's subclass via
-  // resolveSubclassSlug, preferring subclassRef (FK) over the exact-name text
-  // match — pinned here with a drifted display name ("Champ") that only the
-  // FK can resolve (#1148).
+  // fightingStyleFeatStep resolves the target's subclass via resolveSubclassSlug, preferring subclassRef (FK) over the exact-name text match — pinned here with a drifted display name ("Champ") that only the FK can resolve (#1148).
   it("2024 Champion 6→7 grants the second feat even when the subclass display text has drifted, via the subclassRef FK", () => {
     const drifted = { ...target("fighter", 7, "Champ"), subclassRef: { slug: "fighter-champion" } };
     const plan = buildLevelUpPlan(char("fighter", 6, "Champ", "EDITION_2024"), drifted);
@@ -305,9 +292,7 @@ describe("buildLevelUpPlan — generic subclassChoice (#899)", () => {
   });
 });
 
-// fourElementsDisciplines is the first choose-N whose swapCadence resolves
-// "onLevelUp" (default is "never") — canSwap:true here is the meaningful
-// assertion (#1503).
+// fourElementsDisciplines is the first choose-N whose swapCadence resolves "onLevelUp" (default is "never") — canSwap:true here is the meaningful assertion (#1503).
 describe("buildLevelUpPlan — Way of the Four Elements disciplines (#1503)", () => {
   it("2→3 grants 1 discipline pick, canSwap true (a new discipline is being learned)", () => {
     const plan = buildLevelUpPlan(
@@ -388,8 +373,7 @@ describe("buildLevelUpPlan — newSpells (2024 prepared model)", () => {
     expect(step?.meta?.cantrips).toBe(1);
   });
 
-  // A fresh level-1 entry offers its full initial picks with no swap (a new
-  // entry must not swap other classes' spells, #1131).
+  // A fresh level-1 entry offers its full initial picks with no swap (a new entry must not swap other classes' spells, #1131).
   const freshL1 = (cls: string) => buildLevelUpPlan(char(cls, 0), target(cls, 1)).find((s) => s.kind === "newSpells");
 
   it("a fresh level-1 Cleric offers 4 spells + 3 cantrips, no swap (#1131)", () => {
@@ -403,8 +387,7 @@ describe("buildLevelUpPlan — newSpells (2024 prepared model)", () => {
     expect(freshL1("paladin")?.meta?.canSwap).toBeUndefined();
   });
 
-  // levelUpSpellPicks's level<=1 branch reads WIZARD_LEVEL1_SPELLBOOK_SIZE (6),
-  // not the prepared count (4), same as creation (#1513).
+  // levelUpSpellPicks's level<=1 branch reads WIZARD_LEVEL1_SPELLBOOK_SIZE (6), not the prepared count (4), same as creation (#1513).
   it("a fresh level-1 Wizard offers 6 spells (its spellbook, #1513) + 3 cantrips, no swap", () => {
     expect(freshL1("wizard")).toMatchObject({ count: 6, meta: { cantrips: 3 } });
     expect(freshL1("wizard")?.meta?.canSwap).toBeUndefined();
@@ -586,8 +569,7 @@ describe("buildLevelUpPlan — newSpells (2014 known-caster model, #1509)", () =
 
   it("a 2014 Cleric 4→5 emits a newSpells step with count 0, no canSwap, no cantrips (re-prepares)", () => {
     const step = buildLevelUpPlan(char("cleric", 4, null, "EDITION_2014"), target("cleric", 5)).find((s) => s.kind === "newSpells");
-    // Cantrip breakpoints are 1/4/10; level 5 grows none, so no step (matches
-    // the 2024 shape).
+    // Cantrip breakpoints are 1/4/10; level 5 grows none, so no step (matches the 2024 shape).
     expect(step).toBeUndefined();
     const cantripStep14 = buildLevelUpPlan(char("cleric", 3, null, "EDITION_2014"), target("cleric", 4)).find((s) => s.kind === "newSpells");
     expect(cantripStep14?.count).toBe(0);

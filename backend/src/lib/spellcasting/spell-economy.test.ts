@@ -4,8 +4,7 @@ import { spellEconomyRestrictions } from "./spell-economy.js";
 
 const NONE = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
 
-// SRD 5.2 / PHB'24 — "One Spell with a Spell Slot per Turn": a leveled spell in
-// either economy limits the OTHER to cantrips; a cantrip restricts nothing.
+// SRD 5.2 / PHB'24 "One Spell with a Spell Slot per Turn": a leveled spell in either economy limits the other to cantrips; a cantrip restricts nothing.
 describe("spellEconomyRestrictions — 2024 (SRD 5.2)", () => {
   const rules = (a: "cantrip" | "leveled" | null, b: "cantrip" | "leveled" | null) =>
     spellEconomyRestrictions(a, b, "EDITION_2024");
@@ -37,8 +36,7 @@ describe("spellEconomyRestrictions — 2024 (SRD 5.2)", () => {
   });
 });
 
-// SRD 5.1 / PHB'14 p.202 — a spell cast with a bonus action forbids any other
-// spell that turn except a 1-action cantrip.
+// SRD 5.1 / PHB'14 p.202 — a spell cast with a bonus action forbids any other spell that turn except a 1-action cantrip.
 describe("spellEconomyRestrictions — 2014 (SRD 5.1)", () => {
   const rules = (a: "cantrip" | "leveled" | null, b: "cantrip" | "leveled" | null) =>
     spellEconomyRestrictions(a, b, "EDITION_2014");
@@ -76,7 +74,6 @@ describe("spellEconomyRestrictions — 2014 (SRD 5.1)", () => {
   });
 });
 
-// The edition difference the flags encode, side by side.
 describe("edition divergence", () => {
   it("a cantrip-as-bonus limits the action in 2014 but NOT in 2024", () => {
     expect(spellEconomyRestrictions(null, "cantrip", "EDITION_2014").actionLimitedToCantrips).toBe(true);

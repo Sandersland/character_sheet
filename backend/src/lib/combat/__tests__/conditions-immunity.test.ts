@@ -1,13 +1,5 @@
-// #1121: deriveImmuneConditions is the ONE shared rule function the
-// conditions write-guard (resolveApplyCondition) and character-serialize.ts's
-// wire `immuneConditions` both call — pure-function coverage here (no DB),
-// mirroring class-feature-rows.test.ts's `row()`-helper style.
-// `ImmuneConditionEntryRows` (classRows/subclassRows/effLevel) is deliberately
-// a plain shape, not the raw Prisma payload — its own header explains why:
-// this keeps the function directly testable with literals. Integration
-// coverage (the real Mindless Rage/Beguiling Defenses/Nature's Ward seed rows
-// through the real routes) lives in routes/character/__tests__/
-// actions-rage-mindless.test.ts and conditions-immunity-features.test.ts.
+// deriveImmuneConditions is the one shared rule function resolveApplyCondition
+// and serializeCharacter's wire `immuneConditions` field both call.
 import { describe, expect, it } from "vitest";
 
 import { deriveImmuneConditions, type ImmuneConditionEntryRows } from "@/lib/combat/conditions.js";
@@ -69,8 +61,6 @@ describe("deriveImmuneConditions (#1121)", () => {
     const raging: ActiveEffectsMutableState = {
       buffs: [{ id: "r", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active" }],
     };
-    // Below L6 (e.g. a reconciled level-down), Mindless Rage no longer applies
-    // even though the character is still raging.
     expect(deriveImmuneConditions([entry({ subclassRows: [mindlessRage], effLevel: 5 })], "EDITION_2024", raging)).toEqual([]);
   });
 
@@ -107,9 +97,7 @@ describe("deriveImmuneConditions (#1121)", () => {
     const raging: ActiveEffectsMutableState = {
       buffs: [{ id: "r", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active" }],
     };
-    // The caller (immuneConditionEntryRows) resolves each entry's own
-    // effLevel via effectiveEntryLevel BEFORE this function ever sees it —
-    // this function just trusts whatever effLevel it's handed per entry.
+    // The caller resolves each entry's effLevel via effectiveEntryLevel before this function sees it.
     expect(deriveImmuneConditions(entries, "EDITION_2024", raging)).toEqual(["charmed", "frightened"]);
   });
 });

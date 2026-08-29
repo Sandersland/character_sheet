@@ -1,19 +1,5 @@
-/**
- * Characterization lock for the level-gated reconcilers (#617).
- *
- * Asserts the EXACT bytes (summary strings, event `data`, and before/after
- * `resources` payloads) that maneuvers/tool-proficiency reconciliation emits.
- *
- * Since #818 every reconciler snapshots the SAME canonical resources shape
- * via snapshotResources(): { used, maneuversKnown,
- * toolProficienciesKnown, expertiseKnown, advancements, fightingStyle }. The former per-site
- * divergence (maneuvers/toolProfs emitted a partial 4-key object) was an
- * undo-correctness bug — an omitted key wiped on wholesale revert — now fixed.
- *
- * Also locks the registry ORDER interaction: reconcileManeuvers runs before
- * reconcileToolProficiencies, so in a full subclass-clear the tool-prof event's
- * `before.maneuversKnown` is already [] (maneuvers trimmed first).
- */
+// Every reconciler snapshots the same canonical resources shape via snapshotResources() (#617); an omitted key here wipes on wholesale revert.
+// Registry order: reconcileManeuvers runs before reconcileToolProficiencies.
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -29,7 +15,6 @@ import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-ro
 const OWNER_ID = "owner-levelrecon-char";
 let COOKIE: string;
 
-// XP thresholds (levelForExperience): L1=0, L3=900, L6=14000, L7=23000, L17=225000.
 const XP_LVL_1 = 0;
 const XP_LVL_3 = 900;
 const XP_LVL_5 = 6500;
@@ -37,7 +22,6 @@ const XP_LVL_6 = 14000;
 const XP_LVL_7 = 23000;
 const XP_LVL_17 = 225000;
 
-// Unique catalog names so we never collide with seeded rows.
 const FIGHTER_CLASS_NAME = "Test Fighter (Recon Char Suite)";
 const BM_SUBCLASS_NAME = "battle master"; // exact lowercase key deriveResources reads
 
@@ -55,8 +39,7 @@ const BASE_CHARACTER = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-// ── Seed lists (normalizeResourcesMutable passes array entries through
-//    UNCHANGED, so these exact objects are what appears in before/after). ──
+// normalizeResourcesMutable passes array entries through unchanged, so these exact objects are what appears in before/after.
 function fiveManeuvers() {
   return [
     { id: "m1", name: "Disarming Attack", description: "Force target to drop." },
@@ -74,7 +57,6 @@ async function postXp(characterId: string, body: object) {
   return supertest(app).post(`/api/characters/${characterId}/experience`).set("Cookie", COOKIE).send(body);
 }
 
-// Raw event rows (not the serialized activity feed) so before/after are byte-exact.
 type ReconEventType =
   | "maneuversReconciled"
   | "toolProficienciesReconciled"
@@ -111,20 +93,12 @@ beforeAll(async () => {
   const bm = await upsertEditionRow(
     prisma.subclass,
     { classId: fighter.id, name: BM_SUBCLASS_NAME, edition: null },
-    // Distinct from the real seeded "fighter-battle-master" — this test's
-    // Fighter class is its own throwaway row, and (slug, edition) is unique
-    // catalog-wide regardless of classId (#1277).
+    // (slug, edition) is unique catalog-wide regardless of classId (#1277) — distinct from the real seeded "fighter-battle-master".
     { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers + Student of War.", slug: "fighter-battle-master-reconciliation-test" },
     {},
   );
   bmSubclassId = bm.id;
-  // #1546 Part B-i (Ruling 2): this bespoke Battle Master Subclass row has no
-  // ClassFeature children unless seeded here — the shared helper, not a
-  // per-file copy. This suite exercises maneuverChoiceCount/toolProfChoiceCount,
-  // which Part B-ii moved onto these very rows' derivedStat/derivedStatTiers
-  // columns (registry.ts's deriveRowExtras) — lib/classes/fighter.ts's old
-  // deriveExtras is gone (#1532), so these rows are what makes the assertion
-  // resolve at all now.
+  // battleMasterResourceRowsData must seed ClassFeature rows maneuverChoiceCount/toolProfChoiceCount for the assertions below to resolve (#1532).
   await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
   await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, bmSubclassId) });
 });
@@ -157,12 +131,7 @@ async function createBattleMaster(id: string) {
   });
 }
 
-// Two ASI/feat advancements with pure ability + init deltas (hpDelta 0), so the
-// reversal touches abilityScores + initiativeBonus — fields no OTHER reconciler
-// writes — and their before/after bytes are deterministic even though a
-// single-class level-down also recomputes HP in the same batch. The Fighter is
-// homebrew-named, so advancementSlotsForLevel uses the base 5-slot schedule
-// [4,8,12,16,19]: L17→4 allowed (legal), L6→1, L3→0.
+// Homebrew class name, so advancementSlotsForLevel falls back to the base 5-slot schedule [4,8,12,16,19].
 function twoAdvancements() {
   return [
     { id: "adv-asi-str", level: 4, kind: "asi" as const, abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 },
@@ -177,7 +146,6 @@ async function createAdvancedFighter(id: string) {
       ownerId: OWNER_ID,
       id,
       name: `ReconChar ${id}`,
-      // Scores + init reflect the two advancements already applied.
       abilityScores: { ...BASE_ABILITY_SCORES, strength: 12, dexterity: 12 },
       initiativeBonus: 1,
       experiencePoints: XP_LVL_17,
@@ -186,7 +154,6 @@ async function createAdvancedFighter(id: string) {
       spellcasting: Prisma.JsonNull,
       resources: { used: {}, advancements: twoAdvancements() },
       classEntries: {
-        // No subclass → no maneuver/tool reconcile noise; only advancements trim.
         create: [{ name: FIGHTER_CLASS_NAME, classId: fighterClassId, position: 0, level: 17 }],
       },
     },
@@ -194,7 +161,6 @@ async function createAdvancedFighter(id: string) {
 }
 
 describe("level-reconciliation characterization (#617)", () => {
-  // ── maneuvers: partial trim (subclass retained) — 4-key payload ──────────────
   it("maneuversReconciled: partial trim 5→3 on level 7→3", async () => {
     await createBattleMaster("recon-man-partial");
     const res = await postXp("recon-man-partial", { operations: [{ type: "set", value: XP_LVL_3 }] });
@@ -224,11 +190,9 @@ describe("level-reconciliation characterization (#617)", () => {
         advancements: [],
       },
     });
-    // Tool profs untouched at level 3 (Student of War still grants 1).
     expect(await eventsByType("recon-man-partial", "toolProficienciesReconciled")).toHaveLength(0);
   });
 
-  // ── maneuvers + toolProfs: full clear (subclass removed) + registry order ────
   it("maneuvers then toolProfs full-clear on level 7→1, in registry order", async () => {
     await createBattleMaster("recon-full");
     const res = await postXp("recon-full", { operations: [{ type: "set", value: XP_LVL_1 }] });
@@ -248,7 +212,6 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(tool.category).toBe("resources");
     expect(tool.summary).toBe("1 tool proficiency choice removed — subclass no longer available");
     expect(tool.data).toEqual({ removedCount: 1, allowed: 0 });
-    // Ordering interaction: maneuvers already trimmed → maneuversKnown is [] here.
     expect(tool.before).toEqual({
       resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: oneToolProf(), expertiseKnown: [], choicesKnown: {}, advancements: [] },
     });
@@ -256,22 +219,15 @@ describe("level-reconciliation characterization (#617)", () => {
       resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] },
     });
 
-    // Registry order: maneuvers event precedes toolProfs event within the batch.
     const evs = await allEvents("recon-full");
     const manIdx = evs.findIndex((e) => e.type === "maneuversReconciled");
     const toolIdx = evs.findIndex((e) => e.type === "toolProficienciesReconciled");
     expect(manIdx).toBeGreaterThanOrEqual(0);
     expect(toolIdx).toBeGreaterThan(manIdx);
-    // Both share the XP op's batch.
     expect(man.batchId).toBe(tool.batchId);
     expect(man.batchId).toBeTruthy();
   });
 
-  // ── advancements: partial trim (level cap reduced, not below first ASI) ───────
-  // Asserts the deterministic fields only: summary/data + the resources.advancements
-  // payload + abilityScores/initiativeBonus reversal. HP is intentionally NOT pinned
-  // — a single-class level-down recomputes it in the same batch (that coupling is
-  // out of scope here; this case exists to lock the advancement-reversal path).
   it("advancementsReconciled: partial trim 2→1 on level 17→6", async () => {
     await createAdvancedFighter("recon-adv-partial");
     const res = await postXp("recon-adv-partial", { operations: [{ type: "set", value: XP_LVL_6 }] });
@@ -284,17 +240,14 @@ describe("level-reconciliation characterization (#617)", () => {
 
     const before = ev.before as { abilityScores: Record<string, number>; initiativeBonus: number; resources: { advancements: unknown[] } };
     const after = ev.after as { abilityScores: Record<string, number>; initiativeBonus: number; resources: { advancements: unknown[] } };
-    // Before: both advancements present, scores/init reflect them.
     expect(before.abilityScores).toMatchObject({ strength: 12, dexterity: 12 });
     expect(before.initiativeBonus).toBe(1);
     expect(before.resources.advancements).toEqual(twoAdvancements());
-    // After: the feat (tail) is reversed — dexterity −2, init −1; strength ASI kept.
     expect(after.abilityScores).toMatchObject({ strength: 12, dexterity: 10 });
     expect(after.initiativeBonus).toBe(0);
     expect(after.resources.advancements).toEqual(twoAdvancements().slice(0, 1));
   });
 
-  // ── advancements: full clear (level dropped below first ASI level) ───────────
   it("advancementsReconciled: full clear on level 17→3 (below first ASI)", async () => {
     await createAdvancedFighter("recon-adv-full");
     const res = await postXp("recon-adv-full", { operations: [{ type: "set", value: XP_LVL_3 }] });
@@ -305,15 +258,13 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(ev.data).toEqual({ removedCount: 2, allowed: 0 });
 
     const after = ev.after as { abilityScores: Record<string, number>; initiativeBonus: number; resources: { advancements: unknown[] } };
-    // Both reversed: strength −2, dexterity −2, init −1 → back to base.
     expect(after.abilityScores).toMatchObject({ strength: 10, dexterity: 10 });
     expect(after.initiativeBonus).toBe(0);
     expect(after.resources.advancements).toEqual([]);
   });
 });
 
-// ── prepared-spell clamp (#1127): the prepared cap is a per-class table count, so
-//    a level-down trims over-cap prepared spells to the new limit (oldest kept). ──
+// Prepared cap is a per-class table count; a level-down trims over-cap prepared spells to the new limit, oldest kept (#1127).
 function sixPreparedWarlockSpells() {
   return Array.from({ length: 6 }, (_, i) => ({
     id: `wl-spell-${i + 1}`,
@@ -350,7 +301,7 @@ describe("prepared-spell reconciliation (#1127)", () => {
         ownerId: OWNER_ID,
         id,
         name: `ReconPrep ${id}`,
-        experiencePoints: XP_LVL_5, // Warlock 5 → prepared cap 6 (all 6 legal)
+        experiencePoints: XP_LVL_5,
         hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 5, die: "d8", spent: 0 },
         abilityScores: { ...BASE_ABILITY_SCORES, charisma: 16 },
@@ -364,7 +315,6 @@ describe("prepared-spell reconciliation (#1127)", () => {
     await createWarlock("recon-prep");
     const res = await postXp("recon-prep", { operations: [{ type: "set", value: XP_LVL_3 }] });
     expect(res.status).toBe(200);
-    // Warlock 3 prepared cap = 4; over-cap read clamps to exactly 4.
     expect(res.body.spellcasting.preparedSpellLimit).toBe(4);
     expect(res.body.spellcasting.preparedSpellCount).toBe(4);
 
@@ -374,11 +324,10 @@ describe("prepared-spell reconciliation (#1127)", () => {
     const before = ev.before as { spellcasting: { spells: Array<{ id: string; prepared: boolean }> } };
     const after = ev.after as { spellcasting: { spells: Array<{ id: string; prepared: boolean }> } };
     expect(before.spellcasting.spells.filter((s) => s.prepared)).toHaveLength(6);
-    // Oldest 4 (first in array order) stay prepared; the last 2 are unprepared.
     expect(after.spellcasting.spells.filter((s) => s.prepared).map((s) => s.id)).toEqual(
       ["wl-spell-1", "wl-spell-2", "wl-spell-3", "wl-spell-4"],
     );
-    expect(after.spellcasting.spells).toHaveLength(6); // entries kept, just unprepared
+    expect(after.spellcasting.spells).toHaveLength(6);
   });
 
   it("a revert restores all 6 prepared", async () => {
@@ -391,11 +340,7 @@ describe("prepared-spell reconciliation (#1127)", () => {
   });
 });
 
-// #1507: the level-down pair proof — reconcilePreparedSpells (write-side) and
-// buildSpellcastingView's clamp-on-read (read-side) both resolve through the
-// ONE derivePreparedSpellLimit, so a 2014 Bard's cap agrees on both sides by
-// construction. Bard 5 (2014) = 8 known spells (SPELLS_KNOWN_BY_CLASS_2014);
-// Bard 4 = 7.
+// reconcilePreparedSpells (write) and buildSpellcastingView's clamp-on-read (read) both resolve through derivePreparedSpellLimit, so a 2014 Bard's cap agrees on both sides by construction (#1507).
 function eightKnownBardSpells() {
   return Array.from({ length: 8 }, (_, i) => ({
     id: `bard-spell-${i + 1}`,
@@ -458,10 +403,6 @@ describe("prepared-spell reconciliation — 2014 known caster (#1507)", () => {
   });
 
   it("read-side: buildSpellcastingView clamps an over-cap blob written directly (no XP op, reconciler never runs) to the same 7", async () => {
-    // Already-Bard-4 character with an 8-prepared blob written straight via
-    // Prisma — the reconciler only runs on an XP-crossing op, so this proves
-    // the clamp-on-read half of the pair agrees with the write-side test above
-    // by construction (both call derivePreparedSpellLimit).
     await createBard2014("recon-bard-read", 4);
     const res = await supertest(app).get("/api/characters/recon-bard-read").set("Cookie", COOKIE);
     expect(res.status).toBe(200);
@@ -471,16 +412,7 @@ describe("prepared-spell reconciliation — 2014 known caster (#1507)", () => {
   });
 });
 
-// #1531, arbiter AC: reconcilePreparedSpells' select gained `subclassRef` so it
-// and buildSpellcastingView's clamp-on-read resolve an Eldritch Knight's
-// third-caster prepared cap through the SAME derivePreparedSpellLimit call —
-// mirrors the Bard 2014 write-side/read-side pair above exactly, proving the
-// reconciler's select widening actually landed (a reconciler still missing
-// `subclassRef` would see the entry as a non-caster at every level and never
-// trim, while the read-side clamp — fed by characterInclude, unaffected by
-// that select — would still visually clamp the SERVED count; the write-side
-// test below distinguishes the two by asserting the PERSISTED unprepareSpell
-// event actually fired, not just the served number).
+// reconcilePreparedSpells and buildSpellcastingView's clamp-on-read both resolve the Eldritch Knight third-caster cap through derivePreparedSpellLimit (#1531); a reconciler missing `subclassRef` would still pass on served count alone, so the write-side test checks the PERSISTED event.
 function thirteenPreparedEldritchKnightSpells() {
   return Array.from({ length: 13 }, (_, i) => ({
     id: `ek-spell-${i + 1}`,
@@ -496,8 +428,7 @@ function thirteenPreparedEldritchKnightSpells() {
 }
 
 describe("prepared-spell reconciliation — Eldritch Knight third caster (#1531)", () => {
-  // Fighter 4 → THIRD_CASTER_PREPARED[4-3] = 4 (still gate-active, level >= 3);
-  // Fighter 20 → THIRD_CASTER_PREPARED[20-3] = 13 (spellcasting-tables.ts).
+  // THIRD_CASTER_PREPARED[4-3]=4 and [20-3]=13 (spellcasting-tables.ts) are the source of these level constants.
   const XP_LVL_4 = 2700;
   const XP_LVL_20 = 355000;
   let fighterClassId: string;
@@ -553,9 +484,7 @@ describe("prepared-spell reconciliation — Eldritch Knight third caster (#1531)
     expect(before.spellcasting.spells.filter((s) => s.prepared)).toHaveLength(13);
     expect(after.spellcasting.spells.filter((s) => s.prepared)).toHaveLength(4);
 
-    // Persisted, not just served: re-fetch straight from Postgres to prove the
-    // reconciler actually WROTE the trim, rather than the read-side clamp
-    // alone making the served number look right.
+    // Persisted, not just served — proves the reconciler wrote the trim, not just the read-side clamp.
     const persisted = await prisma.character.findUniqueOrThrow({ where: { id: "recon-ek-write" } });
     const persistedSpells = (persisted.spellcasting as { spells: Array<{ prepared: boolean }> }).spells;
     expect(persistedSpells.filter((s) => s.prepared)).toHaveLength(4);

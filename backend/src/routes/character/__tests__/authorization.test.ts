@@ -6,8 +6,6 @@ import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 
-// Minimal valid character row for a given owner (no relations needed — these
-// tests only exercise ownership, not derivation).
 async function makeCharacter(id: string, ownerId: string) {
   await prisma.character.deleteMany({ where: { id } });
   await prisma.character.create({
@@ -28,10 +26,6 @@ async function makeCharacter(id: string, ownerId: string) {
     },
   });
 }
-
-// Exercises the requireAuth gate wired into createApp(): unauthenticated
-// requests to any protected /api route are 401, while the public allowlist
-// (health + /api/auth/*) stays reachable without a session.
 
 const OWNER_ID = "owner-authz-gate";
 
@@ -68,8 +62,8 @@ describe("auth gate (requireAuth)", () => {
 });
 
 describe("character ownership (#101)", () => {
-  const OWNER_A = "owner-authz-a"; // the caller
-  const OWNER_B = "owner-authz-b"; // a different user
+  const OWNER_A = "owner-authz-a";
+  const OWNER_B = "owner-authz-b";
   const CHAR_A = "test-authz-char-a";
   const CHAR_B = "test-authz-char-b";
   let cookieA: string;
@@ -116,7 +110,6 @@ describe("character ownership (#101)", () => {
       .delete(`/api/characters/${CHAR_B}`)
       .set("Cookie", cookieA);
     expect(res.status).toBe(403);
-    // And the row survives.
     const still = await prisma.character.findUnique({ where: { id: CHAR_B } });
     expect(still).not.toBeNull();
   });
@@ -130,13 +123,12 @@ describe("character ownership (#101)", () => {
 });
 
 describe("character-scoped routers reject non-owners (#101)", () => {
-  const OWNER_A = "owner-authz-routers-a"; // the caller
-  const OWNER_B = "owner-authz-routers-b"; // owns the target character
+  const OWNER_A = "owner-authz-routers-a";
+  const OWNER_B = "owner-authz-routers-b";
   const CHAR_B = "test-authz-routers-char-b";
   let cookieA: string;
 
-  // One representative route per character-scoped router. Ownership is checked
-  // before body parsing, so an empty body still yields 403 (never 400/404).
+  // Ownership is checked before body parsing, so an empty body still yields 403 (never 400/404).
   const ROUTES: Array<{ method: "get" | "post"; suffix: string }> = [
     { method: "post", suffix: "/hp" },
     { method: "post", suffix: "/inventory/transactions" },

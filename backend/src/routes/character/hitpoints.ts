@@ -25,8 +25,7 @@ hitPointsRouter.post<{ id: string }>("/", async (req, res) => {
     return;
   }
 
-  // InvalidHitPointOperationError carries status 400, so an invalid op flows to
-  // the central `errorHandler` — no route-local try/catch needed.
+  // InvalidHitPointOperationError carries status 400, so an invalid op flows to the central errorHandler — no route-local try/catch needed.
   const { concentrationChecks } = await applyHitPointOperations(
     req.params.id,
     parseResult.data.operations,
@@ -36,7 +35,6 @@ hitPointsRouter.post<{ id: string }>("/", async (req, res) => {
     where: { id: req.params.id },
     include: characterInclude,
   });
-  // Response = serialized character plus any concentration check(s) triggered by
-  // damage ops (issue #41) so the client can toast the auto-rolled CON save.
+  // Response = serialized character plus any concentration check(s) triggered by damage ops (#41) so the client can toast the auto-rolled CON save.
   res.json({ ...(await serializeCharacter(updated!)), concentrationChecks });
 });

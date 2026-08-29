@@ -1,9 +1,3 @@
-/**
- * Campaign-scoped character preferences (#537). Real Postgres, supertest against
- * the shared `app`. Fixtures: a campaign owned by OWNER with PLAYER joined; PLAYER
- * owns CHAR attached to the campaign and OUTSIDER_CHAR in no campaign.
- */
-
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -93,7 +87,7 @@ describe("campaign character preferences (#537)", () => {
       autoFriendlyHealing: true,
     });
 
-    // Persisted: a single row keyed by (campaign, character).
+    // One row per (campaign, character) pair.
     const rows = await prisma.campaignCharacterPreference.findMany({ where: { characterId: CHAR } });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ campaignId, shareWithDm: true, autoFriendlyHealing: true });

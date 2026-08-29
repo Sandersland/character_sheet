@@ -1,7 +1,4 @@
-// Pure graph helpers for entity identity merges (#387). A merge is a directed
-// edge mergedEntity → survivorEntity ("Jenkins is revealed to be Vecna"). Chains
-// resolve transitively (Jenkins→Vecna→Whispered One). All functions are DB-free
-// so route + reconciliation logic can be unit-tested without Postgres.
+// All functions are DB-free so route + reconciliation logic can be unit-tested without Postgres.
 
 export type MergeStatus = "PREPARED" | "EXECUTED";
 
@@ -19,9 +16,7 @@ function edgeIncluded(edge: MergeEdge, opts: ChainOpts): boolean {
   return opts.executedOnly ? edge.status === "EXECUTED" : true;
 }
 
-// Follow the merged→survivor chain upward from `entityId`, returning the ordered
-// survivor ids (nearest identity first). A visited guard makes a malformed cycle
-// terminate instead of looping.
+// A visited guard makes a malformed cycle terminate instead of looping.
 export function resolveSurvivorChain(
   merges: MergeEdge[],
   entityId: string,
@@ -42,8 +37,7 @@ export function resolveSurvivorChain(
   return chain;
 }
 
-// Every identity that merged transitively INTO `survivorId` (everything
-// downstream), nearest first, excluding `survivorId` itself.
+// Every identity that merged transitively INTO survivorId, excluding survivorId itself.
 export function collectMergedInIdentities(
   merges: MergeEdge[],
   survivorId: string,
@@ -65,8 +59,7 @@ export function collectMergedInIdentities(
   return collected;
 }
 
-// Would adding merged→survivor create a cycle? True when merged === survivor, or
-// survivor already reaches merged by following the chain upward (all statuses).
+// Considers merges of any status (PREPARED or EXECUTED), not just executed ones.
 export function wouldCreateCycle(
   merges: MergeEdge[],
   mergedEntityId: string,

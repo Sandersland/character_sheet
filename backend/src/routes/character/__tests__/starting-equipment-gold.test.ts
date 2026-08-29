@@ -1,12 +1,4 @@
-// Per-option GP reaching the created character's purse (#1564, commit 2).
-// PHB'24 puts a GP amount on almost every option (StartingEquipmentOption.gold),
-// and #1535 (parked, follow-up) will author twelve real packages carrying it —
-// if creation silently ignored the column, every one of those packages' gold
-// would vanish and every #1535 test would still pass. A fixture class (same
-// "safe from assertEveryClassEditionHasPackage" reasoning as
-// starting-equipment-edition.test.ts, which this file mirrors) proves the
-// write path end to end, since the real seeded EDITION_2014 packages all
-// carry gold: 0 by construction and can't exercise the accumulation at all.
+// StartingEquipmentOption.gold reaches the created character's currency (#1564) — a fixture class exercises this since real seeded EDITION_2014 packages all carry gold: 0 and can't.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -62,8 +54,6 @@ describe("per-option gold reaches the created character's currency (#1564)", () 
     });
     fixtureClassId = cls.id;
 
-    // Two groups, each offering a fixed-item (0 gold) option and a flat-gold
-    // option with no items — the PHB'24 shape ("(a) a dagger or (b) 10 gp").
     await prisma.startingEquipmentPackage.create({
       data: {
         classId: fixtureClassId,
@@ -103,7 +93,7 @@ describe("per-option gold reaches the created character's currency (#1564)", () 
 
   afterAll(async () => {
     await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
-    // Cascades to the package's groups/options/items (schema onDelete: Cascade).
+    // Cascades to the package's groups/options/items.
     await prisma.characterClass.deleteMany({ where: { name: FIXTURE_CLASS.name } });
   });
 

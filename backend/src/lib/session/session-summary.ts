@@ -1,12 +1,3 @@
-/**
- * Pure aggregation of a play session's event log into an end-of-session
- * summary (Session Phase 3). Lives here — separate from the DB lifecycle in
- * `sessions.ts` — so it is unit-testable without Postgres.
- *
- * Derive, don't persist: the summary is computed entirely from the session's
- * existing `CharacterEvent` rows. No new per-event bookkeeping is introduced.
- */
-
 import type {
   CampaignRecap,
   ParticipantSummary,
@@ -15,15 +6,9 @@ import type {
   SessionSummaryItem,
 } from "@character-sheet/shared-types";
 
-// The summary shapes are the wire contract and live in shared-types (#1273);
-// re-exported so importers of this module keep resolving them here unchanged.
+// CampaignRecap/ParticipantSummary/SessionSummary are re-exported here so importers of this module keep resolving them (#1273).
 export type { CampaignRecap, ParticipantSummary, SessionSummary };
 
-/**
- * The minimal subset of a `CharacterEvent` the aggregation reads. Matches the
- * Prisma row (before/after/data are JSON) but is declared independently so the
- * helper has no Prisma dependency and stays trivially testable.
- */
 export interface SummaryEventInput {
   type: string;
   reverted?: boolean;
@@ -48,12 +33,6 @@ function numField(value: unknown, key: string): number | undefined {
   return typeof v === "number" ? v : undefined;
 }
 
-/**
- * Reads a per-level counter map out of an event's `spellcasting` snapshot
- * (`before`/`after`). The snapshot shape is `{ spellcasting: { slotsUsed,
- * arcanumUsed, … } }` (see `spellcasting.ts`). Returns the numeric count for
- * `level` within the named counter, defaulting to 0 when absent.
- */
 function spellcastingCount(snapshot: unknown, counter: string, level: number): number {
   const spellcasting = asRecord(asRecord(snapshot).spellcasting);
   const map = asRecord(spellcasting[counter]);
@@ -61,44 +40,26 @@ function spellcastingCount(snapshot: unknown, counter: string, level: number): n
   return typeof v === "number" ? v : 0;
 }
 
-/**
- * Distinguishes a true spell-slot restore from a Warlock Mystic Arcanum charge
- * restore. Both are logged as `restoreSlot` with identical `data` ({ level }),
- * so the only reliable signal is which counter changed in the event's
- * before→after snapshot: a real slot restore decrements `slotsUsed`, while an
- * Arcanum restore decrements `arcanumUsed` (and leaves `slotsUsed` untouched).
- * See `spellcasting.ts`'s `restoreSlot` op, which prefers slots over Arcanum.
- */
+// restoreSlot is logged identically ({ level }) for a real slot restore and a Warlock Mystic Arcanum charge restore; only which counter moved tells them apart.
 function isArcanumRestore(event: SummaryEventInput, level: number): boolean {
   const slotsBefore = spellcastingCount(event.before, "slotsUsed", level);
   const slotsAfter = spellcastingCount(event.after, "slotsUsed", level);
-  // A real spell-slot restore drops slotsUsed by one. If slotsUsed did not
-  // change but arcanumUsed dropped, this restore returned an Arcanum charge.
   if (slotsAfter < slotsBefore) return false;
   const arcanumBefore = spellcastingCount(event.before, "arcanumUsed", level);
   const arcanumAfter = spellcastingCount(event.after, "arcanumUsed", level);
   return arcanumAfter < arcanumBefore;
 }
 
-/**
- * Cast-side counterpart to {@link isArcanumRestore}. A Warlock Mystic Arcanum
- * cast goes through the normal `castSpell` op and emits a non-null `slotLevel`,
- * but it spends an Arcanum charge (`arcanumUsed`), not a spell slot
- * (`slotsUsed`). Inspect the before→after snapshot: it's an Arcanum cast when
- * `arcanumUsed[level]` increased while `slotsUsed[level]` did NOT — so its slot
- * accounting must be skipped (the cast itself still counts toward `spellsCast`).
- */
+// Cast-side counterpart to isArcanumRestore: a Mystic Arcanum cast goes through castSpell with a non-null slotLevel but bumps arcanumUsed, not slotsUsed.
 function isArcanumCast(event: SummaryEventInput, level: number): boolean {
   const slotsBefore = spellcastingCount(event.before, "slotsUsed", level);
   const slotsAfter = spellcastingCount(event.after, "slotsUsed", level);
-  // A real slot cast bumps slotsUsed by one; if it did, this is not Arcanum.
   if (slotsAfter > slotsBefore) return false;
   const arcanumBefore = spellcastingCount(event.before, "arcanumUsed", level);
   const arcanumAfter = spellcastingCount(event.after, "arcanumUsed", level);
   return arcanumAfter > arcanumBefore;
 }
 
-/** Mutable running totals folded across a session's events. */
 interface SummaryAccumulator {
   xpGained: number;
   levelsGained: number;
@@ -129,7 +90,6 @@ function createAccumulator(): SummaryAccumulator {
   };
 }
 
-/** Add an event's `{ itemName, quantityDelta }` into a name→qty map. */
 function tallyItemEvent(
   map: Map<string, number>,
   event: SummaryEventInput,
@@ -143,20 +103,17 @@ function tallyItemEvent(
   }
 }
 
-/** XP net (award/set) and level-up count. */
 function applyProgressEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
   if (event.type === "levelUp") {
     acc.levelsGained += 1;
     return;
   }
   if (event.type !== "xpAward" && event.type !== "xpSet") return;
-  // before/after carry the authoritative XP values for both award and set.
   const before = numField(event.before, "experiencePoints");
   const after = numField(event.after, "experiencePoints");
   if (before !== undefined && after !== undefined) acc.xpGained += after - before;
 }
 
-/** Combat round high-water mark and attack/damage roll counts. */
 function applyRollEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
   switch (event.type) {
     case "combatRoundAdvanced": {
@@ -197,7 +154,6 @@ function applyItemEvent(acc: SummaryAccumulator, event: SummaryEventInput): void
   }
 }
 
-/** Casts (expendSlot/castSpell): counts the cast and tallies the slot spent. */
 function applyCastEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
   if (event.type !== "expendSlot" && event.type !== "castSpell") return;
   if (event.type === "castSpell") acc.spellsCast += 1;
@@ -205,18 +161,15 @@ function applyCastEvent(acc: SummaryAccumulator, event: SummaryEventInput): void
   const data = asRecord(event.data);
   const level = numField(event.data, "level") ?? numField(event.data, "slotLevel");
   if (typeof level !== "number" || data.slotLevel === null) return;
-  // A Mystic Arcanum cast has a non-null slotLevel but spends a charge, not a slot.
   if (isArcanumCast(event, level)) return;
   const key = String(level);
   acc.slotsSpent[key] = (acc.slotsSpent[key] ?? 0) + 1;
 }
 
-/** restoreSlot: nets a real slot restore against slots spent, floored at 0. */
 function applyRestoreEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
   if (event.type !== "restoreSlot") return;
   const level = numField(event.data, "level");
   if (typeof level !== "number") return;
-  // Arcanum charge restores share this event type but aren't spell slots — skip.
   if (isArcanumRestore(event, level)) return;
   const key = String(level);
   // Floor at 0: a cross-session restore has no in-window expend to net against.
@@ -225,7 +178,6 @@ function applyRestoreEvent(acc: SummaryAccumulator, event: SummaryEventInput): v
   else delete acc.slotsSpent[key];
 }
 
-/** ASIs and feats taken, surfaced with a readable label. */
 function applyAdvancementEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
   if (event.type !== "abilityScoreImprovement" && event.type !== "featTaken") return;
   const data = asRecord(event.data);
@@ -238,10 +190,7 @@ function applyAdvancementEvent(acc: SummaryAccumulator, event: SummaryEventInput
   acc.featsOrAsis.push({ type: event.type, label });
 }
 
-// checkRoll / saveRoll / initiativeRoll are logged (roll category) but not yet
-// surfaced in session-summary stats — intentional scope limit (#128).
-
-/** Route one non-reverted event through every per-concern accumulator. */
+// checkRoll/saveRoll/initiativeRoll are logged but intentionally not yet surfaced here (#128).
 function applyEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
   applyProgressEvent(acc, event);
   applyRollEvent(acc, event);
@@ -251,11 +200,6 @@ function applyEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
   applyAdvancementEvent(acc, event);
 }
 
-/**
- * Folds a session's events into a typed summary. Reverted events are skipped so
- * the summary reflects the net result of the session (undone actions don't
- * count). Pure: no I/O, deterministic given its inputs.
- */
 export function computeSessionSummary(
   events: SummaryEventInput[],
   window: SummaryWindow,
@@ -284,14 +228,12 @@ export function computeSessionSummary(
   };
 }
 
-/** Merge a list of already-summed items into a name→qty map. */
 function mergeItems(map: Map<string, number>, items: SessionSummaryItem[]): void {
   for (const item of items) {
     map.set(item.name, (map.get(item.name) ?? 0) + item.qty);
   }
 }
 
-/** Net a name→qty map into a sorted SessionSummaryItem[], dropping zero-net entries. */
 function itemsFromMap(map: Map<string, number>): SessionSummaryItem[] {
   return [...map.entries()]
     .filter(([, qty]) => qty !== 0)
@@ -299,12 +241,7 @@ function itemsFromMap(map: Map<string, number>): SessionSummaryItem[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Aggregates per-participant summaries into a campaign recap (#245). Sums XP,
- * spells, and rolls; takes the max combat rounds (how long combat lasted, not a
- * per-participant total); unions acquired items by name; reports the participant
- * count and total present-time. Pure: deterministic given inputs.
- */
+// combatRounds is the max across participants (how long combat lasted), not a per-participant sum.
 export function computeCampaignRecap(participants: ParticipantSummary[]): CampaignRecap {
   const itemNet = new Map<string, number>();
   const soldNet = new Map<string, number>();

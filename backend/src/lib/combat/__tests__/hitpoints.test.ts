@@ -38,7 +38,6 @@ describe("resolveDamageAmount (#456)", () => {
   it("zeroes an immune damage type, taking precedence over resistance (#529)", () => {
     const immune = new Set(["fire"]);
     expect(resolveDamageAmount(12, "fire", bps, true, immune)).toEqual({ applied: 0, resisted: false, immune: true });
-    // A type that is both immune and resisted zeroes (immunity wins).
     expect(resolveDamageAmount(12, "slashing", bps, true, new Set(["slashing"]))).toEqual({ applied: 0, resisted: false, immune: true });
   });
 
@@ -112,29 +111,28 @@ describe("advancingHitDie (#1380)", () => {
 
 describe("fixedAverageForDie", () => {
   it("returns correct 5e PHB fixed values", () => {
-    expect(fixedAverageForDie(6)).toBe(4);   // d6 → 4
-    expect(fixedAverageForDie(8)).toBe(5);   // d8 → 5
-    expect(fixedAverageForDie(10)).toBe(6);  // d10 → 6
-    expect(fixedAverageForDie(12)).toBe(7);  // d12 → 7
+    expect(fixedAverageForDie(6)).toBe(4);
+    expect(fixedAverageForDie(8)).toBe(5);
+    expect(fixedAverageForDie(10)).toBe(6);
+    expect(fixedAverageForDie(12)).toBe(7);
   });
 });
 
 describe("levelUpHpGain", () => {
   it("average method uses the fixed average + conMod", () => {
-    expect(levelUpHpGain(10, 2, "average")).toBe(8);  // 6 + 2
-    expect(levelUpHpGain(8, -1, "average")).toBe(4);  // 5 - 1
+    expect(levelUpHpGain(10, 2, "average")).toBe(8);
+    expect(levelUpHpGain(8, -1, "average")).toBe(4);
   });
 
   it("roll method uses the provided die value + conMod", () => {
-    expect(levelUpHpGain(10, 2, "roll", 8)).toBe(10); // 8 + 2
-    expect(levelUpHpGain(10, -3, "roll", 4)).toBe(1); // 4 - 3 = 1 (floors at 1)
+    expect(levelUpHpGain(10, 2, "roll", 8)).toBe(10);
+    expect(levelUpHpGain(10, -3, "roll", 4)).toBe(1);
   });
 
   it("floors at 1 (never 0 or negative) on level-up", () => {
-    // Extreme negative Con: d6 roll of 1 with -3 conMod → 1-3 = -2 → clamp to 1
     expect(levelUpHpGain(6, -3, "roll", 1)).toBe(1);
-    expect(levelUpHpGain(6, -3, "average")).toBe(1); // 4 - 3 = 1
-    expect(levelUpHpGain(6, -4, "average")).toBe(1); // 4 - 4 = 0 → clamp to 1
+    expect(levelUpHpGain(6, -3, "average")).toBe(1);
+    expect(levelUpHpGain(6, -4, "average")).toBe(1);
   });
 });
 
@@ -145,7 +143,7 @@ describe("hitDieHeal", () => {
   });
 
   it("floors at 0 (not 1) for negative Con", () => {
-    expect(hitDieHeal(1, -3)).toBe(0);  // 1 - 3 = -2 → 0
+    expect(hitDieHeal(1, -3)).toBe(0);
     expect(hitDieHeal(2, -5)).toBe(0);
   });
 });
@@ -185,14 +183,12 @@ describe("applyDeathSaveRoll", () => {
   it("clamps failures at 3 (nat 1 with 2 already)", () => {
     const twoFails = { successes: 0, failures: 2 };
     const result = applyDeathSaveRoll(twoFails, 0, 1);
-    // nat 1 = +2, but 2+2=4 → clamps to 3
     expect(result.deathSaves.failures).toBe(3);
   });
 
   it("does not immediately trigger reset when failures reach 3 (dead, not stable)", () => {
     const twoFails = { successes: 0, failures: 2 };
     const result = applyDeathSaveRoll(twoFails, 0, 5);
-    // 2+1 = 3 failures → dead, but applyDeathSaveRoll doesn't reset (only stabilize / nat-20 does)
     expect(result.deathSaves.failures).toBe(3);
     expect(result.deathSaves.successes).toBe(0);
     expect(result.current).toBe(0);

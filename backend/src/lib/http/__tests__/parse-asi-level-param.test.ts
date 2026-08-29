@@ -4,8 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { parseAsiLevelOr400 } from "@/lib/http/parse-asi-level-param.js";
 import { MAX_LEVEL } from "@/lib/leveling/experience.js";
 
-// A minimal res double capturing status + json, so the helper can be exercised
-// without an Express app (verbatim from parse-body.test.ts's mockRes).
 function mockRes() {
   const res = {
     statusCode: 0,
@@ -27,9 +25,7 @@ function reqWith(query: Record<string, unknown>): Pick<Request, "query"> {
 }
 
 describe("parseAsiLevelOr400", () => {
-  // The case requireEditionOr400 cannot have: absent is SUCCESS, not a bail, and
-  // it must be distinguishable from a rejected value — hence the discriminated
-  // result rather than that helper's `T | undefined`.
+  // Absent is success, not a bail — must be distinguishable from a rejected value.
   it("succeeds with no asiLevel when the param is absent, writing nothing", () => {
     const res = mockRes();
     expect(parseAsiLevelOr400(reqWith({}), res)).toEqual({ ok: true });

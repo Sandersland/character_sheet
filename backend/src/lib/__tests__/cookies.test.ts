@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { parseCookies, serializeCookie } from "@/lib/auth/cookies.js";
 
-// Pure cookie parsing/serialization — no Postgres, no env beyond the config
-// default for Secure (overridden explicitly here).
-
 describe("parseCookies", () => {
   it("returns {} for a missing header", () => {
     expect(parseCookies(undefined)).toEqual({});

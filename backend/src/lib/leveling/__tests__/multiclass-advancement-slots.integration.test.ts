@@ -1,10 +1,4 @@
-/**
- * Multiclass ASI/feat slot cap (#1073): PHB'24 p.163 — slots accrue per CLASS
- * level, not primary-class × total level. Before this fix a Wizard 3 / Fighter 8
- * character got the Wizard schedule at total level 11 (2 slots: L4, L8),
- * missing Fighter's level-6 bonus ASI entirely.
- */
-
+// #1073: PHB'24 p. 163 — multiclass ASI/feat slots accrue per CLASS level, not primary-class × total level.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -38,11 +32,7 @@ const BASE_CHAR = {
 
 describe("Multiclass ASI/feat slot cap (#1073)", () => {
   const created: string[] = [];
-  // #1529: extraAsiLevels now rides CharacterClass.extraAsiLevels via the FK
-  // relation, not a name lookup — this fixture must link classId to the REAL
-  // seeded Wizard/Fighter rows or these entries resolve as homebrew (base
-  // 5-slot schedule, no Fighter L6/L14 bonus), which is exactly the wrong
-  // schedule this suite exists to prove is NOT used.
+  // #1529: extraAsiLevels rides CharacterClass.extraAsiLevels via the FK relation — this fixture must link classId to the REAL seeded Wizard/Fighter rows or these entries resolve as homebrew (base 5-slot schedule, no Fighter L6/L14 bonus).
   let wizardClassId: string;
   let fighterClassId: string;
 
@@ -78,8 +68,7 @@ describe("Multiclass ASI/feat slot cap (#1073)", () => {
   it("Wizard 3 / Fighter 8 grants 3 ASI slots (Fighter's 4/6/8), not the Wizard schedule at total level 11", async () => {
     const id = await fixture(XP_LVL_11);
 
-    // Old bug: advancementSlotsForLevel("Wizard", 11) = 2 (L4, L8 only) — the
-    // 3rd take below would have been rejected.
+    // Anti-vacuity: the old bug (advancementSlotsForLevel("Wizard", 11) = 2, L4/L8 only) would have rejected this 3rd take.
     await prisma.$transaction((tx) =>
       applyAdvancementOpInTx(tx, id, { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] }, BATCH, null),
     );
@@ -93,7 +82,6 @@ describe("Multiclass ASI/feat slot cap (#1073)", () => {
     const row = await prisma.character.findUniqueOrThrow({ where: { id } });
     expect(row.abilityScores).toEqual({ ...BASE_ABILITY_SCORES, strength: 12, dexterity: 12, constitution: 12 });
 
-    // The 4th ASI is beyond the 3-slot cap.
     await expect(
       prisma.$transaction((tx) =>
         applyAdvancementOpInTx(tx, id, { type: "takeAsi", increases: [{ ability: "intelligence", amount: 2 }] }, BATCH, null),
@@ -104,7 +92,6 @@ describe("Multiclass ASI/feat slot cap (#1073)", () => {
   it("leveling the Fighter entry down to 5 reconciles the level-6 ASI slot away LIFO", async () => {
     const id = await fixture(XP_LVL_11);
 
-    // Take 2 of the 3 available slots (Fighter's L4 and L6 entitlement).
     await prisma.$transaction((tx) =>
       applyAdvancementOpInTx(tx, id, { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] }, BATCH, null),
     );
@@ -112,11 +99,7 @@ describe("Multiclass ASI/feat slot cap (#1073)", () => {
       applyAdvancementOpInTx(tx, id, { type: "takeAsi", increases: [{ ability: "dexterity", amount: 2 }] }, BATCH, null),
     );
 
-    // Drop total XP to level 8. reconcileClassEntryLevels (position-ordered
-    // LIFO) trims the higher-position Fighter entry from 8 → 5, leaving Wizard
-    // untouched at 3. At Fighter 5 only the L4 slot is earned (1 total), so
-    // reconcileAdvancements trims the excess used slot (2 → 1), removing the
-    // most-recently-taken ASI (dexterity) and reversing its delta.
+    // reconcileClassEntryLevels (LIFO) trims Fighter 8 → 5, leaving Wizard at 3. Fighter 5 earns only the L4 slot, so reconcileAdvancements trims the excess used slot (2 → 1), removing the most-recently-taken ASI (dexterity) and reversing its delta.
     await applyExperienceOperations(id, [{ type: "set", value: XP_LVL_8 }]);
 
     const row = await prisma.character.findUniqueOrThrow({

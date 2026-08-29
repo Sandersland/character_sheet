@@ -1,8 +1,3 @@
-// POST /api/characters — species-granted creation choices (#1689): Half-Elf's
-// Skill Versatility (choose two skills) and High Elf's Cantrip (choose one
-// wizard-list cantrip, Intelligence-keyed). Exercises the seeded catalog
-// directly (real Species/SpeciesVariant/SpeciesTrait/Spell rows), same
-// pattern as species-ability-increases-create.test.ts.
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -30,9 +25,7 @@ async function post(body: object) {
 
 const BASE_SCORES = { strength: 12, dexterity: 12, constitution: 12, intelligence: 14, wisdom: 10, charisma: 10 };
 
-// Fighter's own skill picks (2 of skillChoiceCount) + Acolyte's fixed grant
-// (insight, religion) — the FULL class+background pool the create body sends
-// (frontend's buildCreatePayload shape, mirrored here).
+// Mirrors frontend's buildCreatePayload shape: Fighter's own skill picks + Acolyte's fixed grant (insight, religion).
 const CLASS_BACKGROUND_SKILLS = ["athletics", "history", "insight", "religion"];
 
 const baseBody = {
@@ -65,19 +58,11 @@ async function astralElf() {
   return { elf, astralVariant: elf.variants.find((v) => v.slug === "astral")! };
 }
 
-// #1756: a 2014 cantrip from Astral Fire's explicit list (Dancing Lights /
-// Light / Sacred Flame). Pinned to EDITION_2014 for determinism, same reason
-// fireBolt/magicMissile above are.
 async function cantrip2014(name: string) {
   return prisma.spell.findFirstOrThrow({ where: { name, edition: "EDITION_2014" } });
 }
 
-// #1714 forked Fire Bolt to EDITION_2014 (Sorcerer+Wizard, 2-list) — this
-// suite exercises BOTH a 2014 character (baseBody's default rulesEdition)
-// and, at the bottom, a 2024 one (explicit override), so a single
-// no-argument lookup can no longer serve every caller correctly: an
-// unordered findFirstOrThrow across two same-named rows isn't guaranteed to
-// return the one matching the character under test.
+// fireBolt() takes an edition param because an unordered findFirstOrThrow across two same-named 2014/2024 Fire Bolt rows isn't guaranteed to return the one matching the character under test (#1714).
 async function fireBolt(edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2014") {
   return prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition } });
 }
@@ -88,9 +73,6 @@ describe("POST /api/characters — Half-Elf Skill Versatility (#1689)", () => {
     const res = await post({
       ...baseBody,
       speciesId: halfElfRow.id,
-      // Half-Elf's own #1681 ability-increase choice ("+1 to two of your
-      // choice") is orthogonal to this slice's skill choice but still
-      // required by the same request — unrelated fields, same species.
       speciesAbilities: { strength: 1, dexterity: 1 },
       speciesSkills: ["stealth", "perception"],
     });
@@ -177,9 +159,7 @@ describe("POST /api/characters — High Elf Cantrip (#1689)", () => {
     expect(res.status).toBe(201);
     createdCharacterIds.push(res.body.id);
 
-    // Fighter is a non-caster: the served view is the slotless granted-only
-    // shape, and its `ability` must key off the species grant (Intelligence),
-    // not the subclass-derived Wisdom default (#1689's own fix).
+    // Fighter is a non-caster: the served view is the slotless granted-only shape, and its `ability` must key off the species grant (Intelligence), not the subclass-derived Wisdom default (#1689's own fix).
     expect(res.body.spellcasting.ability).toBe("intelligence");
     const entry = (res.body.spellcasting.spells as Record<string, unknown>[]).find((s) => s.name === "Fire Bolt");
     expect(entry).toBeDefined();
@@ -192,8 +172,6 @@ describe("POST /api/characters — High Elf Cantrip (#1689)", () => {
 
   it("400s a leveled spell (Magic Missile) offered as the species cantrip", async () => {
     const { elf, highElfVariant } = await highElf();
-    // #1714 forked Magic Missile to EDITION_2014 too — this character is 2014
-    // rules (baseBody's default), so pin edition for determinism.
     const magicMissile = await prisma.spell.findFirstOrThrow({ where: { name: "Magic Missile", edition: "EDITION_2014" } });
 
     const res = await post({
@@ -230,8 +208,6 @@ describe("POST /api/characters — High Elf Cantrip (#1689)", () => {
 });
 
 describe("POST /api/characters — Astral Fire (#1756)", () => {
-  // Astral Elf's floating +2/+1 spread (#1751) is required by the same request,
-  // orthogonal to the cantrip choice under test here.
   const astralAbilities = { strength: 2, wisdom: 1 };
 
   it("a listed cantrip + chosen ability 201s; the sheet shows it species-sourced and the ability lands on CharacterRace", async () => {
@@ -348,9 +324,7 @@ describe("POST /api/characters — no-spec pins, both directions (#1689)", () =>
     expect(res.status).toBe(400);
   });
 
-  // #1690 gave 2024 Human its own chooseSkills trait (Skillful), so this pin
-  // now needs a 2024 species with genuinely NO choice-bearing trait — Dwarf
-  // carries neither Skillful/Versatile (Human) nor Keen Senses (Elf).
+  // Dwarf carries neither Skillful/Versatile (Human, #1690) nor Keen Senses (Elf) — genuinely no choice-bearing trait.
   it("a 2024 species with no choice-bearing trait (Dwarf) 400s on speciesSkills", async () => {
     const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });
     const res = await post({

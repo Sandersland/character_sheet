@@ -1,9 +1,3 @@
-/**
- * Pure unit tests for computeSessionSummary — no DB. Feeds synthetic event
- * rows (matching the real CharacterEvent JSON shapes produced by the domain
- * libs) and asserts the aggregated summary.
- */
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -46,7 +40,7 @@ describe("computeSessionSummary", () => {
       { type: "xpAward", before: { experiencePoints: 900 }, after: { experiencePoints: 1350 } },
       { type: "xpSet", before: { experiencePoints: 1350 }, after: { experiencePoints: 1400 } },
     ]);
-    expect(s.xpGained).toBe(500); // +450 then +50
+    expect(s.xpGained).toBe(500);
   });
 
   it("handles negative XP deltas (deductions)", () => {
@@ -67,7 +61,7 @@ describe("computeSessionSummary", () => {
       { type: "consumed", data: { itemName: "Torch", quantityDelta: -2 } },
       { type: "bought", data: { itemName: "Healing Potion", quantityDelta: 2 } },
       { type: "acquired", data: { itemName: "Rope", quantityDelta: 1 } },
-      { type: "removed", data: { itemName: "Rope", quantityDelta: -1 } }, // nets to 0 → dropped
+      { type: "removed", data: { itemName: "Rope", quantityDelta: -1 } },
     ]);
     expect(s.itemsAcquired).toEqual([
       { name: "Healing Potion", qty: 2 },
@@ -83,9 +77,7 @@ describe("computeSessionSummary", () => {
       { type: "sold", data: { itemName: "Alms Box", quantityDelta: -1 } },
       { type: "sold", data: { itemName: "Shield", quantityDelta: -1 } },
     ]);
-    // Sold items stay OUT of itemsAcquired (no "×-2" acquisition).
     expect(s.itemsAcquired).toEqual([{ name: "Sword", qty: 1 }]);
-    // …and surface as positive counts under itemsSold, sorted by name.
     expect(s.itemsSold).toEqual([
       { name: "Alms Box", qty: 3 },
       { name: "Shield", qty: 1 },
@@ -97,16 +89,13 @@ describe("computeSessionSummary", () => {
       { type: "awarded", data: { itemName: "Flametongue", quantityDelta: 2 } },
       { type: "awarded", data: { itemName: "Healing Potion", quantityDelta: 3 } },
       { type: "revoked", data: { itemName: "Healing Potion", quantityDelta: -1 } },
-      // Awarded then fully revoked → nets to 0, dropped.
       { type: "awarded", data: { itemName: "Cursed Ring", quantityDelta: 1 } },
       { type: "revoked", data: { itemName: "Cursed Ring", quantityDelta: -1 } },
     ]);
-    // Loot lives in its own line-up, alphabetical, zero-net dropped.
     expect(s.loot).toEqual([
       { name: "Flametongue", qty: 2 },
       { name: "Healing Potion", qty: 2 },
     ]);
-    // Awards never leak into itemsAcquired.
     expect(s.itemsAcquired).toEqual([]);
   });
 
@@ -140,7 +129,6 @@ describe("computeSessionSummary", () => {
     const s = summarize([
       { type: "expendSlot", data: { level: 2 } },
       { type: "expendSlot", data: { level: 2 } },
-      // A real slot restore: slotsUsed drops from 2 → 1 in the snapshot.
       {
         type: "restoreSlot",
         data: { level: 2 },
@@ -152,9 +140,6 @@ describe("computeSessionSummary", () => {
   });
 
   it("does not count a Mystic Arcanum cast toward slotsSpent (charge, not slot)", () => {
-    // Warlock 11+: a level-6 Arcanum cast goes through castSpell with a non-null
-    // slotLevel, but it bumps arcanumUsed — not slotsUsed — in the snapshot. The
-    // spell still counts as cast, but no 6th-level slot was spent.
     const s = summarize([
       {
         type: "castSpell",
@@ -168,8 +153,6 @@ describe("computeSessionSummary", () => {
   });
 
   it("counts a real 6th-level slot cast toward slotsSpent", () => {
-    // A genuine 6th-level slot cast bumps slotsUsed in the snapshot, so it is
-    // NOT mistaken for an Arcanum charge and tallies a slot.
     const s = summarize([
       {
         type: "castSpell",
@@ -184,14 +167,12 @@ describe("computeSessionSummary", () => {
 
   it("tallies only the real slot cast when mixed with an Arcanum cast at another level", () => {
     const s = summarize([
-      // Real 3rd-level slot cast: slotsUsed bumps.
       {
         type: "castSpell",
         data: { spellName: "Fireball", roll: 24, slotLevel: 3 },
         before: { spellcasting: { slotsUsed: { "3": 0 }, arcanumUsed: {} } },
         after: { spellcasting: { slotsUsed: { "3": 1 }, arcanumUsed: {} } },
       },
-      // 6th-level Arcanum cast: arcanumUsed bumps, slotsUsed unchanged.
       {
         type: "castSpell",
         data: { spellName: "Eyebite", roll: 18, slotLevel: 6 },
@@ -204,10 +185,6 @@ describe("computeSessionSummary", () => {
   });
 
   it("does not let a Mystic Arcanum restore decrement slotsSpent", () => {
-    // Warlock 11+: a level-6 Arcanum charge is spent (logged as castSpell at
-    // slotLevel 6), then restored. The restore touches arcanumUsed, not
-    // slotsUsed, so it must NOT net against the slot-spent tally — which here is
-    // already empty because the Arcanum cast itself spends no slot.
     const s = summarize([
       {
         type: "castSpell",
@@ -226,9 +203,6 @@ describe("computeSessionSummary", () => {
   });
 
   it("does not push slotsSpent below zero for an unmatched cross-session restore", () => {
-    // The matching expendSlot happened in a prior session, so there is nothing
-    // to net against in this window. The restore is floored at 0 deliberately
-    // rather than producing a negative/wrong count.
     const s = summarize([
       {
         type: "restoreSlot",
@@ -242,9 +216,7 @@ describe("computeSessionSummary", () => {
 
   it("an unmatched restore cancels at most the in-session expends, flooring at 0", () => {
     const s = summarize([
-      { type: "expendSlot", data: { level: 1 } }, // one spent this session
-      // Two restores: first cancels the in-session expend, second is a
-      // cross-session restore with no in-window match → floored, not negative.
+      { type: "expendSlot", data: { level: 1 } },
       {
         type: "restoreSlot",
         data: { level: 1 },
@@ -304,8 +276,6 @@ describe("computeSessionSummary", () => {
     expect(s.durationMs).toBe(0);
   });
 });
-
-// ── computeCampaignRecap (#245) ───────────────────────────────────────────────
 
 function participant(overrides: Partial<ParticipantSummary>): ParticipantSummary {
   return {
@@ -409,7 +379,6 @@ describe("computeCampaignRecap", () => {
       { name: "Torch", qty: 5 },
     ]);
     expect(recap.startedAt).toBe("2026-06-22T18:00:00.000Z");
-    // b never left → falls back to its endedAt for the window's upper bound.
     expect(recap.endedAt).toBe("2026-06-22T20:30:00.000Z");
   });
 

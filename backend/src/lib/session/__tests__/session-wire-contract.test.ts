@@ -1,9 +1,4 @@
-/**
- * The doorway's `role` used to BE Prisma's CampaignRole; moving the shape into
- * shared-types decoupled them, because that package cannot depend on Prisma
- * (#1273). Without this assertion a schema migration adding a third role would
- * leave the wire type silently lying about what the endpoint can return.
- */
+// If CampaignRole gains a variant, SessionDoorwayRole must gain it too (#1273).
 
 import { describe, expectTypeOf, it } from "vitest";
 

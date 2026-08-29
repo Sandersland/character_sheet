@@ -1,17 +1,8 @@
-/**
- * Physician's Touch (Warrior of Mercy L6, PHB'24 p.92, #1248/#1912) —
- * upgrades Hand of Healing's own action in place (also ends one of
- * Blinded/Deafened/Paralyzed/Poisoned/Stunned) rather than adding a
- * competing catalog row. The base row's reminder (monk-features.ts's
- * "Hand of Healing" row) carries the flat below-L6 text; this descriptor
- * appends the L6 rider. Edition-invariant: Warrior of Mercy has no 2014
- * counterpart (PHB'24 p.92, not in SRD 5.2 — gap-fill content, #1248), so
- * this gates on subclass slug + level only. Registered in
- * ANNOUNCE_AUGMENTORS.
- */
+// Physician's Touch, PHB'24 p.92, Warrior of Mercy L6 — upgrades Hand of Healing's own action in place, rather than a competing catalog row.
+// Edition-invariant: Warrior of Mercy has no 2014 counterpart, so this gates on subclass slug + level only.
 import type { AnnounceAugmentor } from "./announce-augmentors.js";
 
-/** PHB'24 p.92 — Physician's Touch's own grant level. */
+// PHB'24 p.92 — Physician's Touch's own grant level.
 export const PHYSICIANS_TOUCH_LEVEL = 6;
 
 export const PHYSICIANS_TOUCH_REMINDER =

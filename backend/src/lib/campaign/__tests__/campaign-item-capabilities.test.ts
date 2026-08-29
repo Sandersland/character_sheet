@@ -86,7 +86,6 @@ describe("capability snapshot on award (#545)", () => {
     const scalar = row.capabilities.find((c) => c.targetKey === "stealth");
     expect(scalar).toMatchObject({ kind: "passiveBonus", target: "skill", op: "add", value: 2 });
 
-    // The dice-valued capability round-trips count/faces/damageType intact.
     const dice = row.capabilities.find((c) => c.valueDiceCount !== null);
     expect(dice).toMatchObject({ valueDiceCount: 1, valueDiceFaces: 6, valueDamageType: "fire" });
   });
@@ -140,7 +139,7 @@ describe("capability snapshot on award (#545)", () => {
       rechargeDiceFaces: 6,
       rechargeBonus: 1,
       rechargeTrigger: "dawn",
-      used: 0, // runtime counter never copied — awarded pool starts full
+      used: 0,
     });
     const cast = row.capabilities.find((c) => c.kind === "castSpell")!;
     expect(cast).toMatchObject({ castResource: "charges", chargeCost: 1 });
@@ -156,7 +155,6 @@ describe("capability snapshot on award (#545)", () => {
         include: inventoryItemDetailInclude,
       }),
     );
-    // Provenance FK nulled by SetNull, but the snapshotted capabilities survive.
     expect(row.itemId).toBeNull();
     expect(row.capabilities).toHaveLength(2);
     expect(row.requiresAttunement).toBe(true);

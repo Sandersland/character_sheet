@@ -2,12 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { fightingStyleFeatOfferedForClasses } from "@/lib/srd/srd.js";
 
-/**
- * PHB'14 p. 72 (Fighter) / p. 82 (Paladin) / p. 91 (Ranger), = SRD 5.1 (#1495).
- * Fighter gets all six styles; Paladin and Ranger each get a four-style
- * subset. SRD 5.2/PHB'24 draws no per-class subset — any class with the
- * Fighting Style feature may take any of the four 2024 styles.
- */
+// PHB'14 p. 72 (Fighter) / p. 82 (Paladin) / p. 91 (Ranger) = SRD 5.1 (#1495); SRD 5.2/PHB'24 draws no per-class subset.
 describe("fightingStyleFeatOfferedForClasses", () => {
   const archery = { classes: ["Fighter", "Ranger"] };
   const defense = { classes: ["Fighter", "Paladin", "Ranger"] };
@@ -69,12 +64,8 @@ describe("fightingStyleFeatOfferedForClasses", () => {
     it("a multiclass Paladin1/Ranger2 union adds what neither class alone offers", () => {
       const offered = (feat: { classes: string[] }) =>
         fightingStyleFeatOfferedForClasses(feat, ["Paladin", "Ranger"], "EDITION_2014");
-      // Archery: Ranger-only. Protection: Paladin-only. Both must be offered
-      // in the union even though neither single class offers both.
       expect(offered(archery)).toBe(true);
       expect(offered(protection)).toBe(true);
-      // Great Weapon Fighting (Fighter/Paladin) and Two-Weapon Fighting
-      // (Fighter/Ranger) are each covered by one of the two classes too.
       expect(offered(greatWeaponFighting)).toBe(true);
       expect(offered(twoWeaponFighting)).toBe(true);
     });

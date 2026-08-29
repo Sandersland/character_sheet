@@ -1,18 +1,4 @@
-/**
- * #1499 arbiter finding: `buildUnarmedAttacksView` (backend
- * lib/character/serialize/combat.ts) passes `editionOf(row)` into
- * `deriveUnarmedStrike`, which resolves the Martial Arts die via
- * `deriveMartialArtsDie`. That argument had zero DB-backed coverage — the
- * whole backend suite stayed green when the arbiter mutated the call site to
- * the literal `"EDITION_2024"`, which would silently roll a 2014 Monk's
- * unarmed strike on the 2024 die (d6 instead of d4 at L1, d12 instead of d10
- * at L17) forever. Both editions asserted side by side end to end through
- * GET /api/characters/:id, mirroring exhaustion-edition.test.ts's pattern —
- * a separate DB-backed both-editions file is the established answer to the
- * "no 2014 fixture in the snapshot file" constraint documented in
- * character-serialize-snapshot.test.ts's header.
- */
-
+// buildUnarmedAttacksView passes editionOf(row) into deriveUnarmedStrike/deriveMartialArtsDie — untested previously, a hardcoded EDITION_2024 there would silently roll a 2014 Monk's unarmed strike on the 2024 die forever (#1499).
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -32,9 +18,7 @@ const BASE = {
   abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 14, charisma: 8 },
 };
 
-// Level threshold XP so the total character level (proficiency bonus etc.)
-// agrees with the monk class-entry level being asserted, matching the
-// pattern in regrants-served.test.ts.
+// XP threshold keeps the total character level in agreement with the monk class-entry level being asserted.
 const XP_BY_LEVEL: Record<number, number> = { 1: 0, 17: 225000, 20: 355000 };
 
 async function createMonkAt(
@@ -91,15 +75,7 @@ describe("unarmedStrike Martial Arts die forks on rulesEdition (#1499)", () => {
     expect(char2024.unarmedStrike.damage.faces).toBe(12);
   });
 
-  // #1499/#1500's six EDITION_2024-ONLY rows (patientDefense,
-  // patientDefenseFocus, stepOfTheWind, stepOfTheWindFocus, deflectAttacks,
-  // deflectAttacksRedirect — see actions.test.ts's TAGGED_2024_ONLY_ROWS)
-  // must not reach a 2014 monk's wire payload, while the untagged, shared
-  // bonusUnarmedStrike row and the now-both-editions flurryOfBlows row still
-  // do (#1500), and the 2014-exclusive patientDefenseKi/stepOfTheWindKi rows
-  // ALSO reach it. Asserted here (not just in the pure actions.test.ts unit
-  // test) so the AC is direct against the composed GET response rather than
-  // inferred across two files.
+  // The six EDITION_2024-only rows must not reach a 2014 monk's wire payload, while the shared bonusUnarmedStrike/flurryOfBlows rows and the 2014-exclusive patientDefenseKi/stepOfTheWindKi rows do (#1500).
   it("L20 EDITION_2014 monk: availableActions has none of the six 2024-only rows, has bonusUnarmedStrike/flurryOfBlows/patientDefenseKi/stepOfTheWindKi", async () => {
     const id = await createMonkAt("EDITION_2014", "UnarmedEdition 2014-L20", 20);
     const char = (await get(id)).body;
@@ -122,8 +98,6 @@ describe("unarmedStrike Martial Arts die forks on rulesEdition (#1499)", () => {
   });
 });
 
-// #1500 AC — proven at the real derivation/wire layer (GET /api/characters/:id),
-// not just against the in-memory MONK_FEATURES seed array (monk-2014-snapshot.test.ts).
 describe("2014 Monk base-class feature list (#1500)", () => {
   it("L1: Unarmored Defense + Martial Arts in features, no resource pool yet", async () => {
     const id = await createMonkAt("EDITION_2014", "UnarmedEdition 2014-FeatureList-L1", 1);

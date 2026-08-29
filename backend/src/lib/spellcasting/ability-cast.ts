@@ -1,13 +1,4 @@
-/**
- * Shared caster for activated abilities — one sequence behind castSpell and any
- * future focus-cast abilities: pay-cost → build summary → concentration → self-apply.
- *
- * Concentration drop-on-cast and self-apply are lifted here as character-wide
- * helpers operating on the mutable state's `concentratingOn`, not on a
- * SpellEntry — so a non-spellcaster ability can hold/displace concentration too.
- * Import direction stays one-way: spellcasting → ability-cast →
- * {ability-cost, effects, spell-state, hitpoints, events}.
- */
+// Import direction stays one-way: spellcasting -> ability-cast -> {ability-cost, effects, spell-state, hitpoints, events}.
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { payAbilityCostInTx, type AbilityCost, type PayCostContext, type SlotCostSubject } from "./ability-cost.js";
@@ -21,34 +12,18 @@ import { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "@/lib/combat/hi
 import type { ConcentrationState, SpellcastingMutableState } from "./spell-state.js";
 import type { ClearOnTrigger } from "@/lib/classes/class-feature-rows.js";
 
-/** A cast's effect target: the caster themselves, or a consenting ally's sheet (#462). */
 export type CastTarget = "self" | { characterId: string };
 
-/**
- * Mage Armor's "the spell ends if the target dons armor" (#363) — migrated
- * (#1688) off the equip hook's own hardcoded target check onto the buff's own
- * `clearOn` metadata, the same path every effectBuffs-driven buff's
- * equip-driven true-end now rides (equipClearTriggers). "acUnarmoredBase" is
- * the only buffTarget any seeded
- * Spell/GrantedAbility sets that needs one; "equipBodyArmor" fires for EVERY
- * armor category (light included) — the same condition the old hardcoded
- * `slot === "BODY"` check applied regardless of category, so this keeps that
- * behavior byte-for-byte. A future buffTarget needing an equip-driven
- * true-end is one more entry here, not a second special case in the equip
- * hook.
- */
+// A future buffTarget needing an equip-driven true-end is one more entry here, not a new case in equipClearTriggers.
 const BUFF_TARGET_CLEAR_ON: Partial<Record<string, ClearOnTrigger[]>> = {
   acUnarmoredBase: ["equipBodyArmor"],
 };
 
-// The per-op result the dispatcher logs (before/after snapshots + logEvent).
 export interface OpOutcome {
   eventType: string;
   summary: string;
   eventData: Record<string, unknown>;
-  // Extra sub-state folded into the logged event's before/after snapshots beyond
-  // the domain JSON the dispatcher captures. Item-spell casts use this to snapshot
-  // the spent InventoryCapability.used counter (#580) so undo can restore it.
+  // Extra state snapshotted for undo beyond the domain JSON — e.g. item-spell casts' spent InventoryCapability.used counter (#580).
   beforeExtra?: Record<string, unknown>;
   afterExtra?: Record<string, unknown>;
 }
@@ -60,9 +35,7 @@ export interface CastAbilityContext {
   sessionId: string | null;
   cost: PayCostContext;
   concentrationHost: SpellcastingMutableState;
-  // Caster identity — required only for party-target heals (#462); the caster
-  // must be a member of the target's campaign, and their name attributes the
-  // cross-sheet heal event.
+  // Required only for party-target heals (#462) — the caster must be a member of the target's campaign.
   casterUserId?: string;
   casterName?: string;
   casterCampaignId?: string | null;
@@ -72,18 +45,16 @@ export interface CastAbilityInput {
   name: string;
   entryId: string;
   cost: AbilityCost;
-  effect: EffectSpec; // effect shapes the summary; the client roll is trusted, never bound-checked (#406)
+  effect: EffectSpec; // The client roll is trusted, never bound-checked (#406).
   requested?: number;
   roll: number;
   eventType: EventType;
   concentrates: boolean;
   apply?: { target: CastTarget; kind: "heal" | "damage" | "tempHp"; amount: number };
-  // Below-minLevel wording for a `{kind:"slot"}` cost (#1687) — omitted for a
-  // spell cast (payAbilityCostInTx's own "cast a level-N spell" default).
   costSubject?: SlotCostSubject;
 }
 
-// Byte-load-bearing: reproduces the current castSpell summary exactly.
+// Byte-load-bearing: reproduces applyCastSpellOp's existing summary text exactly.
 function buildCastSummary(name: string, label: string, effect: EffectSpec, roll: number): string {
   let s = `Cast ${name}`;
   if (label) s += ` (${label})`;
@@ -95,26 +66,14 @@ function buildCastSummary(name: string, label: string, effect: EffectSpec, roll:
   return s;
 }
 
-// Log + clear a displaced prior concentration, then set the new one. Entry-agnostic:
-// operates on the mutable state's `concentratingOn`, never on a SpellEntry.
 async function handleConcentrationOnCast(ctx: CastAbilityContext, next: ConcentrationState): Promise<void> {
   const host = ctx.concentrationHost;
   const prior = host.concentratingOn;
   if (prior && prior.entryId !== next.entryId) {
-    // #1849: this event's `before` is captured AFTER payAbilityCostInTx already
-    // spent the displacing cast's slot, so it must snapshot ONLY concentratingOn —
-    // never slotsUsed/arcanumUsed/spells. Both events share one batch and LIFO
-    // revert runs the cast's own revert first (correctly restoring the pre-spend
-    // slot count), then this event's revert last; a full-state snapshot here would
-    // replay the post-spend slot count and clobber that refund. See
-    // revertSpellcastingEvent's concentrationDropped branch, which merges this
-    // narrowed snapshot instead of replacing the whole spellcasting column.
+    // #1849: snapshot ONLY concentratingOn — payAbilityCostInTx already spent the slot, so a full-state snapshot here would clobber the LIFO slot refund on revert.
     const dropBefore = { spellcasting: { concentratingOn: { ...prior } } };
-    // No intermediate DB write: the caller's common write-back persists the final
-    // state (with the new concentration spell), so clearing the in-memory flag is
-    // enough for this drop event's before/after payloads.
+    // No intermediate DB write — the caller's write-back persists this along with the new concentration spell.
     host.concentratingOn = null;
-    // The displaced concentration also drops any buffs it was maintaining.
     await clearBuffsForSourceInTx(ctx.tx, ctx.characterId, prior.entryId, ctx.batchId, ctx.sessionId, "newCast");
     await logEvent(ctx.tx, {
       characterId: ctx.characterId,
@@ -131,7 +90,6 @@ async function handleConcentrationOnCast(ctx: CastAbilityContext, next: Concentr
   host.concentratingOn = { entryId: next.entryId, spellName: next.spellName };
 }
 
-// Apply a self-targeted rolled effect to the caster's own HP in the same batch.
 async function applySelfEffectInTx(
   ctx: CastAbilityContext,
   apply: { kind: "heal" | "damage" | "tempHp"; amount: number },
@@ -145,10 +103,7 @@ async function applySelfEffectInTx(
   }
 }
 
-// Apply a rolled heal to a consenting ally's sheet in the same batch (#462).
-// Guards: healing only, caster is a member of the target's (shared) campaign,
-// and the target has opted in via autoFriendlyHealing. The heal event is written
-// on the TARGET (actor "player", source = caster's name) so it's theirs to undo.
+// Guards: caster must share the target's campaign and the target must have opted in via autoFriendlyHealing; the event is written on the TARGET so it's theirs to undo (#462).
 async function applyPartyHealInTx(
   ctx: CastAbilityContext,
   targetId: string,
@@ -179,7 +134,6 @@ async function applyPartyHealInTx(
   await applyHealInTx(ctx.tx, targetId, amount, ctx.batchId, ctx.sessionId, { source: ctx.casterName });
 }
 
-// The one shared cast sequence. Returns the OpOutcome the dispatcher logs.
 export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilityInput): Promise<OpOutcome> {
   const paid = await payAbilityCostInTx(ctx.cost, input.cost, input.requested, input.costSubject);
   const summary = buildCastSummary(input.name, paid.label, input.effect, input.roll);
@@ -194,10 +148,7 @@ export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilit
   if (input.concentrates) {
     await handleConcentrationOnCast(ctx, { entryId: input.entryId, spellName: input.name });
   }
-  // Seed a self-buff from the effect. A concentration cast's buff rides the
-  // concentration host (drops when it breaks); a non-concentration buff spell
-  // (e.g. Mage Armor, 8h ≈ a while-active toggle, #363) persists as `while-active`
-  // until dismissed, a long rest, or a true-end hook clears it.
+  // A non-concentration buff (e.g. Mage Armor, #363) persists as while-active until dismissed, a long rest, or a true-end hook clears it.
   const buff = resolveBuffSpec(input.effect);
   if (buff) {
     await appendActiveBuffInTx(

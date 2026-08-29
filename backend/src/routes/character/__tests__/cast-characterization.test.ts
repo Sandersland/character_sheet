@@ -1,11 +1,4 @@
-/**
- * Characterization lock for the cast event + spellcasting JSON (#406).
- *
- * Asserts the EXACT bytes (summary strings, event `data`, before/after
- * spellcasting snapshots) that casting produces on the current code. It is the
- * byte-parity oracle for the castAbilityInTx refactor: it must be green now and
- * stay green — UNEDITED — after applyCastSpellOp becomes a thin wrapper.
- */
+// Byte-parity oracle for the castAbilityInTx refactor — must stay green, unedited, after applyCastSpellOp becomes a thin wrapper (#406).
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -19,7 +12,6 @@ import { authCookie } from "@/test-support/auth.js";
 const OWNER_ID = "owner-cast-characterization";
 let COOKIE: string;
 
-// Level-5 Wizard (XP 6500) → INT 16, slots L1:4 L2:3 L3:2 (upcast headroom).
 const WIZARD_ID = "test-cast-char-wizard";
 const WIZARD_BASE = {
   id: WIZARD_ID,
@@ -166,20 +158,18 @@ describe("cast characterization — Wizard", () => {
         }],
       });
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(16); // 20 → 16
+    expect(res.body.hitPoints.current).toBe(16);
     const slot1 = res.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
     expect(slot1.used).toBe(1);
   });
 });
-
-// ── Warlock Mystic Arcanum label ────────────────────────────────────────────
 
 const WARLOCK_ID = "test-cast-char-warlock";
 const WARLOCK_BASE = {
   id: WARLOCK_ID,
   name: "Cast Characterization Warlock",
   alignment: "Chaotic Neutral",
-  experiencePoints: 85000, // level 11
+  experiencePoints: 85000,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 60, max: 60, temp: 0 },

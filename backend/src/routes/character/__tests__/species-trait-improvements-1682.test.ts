@@ -1,21 +1,4 @@
-/**
- * #1682: SpeciesTrait.improvements — passive species/variant grants
- * (FeatImprovement[]) mapped through the SAME deriveImprovementBonuses/
- * deriveImprovementProficiencies evaluator a taken feat's improvements and a
- * ClassFeature row's improvements already use (#1691's own precedent — see
- * classfeature-improvements-1691.test.ts, this file's sibling). Proving case
- * is a 2014 Hill Dwarf: Dwarven Toughness's maxHp bonus and Dwarven Combat
- * Training's weapon proficiency, both previously granted by the retired
- * name-keyed RACE_PROFICIENCY_GRANTS record (srd/proficiencies.ts) and now
- * granted by seeded SpeciesTrait rows resolved via the character's OWN
- * species/variant selection (CharacterRace.speciesId/variantId, #1679).
- *
- * speciesId/variantId are set directly on the create body — the species
- * PICKER UI ships in #1680 (parallel slice, not yet merged into this
- * worktree's base), so this bypasses it the same way
- * classfeature-improvements-1691.test.ts bypasses the (also unshipped at the
- * time) subclass picker via a raw DB update.
- */
+// SpeciesTrait.improvements (#1682) are mapped through the SAME deriveImprovementBonuses/deriveImprovementProficiencies evaluator a taken feat's or ClassFeature row's improvements use.
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -76,9 +59,7 @@ describe("SpeciesTrait.improvements (#1682) — 2014 Hill Dwarf", () => {
 
     const res = await get(id);
     expect(res.status).toBe(200);
-    // Level-1 Fighter d10 + CON 14 (12 base + 2 species, #1681) → mod +2 = 12
-    // base; Dwarven Toughness adds +1/level, so 13 at level 1 (the level-delta
-    // proof lives in block 3).
+    // Fighter d10 + CON 14 (12 base + 2 species, #1681) → 12 base; Dwarven Toughness adds +1/level → 13 at level 1.
     expect(res.body.hitDice.total).toBe(1);
     expect(res.body.hitPoints.max).toBe(13);
 
@@ -87,7 +68,7 @@ describe("SpeciesTrait.improvements (#1682) — 2014 Hill Dwarf", () => {
     const battleaxe = res.body.weaponProficiencies.find((w: { name: string }) => w.name === "Battleaxes");
     expect(battleaxe.source).toBe("feat");
 
-    // Species-granted sheet section (#1682): darkvision announce-only, cited SRD 5.1.
+    // Darkvision is announce-only, cited SRD 5.1.
     const traitNames = res.body.speciesTraits.map((t: { name: string }) => t.name);
     expect(traitNames).toEqual(expect.arrayContaining(["Darkvision", "Dwarven Resilience", "Dwarven Combat Training", "Stonecunning", "Dwarven Toughness"]));
     const darkvision = res.body.speciesTraits.find((t: { name: string }) => t.name === "Darkvision");
@@ -111,12 +92,8 @@ describe("SpeciesTrait.improvements (#1682) — 2014 Mountain Dwarf", () => {
     const dwarf = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2014" }, include: { variants: true } });
     const mountainDwarf = dwarf.variants.find((v) => v.slug === "mountain")!;
 
+    // Wizard (not Fighter) grants no class armor proficiency, so light/medium is unambiguously the species grant — buildMergedArmorProficiencies tags class-source first when both apply.
     const id = await createCharacter({
-      // Wizard (not Fighter/BASE_BODY's default): Wizard grants NO class armor
-      // proficiency, so light/medium below is unambiguously the species grant,
-      // never shadowed by class > feat push-order precedence in
-      // buildMergedArmorProficiencies (Fighter is already proficient with
-      // light+medium+heavy+shields, which would tag "class" first).
       classes: [{ name: "Wizard" }],
       rulesEdition: "EDITION_2014",
       speciesId: dwarf.id,
@@ -128,7 +105,6 @@ describe("SpeciesTrait.improvements (#1682) — 2014 Mountain Dwarf", () => {
     expect(armorCategories(res.body)).toEqual(expect.arrayContaining(["light", "medium"]));
     const light = res.body.armorProficiencies.find((p: { category: string }) => p.category === "light");
     expect(light.source).toBe("feat");
-    // Hill Dwarf's own Dwarven Toughness must NOT leak onto a Mountain Dwarf.
     const traitNames = res.body.speciesTraits.map((t: { name: string }) => t.name);
     expect(traitNames).not.toContain("Dwarven Toughness");
     expect(traitNames).toContain("Dwarven Armor Training");
@@ -136,11 +112,7 @@ describe("SpeciesTrait.improvements (#1682) — 2014 Mountain Dwarf", () => {
 });
 
 describe("SpeciesTrait.improvements (#1682) — level-down scales Dwarven Toughness through the existing hitDice-driven derivation, no new reconciler", () => {
-  // Compares a Hill Dwarf against a Human (no maxHp-bearing trait) control
-  // through the SAME level-up/level-down sequence, rather than hand-computing
-  // the base class's average-method HP gain (class hit die + CON mod) — the
-  // delta-of-deltas isolates Dwarven Toughness's own contribution regardless
-  // of what that base number is.
+  // Compares a Hill Dwarf against a Human control through the same level-up/down sequence — the delta-of-deltas isolates Dwarven Toughness's contribution regardless of the base HP-gain number.
   async function levelToTwoAndBack(id: string) {
     const atLevel1 = (await get(id)).body.hitPoints.max as number;
     const xpUp = await supertest(app).post(`/api/characters/${id}/experience`).set("Cookie", COOKIE).send({ operations: [{ type: "set", value: 300 }] });
@@ -161,11 +133,7 @@ describe("SpeciesTrait.improvements (#1682) — level-down scales Dwarven Toughn
     const dwarf = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2014" }, include: { variants: true } });
     const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
     const dwarfId = await createCharacter({ rulesEdition: "EDITION_2014", speciesId: dwarf.id, variantId: hillDwarf.id });
-    // The Hill Dwarf's effective CON is 14 (12 base + 2 species, #1681). Human
-    // 2014 carries no SpeciesTrait row at all (no maxHp perLevel grant) and a
-    // fixed +1-to-everything increase (#1681) — base CON 13 lands the SAME
-    // effective CON 14, so the per-level CON-mod contribution cancels and the
-    // delta-of-deltas isolates Dwarven Toughness alone.
+    // Human's base CON 13 + fixed +1 (#1681) lands the SAME effective CON 14 as the Hill Dwarf, so the CON-mod contribution cancels and the delta-of-deltas isolates Dwarven Toughness alone.
     const human2014 = await prisma.species.findFirstOrThrow({ where: { slug: "human", edition: "EDITION_2014" } });
     const humanId = await createCharacter({
       rulesEdition: "EDITION_2014",
@@ -178,15 +146,9 @@ describe("SpeciesTrait.improvements (#1682) — level-down scales Dwarven Toughn
 
     const dwarfDelta = dwarfResult.atLevel2 - dwarfResult.atLevel1;
     const humanDelta = humanResult.atLevel2 - humanResult.atLevel1;
-    // No species-specific reconciler was added (#1682 touches no file under
-    // lib/leveling/ nor LEVEL_GATED_RECONCILERS) — this +1 is entirely the
-    // perLevel improvement scaling with hitDice.total (deriveImprovementBonuses,
-    // srd/feats.ts), applied at read time on every serialize, the same
-    // mechanism a class feature's own perLevel bonus already used.
+    // No reconciler was added for this — it's the perLevel improvement scaling with hitDice.total (deriveImprovementBonuses), applied at read time on every serialize, same as a class feature's perLevel bonus.
     expect(dwarfDelta).toBe(humanDelta + 1);
 
-    // Reversing via XP drop (revertLevelUps, an existing mechanism unrelated
-    // to #1682) restores each character's own original max exactly.
     expect(dwarfResult.afterLevelDown).toBe(dwarfResult.atLevel1);
     expect(humanResult.afterLevelDown).toBe(humanResult.atLevel1);
   });
@@ -211,9 +173,6 @@ describe("SpeciesTrait.improvements (#1754) — base 2014 Elf Keen Senses derive
     const elf = await prisma.species.findFirstOrThrow({ where: { slug: "elf", edition: "EDITION_2014" }, include: { variants: true } });
     const astralElf = elf.variants.find((v) => v.slug === "astral")!;
 
-    // Astral Elf requires a legal floating +2/+1 spread (#1751) and, since #1756,
-    // an Astral Fire cantrip pick + casting ability — both are creation
-    // prerequisites unrelated to the Keen Senses grant under test.
     const light = await prisma.spell.findFirstOrThrow({ where: { name: "Light", edition: "EDITION_2014" } });
     const id = await createCharacter({
       rulesEdition: "EDITION_2014",
@@ -258,11 +217,9 @@ describe("SpeciesTrait.improvements (#1682) — 2024 species shows edition-speci
     const darkvision = res.body.speciesTraits.find((t: { name: string }) => t.name === "Darkvision");
     expect(darkvision.description).toContain("SRD 5.2");
     expect(darkvision.description).not.toContain("SRD 5.1");
-    expect(darkvision.description).toContain("120 feet"); // 2024 Dwarf darkvision is 120 ft, vs 60 ft in 2014
+    expect(darkvision.description).toContain("120 feet");
 
-    // 2024 Dwarven Toughness is a BASE-species trait (not variant-gated as in
-    // 2014): a variantless 2024 Dwarf still gets +1/level, so a level-1 Fighter
-    // with CON 12 (base 11) reads 12 — proving the base-row grant fires.
+    // 2024 Dwarven Toughness is a base-species trait (not variant-gated like 2014) — a variantless 2024 Dwarf still gets +1/level.
     expect(res.body.hitPoints.max).toBe(12);
   });
 });

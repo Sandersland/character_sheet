@@ -1,14 +1,4 @@
-/**
- * Global error-handler tests (lib/core/error-handler.ts).
- *
- * Verifies the terminal middleware turns uncaught route errors into a consistent
- * JSON 500 — never HTML, never a hang — and preserves intentional HTTP status
- * codes. No Postgres needed: these mount the handler on a throwaway Express app
- * with synthetic throwing routes, so they run without the DB fixture setup.
- *
- * The side-effect import of express-async-errors is what makes async throws
- * reach the handler at all (see app.ts) — exercised here directly.
- */
+// The side-effect import of express-async-errors is what makes async throws reach errorHandler at all — exercised here directly.
 import "express-async-errors";
 
 import express from "express";
@@ -67,9 +57,6 @@ describe("global error handler", () => {
   });
 
   it("maps a Prisma P2025 (record-not-found) to a clean 404", async () => {
-    // A second query racing a delete (e.g. findUniqueOrThrow/update/delete after
-    // an access check) throws P2025 with no `.status`. It must surface as 404,
-    // not 500, and must not leak Prisma's verbose internal message.
     const app = appThatThrows(() => {
       throw Object.assign(new Error("No Character found for the given where"), {
         name: "PrismaClientKnownRequestError",

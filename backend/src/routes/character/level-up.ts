@@ -1,9 +1,4 @@
-// Owns POST /api/characters/:id/level-up/transactions — the unified level-up
-// ceremony endpoint (#885). The submission schema REUSES each domain's existing
-// op schema verbatim — from @character-sheet/contracts for the domains migrated
-// there (#1390), else from the per-domain router — so the wire contract never
-// drifts from the domains it composes; applyLevelUpTransaction validates it
-// against the derived plan and applies every choice under one batchId.
+// The submission schema reuses each domain's existing op schema verbatim, so the wire contract never drifts from the domains it composes.
 import { levelUpTargetSchema, type LevelUpTarget } from "@character-sheet/contracts";
 import { Router } from "express";
 import { z } from "zod";
@@ -43,9 +38,7 @@ const planQuerySchema = z
     message: "classEntryId and classId are mutually exclusive",
   });
 
-// #1139: the granted-spell diff needs the target's committed grant source and any
-// not-yet-committed ?subclassId= pick. Loaded ONLY on the read-only plan route so
-// the shared level-up commit query never fetches (and discards) these catalog rows.
+// Loaded only on the read-only plan route so the shared level-up commit query never fetches (and discards) these catalog rows.
 const GRANT_SOURCE_INCLUDE = { grantedSpells: { orderBy: { gateLevel: "asc" as const }, include: { spell: true } } };
 
 async function persistedGrantSource(target: LevelUpTarget): Promise<GrantedSpellSource | null> {
@@ -57,16 +50,12 @@ async function persistedGrantSource(target: LevelUpTarget): Promise<GrantedSpell
   return entry?.subclassRef ?? null;
 }
 
-// Unguarded by design (#1414): the handler below awaits resolveLevelUpContext
-// first, and that rejects a cross-edition ?subclassId= — so this lookup is only
-// ever reached with an id the character's edition already admits. A second
-// crossEditionRejection here would be a duplicate copy of that one rule.
+// Unguarded by design: the handler below awaits resolveLevelUpContext first, and that rejects a cross-edition ?subclassId= — so this lookup is only ever reached with an id the character's edition already admits.
 async function pickedGrantSource(subclassId: string | undefined): Promise<GrantedSpellSource | null> {
   if (!subclassId) return null;
   return prisma.subclass.findUnique({ where: { id: subclassId }, select: { name: true, ...GRANT_SOURCE_INCLUDE } });
 }
 
-// Neither classEntryId nor classId given → plan the primary (position-0) entry.
 async function resolvePlanTarget(
   characterId: string,
   query: z.infer<typeof planQuerySchema>,
@@ -83,12 +72,8 @@ async function resolvePlanTarget(
 }
 
 /**
- * GET /api/characters/:id/level-up/plan
- * The derived ceremony plan (#886): the resolved target — className, effective
- * subclass, newLevel, isPrimary — plus the ordered LevelUpStep list the POST
- * below will validate a submission against. Query: classEntryId XOR classId
- * (default: the primary entry); optional subclassId triggers the re-plan for a
- * not-yet-committed subclass pick. Read-only — nothing is mutated.
+ * GET /api/characters/:id/level-up/plan (#886)
+ * Query: classEntryId XOR classId (default: the primary entry); optional subclassId re-plans for a not-yet-committed subclass pick. Read-only.
  */
 levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
@@ -102,9 +87,7 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
   try {
     const target = await resolvePlanTarget(req.params.id, parsed.data);
     const context = await resolveLevelUpContext(req.params.id, target, parsed.data.subclassId);
-    // #1546 Part B-i: context.pickedSubclassFeatureRows carries the not-yet-
-    // committed pick's own rows through the re-plan splice — see
-    // resolveLevelUpPlan's own comment.
+    // context.pickedSubclassFeatureRows carries the not-yet-committed pick's own rows through the re-plan splice.
     const steps = resolveLevelUpPlan(
       context.planCharacter,
       context.targetEntry,
@@ -122,9 +105,7 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
       context.planCharacter.edition,
     );
     const targetSubclass = context.chosenSubclassName ?? context.targetEntry.subclass ?? null;
-    // #1531: same persisted/picked precedence as targetSubclass above — the
-    // not-yet-committed pick's own third-caster identity wins when this same
-    // level-up sets a new subclass.
+    // Same persisted/picked precedence as targetSubclass above — the not-yet-committed pick's own third-caster identity wins when this same level-up sets a new subclass.
     const targetSubclassCasterRef = context.chosenSubclassCasterRef ?? context.targetEntry.subclassCasterRef ?? null;
     res.json({
       target: {
@@ -132,10 +113,7 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
         subclass: targetSubclass,
         newLevel: context.targetEntry.newLevel,
         isPrimary: context.targetIsPrimary,
-        // #1509 D5: served so the Review step's granted-spells footnote (a
-        // subclass grant like a Domain/Pact spell, independent of any
-        // newSpells step) can render the right noun without re-deriving the
-        // rule — null for a non-caster target.
+        // Served so the Review step's granted-spells footnote can render the right noun without re-deriving the rule — null for a non-caster target.
         casterModel: casterModelFor(context.targetEntry.name, targetSubclassCasterRef, context.planCharacter.edition),
       },
       steps,
@@ -150,9 +128,7 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
   }
 });
 
-// z.infer of this schema must satisfy LevelUpSubmission — each field reuses the
-// exact op schema its domain already validates, so the parsed body is the domain
-// op shape verbatim (only `target`/hp/subclassId are level-up-local; fightingStyleFeat reuses takeFeat).
+// z.infer of this schema must satisfy LevelUpSubmission — each field reuses the exact op schema its domain already validates.
 const levelUpSubmissionSchema = z.object({
   target: levelUpTargetSchema,
   hp: z.object({ method: z.enum(["average", "roll"]), roll: z.number().int().min(1).optional() }),
@@ -160,15 +136,14 @@ const levelUpSubmissionSchema = z.object({
   subclassId: z.string().min(1).optional(),
   fightingStyleFeat: takeFeatOpSchema.optional(),
   maneuvers: z.array(learnManeuverOpSchema).optional(),
-  // #1516: a maneuver swap (learn-time only) — validated against its step's
-  // meta.canSwap by assertManeuverForgets.
+  // A maneuver swap (learn-time only) — validated against its step's meta.canSwap by
+  // assertManeuverForgets.
   maneuversForgotten: z.array(forgetManeuverOpSchema).optional(),
   toolProficiencies: z.array(learnToolProficiencyOpSchema).optional(),
-  // #1588: Expertise skill picks — freely reversible, no forget/swap field.
   expertise: z.array(learnExpertiseOpSchema).optional(),
   subclassChoices: z.array(learnSubclassChoiceOpSchema).optional(),
-  // #1503: a choose-N swap (e.g. Way of the Four Elements) — validated
-  // against its step's meta.canSwap by assertSubclassChoiceForgets.
+  // A choose-N swap (e.g. Way of the Four Elements) — validated against its step's
+  // meta.canSwap by assertSubclassChoiceForgets.
   subclassChoicesForgotten: z.array(forgetSubclassChoiceOpSchema).optional(),
   spellsLearned: z.array(learnSpellOpSchema).optional(),
   cantripsLearned: z.array(learnSpellOpSchema).optional(),
@@ -177,11 +152,7 @@ const levelUpSubmissionSchema = z.object({
 
 /**
  * POST /api/characters/:id/level-up/transactions
- * One atomic level-up: validates the structured submission against the character's
- * derived plan, then applies hit points, advancement (ASI/feat), subclass choice,
- * subclass-derived choices (maneuvers / tool proficiency / choose-N),
- * and newly learned spells under a single batchId. Any invalid op rolls back the
- * whole ceremony. Returns the full updated character.
+ * Validates the submission against the character's derived plan, then applies every choice under one batchId; any invalid op rolls back the whole ceremony.
  */
 makeTransactionsEndpoint({
   router: levelUpRouter,

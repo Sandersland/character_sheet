@@ -1,10 +1,5 @@
-// Open Hand Technique (Warrior of the Open Hand L3, SRD 5.2 / PHB'24 p.90) —
-// the Flurry counterpart to attemptStunningStrike. When a Flurry of Blows
-// strike hits, impose ONE rider: Addle (no save), Push (Strength save or
-// pushed up to 15 ft), or Topple (Dexterity save or Prone), DC = the monk's
-// focus save DC; no Focus is spent here — the rider rides free on a Flurry
-// hit. Once per turn, client-asserted (no server-side turn state to
-// cross-check).
+// Open Hand Technique, SRD 5.2 / PHB'24 p.90, Warrior of the Open Hand L3 — the Flurry counterpart to attemptStunningStrike.
+// Once per turn is client-asserted — no server-side turn state to cross-check.
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { ImposeOpenHandRiderOperation, OpenHandRider, OpenHandTechniqueOperation } from "@character-sheet/contracts";
@@ -22,7 +17,7 @@ export class InvalidOpenHandTechniqueOperationError extends Error {}
 // SRD 5.2 / PHB'24 p.90; SRD 5.1 / PHB'14 p.78 (Way of the Open Hand's own Open Hand Technique) — edition-invariant.
 export const OPEN_HAND_TECHNIQUE_LEVEL = 3;
 
-/** Whether an Open Hand monk entry (its own level, never `character.level`) has Open Hand Technique. */
+// monkLevel is the entry's own level, never character.level.
 export function hasOpenHandTechnique(monkLevel: number): boolean {
   return monkLevel >= OPEN_HAND_TECHNIQUE_LEVEL;
 }
@@ -32,7 +27,7 @@ export type OpenHandRiderOutcome = "applied" | "resisted";
 export interface OpenHandRiderResult {
   rider: OpenHandRider;
   dc: number;
-  /** Absent for Addle — it has no save to roll. */
+  // Absent for Addle — it has no save to roll.
   roll?: number;
   outcome: OpenHandRiderOutcome;
   summary: string;
@@ -42,7 +37,6 @@ export function canImposeOpenHandRider(input: { usedThisTurn: boolean }): boolea
   return !input.usedThisTurn;
 }
 
-/** Addle always applies (no save). Push/Topple: a fail (roll < DC) means the effect lands. */
 export function resolveOpenHandRiderOutcome(
   rider: OpenHandRider,
   roll: number,
@@ -96,9 +90,7 @@ const OPEN_HAND_TECHNIQUE_SELECT = {
 
 type OpenHandTechniqueRow = Prisma.CharacterGetPayload<{ select: typeof OPEN_HAND_TECHNIQUE_SELECT }>;
 
-// The two editions' Open Hand subclasses ("Warrior of the Open Hand" / "Way
-// of the Open Hand") are SEPARATE subclass rows, not one row forked across
-// editions — a character resolves to at most one, so matching either slug is safe.
+// The two editions' Open Hand subclasses are SEPARATE subclass rows, not one row forked across editions — a character resolves to at most one, so matching either slug is safe.
 const OPEN_HAND_SLUGS: readonly SubclassSlug[] = ["monk-warrior-of-the-open-hand", "monk-way-of-the-open-hand"];
 
 function monkEntry(row: OpenHandTechniqueRow) {
@@ -126,7 +118,7 @@ async function imposeOpenHandRider(
     throw new InvalidOpenHandTechniqueOperationError("Open Hand Technique can only be imposed once per turn");
   }
 
-  // fallow-ignore-next-line code-duplication -- intentionally repeated per monk save-DC vertical (mirrors quivering-palm.ts/stunning-strike.ts) rather than a shared helper
+  // fallow-ignore-next-line code-duplication -- intentionally repeated per monk save-DC vertical (mirrors the same pattern in quivering-palm and stunning-strike) rather than a shared helper
   // Proficiency bonus is total-character-level based, not monk-level — matches every DC formula in this codebase.
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);

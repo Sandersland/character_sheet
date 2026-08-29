@@ -64,7 +64,6 @@ describe("serialize surfaces item-granted spells (#528)", () => {
         ...BASE_CHAR,
         ownerId: OWNER_ID,
         spellcasting: Prisma.JsonNull,
-        // A pure non-caster — proves item spells surface with no caster class.
         classEntries: { create: { name: "Barbarian", level: 3, position: 0 } },
       },
     });
@@ -97,8 +96,6 @@ describe("serialize surfaces item-granted spells (#528)", () => {
     await prisma.inventoryItem.update({ where: { id: itemId }, data: { attuned: true } });
     const [spell] = itemSpells(await serialize(characterId));
     expect(spell).toBeDefined();
-    // Entry id carries the capability id suffix so two castSpell caps for the
-    // same spell on one item stay distinct (#528 review fix).
     expect(spell.id).toBe(`item:${itemId}:spell-witch-bolt:${spell.item?.capabilityId}`);
     expect(spell.name).toBe("Witch Bolt");
     expect(spell.level).toBe(1);

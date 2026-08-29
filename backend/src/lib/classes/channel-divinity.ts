@@ -1,16 +1,3 @@
-/**
- * Channel Divinity cast handler (Cleric + Paladin, #419) — the CD counterpart to
- * applyShadowArtsOperations. Each CD option is a GrantedAbility row with source
- * "channelDivinity"; using one spends 1 Channel Divinity charge via the shared
- * payAbilityCostInTx pool path and routes through castAbilityInTx.
- *
- * The 5e rules that live here: the class/subclass/level gate per option, the
- * per-option "kind" (announce / buff / advantage / invisible / reminder), the
- * cleric-vs-paladin save DC ability, and the derived numbers (Preserve Life HP
- * pool, Sacred Weapon Charisma bonus). Description + cost + save ability come
- * from the catalog row.
- */
-
 import type { ChannelDivinityOperation } from "@character-sheet/contracts";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -30,51 +17,24 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 export class InvalidChannelDivinityOperationError extends Error {}
 
-// How a CD option expresses through the declarative core:
-//   announce  — spend CD, surface the save DC; the condition is reminder text.
-//   buff      — apply a real durable modifier (Sacred Weapon → attackRoll).
-//   advantage — grant advantage on attacks vs one creature (roll-mode reminder).
-//   invisible — self-apply the invisible condition (Cloak of Shadows).
-//   reminder  — pure reminder text, with derived numbers where possible.
 export type ChannelDivinityKind = "announce" | "buff" | "advantage" | "invisible" | "reminder";
 
 interface ChannelDivinityGate {
   className: "cleric" | "paladin";
   subclass?: string; // lowercase; absent = any subclass of that class
-  // The class level at which the option is granted. Most options grant at the
-  // same level in both editions and use a plain number. A few grant at
-  // different levels per edition (Preserve Life, Invoke Duplicity) and use a
-  // Record naming both editions' levels instead — see minLevelFor below.
+  // A plain number when both editions grant at the same level; a Record<RulesEdition, number> only when they differ (see minLevelFor).
   minLevel: number | Record<RulesEdition, number>;
   kind: ChannelDivinityKind;
 }
 
-// Reads a gate's minLevel for one edition. Most gates set a plain number
-// (the same level in both editions); only a gate whose grant level actually
-// differs sets the Record form.
 function minLevelFor(gate: ChannelDivinityGate, edition: RulesEdition): number {
   return typeof gate.minLevel === "number" ? gate.minLevel : gate.minLevel[edition];
 }
 
-// Gate + kind per option, keyed by the catalog row name. Rows themselves carry
-// description/cost/save ability; this table owns the class/subclass/level gate.
-//
-// #1229: "Turn the Unholy"/"Turn the Faithless"/"Abjure Enemy" gates STAY —
-// the issue's own instruction to delete them outright would break a 2014
-// Paladin. Their catalog rows retag to EDITION_2014 instead (channel-
-// divinity.ts, the seed) — a 2024 character never sees them because
-// resolveEditionCatalog (routes/character/channel-divinity.ts) already
-// narrows the candidate list to that character's edition before this gate is
-// ever consulted, so the (now dead-for-2024, live-for-2014) gate entry is
-// correct as-is. "Divine Sense" and "Abjure Foes" are NEW base-class options
-// (no `subclass` — every 2024 Paladin regardless of oath), added below.
+// Turn the Unholy/Turn the Faithless/Abjure Enemy gates stay: their catalog rows are retagged EDITION_2014, and resolveEditionCatalog already excludes them for 2024 characters before this gate runs — dead-for-2024 is correct, not a bug.
 export const CHANNEL_DIVINITY_OPTIONS: Record<string, ChannelDivinityGate> = {
   "Channel Divinity: Turn Undead": { className: "cleric", minLevel: 2, kind: "announce" },
-  // #1590: the domain Channel Divinity options grant at DIFFERENT levels per
-  // edition — PHB'14 p.59/p.63 grants both at level 2, alongside Channel
-  // Divinity itself; SRD 5.2 p.40 shifts both to level 3, alongside the
-  // subclass grant (#1128 only recorded the 2024 level, which wrongly held a
-  // 2014 Cleric to level 3 too).
+  // PHB'14 p.59/p.63 grants at level 2; SRD 5.2 p.40 shifts to level 3.
   "Channel Divinity: Preserve Life": {
     className: "cleric",
     subclass: "life domain",
@@ -87,12 +47,7 @@ export const CHANNEL_DIVINITY_OPTIONS: Record<string, ChannelDivinityGate> = {
     minLevel: { EDITION_2014: 2, EDITION_2024: 3 },
     kind: "reminder",
   },
-  // #1590: this option is only in PHB'14 p.63. SRD 5.2 drops it and replaces
-  // it with Trickster's Transposition (cleric-features.ts). The catalog row
-  // is now tagged EDITION_2014 (prisma/seed/channel-divinity.ts), so a 2024
-  // character's list query already excludes it before this gate is ever
-  // read — the same pattern as Turn the Unholy/Turn the Faithless/Abjure
-  // Enemy above.
+  // PHB'14 p.63 only; SRD 5.2 drops it (replaced by Trickster's Transposition) — same dead-for-2024 pattern as above.
   "Channel Divinity: Cloak of Shadows": { className: "cleric", subclass: "trickery domain", minLevel: 6, kind: "invisible" },
   "Channel Divinity: Sacred Weapon": { className: "paladin", subclass: "oath of devotion", minLevel: 3, kind: "buff" },
   "Channel Divinity: Turn the Unholy": { className: "paladin", subclass: "oath of devotion", minLevel: 3, kind: "announce" },
@@ -100,28 +55,19 @@ export const CHANNEL_DIVINITY_OPTIONS: Record<string, ChannelDivinityGate> = {
   "Channel Divinity: Turn the Faithless": { className: "paladin", subclass: "oath of the ancients", minLevel: 3, kind: "announce" },
   "Channel Divinity: Abjure Enemy": { className: "paladin", subclass: "oath of vengeance", minLevel: 3, kind: "announce" },
   "Channel Divinity: Vow of Enmity": { className: "paladin", subclass: "oath of vengeance", minLevel: 3, kind: "advantage" },
-  // SRD 5.2, #1229: Divine Sense is the base Channel Divinity option every
-  // Paladin starts with (no subclass), gated at L3 (the level Channel
-  // Divinity itself is granted at in 2024, not L1 as in 2014).
+  // SRD 5.2 — base option every Paladin gets (no subclass), gated at L3 (2024's Channel Divinity grant level, not L1 as in 2014).
   "Channel Divinity: Divine Sense": { className: "paladin", minLevel: 3, kind: "reminder" },
-  // SRD 5.2, #1229: Abjure Foes is a base Channel Divinity option (no
-  // subclass) granted at L9. The DC is Charisma-derived (channelDivinitySaveDC
-  // below); the save ABILITY the target rolls is Wisdom (the catalog row's
-  // own saveAbility column, prisma/seed/channel-divinity.ts).
+  // SRD 5.2 — base option (no subclass) at L9; DC is Charisma-derived, but the target's save ability is Wisdom (catalog row's saveAbility).
   "Abjure Foes": { className: "paladin", minLevel: 9, kind: "announce" },
 };
 
-/** One class entry as needed for gating (name + subclass + optional explicit level). */
 export interface GateEntry {
   name: string;
   subclass?: string | null;
   level?: number | null;
 }
 
-// True when the character (via some class entry) is entitled to the option. The
-// gate level is the character's total level from XP — the same single-class-
-// primary assumption deriveResources uses (persisted classEntry.level is a
-// multiclass hint, not maintained from XP, so it isn't trusted here).
+// characterLevel is XP-derived total level — persisted classEntry.level is a multiclass hint, not trusted here (mirrors deriveResources).
 export function isEntitled(gate: ChannelDivinityGate, entries: GateEntry[], characterLevel: number, edition: RulesEdition): boolean {
   if (characterLevel < minLevelFor(gate, edition)) return false;
   return entries.some((e) => {
@@ -130,8 +76,6 @@ export function isEntitled(gate: ChannelDivinityGate, entries: GateEntry[], char
   });
 }
 
-// The Channel Divinity save DC for the granting class: cleric keys off Wisdom,
-// paladin off Charisma (its spell save DC). Both are 8 + prof + ability mod.
 function channelDivinitySaveDC(
   className: "cleric" | "paladin",
   abilityScores: Record<string, number>,
@@ -141,15 +85,11 @@ function channelDivinitySaveDC(
   return 8 + profBonus + abilityModifier(abilityScores[ability] ?? 10);
 }
 
-/** Preserve Life healing pool: 5× cleric level. */
 function preserveLifeHpPool(clericLevel: number): number {
   return clericLevel * 5;
 }
 
-// Invoke Duplicity's reminder text by edition. PHB'14 p.63 keeps it an Action
-// that needs Concentration. PHB'24 pp.75-76 (mirror-sourced, see
-// cleric-features.ts) makes it a Bonus Action instead, drops Concentration,
-// and lets you move the duplicate with a Bonus Action too.
+// PHB'14 p.63: Action + Concentration. PHB'24 pp.75-76: Bonus Action, no Concentration, movable by bonus action.
 function invokeDuplicityReminder(edition: RulesEdition): string {
   switch (edition) {
     case "EDITION_2014":
@@ -163,12 +103,8 @@ function invokeDuplicityReminder(edition: RulesEdition): string {
   }
 }
 
-// Turn Undead's reminder text by edition. PHB'14 p.57 makes undead flee (a
-// "turned" state). SRD 5.2 p.37 (cleric-features.ts) instead gives Frightened
-// and Incapacitated, with its own early-end clause on damage. `saveDc` is
-// always a real number here (Turn Undead's kind is "announce"), but its type
-// stays nullable, so this falls back to "?" instead of ever printing the
-// word "null".
+// PHB'14 p.57: turned (flees). SRD 5.2 p.37: Frightened + Incapacitated, ends early on damage.
+// saveDc is always real for this "announce" kind, but stays nullable in the type, so this falls back to "?" rather than printing "null".
 function turnUndeadReminder(saveAbility: string | null | undefined, saveDc: number | null, edition: RulesEdition): string {
   const dc = saveDc ?? "?";
   switch (edition) {
@@ -183,7 +119,6 @@ function turnUndeadReminder(saveAbility: string | null | undefined, saveDc: numb
   }
 }
 
-// Descriptor (shared by GET + cast summary).
 export interface ChannelDivinityDescriptor {
   id: string;
   name: string;
@@ -197,12 +132,10 @@ export interface ChannelDivinityDescriptor {
 interface DescribeContext {
   abilityScores: Record<string, number>;
   profBonus: number;
-  classLevel: number; // level of the granting class (for derived numbers)
+  classLevel: number;
   edition: RulesEdition;
 }
 
-// Build the human descriptor for an option: the save DC (announce), the derived
-// numbers (Preserve Life pool, Sacred Weapon bonus), and the reminder line.
 export function describeChannelDivinity(
   row: { id: string; name: string; description: string; saveAbility?: string | null; buffModifier?: number | null },
   gate: ChannelDivinityGate,
@@ -231,22 +164,11 @@ export function describeChannelDivinity(
     case "Channel Divinity: Turn Undead":
       reminder = turnUndeadReminder(row.saveAbility, saveDc, ctx.edition);
       break;
-    // #1229 follow-on 2: without its own arm, this reminder-kind row (no
-    // saveAbility) would fall to the default branch's `saveDc !== null &&
-    // row.saveAbility` check and yield "" — a silent empty reminder.
+    // Without this arm, the default branch's `saveDc !== null && row.saveAbility` check yields "" for this row (no saveAbility) — a silent empty reminder.
     case "Channel Divinity: Divine Sense":
       reminder = "Sense celestials, fiends, and undead within 60 ft for 10 minutes or until Incapacitated; also reveals consecrated/desecrated places (as Hallow).";
       break;
-    // #1229: Abjure Foes' default-branch reminder ("or are turned/affected")
-    // is generic; this arm states the real effect (Frightened) and the
-    // Charisma-modifier target count instead.
-    //
-    // This case label is the row's name VERBATIM, and Abjure Foes is the only
-    // CHANNEL_DIVINITIES row without the "Channel Divinity: " prefix. If you
-    // ever normalise that name, change this label in the same edit — otherwise
-    // this arm silently falls through to `default:` and the reminder loses the
-    // target count. (Display is unaffected either way: the picker strips the
-    // prefix with an anchored regex, so a bare name passes through unchanged.)
+    // Abjure Foes is the only row without a "Channel Divinity: " prefix — if you ever normalize that name, update this case label too, or this arm falls through to default and loses the target count.
     case "Abjure Foes":
       reminder = `Up to ${chaModifierFloor1(ctx.abilityScores)} creature(s) within 60 ft make a ${row.saveAbility} save (DC ${saveDc}) or are Frightened for 1 minute or until damaged.`;
       break;
@@ -266,14 +188,10 @@ export function describeChannelDivinity(
   };
 }
 
-// Charisma modifier, floored at 1 — Sacred Weapon's attack-roll bonus AND
-// Abjure Foes' target count share this exact SRD formula ("minimum +1" /
-// "minimum of one creature"), so one function serves both call sites (#1229).
 function chaModifierFloor1(abilityScores: Record<string, number>): number {
   return Math.max(1, abilityModifier(abilityScores.charisma ?? 10));
 }
 
-// The CD option's EffectSpec: a buff for Sacred Weapon, roll-less utility otherwise.
 function channelDivinityEffectSpec(kind: ChannelDivinityKind): EffectSpec {
   return {
     effectType: kind === "buff" ? "buff" : "utility",
@@ -286,18 +204,7 @@ function channelDivinityEffectSpec(kind: ChannelDivinityKind): EffectSpec {
   };
 }
 
-/**
- * Applies a batch of Channel Divinity operations atomically. Mirrors
- * applyShadowArtsOperations: one batchId, LIFO-undoable events, state re-read
- * per op. Per use: the pool payer logs its own spendResource event (refunds the
- * CD charge on revert); a buff/condition side-effect logs under its own category
- * (restored on revert); the resources-category castChannelDivinity event records
- * the use with its DC / reminder / derived numbers.
- */
-// Validate the requested Channel Divinity option against the catalog + gating +
-// cost rules, returning the resolved catalog row, gate, (pool) cost and derived
-// descriptor. Throws the same InvalidChannelDivinityOperationError messages as
-// before — extracted so applyOp reads as resolve → cast → side-effect → log.
+// One batchId, LIFO-undoable events (mirrors applyShadowArtsOperations): the pool payer's spendResource event refunds CD on revert; buff/condition side effects revert under their own category.
 async function resolveChannelDivinityCast(
   tx: Prisma.TransactionClient,
   abilityId: string,
@@ -308,11 +215,7 @@ async function resolveChannelDivinityCast(
     throw new InvalidChannelDivinityOperationError(`Channel Divinity option not found in catalog: ${abilityId}`);
   }
 
-  // Before the option-name gate lookup below, so a wrong-edition row (whose
-  // name may not even be one of CHANNEL_DIVINITY_OPTIONS' keys) reports its
-  // edition mismatch, never "Unknown Channel Divinity option" (#1345, found
-  // by this plan's audit). Transient cast, not a permanent snapshot — still
-  // a wrong-edition rule applied to one cast and recorded in the audit event.
+  // Must run before the gate lookup below: a wrong-edition row may not even be a CHANNEL_DIVINITY_OPTIONS key, and should report edition mismatch, not "Unknown Channel Divinity option" (#1345).
   const mismatch = crossEditionRejection(catalog, `Channel Divinity option "${catalog.name}"`, ctx.edition);
   if (mismatch) throw new InvalidChannelDivinityOperationError(mismatch);
 
@@ -331,7 +234,6 @@ async function resolveChannelDivinityCast(
     throw new InvalidChannelDivinityOperationError(`${catalog.name} has no Channel Divinity cost`);
   }
 
-  // Effective level of the granting class (for Preserve Life's HP pool).
   const descriptor = describeChannelDivinity(catalog, gate, {
     abilityScores: ctx.abilityScores,
     profBonus: ctx.profBonus,
@@ -342,8 +244,6 @@ async function resolveChannelDivinityCast(
   return { catalog, gate, cost, descriptor };
 }
 
-// Per-kind real side effects (buff appends an active buff, invisible applies the
-// condition), sharing batchId for revert symmetry. No-op for the other kinds.
 async function applyChannelDivinitySideEffect(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -421,9 +321,6 @@ export async function applyChannelDivinityOperations(
 
       await applyChannelDivinitySideEffect(tx, characterId, gate, catalog, abilityScores, batchId, sessionId);
 
-      // The cast record itself restores nothing (CD refunded by the pool payer's
-      // own spendResource event, buff/condition by their own events) — it records
-      // the use with the DC / reminder / roll-mode data.
       let summary = `Channeled ${catalog.name.replace(/^Channel Divinity: /, "")}`;
       if (descriptor.saveDc !== null) summary += ` (DC ${descriptor.saveDc})`;
       else if (descriptor.reminder) summary += ` — ${descriptor.reminder}`;

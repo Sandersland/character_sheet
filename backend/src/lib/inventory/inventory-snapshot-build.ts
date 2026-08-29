@@ -1,15 +1,5 @@
-// The ONE place a snapshot is constructed (#1648, epic #1644). Every creation
-// path (Task 4) and the one-shot backfill (Task 3) call this, and it ends in
-// .parse() so a row that cannot be represented fails at the write instead of
-// persisting a blob #1649's readers cannot use.
-//
-// Capabilities map through readCapability rather than re-reading the raw
-// columns: that adapter already produces the five shapes
-// snapshotCapabilitySchema mirrors, and a second mapping would be a mirror to
-// keep in step — the exact tax this epic removes. readCapability returns an
-// OpaqueCapability for a malformed row, which .parse() then rejects; that is
-// intended — an unrepresentable capability must surface here, loudly, not be
-// silently dropped.
+// #1648: the ONE place a snapshot is constructed; ends in .parse() so an unrepresentable row fails at the write instead of persisting a blob #1649's readers can't use.
+// Capabilities map through readCapability rather than re-reading raw columns, so a malformed row surfaces as an OpaqueCapability that .parse() rejects, instead of being silently dropped.
 import { inventorySnapshotSchema, type InventorySnapshot } from "@character-sheet/contracts";
 import type { EquipSlot, ItemCategory, ItemRarity } from "@/generated/prisma/client.js";
 import type { AttunementPrereqKind, CapabilityColumns } from "./capabilities.js";
@@ -23,17 +13,12 @@ import {
 } from "./detail-snapshot.js";
 import type { Currency } from "./inventory-currency.js";
 
-// A capability row plus the id buildInventorySnapshot keys it by in the
-// snapshot's `capabilities[].key` — the same id InventoryCapabilityUse rows
-// address as `capabilityKey`.
+// The id here becomes the snapshot's `capabilities[].key` — the same id InventoryCapabilityUse rows address as `capabilityKey`.
 export interface SnapshotCapabilityRow extends CapabilityColumns {
   id: string;
 }
 
-// The frozen-field shape buildInventorySnapshot reads from. Deliberately
-// structural (not tied to a specific Prisma payload type) so every creation
-// site — a live DB row, a Prisma nested-create input, or an undo snapshot —
-// can supply it without an intermediate re-shape.
+// Deliberately structural, not tied to a specific Prisma payload type, so a live DB row, a Prisma nested-create input, or an undo snapshot can all supply it without an intermediate re-shape.
 export interface SnapshotSourceRow {
   name: string;
   category: ItemCategory;
@@ -51,22 +36,12 @@ export interface SnapshotSourceRow {
   capabilities: SnapshotCapabilityRow[];
 }
 
-// A DM-authored campaign Item's cost is stored PARTIAL — campaign-items.ts's
-// currencySchema is `z.object({cp,sp,gp,pp}).partial()`, so a hand-typed
-// "5000 gp" persists as `{gp: 5000}` with no cp/sp/pp keys at all. asCurrency
-// is an unchecked cast (the column is untyped Json), so that shape reaches
-// here looking like a full Currency. snapshotCostSchema is strict and
-// requires all four, so a missing denomination must become 0 here rather than
-// surface as a parse failure on every campaign item whose cost wasn't typed
-// in every denomination.
+// campaign-items.ts's currencySchema is partial, so a campaign Item's cost can reach here as e.g. `{gp: 5000}`; snapshotCostSchema is strict, so a missing denomination must become 0 here rather than fail to parse.
 function narrowCost(cost: Currency): { cp: number; sp: number; gp: number; pp: number } {
   return { cp: cost.cp ?? 0, sp: cost.sp ?? 0, gp: cost.gp ?? 0, pp: cost.pp ?? 0 };
 }
 
-// consumableDetail's maxUses is frozen; usesRemaining is the runtime counter
-// and stays a column (InventoryItem.usesRemaining) — dropped here rather than
-// left for the strict schema to reject, so a caller sees the parse succeed on
-// everything else and only fail where it actually matters.
+// usesRemaining stays a runtime column (InventoryItem.usesRemaining); dropped here rather than left for the strict schema to reject.
 function narrowConsumable(detail: ConsumableDetailFields) {
   return {
     effectDiceCount: detail.effectDiceCount,
@@ -91,11 +66,7 @@ export function buildInventorySnapshot(row: SnapshotSourceRow): InventorySnapsho
     requiresAttunement: row.requiresAttunement,
     attunementPrereqKind: row.attunementPrereqKind,
     attunementPrereqValue: row.attunementPrereqValue,
-    // Re-narrowed through weaponDetailFields/armorDetailFields (not spread
-    // directly): a caller may hand this a fuller row (e.g. a live DB row
-    // carrying id/itemId) that's merely structurally compatible with
-    // WeaponDetailFields/ArmorDetailFields — the strict schema below would
-    // reject those extra keys at runtime even though TS allows the call.
+    // Re-narrowed through weaponDetailFields/armorDetailFields, not spread directly: a caller may hand a fuller row (e.g. a live DB row carrying id/itemId), and the strict schema below would reject those extra keys at runtime even though TS allows the call.
     weapon: row.weaponDetail ? weaponDetailFields(row.weaponDetail) : null,
     armor: row.armorDetail ? armorDetailFields(row.armorDetail) : null,
     consumable: row.consumableDetail ? narrowConsumable(row.consumableDetail) : null,

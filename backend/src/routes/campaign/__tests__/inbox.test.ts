@@ -47,8 +47,7 @@ describe("GET/POST /api/inbox (#1945)", () => {
   }
 
   async function mention(entityId: string, body?: string, date?: string): Promise<void> {
-    // NOTE (not ENTRY) so `date` defaults to today — createJournalSchema
-    // requires an explicit date for ENTRY.
+    // NOTE (not ENTRY): createJournalSchema requires an explicit date for ENTRY, but not NOTE.
     const res = await supertest(app)
       .post(`/api/characters/${CHAR_OWNER}/journal`)
       .set("Cookie", cookieOwner)
@@ -81,7 +80,6 @@ describe("GET/POST /api/inbox (#1945)", () => {
     await makeCharacter(CHAR_OWNER, OWNER, campaignId);
     await prisma.character.update({ where: { id: CHAR_OWNER }, data: { campaignId } });
 
-    // A campaign the caller is only a MEMBER of — must contribute nothing.
     const other = await supertest(app)
       .post("/api/campaigns")
       .set("Cookie", cookieMember)
@@ -186,9 +184,7 @@ describe("GET/POST /api/inbox (#1945)", () => {
     const times = (res.body as { signalAt: string }[]).map((r) => Date.parse(r.signalAt));
     expect(times).toEqual([...times].sort((a, b) => b - a));
 
-    // Both entities are mentioned + undescribed, so needs-chronicling flags
-    // both; its signalAt is the MAX across them (today's mention), not
-    // pinned to the 2020 one — proves signalAt reflects the real sort key.
+    // needs-chronicling's signalAt is the MAX across both flagged entities, not pinned to the 2020 one.
     const chronicling = res.body.find(
       (r: { kind: string }) => r.kind === "NEEDS_CHRONICLING",
     ) as { signalAt: string } | undefined;
@@ -218,14 +214,11 @@ describe("GET/POST /api/inbox (#1945)", () => {
     const captainRook = await makeEntity(campaignId, "Captain Rook");
     const captainRok = await makeEntity(campaignId, "Captain Rok");
 
-    // Old Rook accrues 3 mentions of its own, THEN gets identity-merged into
-    // Captain Rook — those 3 must attribute to Captain Rook, not vanish.
+    // Old Rook accrues 3 mentions, THEN gets identity-merged into Captain Rook — those 3 must attribute to Captain Rook, not vanish.
     await mention(oldRook, `Notes about @[${oldRook}], part one.`);
     await mention(oldRook, `Notes about @[${oldRook}], part two.`);
     await mention(oldRook, `Notes about @[${oldRook}], part three.`);
-    // Captain Rook: 1 direct mention. Captain Rok (typo): 2 direct mentions —
-    // MORE than Captain Rook's own direct count, so without attribution the
-    // typo would wrongly win pickDefaultSurvivor.
+    // Captain Rok (typo) gets MORE direct mentions than Captain Rook, so without attribution the typo would wrongly win pickDefaultSurvivor.
     await mention(captainRook, `About @[${captainRook}].`);
     await mention(captainRok, `About @[${captainRok}], first.`);
     await mention(captainRok, `About @[${captainRok}], second.`);
@@ -249,7 +242,7 @@ describe("GET/POST /api/inbox (#1945)", () => {
 
   it("removes an EXECUTED-merged-away entity from clustering entirely, even against an unrelated near-duplicate (#1945 review)", async () => {
     const lili = await makeEntity(campaignId, "Lili");
-    const concierge = await makeEntity(campaignId, "The Concierge"); // unrelated name, the survivor
+    const concierge = await makeEntity(campaignId, "The Concierge");
     const lily = await makeEntity(campaignId, "Lily"); // near-dup of "Lili" by distance, NOT itself merge-linked
 
     await mergeExecuted(lili, concierge);
@@ -260,9 +253,7 @@ describe("GET/POST /api/inbox (#1945)", () => {
       c.entities.some((e) => e.id === lili),
     );
     expect(involvesLili).toBe(false);
-    // Lily's only near-duplicate partner (Lili) is gone, so Lily forms no
-    // cluster either — pairwise exclusion alone would have missed this,
-    // since Lili/Lily were never themselves a merge pair.
+    // Lily's only near-duplicate partner (Lili) is gone, so Lily forms no cluster either — pairwise exclusion alone would have missed this.
     const involvesLily = clusters.some((c: { entities: { id: string }[] }) =>
       c.entities.some((e) => e.id === lily),
     );
@@ -347,8 +338,7 @@ describe("GET/POST /api/inbox (#1945)", () => {
     );
     expect(row).toBeDefined();
 
-    // The signature is real (belongs to otherCampaignId's flagged entity) but
-    // the request claims it belongs to campaignId (A) instead.
+    // The signature is real (belongs to otherCampaignId) but the request claims campaignId (A).
     const dismiss = await supertest(app)
       .post("/api/inbox/dismissals")
       .set("Cookie", cookieOwner)
@@ -400,8 +390,7 @@ describe("GET/POST /api/inbox (#1945)", () => {
       .send({ campaignId, kind: "DUPLICATE_CLUSTER", signature });
     expect(redismiss.status).toBe(201);
 
-    // A membership change (new near-duplicate joins) mints a new signature and
-    // resurfaces the cluster.
+    // A membership change (new near-duplicate joins) mints a new signature and resurfaces the cluster.
     await makeEntity(campaignId, "Zila");
     res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
     cluster = res.body.find(

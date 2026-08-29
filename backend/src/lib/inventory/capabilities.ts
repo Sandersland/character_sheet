@@ -1,8 +1,3 @@
-// Item-capability adapter (#545). Mirrors readEffectSpec (effects.ts) and
-// readAbilityCost (ability-cost.ts): a flat-column side-table row → a typed,
-// kind-discriminated Capability. All five kinds are materialized: passiveBonus,
-// castSpell (#528), grant (#529), activatedEffect (#543), charges (#555).
-
 import { PROFICIENCY_KINDS, type SnapshotCapability } from "@character-sheet/contracts";
 
 import { casterFractionFor, type SubclassCasterRef } from "@/lib/srd/srd.js";
@@ -27,9 +22,7 @@ import type {
   SerializedCapability,
 } from "@character-sheet/shared-types";
 
-// The capability vocabulary is the wire contract and lives in shared-types
-// (#1273); re-exported so the ~8 backend modules importing it from here keep
-// resolving it unchanged.
+// #1273: re-exported so the ~8 backend modules importing it from here keep resolving it unchanged.
 export type {
   ActivatedDurationKind,
   ActivationType,
@@ -50,13 +43,7 @@ export type {
   SerializedCapability,
 };
 
-// The capability vocabulary moved to @character-sheet/contracts (#1647): the
-// snapshot schema validates against it and that package is a leaf zone, so a
-// tuple it uses cannot live here. Re-exported so the backend modules importing
-// it from this module keep resolving unchanged, and so
-// capability-wire-contract.test.ts still latches each tuple to its shared union.
-// (CAPABILITY_KINDS has no importer through this module — it's new, not moved
-// — so it isn't re-exported here; consumers reach it via contracts directly.)
+// #1647: moved to @character-sheet/contracts, a leaf zone the snapshot schema validates against; re-exported so backend importers keep resolving unchanged. CAPABILITY_KINDS is new (not moved), so it isn't re-exported here — consumers reach it via contracts directly.
 export {
   ADVANTAGE_ON,
   ATTUNEMENT_PREREQ_KINDS,
@@ -68,14 +55,10 @@ export {
   GRANT_TYPES,
   GRANT_VALUE_KINDS,
 } from "@character-sheet/contracts";
-// PROFICIENCY_KINDS is imported above (not just re-exported) because
-// collectProficiencyGrant below needs a local binding — `export { X } from`
-// alone doesn't introduce one.
+// Imported above (not just re-exported) because collectProficiencyGrant below needs a local binding — `export { X } from` alone doesn't introduce one.
 export { PROFICIENCY_KINDS };
 
-// The column-read form of a dice-valued bonus: valueDamageType is a nullable
-// column, so this stays nullable where the wire CapabilityDice is not —
-// serializePassiveBonus drops the null on the way out.
+// valueDamageType is a nullable column, so this stays nullable where the wire CapabilityDice is not — serializePassiveBonus drops the null on the way out.
 interface CapabilityDiceColumns {
   count: number;
   faces: number;
@@ -93,8 +76,7 @@ export interface PassiveBonusCapability {
   dice?: CapabilityDiceColumns | null;
 }
 
-// A castSpell capability (#528): the item casts a referenced Spell from its own
-// resource. DC/attack are either fixed item values or resolve to the wielder's.
+// #528: DC/attack are either fixed item values or resolve to the wielder's.
 export interface CastSpellCapability {
   kind: "castSpell";
   spellId: string;
@@ -113,9 +95,7 @@ export interface CastSpellCapability {
   description?: string | null;
 }
 
-// An activatedEffect (#543): a command-word / action / bonus-action toggle that
-// seeds a while-active (or until-rest) self-buff and spends an item resource. The
-// inline self-buff reuses the passiveBonus target/op/value shape.
+// #543: the inline self-buff reuses the passiveBonus target/op/value shape.
 export interface ActivatedEffectCapability {
   kind: "activatedEffect";
   activation: ActivationType;
@@ -133,9 +113,7 @@ export interface ActivatedEffectCapability {
   description?: string | null;
 }
 
-// A grant capability (#529): a resistance/immunity/conditionImmunity/advantage/
-// proficiency the item confers while active. grantOn is advantage-only; grantValue
-// is null for whole-axis advantage (e.g. all initiative rolls).
+// #529: grantOn is advantage-only; grantValue is null for whole-axis advantage (e.g. all initiative rolls).
 export interface GrantCapability {
   kind: "grant";
   grantType: GrantType;
@@ -146,10 +124,7 @@ export interface GrantCapability {
   description?: string | null;
 }
 
-// The item's shared charge pool (#555) — at most one per item. Spending
-// capabilities (castSpell/activatedEffect with a `charges` resource) draw from
-// it implicitly; remaining = maxCharges − the row's `used` counter (derived,
-// never stored). Null recharge dice = full refill on the trigger.
+// #555: at most one per item. remaining = maxCharges − the row's `used` counter (derived, never stored). Null recharge dice = full refill on the trigger.
 export interface ChargesCapability {
   kind: "charges";
   maxCharges: number;
@@ -159,11 +134,7 @@ export interface ChargesCapability {
   description?: string | null;
 }
 
-// A malformed capability row (e.g. a charges row missing maxCharges) reads as
-// opaque so callers skip payload fields rather than throw. All five kinds are
-// materialized, so the Exclude<> is `never`: no well-formed row lands here, and
-// the fallback cast in readCapability is the single escape hatch. (Kept literal
-// so discriminant narrowing on Capability.kind stays sound.)
+// All five kinds are materialized, so the Exclude<> is `never` — no well-formed row lands here, and the fallback cast in readCapability is the single escape hatch. Kept literal so discriminant narrowing on Capability.kind stays sound.
 export interface OpaqueCapability {
   kind: Exclude<CapabilityKind, "passiveBonus" | "castSpell" | "activatedEffect" | "grant" | "charges">;
   description?: string | null;
@@ -177,29 +148,22 @@ export type Capability =
   | ChargesCapability
   | OpaqueCapability;
 
-// Number of uses a castSpell capability has per recharge period. atWill is
-// unlimited (Infinity); every other resource defaults to 1 when uses is unset.
+// atWill is unlimited (Infinity); every other resource defaults to 1 when uses is unset.
 export function castUsesTotal(cap: CastSpellCapability): number {
   if (cap.resource === "atWill") return Infinity;
   return cap.uses > 0 ? cap.uses : 1;
 }
 
-// Does a castSpell resource recharge on the given rest? perRestShort recharges on
-// a short OR long rest; perRestLong and the perDay dawn/dusk approximations recharge
-// on a long rest only; atWill never tracks uses (nothing to reset). charges spends
-// the item's shared pool — the POOL recharges (rechargeItemChargePoolsOnRest),
-// never the capability's own counter.
+// charges spends the item's shared pool — the POOL recharges via rechargeItemChargePoolsOnRest, never the capability's own counter.
 export function castResourceRechargesOn(resource: string, rest: "short" | "long"): boolean {
   if (resource === "atWill" || resource === "charges") return false;
-  if (resource === "perRestShort") return true; // short or long
+  if (resource === "perRestShort") return true;
   return rest === "long";
 }
 
-// Does a charges pool's recharge trigger fire on the given rest? `short` fires on
-// a short OR long rest; `long` and the dawn/dusk day-boundary approximations fire
-// on a long rest only (same convention as castResourceRechargesOn).
+// Same short/long convention as castResourceRechargesOn.
 export function chargeTriggerRechargesOn(trigger: ChargeTrigger, rest: "short" | "long"): boolean {
-  if (trigger === "short") return true; // short or long
+  if (trigger === "short") return true;
   return rest === "long";
 }
 
@@ -245,21 +209,16 @@ export interface CapabilityColumns {
   chargeCost?: number | null;
 }
 
-// Nullish default as a call, not a `??` operator — keeps the per-kind readers'
-// field defaulting out of their branch count (each `??` is a cyclomatic branch).
+// A call, not a `??` operator, so it keeps the per-kind readers' field defaulting out of their branch count (each `??` is a cyclomatic branch).
 function orElse<T>(value: T | null | undefined, fallback: T): T {
   return value ?? fallback;
 }
 
-// Optional dice payload shared by passiveBonus (value dice) and charges (recharge
-// dice): present only when both count and faces are set, else null.
 function readDicePair(count?: number | null, faces?: number | null): { count: number; faces: number } | null {
   return count && faces ? { count, faces } : null;
 }
 
-// Per-kind readers over the flat columns. Each returns null when the row is
-// malformed for its kind (missing a required column), so readCapability falls
-// through to opaque rather than throwing.
+// Each returns null when the row is malformed for its kind, so readCapability falls through to opaque rather than throwing.
 function readCastSpellRow(row: CapabilityColumns): CastSpellCapability | null {
   if (!row.spellId) return null;
   return {
@@ -340,7 +299,6 @@ function readActivatedEffectRow(row: CapabilityColumns): ActivatedEffectCapabili
   };
 }
 
-// Dispatch table keyed by the row's kind discriminant.
 const CAPABILITY_READERS: Record<string, ((row: CapabilityColumns) => Capability | null) | undefined> = {
   castSpell: readCastSpellRow,
   charges: readChargesRow,
@@ -349,21 +307,13 @@ const CAPABILITY_READERS: Record<string, ((row: CapabilityColumns) => Capability
   activatedEffect: readActivatedEffectRow,
 };
 
-// Adapter over the flat capability columns — one ItemCapability row per
-// capability, with no per-kind DB tables (the dispatch table above is code, not
-// schema). A malformed
-// passiveBonus (missing target/op) or grant (missing grantType) reads as opaque
-// rather than throwing.
 export function readCapability(row: CapabilityColumns): Capability {
   return (
     CAPABILITY_READERS[row.kind]?.(row) ?? { kind: row.kind as OpaqueCapability["kind"], description: row.description ?? null }
   );
 }
 
-// Per-kind flatteners for capabilityColumnsFromSnapshot below — mirrors
-// readCastSpellRow/readChargesRow/etc.'s per-kind-reader shape (a dispatch
-// table of small functions keeps each one's own complexity low, matching
-// this file's established pattern for the reverse direction).
+// Mirrors readCastSpellRow/readChargesRow/etc.'s per-kind-reader shape for the reverse direction, keeping each function's own complexity low.
 function passiveBonusColumns(cap: Extract<SnapshotCapability, { kind: "passiveBonus" }>) {
   return {
     target: cap.target,
@@ -430,16 +380,7 @@ function chargesColumns(cap: Extract<SnapshotCapability, { kind: "charges" }>) {
   };
 }
 
-// The inverse of readCapability, for the InventoryItem side (#1649). The
-// snapshot stores a capability as the already-typed union (SnapshotCapability),
-// but every capability consumer in this codebase — chargePoolOf, readCapability
-// itself, deriveItemGrants/deriveItemPassiveBonuses, serializeCapability — is
-// written against the flat CapabilityColumns row shape that used to come off
-// the InventoryCapability table. Rather than rewrite every one of those
-// consumers to a second, parallel code path, this maps a snapshot capability
-// (+ its InventoryCapabilityUse `used` counter) back onto that same flat shape,
-// keyed by `key` (the old InventoryCapability row's id, preserved verbatim in
-// the snapshot) so every existing reader keeps working unchanged.
+// #1649: the inverse of readCapability. Maps a snapshot capability (+ its InventoryCapabilityUse `used` counter) back onto the flat CapabilityColumns shape every existing consumer is written against, keyed by `key` (the old InventoryCapability row's id, preserved verbatim), rather than rewriting every consumer to a second parallel code path.
 export function capabilityColumnsFromSnapshot(
   cap: SnapshotCapability,
   used: number,
@@ -459,15 +400,7 @@ export function capabilityColumnsFromSnapshot(
   }
 }
 
-// Every CapabilityColumns field except the runtime `used` counter — named
-// once so the two "copy one capability row's columns into a new row" sites
-// (capabilityColumnFields below) can't drift apart on which columns count as
-// "the capability" vs. runtime state.
-//
-// The `satisfies` below rejects a key that is NOT on CapabilityColumns, but
-// nothing catches one that is MISSING: a column added to the capability tables
-// and not added here is silently dropped from every copy, surfacing later as a
-// schema parse failure far from the cause. Add the column in both places.
+// The `satisfies` below rejects a key that is NOT on CapabilityColumns, but nothing catches one that is MISSING: a column added to the capability tables and not added here is silently dropped from every copy, surfacing later as a schema parse failure far from the cause. Add the column in both places.
 const CAPABILITY_COLUMN_KEYS = [
   "kind", "description", "target", "op", "value", "targetKey", "condition",
   "valueDiceCount", "valueDiceFaces", "valueDamageType",
@@ -478,62 +411,41 @@ const CAPABILITY_COLUMN_KEYS = [
   "maxCharges", "rechargeDiceCount", "rechargeDiceFaces", "rechargeBonus", "rechargeTrigger", "chargeCost",
 ] as const satisfies readonly (keyof CapabilityColumns)[];
 
-// The flat-column copy shared by every "snapshot one capability row into
-// another" call site — snapshotInventoryItemForUndo (inventory-snapshot.ts,
-// which adds `used` back: undo restores spend state verbatim) and
-// snapshotCampaignItemCapabilityCreates (campaign-item-award.ts, `used`
-// excluded: an awarded pool starts full). Generic over T so a caller passing
-// a live Prisma row keeps its literal column types (e.g. `kind: CapabilityKind`,
-// not the interface's widened `string`) — required for the result to satisfy
-// a Prisma *CreateInput shape directly.
+// Shared by snapshotInventoryItemForUndo (adds `used` back verbatim) and snapshotCampaignItemCapabilityCreates (`used` excluded — an awarded pool starts full). Generic over T so a caller passing a live Prisma row keeps its literal column types, required for the result to satisfy a Prisma *CreateInput shape directly.
 export function capabilityColumnFields<T extends CapabilityColumns>(
   c: T,
 ): Pick<T, (typeof CAPABILITY_COLUMN_KEYS)[number]> {
   const out: Record<string, unknown> = {};
-  // Cast on write, not on the function's own signature: the loop's key is
-  // widened to `keyof CapabilityColumns` on each iteration, which TS can't
-  // narrow back to the exact field being assigned — the return type above is
-  // what keeps callers precise.
+  // Cast on write, not on the function's own signature: the loop's key widens to `keyof CapabilityColumns`, which TS can't narrow back to the exact field — the return type above is what keeps callers precise.
   for (const key of CAPABILITY_COLUMN_KEYS) out[key] = c[key];
   return out as Pick<T, (typeof CAPABILITY_COLUMN_KEYS)[number]>;
 }
 
-// Max uses per recharge for an activatedEffect. atWill is unlimited (null = no
-// cap); perRest/perDay allow resourceCharges uses (default 1) per period. A
-// charges-costed effect is gated by the item's shared pool, not a per-item
-// counter — null here (applyActivate spends the pool instead).
+// atWill is unlimited (null = no cap). A charges-costed effect is gated by the item's shared pool, not a per-item counter — null here (applyActivate spends the pool instead).
 export function activatedMaxUses(cap: ActivatedEffectCapability): number | null {
   if (cap.resourceKind === "atWill" || cap.resourceKind === "charges") return null;
   return Math.max(1, cap.resourceCharges);
 }
 
-// The rest that recharges an activatedEffect's uses, or null when it never rests
-// (atWill, or charges — the pool recharges itself). perRest(short) recharges on a
-// short rest; perRest(long) and perDay (dawn/dusk approximated) on a long rest.
+// null when it never rests (atWill, or charges — the pool recharges itself).
 export function activatedRechargeRest(cap: ActivatedEffectCapability): "short" | "long" | null {
   if (cap.resourceKind === "atWill" || cap.resourceKind === "charges") return null;
   if (cap.resourceKind === "perRest" && cap.resourcePeriod === "short") return "short";
   return "long";
 }
 
-// The item's shared charge pool (#555): the first well-formed kind=charges row,
-// paired with its raw row so callers keep the row's id/used fields. Authoring
-// enforces at most one pool per item; extra rows are ignored, not merged.
+// #555: the first well-formed kind=charges row. Authoring enforces at most one pool per item; extra rows are ignored, not merged.
 export function chargePoolOf<T extends CapabilityColumns>(
   rows: T[],
 ): { cap: ChargesCapability; row: T } | null {
   for (const row of rows) {
     const cap = readCapability(row);
-    // Field-presence guard (same reasoning as activatedCapabilityOf): a malformed
-    // charges row falls through to opaque, which still carries kind "charges" at
-    // runtime — require maxCharges so it can't masquerade as the pool.
+    // Field-presence guard, same reasoning as activatedCapabilityOf: a malformed charges row falls through to opaque, which still carries kind "charges" at runtime — require maxCharges so it can't masquerade as the pool.
     if (cap.kind === "charges" && "maxCharges" in cap) return { cap, row };
   }
   return null;
 }
 
-// Human phrasing for a pool's recharge: "regains 1d6+1 at dawn", "regains 1 at
-// dawn" (fixed amount), "refills on a long rest" (no dice, no bonus = full refill).
 export function describeChargeRecharge(cap: ChargesCapability): string {
   const when =
     cap.rechargeTrigger === "dawn"
@@ -551,8 +463,7 @@ export function describeChargeRecharge(cap: ChargesCapability): string {
   return `refills ${when}`;
 }
 
-// Human phrasing for an activation type (the reminder text prefix). Internal to
-// describeActivatedReminder — not exported (the frontend has its own copy).
+// Not exported — the frontend has its own copy.
 function describeActivation(activation: ActivationType): string {
   switch (activation) {
     case "action":
@@ -566,9 +477,7 @@ function describeActivation(activation: ActivationType): string {
   }
 }
 
-// Reminder text an activated item surfaces: the activation verb + the duration
-// approximation. A free-text durationText ("10 minutes") is shown verbatim since
-// no minute timer is modeled — the holder toggles it off manually or on a rest.
+// A free-text durationText ("10 minutes") is shown verbatim since no minute timer is modeled — the holder toggles it off manually or on a rest.
 export function describeActivatedReminder(cap: ActivatedEffectCapability): string {
   const parts = [describeActivation(cap.activation)];
   if (cap.durationText) {
@@ -581,8 +490,7 @@ export function describeActivatedReminder(cap: ActivatedEffectCapability): strin
   return parts.join(" · ");
 }
 
-// Per-kind serializers. Each drops nulls so the wire shape matches the optional-
-// field DM input; nested dice/recharge mirror the authoring shape.
+// Each drops nulls so the wire shape matches the optional-field DM input; nested dice/recharge mirror the authoring shape.
 function serializeCastSpell(cap: CastSpellCapability): SerializedCapability {
   return {
     kind: cap.kind,
@@ -658,8 +566,6 @@ function serializeActivatedEffect(cap: ActivatedEffectCapability): SerializedCap
   };
 }
 
-// Serialize a capability row for the API (campaign item + inventory item alike),
-// dropping nulls so the wire shape matches the optional-field DM input.
 export function serializeCapability(row: CapabilityColumns): SerializedCapability {
   const cap = readCapability(row);
   switch (cap.kind) {
@@ -674,18 +580,12 @@ export function serializeCapability(row: CapabilityColumns): SerializedCapabilit
     case "activatedEffect":
       return serializeActivatedEffect(cap);
     default:
-      // Malformed-row fallthrough (cap is OpaqueCapability, kind typed never) —
-      // emit the raw row's kind + description so the wire still names the payload.
+      // Malformed-row fallthrough: emit the raw row's kind + description so the wire still names the payload.
       return { kind: row.kind as CapabilityKind, ...(row.description ? { description: row.description } : {}) };
   }
 }
 
-// The buffsByTarget channel key a scalar passiveBonus contributes to, or null
-// when the target isn't yet wired into a per-target modifier channel: dice→damage
-// (#526C) and save/abilityScore/spell*/initiative/speed/maxHp (later slices).
-// The "ac" channel (#383) is consumed at the serialize acParts seam, not by
-// buffsByTarget. Reuses the same channel keys active buffs already use so item
-// bonuses and cast buffs sum together on read.
+// Null when the target isn't yet wired into a per-target modifier channel. The "ac" channel (#383) is consumed at the serialize acParts seam, not by buffsByTarget. Reuses the same channel keys active buffs already use so item bonuses and cast buffs sum together on read.
 export function passiveBonusChannel(cap: PassiveBonusCapability): string | null {
   switch (cap.target) {
     case "skill":
@@ -701,19 +601,16 @@ export function passiveBonusChannel(cap: PassiveBonusCapability): string | null 
   }
 }
 
-// One resolved item passive contribution, shaped like the fields serializeCharacter
-// reads off an ActiveBuff (source + modifier) so it merges into the same channel.
+// Shaped like the fields serializeCharacter reads off an ActiveBuff (source + modifier) so it merges into the same channel.
 export interface ItemPassiveContribution {
   target: string;
   modifier: number;
   source: string;
-  // Optional 5e usage condition (e.g. AC "while wearing no armor"); surfaced as
-  // reminder text where the channel can't auto-apply it (#383). Omitted when absent.
+  // #383: surfaced as reminder text where the channel can't auto-apply it.
   condition?: string;
 }
 
-// The minimal item shape the passive-bonus derivation needs. An item is "active"
-// when equipped OR attuned; only then do its scalar add-op capabilities apply.
+// An item is "active" when equipped OR attuned; only then do its scalar add-op capabilities apply.
 export interface PassiveBonusItem {
   name: string;
   equipped: boolean;
@@ -721,8 +618,6 @@ export interface PassiveBonusItem {
   capabilities: CapabilityColumns[];
 }
 
-// Resolve one capability column to a passive-bonus contribution, or null if it
-// isn't a scalar (non-dice) add-op passiveBonus with a known modifier channel —
 // setTo, dice-valued, and unchanneled targets are skipped this slice.
 function passiveBonusContribution(
   col: CapabilityColumns,
@@ -742,8 +637,6 @@ function passiveBonusContribution(
   };
 }
 
-// Gather scalar (non-dice) add-op passiveBonus capabilities from active items and
-// resolve each to its modifier channel.
 export function deriveItemPassiveBonuses(items: PassiveBonusItem[]): ItemPassiveContribution[] {
   const out: ItemPassiveContribution[] = [];
   for (const item of items) {
@@ -756,8 +649,7 @@ export function deriveItemPassiveBonuses(items: PassiveBonusItem[]): ItemPassive
   return out;
 }
 
-// The minimal item shape grant derivation needs. Activation gate (#545): an item
-// that requires attunement is active only when attuned; otherwise when equipped.
+// #545: an item that requires attunement is active only when attuned; otherwise when equipped.
 export interface GrantItem {
   name: string;
   equipped: boolean;
@@ -766,16 +658,11 @@ export interface GrantItem {
   capabilities: CapabilityColumns[];
 }
 
-/** Is this item currently conferring its capabilities? (equip, or attune when required.) */
 export function isItemActive(item: { equipped: boolean; attuned: boolean; requiresAttunement: boolean }): boolean {
   return item.requiresAttunement ? item.attuned : item.equipped;
 }
 
-// One item-sourced damage resistance/immunity or condition immunity. Stays
-// backend-private (unlike its advantage/proficiency siblings, which are shared
-// wire types) because serializeCharacter remaps it: `value` becomes `damageType`
-// on a resistance/immunity and `condition` on a condition immunity, so the wire
-// shape is a different type that merely looks alike.
+// Stays backend-private, unlike its advantage/proficiency siblings: serializeCharacter remaps `value` to `damageType` on a resistance/immunity and `condition` on a condition immunity, so the wire shape is a different type that merely looks alike.
 export interface ItemTraitGrant {
   value: string;
   source: string;
@@ -789,8 +676,6 @@ export interface DerivedItemGrants {
   proficiencies: ItemProficiencyGrant[];
 }
 
-// Per-grant-type collectors: each folds one grant capability into the matching
-// bucket. resistance/immunity/conditionImmunity share the trait-grant shape.
 function collectTraitGrant(bucket: ItemTraitGrant[], cap: GrantCapability, source: string) {
   if (cap.grantValue) bucket.push({ value: cap.grantValue, source });
 }
@@ -823,9 +708,7 @@ const GRANT_COLLECTORS: Record<GrantType, (out: DerivedItemGrants, cap: GrantCap
   proficiency: collectProficiencyGrant,
 };
 
-// Gather every grant capability from active items into per-derivation buckets.
-// resistance feeds the #456 halve channel; proficiency merges into the derived
-// proficiency lists; advantage/conditionImmunity/immunity surface as flags + text.
+// #456: resistance feeds the halve channel; advantage/conditionImmunity/immunity surface as flags + text.
 export function deriveItemGrants(items: GrantItem[]): DerivedItemGrants {
   const out: DerivedItemGrants = {
     resistances: [],
@@ -845,41 +728,31 @@ export function deriveItemGrants(items: GrantItem[]): DerivedItemGrants {
   return out;
 }
 
-/** Damage types item grants make the character resistant to (fed into #456 halving). */
 export function itemResistedDamageTypes(items: GrantItem[]): Set<string> {
   return new Set(deriveItemGrants(items).resistances.map((r) => r.value));
 }
 
-/** Damage types item grants make the character immune to (zeroed at damage-apply). */
 export function itemImmuneDamageTypes(items: GrantItem[]): Set<string> {
   return new Set(deriveItemGrants(items).immunities.map((i) => i.value));
 }
 
-/** A concrete attunement prerequisite resolved from the snapshotted columns. */
 export interface AttunementPrereq {
   kind: AttunementPrereqKind;
   value: string | null;
 }
 
-// The character facts an attunement prerequisite is checked against.
 export interface AttunementSubject {
   classEntries: { name: string; subclassRef?: SubclassCasterRef | null }[];
   raceName: string | null;
   alignment: string | null;
 }
 
-// Picks the indefinite article from the initial LETTER, not the initial sound (#1485).
-// Correct for every value this catalog carries — species and class names and
-// alignments — but wrong for a consonant-sounding vowel initial ("an Unicorn Rider")
-// and for a silent h ("a Hour"). Both are reachable: the DM authoring form takes
-// attunementPrereqValue as free text, so widen this to a lookup if such a value ships.
+// #1485: picks the indefinite article from the initial LETTER, not the initial sound — wrong for a consonant-sounding vowel initial ("an Unicorn Rider") or a silent h ("a Hour"), both reachable since attunementPrereqValue is DM free text.
 function withArticle(noun: string): string {
   return `${/^[aeiou]/i.test(noun) ? "an" : "a"} ${noun}`;
 }
 
-// Human phrasing for a failed prerequisite (5e "requires attunement by a …").
-// Every arm routes through withArticle so a future AttunementPrereqKind cannot
-// reintroduce a hardcoded article.
+// Every arm routes through withArticle so a future AttunementPrereqKind cannot reintroduce a hardcoded article.
 export function describeAttunementPrereq(prereq: AttunementPrereq): string {
   switch (prereq.kind) {
     case "spellcaster":
@@ -894,8 +767,7 @@ export function describeAttunementPrereq(prereq: AttunementPrereq): string {
   }
 }
 
-// Does the subject satisfy the prerequisite? Comparisons are case-insensitive.
-// spellcaster is met when any class entry has a nonzero caster fraction.
+// Comparisons are case-insensitive; spellcaster is met when any class entry has a nonzero caster fraction.
 export function meetsAttunementPrereq(prereq: AttunementPrereq, subject: AttunementSubject): boolean {
   const want = (prereq.value ?? "").trim().toLowerCase();
   switch (prereq.kind) {

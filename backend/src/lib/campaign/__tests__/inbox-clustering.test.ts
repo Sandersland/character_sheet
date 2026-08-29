@@ -52,15 +52,11 @@ describe("isDuplicatePair", () => {
   });
 
   it("uses the shorter folded name's length for the threshold", () => {
-    // "Vex" (3 chars) vs "Vexara" (6 chars): shorter side is <4, so threshold is 1.
-    // Distance between "vex" and "vexara" is 3 (three insertions) -> no match.
+    // shorter side ("Vex", 3 chars) is <4, so threshold is 1; distance to "Vexara" is 3 -> no match.
     expect(isDuplicatePair("Vex", "Vexara")).toBe(false);
   });
 });
 
-// #1945 review: unbounded distance pairing false-positived on any two
-// single-letter names, and on a differing trailing number ("Guard 1"/"Guard
-// 2" are 1 apart, well within threshold).
 describe("isDuplicatePair — digit-conflict guard", () => {
   it("never pairs names whose digit runs differ, however close by distance", () => {
     expect(isDuplicatePair("Guard 1", "Guard 2")).toBe(false);
@@ -118,9 +114,7 @@ describe("buildDuplicateClusters", () => {
   });
 
   it("excludes a pair linked by any CampaignEntityMerge, regardless of status", () => {
-    // Petarus/Potaras ARE within edit-distance-2 of each other (2
-    // substitutions, folded length 7) — without the merge exclusion they'd
-    // cluster; the identity merge is what suppresses the flag (#387).
+    // Petarus/Potaras are within edit-distance-2 (would cluster without the merge exclusion) — proves the exclusion is what suppresses it, not name dissimilarity.
     const entities: ClusterableEntity[] = [
       { id: "petarus", name: "Petarus" },
       { id: "potaras", name: "Potaras" },
@@ -148,9 +142,6 @@ describe("buildDuplicateClusters", () => {
     expect(clusters).toContainEqual(["3", "4"]);
   });
 
-  // #1945 review: the blocker-grade product trap — a DM's "Guard 1/Guard
-  // 2/Guard 3" or "Room 101/Room 102" naming scheme must never surface a
-  // destructive one-click combine offer.
   it("never clusters Guard 1/Guard 2/Guard 3 despite each pair being distance 1 apart", () => {
     const entities: ClusterableEntity[] = [
       { id: "1", name: "Guard 1" },

@@ -1,13 +1,4 @@
-// buildInventorySnapshot (#1648, epic #1644) — the one construction function
-// every creation path calls. Assembled first against a hand-built row so the
-// mapping is verified in isolation before the write-path describe blocks below
-// exercise the real creation/mutation call sites.
-//
-// #1649 retired this file's original premise: #1648 dual-wrote the snapshot
-// alongside the four Inventory* mirror tables so both could be verified
-// side by side; #1649 deletes those tables; every write below is now the
-// SOLE write, verified against the snapshot + InventoryCapabilityUse /
-// InventoryItem.usesRemaining alone.
+// #1648/#1649: buildInventorySnapshot is the one construction function every creation path calls; the snapshot + InventoryCapabilityUse / InventoryItem.usesRemaining are now the SOLE write, no mirror tables left to cross-check against.
 import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -141,9 +132,7 @@ describe("buildInventorySnapshot (#1648)", () => {
     }
   });
 
-  // readCastSpellRow defaults a null spellName to "", which the schema rejects
-  // (min(1)). Zero rows hit this today — there are no castSpell rows at all —
-  // but the builder must not be the thing that discovers it.
+  // readCastSpellRow defaults a null spellName to "", which the schema rejects (min(1)).
   it("throws rather than emitting an unparseable castSpell entry", () => {
     expect(() => buildInventorySnapshot(ROW_WITH_NAMELESS_CAST_SPELL)).toThrow(/spellName/);
   });
@@ -153,28 +142,14 @@ describe("buildInventorySnapshot (#1648)", () => {
     expect(snap.capabilities.map((c) => c.key)).toEqual(ROW_WITH_EVERYTHING.capabilities.map((c) => c.id));
   });
 
-  // Found while implementing Task 4: campaign-items.ts's currencySchema is
-  // `z.object({cp,sp,gp,pp}).partial()`, so a DM typing "5000 gp" persists
-  // Item.cost as `{gp: 5000}` with no cp/sp/pp keys — asCurrency is an
-  // unchecked cast (Json column), so that shape reaches the builder looking
-  // like a full Currency. snapshotCostSchema is strict and rejects a missing
-  // key, so every such campaign item would throw at award/backfill time
-  // without this.
+  // campaign-items.ts's currencySchema is partial, so Item.cost can land as `{gp: 5000}` with no cp/sp/pp keys; snapshotCostSchema is strict and would otherwise reject it.
   it("fills a partial cost's missing denominations with 0 rather than failing to parse", () => {
     const snap = buildInventorySnapshot({ ...ROW_WITH_EVERYTHING, cost: { gp: 5000 } as SnapshotSourceRow["cost"] });
     expect(snap.cost).toEqual({ cp: 0, sp: 0, gp: 5000, pp: 0 });
   });
 });
 
-// ── The four creation paths write a snapshot (+ InventoryCapabilityUse) ─────
-//
-// applyAcquire covers BOTH catalog and custom (the branch is upstream in
-// resolveAcquireSource) but is tested as two cases here since they populate
-// different fields; awardCampaignItem; recreateDeletedItem (inventory-revert.ts,
-// reached via revertInventoryEvent); and character creation's NESTED
-// `inventoryItems: { create: [...] }` — the one a grep for `inventoryItem.create`
-// misses. One test per path, no shared helper: a shared helper would let a
-// missed call site pass on its neighbour's coverage.
+// One test per snapshot-writing creation path (applyAcquire catalog/custom, awardCampaignItem, recreateDeletedItem, character creation's nested inventoryItems create), no shared helper — a shared helper would let a missed call site pass on its neighbour's coverage.
 
 const OWNER_ID = "owner-inventory-snapshot-dual-write";
 
@@ -200,12 +175,7 @@ async function makeCharacter(): Promise<string> {
 }
 
 describe("the four creation paths write a snapshot (#1649)", () => {
-  // Accumulated (never spliced) across every test in this describe block, not
-  // cleared per-test: the final guard test needs every character this suite
-  // created still present so its check is SCOPED to this suite's own writes,
-  // not a database-wide count that would also see unrelated test files' raw
-  // (non-app-layer) InventoryItem fixtures and fail on rows this issue never
-  // touches. Cleaned up once, in afterAll.
+  // Accumulated (never spliced) across the whole describe block so the final guard test's count is scoped to this suite's own writes, not a database-wide count. Cleaned up once, in afterAll.
   const characterIds: string[] = [];
   const campaignIds: string[] = [];
   const itemIds: string[] = [];
@@ -266,8 +236,6 @@ describe("the four creation paths write a snapshot (#1649)", () => {
     expect(row.snapshot).not.toBeNull();
     const parsed = inventorySnapshotSchema.parse(row.snapshot);
     expect(parsed.consumable).toEqual({ effectDiceCount: 2, effectDiceFaces: 4, effectModifier: null, effectDescription: "Heals", maxUses: 3 });
-    // A fresh charged consumable starts full — usesRemaining lives directly on
-    // InventoryItem (promoted out of InventoryConsumableDetail by #1648).
     expect(row.usesRemaining).toBe(3);
   });
 
@@ -328,8 +296,6 @@ describe("the four creation paths write a snapshot (#1649)", () => {
     await awardCampaignItem({ campaignId: campaign.id, campaignItemId: campaignItem.id, characterId, quantity: 1 });
     const awarded = await prisma.inventoryItem.findFirstOrThrow({ where: { characterId, itemId: campaignItem.id } });
     const originalKey = inventorySnapshotSchema.parse(awarded.snapshot).capabilities[0].key;
-    // Simulate 2 charges already spent before the item was revoked, so the
-    // undo-recreate's "preserve `used` verbatim" behavior has something to prove.
     await prisma.inventoryCapabilityUse.updateMany({
       where: { inventoryItemId: awarded.id, capabilityKey: originalKey },
       data: { used: 2 },
@@ -346,9 +312,7 @@ describe("the four creation paths write a snapshot (#1649)", () => {
     expect(recreated.snapshot).not.toBeNull();
     const parsed = inventorySnapshotSchema.parse(recreated.snapshot);
     expect(parsed.capabilities).toHaveLength(1);
-    // #1649: a capability's key is no longer a live InventoryCapability row's
-    // id — it's just an opaque string carried inside the snapshot blob — so a
-    // recreate restores the SAME key rather than minting a new one.
+    // #1649: a capability's key is an opaque string inside the snapshot blob, not a live InventoryCapability row id — a recreate restores the SAME key rather than minting a new one.
     expect(parsed.capabilities[0].key).toBe(originalKey);
     expect(parsed.capabilities[0]).toMatchObject({ kind: "charges", maxCharges: 5 });
 
@@ -390,8 +354,6 @@ describe("the four creation paths write a snapshot (#1649)", () => {
     }
   });
 
-  // Scoped to the characters THIS suite created (see the characterIds comment
-  // above) so it can't fail on an unrelated file's raw, non-app-layer fixture rows.
   it("every InventoryItem created in this suite carries a snapshot", async () => {
     expect(
       await prisma.inventoryItem.count({
@@ -401,11 +363,7 @@ describe("the four creation paths write a snapshot (#1649)", () => {
   });
 });
 
-// ── Mutable inventory state writes to its single home (#1649) ──────────────
-//
-// activatedUsesSpent is already an InventoryItem column, unmoved by this
-// issue. One scenario per write family the AC names: a rest sweep, a
-// consumable use, an item spell cast, an activation, and an undo.
+// #1649: one scenario per mutable-state write family — a rest sweep, a consumable use, an item spell cast, an activation, and an undo.
 
 const MUTABLE_SPELL = {
   name: "Snapshot-Write Mutable Spell",
@@ -432,9 +390,7 @@ describe("mutable inventory state writes only its single home (#1649)", () => {
 
   beforeAll(async () => {
     await ensureTestOwner(OWNER_ID);
-    // upsertEditionRow, not .upsert(): Spell's business key is now (name,
-    // edition) (#1710), and this fixture spell is edition-neutral.
-    // catalogEntryId (#1796) is resolved first — required, no default.
+    // Spell's business key is (name, edition) (#1710); catalogEntryId (#1796) is required, no default.
     const catalogEntryId = await makeCatalogEntry({ name: MUTABLE_SPELL.name });
     const spell = await upsertEditionRow(
       prisma.spell,
@@ -447,9 +403,7 @@ describe("mutable inventory state writes only its single home (#1649)", () => {
 
   afterAll(async () => {
     await prisma.character.deleteMany({ where: { id: { in: characterIds } } });
-    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
-    // #1796) — the reverse cascade doesn't exist (the supertype stays
-    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE, #1796); the reverse cascade doesn't exist, so `spell.deleteMany` alone would orphan the entry.
     await prisma.catalogEntry.deleteMany({ where: { name: MUTABLE_SPELL.name, kind: "SPELL" } });
   });
 
@@ -486,10 +440,7 @@ describe("mutable inventory state writes only its single home (#1649)", () => {
 
     await applyHitPointOperations(characterId, [{ type: "longRest" }]);
 
-    // rechargeOneChargePool: dawn triggers on a long rest; no rechargeDice, so
-    // the regain is the flat rechargeBonus (2) — nextUsed = max(0, 4-2).
     expect((await capabilityUse(poolCapId)).used).toBe(2);
-    // resetItemSpellUsesOnRest: perRestShort recharges on short OR long.
     expect((await capabilityUse(castCapId)).used).toBe(0);
 
     const potionRow = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: potion.id } });

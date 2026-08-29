@@ -1,9 +1,4 @@
-// POST /api/characters — speciesId is the SOLE mechanical anchor since #1684
-// pruned the flat `Race` model and the legacy `race`-name create path.
-// Exercises the seeded catalog directly (real Species/SpeciesVariant rows
-// from seedSpecies) rather than a fixture — same pattern as the background
-// ability spread suite in characters.test.ts, which relies on the seeded
-// Criminal background.
+// speciesId is the sole mechanical anchor since #1684 pruned the flat Race model and the legacy race-name create path.
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -59,15 +54,10 @@ describe("POST /api/characters — speciesId/variantId is the sole anchor (#1684
     expect(raceRow.speciesId).toBe(dwarf.id);
     expect(raceRow.variantId).toBe(hillDwarf.id);
     expect(raceRow.variantName).toBe("Hill Dwarf");
-    // #1684: the display-name snapshot defaults from the variant, replacing
-    // the flat Race model's own separately-submitted `name`.
     expect(raceRow.name).toBe("Hill Dwarf");
   });
 
-  // The compat-gap fix (#1684's whole point): Aasimar never had a flat Race
-  // row (the legacy `race`-name path could never create one), so this proves
-  // creation now succeeds for a species the pre-#1684 create path could not
-  // serve at all.
+  // Aasimar never had a flat Race row — this proves creation succeeds for a species the pre-#1684 path couldn't serve.
   it("creates a 2024-only species with no former flat Race row (Aasimar) — the compat-gap fix", async () => {
     const aasimar = await prisma.species.findFirstOrThrow({ where: { slug: "aasimar", edition: "EDITION_2024" } });
 
@@ -142,7 +132,7 @@ describe("POST /api/characters — speciesId/variantId is the sole anchor (#1684
       ...baseBody,
       rulesEdition: "EDITION_2014",
       speciesId: dwarf2014.id,
-      variantId: woodElf.id, // belongs to Elf, not Dwarf
+      variantId: woodElf.id,
     });
 
     expect(res.status).toBe(400);

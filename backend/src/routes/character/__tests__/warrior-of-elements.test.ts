@@ -17,7 +17,7 @@ const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Warrior of Elements Test Monk",
   alignment: "True Neutral",
-  experiencePoints: 225000, // level 17 → proficiency +6, Martial Arts die d12
+  experiencePoints: 225000,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 120, max: 120, temp: 0 },
@@ -40,11 +40,7 @@ function toggleAttunement(actionKey: "elementalAttunement" | "endElementalAttune
     .send({ operations: [{ type: "executeAction", actionKey }] });
 }
 
-// Production always sets both classId/subclassId, and characterInclude's
-// ClassFeature relations key off them, so a subclass string with no matching
-// subclassId loses that subclass's feature text. Only "Warrior of the
-// Elements" is asserted against `.features`, so only its rows (text copied
-// verbatim from the real seeded EDITION_2024 rows) are seeded here.
+// characterInclude's ClassFeature relations key off classId+subclassId together — a subclass string with no matching subclassId loses that subclass's feature text, so only "Warrior of the Elements" (the one asserted against .features) is seeded here.
 const WARRIOR_OF_ELEMENTS_SUBCLASS_NAME = "Warrior of Elements Route Test Subclass";
 let warriorOfElementsSubclassId: string | undefined;
 
@@ -72,15 +68,12 @@ async function resolveClassAndSubclass(subclass: string | undefined): Promise<{ 
   if (subclass !== "Warrior of the Elements") return { classId: cls.id, subclassId: undefined };
 
   if (!warriorOfElementsSubclassId) {
-    // find-then-create, not .upsert()'s classId_name compound key: `edition` is
-    // nullable, and Prisma rejects a literal null in a compound-unique where
-    // clause (see upsertEditionRow's JSDoc).
+    // find-then-create, not .upsert()'s classId_name compound key — edition is nullable, and Prisma rejects a literal null in a compound-unique where clause.
     const existing = await prisma.subclass.findFirst({ where: { classId: cls.id, name: WARRIOR_OF_ELEMENTS_SUBCLASS_NAME } });
     const sub =
       existing ??
       (await prisma.subclass.create({
-        // A distinct slug: Subclass has a @@unique([slug, edition]) constraint and
-        // the real seeded row shares this fixture's (implicit) null edition.
+        // A distinct slug — Subclass has a @@unique([slug, edition]) constraint and the real seeded row shares this fixture's (implicit) null edition.
         data: { classId: cls.id, name: WARRIOR_OF_ELEMENTS_SUBCLASS_NAME, description: "Test fixture subclass.", slug: "warrior-of-elements-route-test-fixture" },
       }));
     warriorOfElementsSubclassId = sub.id;
@@ -133,9 +126,7 @@ function xpForLevel(level: number): number {
   return 0;
 }
 
-// classEntries[0].level lags the XP-derived level here — a "pending level-up"
-// where the character gained XP but hasn't run the /hp levelUp op yet.
-// createMonk keeps both in sync; this fixture deliberately doesn't.
+// A "pending level-up": XP-derived level outruns classEntries[0].level because /hp's levelUp op hasn't run yet. createMonk keeps both in sync; this fixture deliberately doesn't.
 async function createMonkStaleLevelColumn(entryLevelColumn: number, xpLevel: number, subclass?: string) {
   const { classId, subclassId } = await resolveClassAndSubclass(subclass);
   await prisma.character.create({
@@ -237,8 +228,7 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     ]);
   });
 
-  // The generic toggle engine has no "already active" guard: re-activating
-  // simply re-applies the buff (appendActiveBuffInTx dedups by key, never stacks) and spends Focus again.
+  // The generic toggle engine has no "already active" guard — appendActiveBuffInTx dedups by key, never stacks, so re-activating just re-applies the buff and spends Focus again.
   it("activating Elemental Attunement twice re-applies the buff and spends Focus again (no guard, matches Rage)", async () => {
     await createMonk(17, "Warrior of the Elements");
     await toggleAttunement("elementalAttunement");
@@ -291,18 +281,14 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     expect(focus.remaining).toBe(16);
   });
 
-  // assertWarriorOfElements resolves through deriveEntryScopedActions against the
-  // XP-derived effective level, not the classEntries[].level column (which can
-  // lag XP after a pending level-up not yet applied via /hp levelUp).
+  // deriveEntryScopedActions gates on the XP-derived effective level, not the classEntries[].level column, which can lag after a pending level-up.
   it("gates off the XP-derived level, not a stale classEntries[].level column (single-class pending level-up)", async () => {
     await createMonkStaleLevelColumn(2, 3, "Warrior of the Elements");
     const res = await toggleAttunement("elementalAttunement");
     expect(res.status).toBe(200);
   });
 
-  // The row-driven toggle's "not granted" failure surfaces through the same
-  // generic gate every row-driven action uses (assertKnownActionKeys/eligibleRowActions):
-  // a Warrior of the Open Hand's own rows never contain "elementalAttunement", so it 400s as an unknown action key.
+  // assertKnownActionKeys/eligibleRowActions is the same generic gate every row-driven action uses — a Warrior of the Open Hand's rows never contain "elementalAttunement", so it 400s as an unknown action key.
   it("rejects Elemental Attunement from a non-elements monk", async () => {
     await createMonk(17, "Warrior of the Open Hand");
     const res = await toggleAttunement("elementalAttunement");

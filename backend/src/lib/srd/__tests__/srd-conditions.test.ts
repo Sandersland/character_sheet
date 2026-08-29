@@ -5,10 +5,6 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { CONDITIONS, conditionDefinition, conditionRulesText, exhaustionRollEffects } from "@/lib/srd/condition-data.js";
 import type { RollEffect } from "@/lib/srd/roll-effects.js";
 
-// #1309: the 2014 half of what #1135 replaced. Nine conditions carry real
-// mechanical or textual deltas from PHB'14 to SRD 5.2; the other five are
-// byte-identical across editions and must resolve to the exact same object
-// (not a duplicated row) in both.
 describe("conditionDefinition — 2014 divergent conditions (#1309, PHB'14 pp. 290-292 Appendix A)", () => {
   it("charmed: 2014 description differs from 2024's; rollEffects stay absent in both", () => {
     const c2014 = conditionDefinition("charmed", "EDITION_2014");
@@ -107,9 +103,7 @@ describe("conditionDefinition — 2014 divergent conditions (#1309, PHB'14 pp. 2
   });
 });
 
-// The remaining 5 conditions are byte-identical across editions; a
-// duplicated row per edition would defeat the point of the sparse override
-// map, so this pins reference equality, not just deep equality.
+// Pins reference equality, not deep equality — a duplicated row per edition would defeat the point of the sparse override map.
 describe("conditionDefinition — byte-identical conditions resolve to one shared object (#1309)", () => {
   it.each(["blinded", "deafened", "frightened", "poisoned", "restrained"] as const)(
     "%s: 2014 and 2024 lookups return the exact same CONDITIONS row",
@@ -122,10 +116,6 @@ describe("conditionDefinition — byte-identical conditions resolve to one share
   );
 });
 
-// #1322: these five pins were deleted from the frontend's CONDITION_DESCRIPTIONS
-// (frontend/src/lib/conditions.test.ts) along with the mirror they lived in.
-// Carried here rather than dropped, now asserted against the backend rules
-// text they were always describing.
 describe("conditionDefinition — 2024 (SRD 5.2) text pins migrated from the deleted frontend CONDITION_DESCRIPTIONS (#1322)", () => {
   it("scopes Grappled's attack disadvantage to targets other than the grappler", () => {
     expect(conditionDefinition("grappled", "EDITION_2024").description).toContain(
@@ -156,22 +146,9 @@ describe("conditionDefinition — 2024 (SRD 5.2) text pins migrated from the del
   });
 });
 
-// #1322: the resolved {key,label,description} rows served on GET /api/reference.
-// rollEffects is deliberately dropped — the client receives resolved
-// rollModifiers already, so shipping raw per-condition grants would ship the rule.
+// rollEffects is deliberately dropped from the wire — the client receives resolved rollModifiers already, so shipping per-condition grants would ship the rule.
 describe("conditionRulesText", () => {
-  // Asserts ALPHABETICAL LABEL order — what the sort guarantees — not
-  // CONDITIONS' declaration order, which only coincides with it today. Pinning
-  // the declaration order would re-create the implicit dependency the sort
-  // exists to break, and would fail with a message pointing at CONDITIONS
-  // rather than at the out-of-order entry a reader actually needs to fix.
-  //
-  // Honest limit: this cannot currently detect the sort being REMOVED, because
-  // CONDITIONS is alphabetical as authored, so sorted and unsorted output are
-  // identical. It pins the observable contract, and it goes red the moment a
-  // condition is added out of alphabetical order while the sort is missing —
-  // which is the failure this exists for. conditionRulesText reads the module
-  // constant, so there is no seam to inject unsorted input through.
+  // Asserts alphabetical label order, not declaration order; can't catch the sort being removed since CONDITIONS is already alphabetical.
   it("returns all 14 conditions in alphabetical label order, for both editions", () => {
     for (const edition of ["EDITION_2024", "EDITION_2014"] as const) {
       const rows = conditionRulesText(edition);
@@ -208,24 +185,13 @@ describe("conditionRulesText", () => {
   });
 });
 
-// #1327: Initiative is a Dexterity check (SRD 5.2 / PHB'14 p. 189, Combat →
-// Initiative), so any condition granting unqualified disadvantage on ability
-// checks must grant it on Initiative too — RollModeKind splits `initiative`
-// out of `check` for engine reasons (see the module comment on
-// EXHAUSTION_ROLL_KINDS), not because the rules treat them differently. This
-// closes the footgun with a test rather than widening resolveRollMode, which
-// would (a) put a rule in the frontend and (b) double the flat exhaustion
-// penalty on Initiative (see frontend/src/lib/rollMode.test.ts).
+// Initiative is a Dexterity check — SRD 5.2 / PHB'14 p. 189, Combat → Initiative.
 describe("CONDITIONS invariant — unqualified check disadvantage must cover Initiative (#1327)", () => {
-  // A grant of "disadvantage on ability checks" with no `ability` narrowing.
-  // Rage's { mode:"advantage", kind:"check", ability:"strength" } is excluded
-  // on two counts (mode and ability) and must stay excluded: a Strength-check
-  // advantage must never reach a Dexterity-based Initiative roll.
+  // ability:undefined excludes ability-scoped grants like Rage's Strength-check advantage from tripping this check.
   const isUnqualifiedCheckDisadvantage = (e: RollEffect): boolean =>
     e.mode === "disadvantage" && e.kind === "check" && e.ability === undefined;
 
-  // The obligation it creates. `ability === undefined` on this side too: an
-  // ability-scoped initiative grant would not discharge an unqualified one.
+  // ability:undefined here too — an ability-scoped initiative grant wouldn't discharge an unqualified check grant.
   const isUnqualifiedInitiativeDisadvantage = (e: RollEffect): boolean =>
     e.mode === "disadvantage" && e.kind === "initiative" && e.ability === undefined;
 
@@ -242,9 +208,7 @@ describe("CONDITIONS invariant — unqualified check disadvantage must cover Ini
     },
   );
 
-  // Non-vacuity pin: without this, deleting both `check` grants below would
-  // leave the invariant above passing on an empty set. Expected to be updated
-  // deliberately when a condition joins (or leaves) this set.
+  // Non-vacuity pin: prevents the invariant above from passing on an empty set.
   it.each(["EDITION_2024", "EDITION_2014"] as const)("%s: covers exactly frightened and poisoned today", (edition) => {
     const covered = CONDITIONS.map((c) => c.key).filter((key) => {
       const effects = conditionDefinition(key, edition).rollEffects ?? [];
@@ -253,9 +217,6 @@ describe("CONDITIONS invariant — unqualified check disadvantage must cover Ini
     expect(covered).toEqual(["frightened", "poisoned"]);
   });
 
-  // exhaustionRollEffects2014 is the other place this convention is
-  // load-bearing (tier 1: "disadvantage on ability checks" must also cover
-  // Initiative) — same invariant, different data source.
   it.each(["EDITION_2024", "EDITION_2014"] as const)(
     "%s: exhaustionRollEffects honours the same invariant at every level 0-6",
     (edition) => {

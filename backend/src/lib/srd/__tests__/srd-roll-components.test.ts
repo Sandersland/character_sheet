@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { deriveWeaponAttackBonus, deriveWeaponAttackComponents, deriveWeaponDamage } from "@/lib/srd/srd.js";
 
-const scores = { strength: 16, dexterity: 14 }; // STR +3, DEX +2
+const scores = { strength: 16, dexterity: 14 };
 
 const longsword = {
   name: "Longsword",
@@ -42,13 +42,7 @@ const rapier = {
 const martialGrant = [{ name: "Martial Weapons" }];
 const noGrants: { name: string }[] = [];
 
-// Expected values below are hand-derived from the 5e rule (STR +3 / DEX +2 /
-// proficiencyBonus 3), NOT computed by calling either function under test —
-// deriveWeaponAttackBonus delegates to deriveWeaponAttackComponents, so
-// comparing the components' sum against deriveWeaponAttackBonus's own return
-// is a tautology (proven by mutation: zeroing the Archery bonus rule left a
-// prior version of this suite fully green). Each case is checked against
-// literal numbers so a rule regression actually fails the test.
+// Expected values are hand-derived from 5e math, not computed by the function under test — comparing outputs against themselves would be tautological.
 describe("deriveWeaponAttackComponents — matches hand-derived 5e math", () => {
   const cases: Array<{
     label: string;
@@ -124,9 +118,6 @@ describe("deriveWeaponAttackComponents — matches hand-derived 5e math", () => 
     );
     expect(components).toEqual(expected);
 
-    // Also confirm the sum still matches deriveWeaponAttackBonus's own return —
-    // this alone is the tautological check the mutation defeated, so it stays
-    // as a NO-DRIFT regression guard alongside (never instead of) the literals above.
     const expectedTotal = expected.abilityMod + expected.proficiencyBonus + expected.rangedBonus + expected.attackRollBonus;
     expect(
       deriveWeaponAttackBonus(weapon, scores, proficiencyBonus, grants, rangedBonus, attackRollBonus),
@@ -136,7 +127,7 @@ describe("deriveWeaponAttackComponents — matches hand-derived 5e math", () => 
   it("zeroes proficiencyBonus (not just omits it) when not proficient", () => {
     const c = deriveWeaponAttackComponents(longsword, scores, 3, noGrants);
     expect(c.proficiencyBonus).toBe(0);
-    expect(c.abilityMod).toBe(3); // STR mod
+    expect(c.abilityMod).toBe(3);
   });
 
   it("zeroes rangedBonus for a melee weapon even when a ranged bonus value is passed", () => {
@@ -145,12 +136,8 @@ describe("deriveWeaponAttackComponents — matches hand-derived 5e math", () => 
   });
 });
 
-// #1361: the combat-log drill-in needs to know WHICH ability abilityMod came
-// from (finesse takes the higher of STR/DEX, ranged always DEX) to render
-// "+ 4 (Dexterity)" instead of a neutral label. Asserted through the real
-// derive function, not hardcoded, so a rule regression here would fail.
 describe("deriveWeaponAttackComponents — names the governing ability (#1361)", () => {
-  const dexOverStr = { strength: 10, dexterity: 16 }; // DEX +3 > STR +0
+  const dexOverStr = { strength: 10, dexterity: 16 };
 
   it("finesse weapon on a STR > DEX character names strength", () => {
     expect(deriveWeaponAttackComponents(rapier, scores, 3, martialGrant).ability).toBe("strength");
@@ -174,10 +161,6 @@ describe("deriveWeaponAttackComponents — names the governing ability (#1361)",
   });
 });
 
-// deriveWeaponDamage already exposed `abilityModifier` (#732); this issue
-// surfaces the other hidden addend, `meleeDamageBonus` (Rage etc.), which today
-// is folded silently into `damageModifier`. Same no-drift property: the two
-// components must sum to the existing `damageModifier`.
 describe("deriveWeaponDamage — meleeDamageBonus component sums to damageModifier", () => {
   it("melee weapon with an active Rage-style buff", () => {
     const d = deriveWeaponDamage(longsword, false, scores, 2);
@@ -199,10 +182,8 @@ describe("deriveWeaponDamage — meleeDamageBonus component sums to damageModifi
   });
 });
 
-// #1361: same rule, same single source (weaponAbilityMod) as the attack side —
-// asserted through the real derive function so a rule regression here fails too.
 describe("deriveWeaponDamage — names the governing ability (#1361)", () => {
-  const dexOverStr = { strength: 10, dexterity: 16 }; // DEX +3 > STR +0
+  const dexOverStr = { strength: 10, dexterity: 16 };
 
   it("finesse weapon on a STR > DEX character names strength", () => {
     expect(deriveWeaponDamage(rapier, false, scores).ability).toBe("strength");

@@ -28,9 +28,7 @@ describe("caster fraction rules data", () => {
   it("classifies third-caster subclasses off subclassRef, never a name match (#1531)", () => {
     expect(casterFractionFor("Fighter", ELDRITCH_KNIGHT)).toBe("third");
     expect(casterFractionFor("Rogue", ARCANE_TRICKSTER)).toBe("third");
-    // A plain Champion fighter is still a non-caster.
     expect(casterFractionFor("Fighter", NON_CASTER_SUBCLASS)).toBe("none");
-    // No subclassRef at all (homebrew, or no subclass chosen) is also "none".
     expect(casterFractionFor("Fighter", null)).toBe("none");
   });
 
@@ -57,7 +55,7 @@ describe("deriveMulticlassSpellcasting — single class byte-for-byte with deriv
     { name: "Ranger", level: 9 },
     { name: "Fighter", level: 3, label: "Eldritch Knight", subclassRef: ELDRITCH_KNIGHT },
     { name: "Rogue", level: 13, label: "Arcane Trickster", subclassRef: ARCANE_TRICKSTER },
-    { name: "Fighter", level: 5 }, // non-caster
+    { name: "Fighter", level: 5 },
   ];
 
   for (const c of cases) {
@@ -134,7 +132,7 @@ describe("deriveMulticlassSpellcasting — multiclass combos (PHB p. 164)", () =
     expect(info.pact).toEqual({
       slotLevel: 2,
       count: 2,
-      spellSaveDC: 8 + 2 + 3, // CHA 16 -> +3, pb 2
+      spellSaveDC: 8 + 2 + 3,
       spellAttackBonus: 2 + 3,
     });
   });

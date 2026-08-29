@@ -16,16 +16,13 @@ export type EventCategory =
   | "roll";
 
 export type EventType =
-  // inventory
   | "acquired"
   | "consumed"
   | "sold"
   | "bought"
   | "removed"
-  // DM campaign-item award/revoke (#381) — inventory-category, undoable
   | "awarded"
   | "revoked"
-  // hitPoints
   | "damage"
   | "heal"
   | "setTemp"
@@ -35,16 +32,10 @@ export type EventType =
   | "levelDown"
   | "deathSave"
   | "stabilize"
-  // experience
   | "xpAward"
   | "xpSet"
-  // currency
   | "currencyAdjust"
-  // spellcasting
   | "castSpell"
-  // A row-driven ability's {kind:"slot"} spend (#1687) — the generic-ability
-  // counterpart to castSpell for the row-driven dispatcher, whose OpOutcome
-  // was previously discarded for every cost kind (routes/character/actions.ts).
   | "castAbilitySlot"
   | "expendSlot"
   | "restoreSlot"
@@ -54,14 +45,12 @@ export type EventType =
   | "unprepareSpell"
   | "concentrationDropped"
   | "convertSorceryPoints"
-  // class
   | "classAdded"
   | "subclassChosen"
   | "subclassRemoved"
   | "fightingStyleChosen"
   | "fightingStyleRemoved"
   | "classLevelsReconciled"
-  // resources
   | "spendResource"
   | "restoreResource"
   | "initiativeRegen"
@@ -77,95 +66,67 @@ export type EventType =
   | "triggerQuiveringPalm"
   | "dealHandOfHarm"
   | "useHandOfUltimateMercy"
-  // toggleElementalAttunement retired (#1686) — Elemental Attunement's own
-  // toggle now logs through the generic buffApplied/buffCleared/
-  // spendResource event types (like Rage) instead of its own bespoke one.
   | "castElementalBurst"
-  // Way of the Four Elements (2014, #1503) — cast a known elemental
-  // discipline. The only one of the retired 2014 discipline events
-  // (learnDiscipline/forgetDiscipline/swapDiscipline/disciplinesReconciled/
-  // castDiscipline, #1247/34f5a4cf) that returns: learn/forget ride the
-  // generic learnSubclassChoice/forgetSubclassChoice events, and the reconcile
-  // rides subclassChoicesReconciled — no bespoke discipline-only twins.
   | "castDiscipline"
   | "elementalStrike"
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"
-  // Expertise (#1588)
   | "learnExpertise"
   | "forgetExpertise"
   | "expertiseReconciled"
   | "learnSubclassChoice"
   | "forgetSubclassChoice"
   | "subclassChoicesReconciled"
-  // advancement (ASI + feats)
   | "abilityScoreImprovement"
   | "featTaken"
   | "advancementRemoved"
   | "advancementsReconciled"
-  // inventory (equip/unequip logged for timeline + undo)
   | "equipped"
   | "unequipped"
-  // inventory attunement (#545)
   | "attuned"
   | "unattuned"
-  // Eldritch Knight Weapon Bond (2014, #1854)
   | "weaponBonded"
   | "weaponUnbonded"
-  // inventory activated effects (#543)
   | "activated"
   | "deactivated"
   | "activatedRecharged"
-  // session lifecycle
   | "sessionStarted"
   | "sessionEnded"
-  // combat lifecycle
   | "combatStarted"
   | "combatEnded"
   | "combatRoundAdvanced"
-  // combat action resolution (#1829, epic #1827) — one undoable event per
-  // resolved weapon swing / spell cast, carrying its rolls in `data`
-  // (replaces the separate attackRoll/damageRoll/castSpell rows a resolution
-  // used to write; those event types stay for the standalone roll-log paths
-  // until the adapter slices #1832/#1833 retire them).
+  // #1829: resolveAction carries its rolls in `data`; attackRoll/damageRoll/castSpell stay for the standalone roll-log paths until #1832/#1833 retire them.
   | "resolveAction"
-  // conditions
   | "conditionApplied"
   | "conditionRemoved"
   | "exhaustionSet"
-  // effects (active buffs)
   | "buffApplied"
   | "buffCleared"
-  // roll events (rolls logged from session UI — non-undoable)
   | "attackRoll"
   | "damageRoll"
   | "checkRoll"
   | "saveRoll"
   | "initiativeRoll"
-  // meta
   | "revert";
 
 export interface LogEventParams {
   characterId: string;
   category: EventCategory;
   type: EventType;
-  /** Human-readable description, e.g. "Leveled up to 7 (+9 HP)". Stored at
-   *  write time so the timeline reads correctly even if semantics change. */
+  // Stored at write time so the timeline reads correctly even if semantics change.
   summary: string;
-  /** Polymorphic soft-reference — no FK. entityType = "InventoryItem", etc. */
+  // Polymorphic soft-reference — no FK. entityType = "InventoryItem", etc.
   entityType?: string;
   entityId?: string | null;
-  /** Sub-state snapshot before the op (drives undo and field-level diff). */
+  // Drives undo and field-level diff.
   before?: Record<string, unknown> | null;
-  /** Sub-state snapshot after the op. */
   after?: Record<string, unknown> | null;
-  /** Op-specific inputs not derivable from before/after alone. */
+  // Op-specific inputs not derivable from before/after alone.
   data?: Record<string, unknown> | null;
   batchId?: string;
   actor?: string;
-  /** FK to the play session during which this event occurred. Null for
-   *  out-of-session events (shopping, level-ups on the reference sheet). */
+  // Null for out-of-session events (shopping, level-ups on the reference sheet).
   sessionId?: string | null;
 }
 
@@ -175,16 +136,11 @@ type DiffField = {
   newValue: Prisma.InputJsonValue | null;
 };
 
-/** A recurse-able node: a non-null, non-array object whose keys we walk. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-/**
- * Emit an atomic (non-recursed) change for one leaf, or nothing if unchanged.
- * Covers primitives, arrays, and null; arrays compare deeply via JSON so a
- * reordered/extended array reads as one change at its own path.
- */
+// Arrays compare via JSON.stringify — a reordered/extended array reads as one change at its own path, not per-element.
 function diffLeaf(path: string, oldVal: unknown, newVal: unknown): DiffField[] {
   const normalizedOld = oldVal === undefined ? null : oldVal;
   const normalizedNew = newVal === undefined ? null : newVal;
@@ -196,11 +152,6 @@ function diffLeaf(path: string, oldVal: unknown, newVal: unknown): DiffField[] {
   }];
 }
 
-/**
- * Recursively walks `before` and `after`, returning one entry per changed
- * leaf. Arrays are treated as atomic (compared as-is rather than element-
- * by-element) to keep paths readable (e.g. "rolls" rather than "rolls.0").
- */
 export function diffToFields(
   before: Record<string, unknown> | null | undefined,
   after: Record<string, unknown> | null | undefined,
@@ -214,7 +165,6 @@ export function diffToFields(
     const path = prefix ? `${prefix}.${key}` : key;
     const oldVal = b[key];
     const newVal = a[key];
-    // Recurse into plain nested objects; everything else is an atomic leaf.
     if (isPlainObject(oldVal) && isPlainObject(newVal)) {
       result.push(...diffToFields(oldVal, newVal, path));
     } else {
@@ -225,13 +175,7 @@ export function diffToFields(
   return result;
 }
 
-/**
- * Writes one `CharacterEvent` row and its derived `CharacterEventField` rows
- * (field-level diff from before→after) inside the caller's transaction.
- *
- * Always call within a `prisma.$transaction` — this is intentionally NOT a
- * standalone function so the event is atomic with the state change it records.
- */
+// Always call inside the caller's $transaction — not standalone, so the event write is atomic with the state change it records.
 export async function logEvent(
   tx: Prisma.TransactionClient,
   params: LogEventParams

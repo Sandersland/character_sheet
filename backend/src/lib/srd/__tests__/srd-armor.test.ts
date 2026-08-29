@@ -19,8 +19,8 @@ describe("deriveArmorClass", () => {
   });
 
   it("medium armor caps Dex at dexModifierMax", () => {
-    expect(deriveArmorClass(halfPlate, false, 4)).toBe(17); // capped at +2
-    expect(deriveArmorClass(halfPlate, false, 1)).toBe(16); // under cap
+    expect(deriveArmorClass(halfPlate, false, 4)).toBe(17);
+    expect(deriveArmorClass(halfPlate, false, 1)).toBe(16);
   });
 
   it("medium armor defaults the Dex cap to +2 when dexModifierMax is null/undefined", () => {
@@ -162,14 +162,14 @@ describe("deriveArmorClass — Unarmored Defense", () => {
   });
 
   it("monk with a shield falls back to base + shield even with high Wis", () => {
-    // PHB p.78: a shield disqualifies Monk Unarmored Defense entirely.
-    expect(deriveArmorClass(null, true, 2, ud(["monk"], 0, 3))).toBe(14); // base+shield 14, not monk 15
+    // PHB p.78
+    expect(deriveArmorClass(null, true, 2, ud(["monk"], 0, 3))).toBe(14);
     expect(deriveArmorClass(null, true, 2, ud(["monk"], 0, 0))).toBe(14);
   });
 
   it("barbarian/monk multiclass takes the highest formula", () => {
-    expect(deriveArmorClass(null, false, 2, ud(["barbarian", "monk"], 1, 3))).toBe(15); // monk 15 > barb 13
-    expect(deriveArmorClass(null, false, 2, ud(["barbarian", "monk"], 3, 1))).toBe(15); // barb 15 > monk 13
+    expect(deriveArmorClass(null, false, 2, ud(["barbarian", "monk"], 1, 3))).toBe(15);
+    expect(deriveArmorClass(null, false, 2, ud(["barbarian", "monk"], 3, 1))).toBe(15);
   });
 
   it("is ignored entirely while wearing body armor", () => {
@@ -178,7 +178,7 @@ describe("deriveArmorClass — Unarmored Defense", () => {
   });
 
   it("never lowers AC below the base formula on a negative Con", () => {
-    expect(deriveArmorClass(null, false, 2, ud(["barbarian"], -1, 0))).toBe(12); // base 12 > barb 11
+    expect(deriveArmorClass(null, false, 2, ud(["barbarian"], -1, 0))).toBe(12);
   });
 
   it("does nothing for classes without Unarmored Defense", () => {
@@ -202,13 +202,11 @@ describe("Mage Armor unarmored base override (#363)", () => {
   });
 
   it("stacks a shield on top of the Mage Armor base", () => {
-    expect(deriveArmorClass(null, true, 2, undefined, mageArmor)).toBe(17); // 13 + 2 Dex + 2 shield
+    expect(deriveArmorClass(null, true, 2, undefined, mageArmor)).toBe(17);
   });
 
   it("keeps the higher of Mage Armor and Unarmored Defense (best-of)", () => {
-    // Barbarian 10 + Dex2 + Con5 = 17 beats Mage Armor 13 + Dex2 = 15.
     expect(deriveArmorClass(null, false, 2, ud(["barbarian"], 5, 0), mageArmor)).toBe(17);
-    // Mage Armor 13 + Dex2 = 15 beats a Con-less barbarian 10 + Dex2 = 12.
     expect(deriveArmorClass(null, false, 2, ud(["barbarian"], 0, 0), mageArmor)).toBe(15);
   });
 
@@ -243,16 +241,12 @@ describe("Draconic Resilience unarmored base override (#1122)", () => {
   });
 
   it("keeps the higher of Draconic Resilience and Unarmored Defense (best-of)", () => {
-    // Barbarian 10 + Dex2 + Con5 = 17 beats Draconic Resilience 13 + Dex2 = 15.
     expect(deriveArmorClass(null, false, 2, ud(["barbarian"], 5, 0), undefined, draconicResilience)).toBe(17);
-    // Draconic Resilience 13 + Dex2 = 15 beats a Con-less barbarian 10 + Dex2 = 12.
     expect(deriveArmorClass(null, false, 2, ud(["barbarian"], 0, 0), undefined, draconicResilience)).toBe(15);
   });
 
   it("competes best-of with a simultaneous Mage Armor override", () => {
-    // Same 13+Dex shape, so the totals tie (unarmoredBaseOverride wins the label
-    // deterministically as the first-pushed candidate) — this asserts the value,
-    // which is unaffected by which of the two tied candidates the label comes from.
+    // Tied 13+Dex candidates — only the value is asserted, not which label wins.
     const parts = deriveArmorClassParts(null, false, 2, undefined, { label: "Mage Armor", value: 13 }, draconicResilience);
     expect(parts.reduce((t, p) => t + p.value, 0)).toBe(15);
   });

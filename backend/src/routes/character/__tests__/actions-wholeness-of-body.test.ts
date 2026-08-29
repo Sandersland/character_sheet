@@ -1,7 +1,4 @@
-/**
- * SRD 5.2: Bonus Action, regain Martial Arts die + Wisdom modifier HP; usable
- * max(1, Wis mod) times per long rest.
- */
+// SRD 5.2
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -18,7 +15,7 @@ const MONK_ID = "test-actions-wholeness-of-body";
 const MONK_CATALOG_NAME = "Actions Wholeness Of Body Test Monk";
 let monkClassId: string;
 
-const L6_XP = 14000; // single-class monk level 6
+const L6_XP = 14000;
 
 const MONK_BASE = {
   id: MONK_ID,
@@ -33,7 +30,7 @@ const MONK_BASE = {
     dexterity: 16,
     constitution: 12,
     intelligence: 10,
-    wisdom: 14, // +2 mod → wholenessOfBody pool total 2
+    wisdom: 14,
     charisma: 8,
   },
   savingThrowProficiencies: ["strength", "dexterity"],
@@ -129,10 +126,10 @@ describe("POST /:id/actions/transactions — Wholeness of Body (#1245)", () => {
   });
 
   it("spends 1 use and heals the client-rolled amount (Martial Arts die + Wis mod)", async () => {
-    const res = await executeAction("wholenessOfBody", 7); // e.g. 1d8 rolled 5 + Wis +2
+    const res = await executeAction("wholenessOfBody", 7);
     expect(res.status).toBe(200);
-    expect(pool(res.body, "wholenessOfBody")).toMatchObject({ used: 1, remaining: 1 }); // Wis +2 → 2 uses
-    expect(res.body.hitPoints.current).toBe(17); // 10 + 7
+    expect(pool(res.body, "wholenessOfBody")).toMatchObject({ used: 1, remaining: 1 });
+    expect(res.body.hitPoints.current).toBe(17);
   });
 
   it("the spend is logged as a session/activity spendResource event", async () => {
@@ -155,6 +152,6 @@ describe("POST /:id/actions/transactions — Wholeness of Body (#1245)", () => {
     const res = await executeAction("wholenessOfBody");
     expect(res.status).toBe(200);
     expect(pool(res.body, "wholenessOfBody")).toMatchObject({ used: 1, remaining: 1 });
-    expect(res.body.hitPoints.current).toBe(10); // unchanged
+    expect(res.body.hitPoints.current).toBe(10);
   });
 });

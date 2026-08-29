@@ -1,9 +1,4 @@
-/**
- * Level-down reconciliation for Expertise (#1588): dropping a Rogue from L6
- * (cap 4) to L1 (cap 2) trims expertiseKnown to the new cap, logs one
- * expertiseReconciled event, and is undoable via the XP batch's revert.
- * Mirrors weapon-bond-reconciliation.test.ts's shape.
- */
+// #1588: mirrors weapon-bond-reconciliation.test.ts's shape.
 import { afterEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 

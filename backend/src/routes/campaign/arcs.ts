@@ -6,16 +6,6 @@ import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 
-// Campaign arcs / "parts" (#863): named groupings the journal page files sessions
-// ("chapters") under so a long campaign stays navigable. Arcs are campaign-level
-// (one shared story spine) and DM-curated, so this is plain owner-gated REST CRUD
-// (like campaign-items.ts) — NOT the character transaction/audit pattern, since an
-// arc carries no character-sheet mechanical effect. `position` is an explicit
-// ordering column; a create appends (position = current count) and a patch may
-// reorder by setting it directly. Deleting an arc SetNulls its sessions' arcId
-// (schema relation), so sessions and their journal entries always survive.
-// createArcSchema/updateArcSchema live in @character-sheet/contracts (#1394).
-
 export const arcsRouter = Router();
 
 const OWNER_ONLY = "Only the campaign owner may manage campaign arcs";
@@ -30,18 +20,10 @@ function serializeArc(row: CampaignArc) {
   };
 }
 
-/**
- * GET /api/campaigns/:id/arcs
- * Member-readable ordered list (the journal spine). Any campaign member sees it.
- */
 arcsRouter.get("/campaigns/:id/arcs", async (req, res) => {
   await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
-  // Order by [position, createdAt] in EVERY read path: two concurrent DM creates
-  // can both read the same arc count and land on the same `position` (the POST
-  // below isn't transactional), so createdAt is the deterministic tiebreak that
-  // keeps tied arcs in a stable order. A hardening UNIQUE(campaignId, position)
-  // constraint would fight the PATCH reorder flow, so it's tracked as a follow-up.
+  // createdAt is a deterministic tiebreak: concurrent creates can land on the same position.
   const arcs = await prisma.campaignArc.findMany({
     where: { campaignId: req.params.id },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -49,13 +31,6 @@ arcsRouter.get("/campaigns/:id/arcs", async (req, res) => {
   res.json(arcs.map(serializeArc));
 });
 
-/**
- * POST /api/campaigns/:id/arcs
- * Owner-only create; position appends (= current arc count). The count+create
- * isn't atomic, so two concurrent DM creates can tie on `position`; that's made
- * harmless by the [position, createdAt] read ordering above (hardening constraint
- * is a tracked follow-up).
- */
 arcsRouter.post("/campaigns/:id/arcs", async (req, res) => {
   await assertCampaignOwner(prisma, req.user!.id, req.params.id, "edit", OWNER_ONLY);
 
@@ -69,11 +44,7 @@ arcsRouter.post("/campaigns/:id/arcs", async (req, res) => {
   res.status(201).json(serializeArc(arc));
 });
 
-/**
- * PATCH /api/campaigns/:id/arcs/:arcId
- * Owner-only rename and/or reorder. Full sequence normalization is the caller's
- * job (#864); this persists whatever name/position the owner sends.
- */
+// Persists whatever position is sent as-is — sequence normalization is the caller's job (#864).
 arcsRouter.patch("/campaigns/:id/arcs/:arcId", async (req, res) => {
   await assertCampaignOwner(prisma, req.user!.id, req.params.id, "edit", OWNER_ONLY);
 
@@ -96,11 +67,7 @@ arcsRouter.patch("/campaigns/:id/arcs/:arcId", async (req, res) => {
   res.json(serializeArc(arc));
 });
 
-/**
- * DELETE /api/campaigns/:id/arcs/:arcId
- * Owner-only. Sessions fall back to un-arced via the SetNull relation — deleting
- * an arc never deletes a session or its journal entries.
- */
+// Sessions SetNull their arcId on delete — never cascades to sessions or journal entries.
 arcsRouter.delete("/campaigns/:id/arcs/:arcId", async (req, res) => {
   await assertCampaignOwner(prisma, req.user!.id, req.params.id, "edit", OWNER_ONLY);
 

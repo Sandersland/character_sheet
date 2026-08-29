@@ -1,13 +1,4 @@
-/**
- * #1602: a stranded cross-edition subclass on a multiclass SECONDARY entry
- * must be repairable through the same setSubclass op the primary entry
- * already uses. #1598 built the explanation and the re-pick, but only wired
- * them to the character's primary class entry on the frontend. The backend
- * write path was already entry-scoped (setSubclass resolves its target by
- * the subclass's own classId, not by position, #1065) — this test proves
- * that end to end through the real HTTP transaction route, starting from a
- * stranded secondary entry rather than a fresh pick.
- */
+// setSubclass resolves its target by the subclass's own classId, not by roster position (#1065), so it can repair a stranded SECONDARY entry the same way it already repairs the primary — proven end to end through the real HTTP route (#1602).
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -50,7 +41,7 @@ async function strandedMulticlassCharacter() {
       alignment: "True Neutral",
       ownerId: OWNER_ID,
       rulesEdition: "EDITION_2024",
-      experiencePoints: 6500, // derived total level 5 (wizard 2 + warlock 3)
+      experiencePoints: 6500,
       initiativeBonus: 0,
       speed: 30,
       hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -63,9 +54,7 @@ async function strandedMulticlassCharacter() {
       classEntries: {
         create: [
           { name: "Wizard", classId: wizardId, position: 0, level: 2 },
-          // Warlock 3 meets the EDITION_2024 subclass gate (level 3 for every
-          // class) — already stranded on the 2014-only Archfey row, the same
-          // state a live #1233 retag leaves behind.
+          // Warlock 3 meets the EDITION_2024 subclass gate — already stranded on the 2014-only Archfey row, the same state a live #1233 retag leaves behind.
           { name: "Warlock", classId: warlockId, position: 1, level: 3, subclass: "The Archfey", subclassId: archfeyId },
         ],
       },
@@ -115,8 +104,6 @@ describe("re-picking a stranded SECONDARY class entry's subclass (#1602)", () =>
     const secondaryEntry = await prisma.characterClassEntry.findUniqueOrThrow({ where: { id: secondaryEntryId } });
     expect(secondaryEntry.subclassId).toBe(fiendId);
 
-    // Position independence (#1065): the op must resolve by the subclass's
-    // own classId, not by roster position — the primary entry stays untouched.
     const primaryEntry = await prisma.characterClassEntry.findUniqueOrThrow({ where: { id: primaryEntryId } });
     expect(primaryEntry.subclassId).toBeNull();
   });

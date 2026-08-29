@@ -17,17 +17,7 @@ const transactionsRequestSchema = z.object({
 
 /**
  * POST /api/characters/:id/resolve-action/transactions
- *
- * Slice 2 of epic #1827 (unified combat action resolution): commits a
- * resolved weapon swing or spell cast as ONE undoable `resolveAction`
- * CharacterEvent. Mirrors POST /api/characters/:id/spellcasting/transactions
- * (`castSpell`) — validate ops, apply atomically, write the audit event,
- * return the updated character.
- *
- * The weapon adapter (#1832, `frontend/src/api/combat.ts`) is the first
- * frontend caller — `InlineAttackPicker`'s weapon swings commit here now.
- * `useSpellPicker` still commits through the pre-existing `castSpell` path
- * until the spell adapter slice (#1833) migrates it.
+ * Commits a resolved weapon swing or spell cast as one undoable `resolveAction` CharacterEvent.
  */
 makeTransactionsEndpoint({
   router: resolveActionRouter,

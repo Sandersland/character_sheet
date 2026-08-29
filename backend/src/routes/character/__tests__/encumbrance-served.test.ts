@@ -1,14 +1,3 @@
-/**
- * Wire contract for the three derived inventory numbers (#1377): carryCapacity,
- * carriedWeight and attunementCap. The frontend used to author all three, so
- * these assertions are the only thing standing between the sheet and a silently
- * re-introduced client-side rule.
- *
- * carriedWeight is re-asserted after a quantity change and after a currency
- * change because those are the two inputs whose staleness a single GET can't
- * catch.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -23,7 +12,6 @@ const OWNER_ID = "owner-encumbrance-served";
 const CHARACTER_ID = "encumbrance-served-character";
 let COOKIE: string;
 
-// STR 14 → capacity 210. 100 coins → 2 lb.
 const FIXTURE = {
   id: CHARACTER_ID,
   name: "Encumbrance Fixture",
@@ -79,10 +67,7 @@ describe("GET /api/characters/:id — encumbrance + attunement cap (#1377)", () 
   });
 
   it("capacity tracks the served (clamped) STR score, not the raw column", async () => {
-    // A stored +2 STR ASI with no slot to hold it at level 1: the advancement
-    // clamp reverses it on read, so the served STR is 12 while the column still
-    // says 14. Capacity must follow the served number — this is the one
-    // assertion that fails if the serializer reads row.abilityScores.
+    // Guards against the serializer reading the raw column instead of the clamped/served ability score.
     await prisma.character.update({
       where: { id: CHARACTER_ID },
       data: {
@@ -117,7 +102,7 @@ describe("GET /api/characters/:id — encumbrance + attunement cap (#1377)", () 
       .send({ operations: [{ type: "adjustQuantity", inventoryItemId: item.id, delta: 2 }] });
 
     expect(response.status).toBe(200);
-    // 5 × 10 lb of gear + 2 lb of coins.
+
     expect(response.body.carriedWeight).toBe(52);
   });
 
@@ -131,7 +116,7 @@ describe("GET /api/characters/:id — encumbrance + attunement cap (#1377)", () 
       .send({ currency: { cp: 0, sp: 0, gp: 500, pp: 0 } });
 
     expect(response.status).toBe(200);
-    // 30 lb of gear + 500 coins (= 10 lb) = 40 lb total.
+
     expect(response.body.carriedWeight).toBe(40);
   });
 

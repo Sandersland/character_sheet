@@ -1,24 +1,16 @@
 /**
- * resolveAction transaction handler (#1829, epic #1827 slice 2) — the backend
- * half of the unified combat-action resolver: a weapon swing or spell cast
- * persists as ONE undoable `CharacterEvent` whose `data` carries the rolls,
- * instead of the separate attackRoll/damageRoll/castSpell rows the old
- * per-domain paths wrote. The old attack/damage roll-log path is retired
- * (#1845/#1861 — standalone check/save/initiative/tally rolls now commit here
- * too via the `logRoll` op arm); the `castSpell` op remains for pre-#1833 callers.
+ * resolveAction transaction handler (#1829) — a weapon swing or spell cast persists as ONE undoable
+ * `CharacterEvent` whose `data` carries the rolls, instead of separate attackRoll/damageRoll/castSpell
+ * rows. Standalone check/save/initiative/tally rolls also commit here via the `logRoll` op arm (#1861);
+ * the `castSpell` op remains for pre-#1833 callers.
  *
- * The only state delta this slice handles is a leveled spell's slot spend
- * (`slotLevel` on the op) — paid through the same `loadSlotPayContext` +
- * `payAbilityCostInTx` preamble `castSpell`/`castAbilityWithSlotInTx` use, so
- * slot-table derivation, Mystic Arcanum fallback, and the "no slots
- * remaining" guard are each the ONE shared implementation, not a second copy.
- * A cantrip or weapon resolution (`slotLevel` omitted) has no server-side
- * state to spend — the event is still written, with no before/after
- * snapshot, so it appears on the timeline and is still LIFO-revertible
- * (nothing to restore, but the batch is still markable reverted). A
- * row-driven RESOURCE cost (the design's other `data.slotLevel`-adjacent
- * case) is deliberately out of scope for this slice — no acceptance
- * criterion here exercises it — and is flagged in the slice report.
+ * The only state delta this handles is a leveled spell's slot spend (`slotLevel` on the op), paid
+ * through the same `loadSlotPayContext` + `payAbilityCostInTx` preamble `castSpell`/`castAbilityWithSlotInTx`
+ * use, so slot-table derivation, Mystic Arcanum fallback, and the "no slots remaining" guard are each the
+ * ONE shared implementation. A cantrip or weapon resolution (`slotLevel` omitted) has no server-side state
+ * to spend — the event is still written, with no before/after snapshot, so it is still LIFO-revertible
+ * (nothing to restore, but the batch is still markable reverted). A row-driven RESOURCE cost is deliberately
+ * out of scope here.
  */
 
 import { Prisma, type SpellCastKind } from "@/generated/prisma/client.js";
@@ -61,8 +53,8 @@ export class InvalidResolveActionOperationError extends Error {
 
 // Assassinate's eligibility gate (#1526): the character row is already
 // widened to carry classEntries/rulesEdition for this, so the check costs no
-// extra query. Self-or-announce (CLAUDE.md) still means the server never
-// computes the crit itself — it only gates WHO may assert one via this flag.
+// extra query. Self-or-announce still means the server never computes the
+// crit itself — it only gates WHO may assert one via this flag.
 function assertAssassinateEligible(row: ResolveActionRow, op: ResolveActionOperation): void {
   if (!op.assassinate) return;
   if (!assassinateEligible(row.classEntries, editionOf(row))) {
@@ -87,8 +79,8 @@ async function payResolveActionCost(
   if (op.slotLevel == null) return { before: null, after: null };
 
   // Shared "load → derive → build cost context" preamble with
-  // castAbilityWithSlotInTx (spellcasting.ts) — own not-found error kept
-  // (400 domain error here vs that caller's 5xx internal invariant).
+  // castAbilityWithSlotInTx — own not-found error kept (400 domain error
+  // here vs that caller's 5xx internal invariant).
   const { state, costCtx } = await loadSlotPayContext(
     tx,
     characterId,
@@ -100,8 +92,8 @@ async function payResolveActionCost(
 
   // Reuses the same payer castSpell/castAbilityWithSlotInTx pay through —
   // Mystic Arcanum fallback and the "no slots remaining" guard live in ONE
-  // place (ability-cost.ts), not re-implemented here. Mutates
-  // state.slotsUsed/arcanumUsed in place (same aliasing costCtx sets up).
+  // place, not re-implemented here. Mutates state.slotsUsed/arcanumUsed in
+  // place (same aliasing costCtx sets up).
   await payAbilityCostInTx(costCtx, { kind: "slot", minLevel: op.slotLevel }, op.slotLevel, ABILITY_SLOT_SUBJECT);
 
   const after = snapshotSpellcasting(state);
@@ -113,27 +105,17 @@ async function payResolveActionCost(
   return { before, after };
 }
 
-// The universal cost + side-effects router for BOTH branches a resolveAction
-// op can take (#1848 review — the pre-rename `applySpellCastSideEffects`
-// named only the second, spell-shaped branch, misleading a reader tracing a
-// WEAPON op's failure through applyResolveActionOperations): a weapon or
-// cantrip-with-no-entryId op (`op.entryId == null`) delegates to
-// payResolveActionCost's bare slot-spend; an entryId-bearing spell op
-// (#1833) routes the op's slotLevel/apply through the SAME castAbilityInTx
-// sequence the old castSpell op uses (castSpellForResolutionInTx), so
-// concentration (set + displaced-prior drop), a buff spell's self-buff
-// (Mage Armor), and a self/ally heal/damage apply all still happen — not
-// just the slot spend payResolveActionCost pays alone. `roll` feeds
-// castAbilityInTx's own eventData/apply-amount plumbing; the resolveAction
-// event logged by the caller carries the actual rail data (toHit/save/
-// effect/riders) separately, so `roll`'s own eventData never surfaces on
-// the wire.
-// The per-turn interlock record a resolution produces (#1439). ONLY the spell
-// branch below builds one — so the cast-kind recording is coupled to the spell
-// resolution actually running (castSpellForResolutionInTx, which throws for an
-// entryId that isn't a real spell entry), never to entryId presence alone. A
-// weapon/cantrip-with-no-entryId op returns null and can never touch the
-// interlock. `kind` is leveled iff a slot was spent (a cantrip has no slotLevel).
+// The universal cost + side-effects router for BOTH branches a resolveAction op can take: a weapon
+// or cantrip-with-no-entryId op (`op.entryId == null`) delegates to payResolveActionCost's bare
+// slot-spend; an entryId-bearing spell op (#1833) routes slotLevel/apply through the SAME
+// castAbilityInTx sequence castSpell uses (castSpellForResolutionInTx), so concentration, a buff
+// spell's self-buff, and a self/ally heal/damage apply all still happen. `roll` feeds
+// castAbilityInTx's own eventData/apply-amount plumbing; the resolveAction event logged by the
+// caller carries the rail data (toHit/save/effect/riders) separately.
+//
+// ONLY the spell branch builds a TurnSpellCast record for the per-turn interlock (#1439) — coupled
+// to the spell resolution actually running, never to entryId presence alone. `kind` is leveled iff a
+// slot was spent (a cantrip has no slotLevel).
 interface TurnSpellCast {
   economy: "action" | "bonus" | "reaction";
   kind: SpellCastKind;
@@ -184,13 +166,9 @@ async function payActionCostAndSideEffectsInTx(
   };
 }
 
-// Record the per-turn spell-cast kind for the 5e bonus-action interlock (#1439)
-// — no-op unless a spell actually resolved (spellCast produced by the spell
-// branch above) and the character is in a session. recordTurnSpellCast is
-// itself a further no-op when the session's combat is inactive (its WHERE
-// gates on session.combatActive, #1875) — out of combat there are no turn
-// boundaries to clear a recorded block, so none is written. Kept out of applyOp
-// so its own guard doesn't count against that function's complexity budget.
+// Records the per-turn spell-cast kind for the 5e bonus-action interlock (#1439) — no-op unless a
+// spell actually resolved and the character is in a session. recordTurnSpellCast is itself a further
+// no-op when the session's combat is inactive (session.combatActive, #1875).
 async function recordSpellCastForOp(
   tx: Prisma.TransactionClient,
   sessionId: string | null,
@@ -208,15 +186,11 @@ function summaryFor(op: ResolveActionOperation): string {
 
 /**
  * Applies a batch of resolveAction operations atomically. Mirrors
- * applySpellcastingOperations/applyHitPointOperations: one batchId, one
- * $transaction, one CharacterEvent per op (category "combat", type
- * "resolveAction") — the single audit row a resolution's undo reverses.
+ * applySpellcastingOperations/applyHitPointOperations: one batchId, one $transaction, one
+ * CharacterEvent per op (category "combat", type "resolveAction").
  *
- * `casterUserId` (#1833) is the authenticated caller — unused by a weapon/
- * cantrip-with-no-apply resolution, but required to route a spell's self/ally
- * heal apply (party-target healing #462 needs the caster's identity to check
- * campaign membership), the same parameter applySpellcastingOperations
- * already threads through for the pre-existing castSpell op.
+ * `casterUserId` (#1833) is the authenticated caller — required to route a spell's self/ally heal
+ * apply (party-target healing #462 needs it to check campaign membership).
  */
 export async function applyResolveActionOperations(
   characterId: string,

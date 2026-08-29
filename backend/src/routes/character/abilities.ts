@@ -7,14 +7,7 @@ export const abilitiesRouter = Router({ mergeParams: true });
 
 /**
  * POST /api/characters/:id/abilities/:abilityKey/transactions
- * The one transaction endpoint for every automated class/subclass ability: it
- * resolves `abilityKey` in ABILITY_REGISTRY and runs that handler's schema /
- * apply / domain errors / respond. Body and response shapes are the ability's
- * own — this layer adds only dispatch.
- *
- * The key is resolved BEFORE assertCharacterAccess, so an unknown key on another
- * owner's sheet 404s rather than 403s. That matches what an unknown URL already
- * did (the /api catch-all 404s with no access check) and ability keys aren't secret.
+ * The key is resolved before assertCharacterAccess, so an unknown key on another owner's sheet 404s rather than 403s.
  */
 abilitiesRouter.post<{ id: string; abilityKey: string }>("/:abilityKey/transactions", (req, res) => {
   const handler = ABILITY_REGISTRY[req.params.abilityKey];

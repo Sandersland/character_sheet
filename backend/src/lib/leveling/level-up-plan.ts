@@ -1,7 +1,4 @@
-// Pure planner: the ordered choice-steps advancing to per-class level N grants.
-// Every step is DERIVED by diffing the existing rule functions at N vs N-1 —
-// thresholds are never re-encoded here. Consumed by the level-up ceremony (#886)
-// and validated against by the transaction endpoint (#885).
+// Pure planner — every step is derived by diffing rule functions at N vs N-1; thresholds are never re-encoded here.
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
@@ -42,114 +39,51 @@ export interface LevelUpStep {
   meta?: Record<string, unknown>;
 }
 
-// Pre-level-up character state (narrow, purpose-built — not the full wire shape).
 export interface LevelUpPlanCharacter {
   abilityScores: Record<string, number>;
   classEntries: { name: string; subclass?: string | null; level: number }[];
-  // The character's known spell entries, for validating a #1101 swap forget.
-  // Only id/level/source matter (a legal swap target is a user-learned leveled
-  // spell); populated in resolveLevelUpContext, absent in swap-free callers.
+  // #1101: for validating a swap forget. Only id/level/source matter (a legal swap target is a user-learned leveled spell); populated in resolveLevelUpContext, absent in swap-free callers.
   spellEntries?: { id: string; level: number; source?: string | null }[];
-  // deriveResources' subclass gate is edition-aware (#1291) — this pure planner
-  // has no row to read editionOf from, so the caller (resolveLevelUpContext)
-  // resolves it once and carries it alongside abilityScores/classEntries.
+  // #1291: edition-aware subclass gate — resolved once by the caller (resolveLevelUpContext) since this pure planner has no row to read editionOf from.
   edition: RulesEdition;
-  // #1497: the CURRENT effectiveMaxHitPoints composition inputs (hp-core.ts) —
-  // resolveLevelUpContext resolves these once via effectiveMaxHitPointsForRow
-  // (mirroring buildHpOpContext), so hitPointsStep can preview the post-level
-  // EFFECTIVE max through the SAME function bumpHpForLevelUp (hp-ops.ts)
-  // commits with, rather than re-deriving exhaustion's PHB'14 p. 291 tier-4
-  // halving inline. `rawMax` is the STORED pre-halving max (hp.max, not the
-  // served already-halved character.hitPoints.max). Optional with an inert
-  // all-zero default (hitPointsStep) — matches extraAsiLevels/subclassLevel's
-  // own optional-with-fallback pattern above — so the many existing plan
-  // fixtures that never touch exhaustion don't need updating.
+  // #1497: effectiveMaxHitPoints composition inputs, resolved once by resolveLevelUpContext (effectiveMaxHitPointsForRow) so hitPointsStep previews the post-level EFFECTIVE max through the same function bumpHpForLevelUp commits with. `rawMax` is the pre-halving stored max, not the served character.hitPoints.max.
   hpBaseline?: { rawMax: number; maxHpBonus: number; exhaustionLevel: number };
 }
 
-// The class entry AFTER this level-up. subclassLevel is passed in ALREADY
-// edition-resolved (a pure fn can't fetch the catalog Class row or the
-// character's edition) — the caller must route the raw catalog column through
-// subclassGateLevel(..., edition) first (#1308); this field is never the raw
-// 2014-only column. Defaults to 3 when absent, matching subclassGateLevel's own
-// default.
+// subclassLevel arrives already edition-resolved via subclassGateLevel (#1308) — never the raw 2014-only catalog column. Defaults to 3, matching subclassGateLevel's own default.
 export interface TargetClassEntry {
   name: string;
   subclass?: string | null;
-  // #1148 review finding: the FK identity resolveSubclassSlug prefers over
-  // the (drift-prone) `subclass` display name — resolveLevelUpContext
-  // resolves this from the PERSISTED entry's subclassRef (mirroring
-  // persistedSubclassId's own comment), `null` when no subclass is chosen
-  // yet or the target is a brand-new entry. Without this field,
-  // fightingStyleFeatStep's resolveSubclassSlug call had no FK path at all —
-  // only the exact-name fallback, silently missing a Champion whose
-  // CharacterClassEntry.name or .subclass text had drifted from the catalog.
+  // resolveSubclassSlug prefers this FK identity over the drift-prone `subclass` display name; resolveLevelUpContext resolves it from the persisted entry's subclassRef. `null` when no subclass is chosen yet or a brand-new entry (#1148).
   subclassRef?: { slug: string } | null;
-  // #1531: the same PERSISTED (or re-plan PICKED, mirroring subclassRef's own
-  // comment) subclass's casterFraction/spellcastingAbility — the caller
-  // resolves this from the Subclass row alongside subclassRef.slug, since a
-  // pure planner has no DB relation to read it from itself. Every third-caster
-  // check below (newSpells' levelUpSpellPicks/swapCadenceFor/
-  // maxSpellLevelForClass/spellListsFor/casterModelFor) reads THIS field, never
-  // `subclass`/`subclassRef.slug` — replaces the retired THIRD_CASTER_SUBCLASSES
-  // name-keyed lookup (spellcasting-tables.ts).
+  // #1531: persisted/re-plan-picked subclass's casterFraction/spellcastingAbility. Every third-caster check below reads THIS field, never `subclass`/`subclassRef.slug`.
   subclassCasterRef?: SubclassCasterRef | null;
   newLevel: number;
   subclassLevel?: number;
-  // The hit die THIS level-up rolls, already resolved through advancingHitDie by
-  // the caller. Required rather than optional (#1380): an optional field would
-  // let a future construction site silently fall back to the character's
-  // persisted position-0 die, which is the multiclass wrong-die bug.
+  // #1380: required (not optional) so a future call site can't silently fall back to the persisted position-0 die — the multiclass wrong-die bug.
   hitDie: string;
-  // #1529: CharacterClass.extraAsiLevels/fightingStyleFeatLevel, already
-  // resolved by the caller (resolveLevelUpContext, alongside subclassLevel) —
-  // a pure planner has no DB relation to read them from itself. Defaults ([]
-  // / null) match a homebrew class's catalog-less fallback, same shape as
-  // subclassLevel's own default-3 comment.
+  // #1529: resolved by the caller (resolveLevelUpContext) — a pure planner has no DB relation to read these. Defaults ([]/null) match a homebrew class's catalog-less fallback.
   extraAsiLevels?: number[];
   fightingStyleFeatLevel?: number | null;
-  // #1546 Part B-i: the seeded ClassFeature rows for THIS target — the FK
-  // carrier resolveLevelUpContext resolves (TARGET_ENTRY_SELECT, mirroring
-  // characterInclude's class.features/subclassRef.features), same rationale
-  // as subclassLevel/extraAsiLevels above (a pure planner has no DB relation
-  // to read these itself). `subclassFeatureRows` is the PERSISTED subclass's
-  // own rows — absent when no subclass is chosen yet. The not-yet-committed
-  // `?subclassId=` pick's own rows travel separately, as resolveLevelUpPlan's
-  // own parameter (mirroring persistedGrantSource/pickedGrantSource,
-  // level-up.ts, which solves this exact persisted/picked split for #898's
-  // granted spells) — never baked onto this field, since a re-plan target
-  // hasn't actually committed to that subclass.
+  // #1546: seeded ClassFeature rows for THIS target, resolved by the caller — a pure planner has no DB relation to read these. subclassFeatureRows is the PERSISTED subclass's own rows; a not-yet-committed `?subclassId=` pick's rows travel separately as resolveLevelUpPlan's own parameter.
   classFeatureRows?: ClassFeatureRow[];
   subclassFeatureRows?: ClassFeatureRow[];
-  // #1631: the EFFECTIVE subclass's SubclassSpellListExpansion spellIds
-  // (already edition-admitted by the caller, loadSubclassSpellListExpansionIds)
-  // — a pure planner has no DB relation to read these itself, same rationale
-  // as classFeatureRows/subclassFeatureRows above. "Effective" mirrors
-  // subclassFeatureRows' own persisted/picked resolution: the caller uses the
-  // not-yet-committed pick when this same level-up sets a new subclass, else
-  // the persisted one. Folded into newSpellsStep's meta.expandedSpellIds,
-  // widening the choosable pool a leveled pick may come from (never a free
-  // grant — that's SubclassGrantedSpell's role) alongside spellLists.
+  // #1631: the EFFECTIVE subclass's SubclassSpellListExpansion spellIds, already edition-admitted by the caller (loadSubclassSpellListExpansionIds) — uses the not-yet-committed pick when this level-up sets a new subclass, else the persisted one. Widens newSpellsStep's choosable pool; never a free grant.
   subclassSpellListExpansionIds?: string[];
 }
 
-// The target plus its derived resources at N and N-1 — the context each step reads.
 interface PlanContext {
   target: TargetClassEntry;
-  // hitPointsStep's Con modifier source; every other step reads the scores only
-  // through the already-derived `now`/`prev`.
+  // hitPointsStep's Con modifier source; every other step reads the scores only through the already-derived `now`/`prev`.
   abilityScores: Record<string, number>;
   now: DerivedClassInfo | null;
   prev: DerivedClassInfo | null;
-  // Threaded to newSpellsStep's spellListsFor call — Magical Secrets resolves
-  // differently per edition (#1440).
+  // Threaded to newSpellsStep's spellListsFor call — Magical Secrets resolves differently per edition (#1440).
   edition: RulesEdition;
-  // hitPointsStep's effective-max preview inputs — see
-  // LevelUpPlanCharacter.hpBaseline's own comment.
+  // hitPointsStep's effective-max preview inputs (#1497).
   hpBaseline?: { rawMax: number; maxHpBonus: number; exhaustionLevel: number };
 }
 
-// deriveResources at a given per-class level, holding the target subclass fixed.
 function derivedAt(
   target: TargetClassEntry,
   abilityScores: Record<string, number>,
@@ -157,29 +91,8 @@ function derivedAt(
   edition: RulesEdition,
 ): DerivedClassInfo | null {
   if (level < 1) return null;
-  // #1546 Part B-i threaded this carrier (target.classFeatureRows/
-  // subclassFeatureRows, resolved by the caller — see TargetClassEntry's own
-  // comment), replacing the `undefined` this call passed before. #1546 Part
-  // B-ii is what makes it load-bearing: Battle Master's maneuverChoiceCount/
-  // toolProfChoiceCount/announcedSaveDC (#1589, renamed from maneuverSaveDC)
-  // moved OFF SubclassDefinition.deriveExtras
-  // (code) onto these rows (registry.ts's deriveRowExtras), so choiceCountStep
-  // below now genuinely diffs row-driven counts, not a coincidental `?? 0` over
-  // two absent code-authored values. That also opens a null-flip channel this
-  // function's callers must tolerate: with an EMPTY carrier (a bare test
-  // fixture, or a class/subclass whose only content is now row-driven),
-  // deriveResources' `resources.length === 0 && features.length === 0 &&
-  // !hasExtras` guard can return null here where a real carrier would have
-  // returned a populated object — see derive-resources-null-flip.test.ts and
-  // level-up-plan-feature-rows.test.ts's explicit boundary assertion. Every
-  // step below stays null-safe through `now?.[field] ?? 0` /
-  // `prev?.[field] ?? 0` regardless (choiceCountStep), so a flip to null here
-  // only ever reads as "nothing granted yet", never throws.
-  // subclassLevel (#1576) feeds isSubclassActive so the gate survives its
-  // class module's deletion. Safe to pass the value `target` already carries
-  // even though the caller resolved it through subclassGateLevel first:
-  // re-applying that function is idempotent — 2024 returns 3 for any input,
-  // and 2014 returns `x ?? 3`, which is `x` for an already-resolved x.
+  // #1546: an EMPTY featureRows carrier can make deriveResources' null-guard return null where a populated carrier would return an object — every step below stays null-safe via `now?.[field] ?? 0` / `prev?.[field] ?? 0` regardless.
+  // #1576: passing target.subclassLevel (already subclassGateLevel-resolved) is safe — the function is idempotent on an already-resolved input.
   const featureRows: ClassFeatureRowsCarrier = {
     classRows: target.classFeatureRows ?? [],
     subclassRows: target.subclassFeatureRows ?? [],
@@ -188,37 +101,11 @@ function derivedAt(
   return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level), featureRows, edition);
 }
 
-// Everything the ceremony's HP step shows the player: the advancing die, the Con
-// modifier that applies to it, and the two outcomes they are choosing between
-// (#1380). Every number routes through levelUpHpGain — the same function
-// applyLevelUpOp commits with — so the preview and the commit agree by
-// construction rather than by two matching copies of the arithmetic.
-//
-// `fixedAverage` is served rather than left to the client as averageGain −
-// conMod: the max(1, …) level-up floor makes that subtraction wrong (a d6 with
-// Con 1 gives averageGain 1, and 1 − (−5) reads 6, not 4).
-//
-// Missing constitution defaults to 10, matching buildHpOpContext — a plan that
-// diverged there would preview NaN against a real committed number.
-//
-// No `edition` parameter on the gain numbers themselves: the fixed-average
-// table (d6→4 … d12→7) and the floor read identically in SRD 5.1 and SRD 5.2
-// (PHB'14 p. 15 / PHB'24 p. 36). `edition` IS threaded into
-// effectiveMaxHitPoints below, since THAT composition forks (exhaustion's
-// PHB'14 p. 291 tier-4 halving is 2014-only, condition-data.ts).
-//
-// #1497: `effectiveMaxAverage`/`effectiveMaxByRoll` are the post-level
-// EFFECTIVE max (the same number `character.hitPoints.max` serves) — routed
-// through effectiveMaxHitPoints, the SAME function bumpHpForLevelUp
-// (hp-ops.ts) commits with, over `hpBaseline.rawMax + gain` for each outcome.
-// This is NOT `currentMax + gain`: at exhaustion 4+ the halving grows with the
-// new max too, so that arithmetic silently disagreed with the commit whenever
-// the pre-halving max's parity flipped — the bug this field exists to close.
-// Serving it unconditionally (never just at exhaustion 4+) needs no edition/
-// exhaustion branch here: effectiveMaxHitPoints's own penalty is 0 off that
-// tier, so the general formula already reduces to `rawMax + gain` there.
-// `effectiveMaxByRoll` is indexed 1..faces (index 0 is inert/unused) so the
-// client can read `array[roll]` directly with no off-by-one arithmetic.
+// Every number routes through levelUpHpGain — the same function applyLevelUpOp commits with — so preview and commit agree by construction.
+// `fixedAverage` is served rather than left to the client as averageGain − conMod: the max(1, …) level-up floor makes that subtraction wrong.
+// No `edition` param on the gain numbers (PHB'14 p. 15 / PHB'24 p. 36 read identically); `edition` IS threaded into effectiveMaxHitPoints below since exhaustion's PHB'14 p. 291 tier-4 halving is 2014-only.
+// #1497: effectiveMaxAverage/effectiveMaxByRoll route through effectiveMaxHitPoints — the same function bumpHpForLevelUp commits with — over `hpBaseline.rawMax + gain`, not `currentMax + gain` (wrong once the pre-halving max's parity flips at exhaustion 4+).
+// effectiveMaxByRoll is indexed 1..faces (index 0 unused) for direct `array[roll]` reads.
 function hitPointsStep({ target, abilityScores, hpBaseline, edition }: PlanContext): LevelUpStep {
   const faces = hitDieFace(target.hitDie);
   const conMod = abilityModifier(abilityScores.constitution ?? 10);
@@ -251,19 +138,12 @@ function advancementStep({ target }: PlanContext): LevelUpStep | null {
   return delta > 0 ? { kind: "advancement", count: delta } : null;
 }
 
-// Emitted only when reaching the subclass level with no subclass yet chosen.
 function subclassStep({ target }: PlanContext): LevelUpStep | null {
   const subclassLevel = target.subclassLevel ?? 3;
   return target.newLevel === subclassLevel && !target.subclass ? { kind: "subclass" } : null;
 }
 
-// A Fighting Style feat pick (#1137): Fighter's arrives with a new level-1 entry,
-// Paladin's and Ranger's at level 2, and a Champion's second slot at 7 (2024) /
-// 10 (2014) — #1148. Derived from the fightingStyleFeatSlots delta. `target.subclass`
-// is resolved via resolveSubclassSlug (never a raw string comparison, #1277) —
-// this is the CURRENTLY-KNOWN persisted subclass (see buildLevelUpPlan's own
-// comment), so a level-up that PICKS Champion this same step doesn't yet see
-// the extra slot, matching subclassStep's own persisted-only gate.
+// #1137: Fighter's arrives at level 1, Paladin's/Ranger's at level 2, and a Champion's second slot at 7 (2024) / 10 (2014, #1148) — derived from the fightingStyleFeatSlots delta. `target.subclass` resolves via resolveSubclassSlug, never a raw string comparison (#1277).
 function fightingStyleFeatStep({ target, edition }: PlanContext): LevelUpStep | null {
   const fightingStyleFeatLevel = target.fightingStyleFeatLevel ?? null;
   const subclass = resolveSubclassSlug(target.name, target);
@@ -273,17 +153,7 @@ function fightingStyleFeatStep({ target, edition }: PlanContext): LevelUpStep | 
   return delta > 0 ? { kind: "fightingStyleFeat", count: delta } : null;
 }
 
-// Diff one bespoke choose-N count (maneuvers/tools) across N vs N-1.
-// #1516: maneuvers carries meta.canSwap unconditionally whenever the step
-// exists — "Each time you learn new maneuvers, you can also replace one
-// maneuver you know with a different one" (PHB'14 Battle Master p.73; SRD 5.2
-// carries the equivalent grant). Unlike subclassChoiceSwapCadence (per
-// catalogSource, since most choose-N features carry no such text), EVERY
-// source of maneuverChoiceCount grants this, and the condition is exactly
-// "new maneuvers were just learned" — the same delta>0 that already gates
-// this step's existence — so no separate swap-only step is needed, mirroring
-// subclassChoiceSteps' own reasoning. Tool proficiency choices carry no such
-// text, so they never get canSwap.
+// #1516: maneuvers carries meta.canSwap unconditionally whenever the step exists (PHB'14 Battle Master p. 73; SRD 5.2 carries the equivalent grant) — every source of maneuverChoiceCount grants this swap. Tool proficiency choices carry no such text, so they never get canSwap.
 function choiceCountStep(
   { now, prev }: PlanContext,
   kind: LevelUpStepKind,
@@ -294,13 +164,7 @@ function choiceCountStep(
   return { kind, count: delta, ...(kind === "maneuvers" ? { meta: { canSwap: true } } : {}) };
 }
 
-// Generic subclass "choose N from a catalog" (#899): one step per key that
-// grew. `canSwap` (#1503) rides `meta` for a catalogSource whose swap cadence
-// is "onLevelUp" — unlike newSpellsStep's swap (legal even on a no-new-picks
-// level, so it needs its own swap-only step), a choose-N swap is PHB'14-legal
-// only "whenever you learn a new X" — exactly the condition that already
-// gates this step's existence (delta > 0) — so no separate swap-only step is
-// needed; canSwap just rides the step that's already there.
+// #899: one step per catalog key that grew. `canSwap` (#1503) rides `meta` when the catalogSource's swap cadence is "onLevelUp" — legal only "whenever you learn a new X", the same delta>0 condition that already gates this step's existence.
 function subclassChoiceSteps({ now, prev, edition }: PlanContext): LevelUpStep[] {
   const prevCounts = new Map((prev?.subclassChoices ?? []).map((c) => [c.key, c.count]));
   return (now?.subclassChoices ?? [])
@@ -318,55 +182,22 @@ function subclassChoiceSteps({ now, prev, edition }: PlanContext): LevelUpStep[]
     }));
 }
 
-// Per-edition: onLevelUp-cadence casters offer the prepared/known-count delta
-// plus one optional swap (#1101), so a swap-only step (count 0, canSwap) is
-// emitted even on a no-new-spells level — Bard/Sorcerer/Warlock + EK/AT in BOTH
-// editions, plus the 2014 Ranger (SRD 5.1 swaps on level-up; SRD 5.2's Ranger
-// re-prepares on a rest instead, #1509). The Wizard scribes a flat 2 with no
-// swap. #1131: every caster also picks new cantrips on a cantrips-known growth
-// level (so Cleric/Druid get a cantrips-only step at 4/10), and a fresh level-1
-// entry offers its full initial spell+cantrip picks with no swap (a new entry
-// may not swap other classes' spells). Bard picks from level 10 are Magical
-// Secrets. `spellLists`/`cantripLists` (#1440) are the served membership facts:
-// the eligibility gate (assertPickSpellEligibility) and the picker
-// (eligibleNewSpells/eligibleNewCantrips) both read these rather than
-// re-deriving magicalSecretsSpellLists themselves — one rule, one call site,
-// emitted unconditionally (including when null) so "explicitly unrestricted"
-// stays distinguishable from "absent". `casterModel` (#1509 D5) is the served
-// noun the ceremony's swap copy renders — "known" for a 2014 Bard/Sorcerer/
-// Warlock/Ranger (+ EK/AT in either edition), "prepared" for every SRD 5.2
-// caster and every 2014 re-prepare class — so level-up-submission.ts's swap
-// messages and the frontend never re-derive it from className/edition.
-// spellLists/cantripLists (#1825) resolve through spellListsFor — the same
-// resolver GET /api/spells (routes/catalog/spells.ts) uses — so the EK/AT →
-// wizard redirect and Bard Magical Secrets can never diverge between the
-// level-up gate and the catalog picker.
-// #1631: split out of newSpellsStep purely to keep that function's own
-// cyclomatic count from crossing the CI health gate (mirrors this file's own
-// split reasoning elsewhere, e.g. subclassChoiceSteps). Never applies to
-// cantripLists (no seeded expansion list grants a cantrip today).
+// #1440/#1825: spellLists/cantripLists resolve through spellListsFor — the same resolver GET /api/spells uses — so the eligibility gate, the picker, and the catalog picker can never diverge on EK/AT's wizard redirect or Bard Magical Secrets. Served even when null so "explicitly unrestricted" stays distinguishable from "absent".
+// #1509: `casterModel` is the served noun ("known" vs "prepared") so level-up-submission.ts's swap messages and the frontend never re-derive it from className/edition.
+// #1101/#1131: onLevelUp-cadence casters get a swap-only step even with no new spells; every caster also picks cantrips on a cantrips-known growth level. No seeded expansion list grants a cantrip today, so this never applies to cantripLists.
 function expandedSpellIdsMeta(target: TargetClassEntry): { expandedSpellIds: string[] } | Record<string, never> {
   return target.subclassSpellListExpansionIds?.length ? { expandedSpellIds: target.subclassSpellListExpansionIds } : {};
 }
 
-// #1855: the Eldritch Knight leveled-spell school gate (PHB'14 p. 74) — resolved
-// through resolveSubclassSlug (#1277), never a name literal, mirroring this
-// file's own subclassChoiceSteps/fightingStyleFeatStep identity checks. `null`
-// for every non-EK target (including Arcane Trickster, out of #1855's scope)
-// so newSpellsStep's meta spread below omits spellSchools entirely for them.
+// #1855: Eldritch Knight leveled-spell school gate (PHB'14 p. 74) — resolved through resolveSubclassSlug (#1277), never a name literal. `null` for every non-EK target so newSpellsStep's meta spread omits spellSchools for them.
 function ekSpellSchoolGate(target: TargetClassEntry, edition: RulesEdition): SpellSchoolGate | null {
   const slug = resolveSubclassSlug(target.name, { subclass: target.subclass, subclassRef: target.subclassRef });
   return isEldritchKnightSlug(slug) ? eldritchKnightSpellSchoolGate(target.newLevel, edition) : null;
 }
 
-// #1855: split out of newSpellsStep purely to keep that function's own
-// cyclomatic count under the fallow health gate — same #1631 reasoning as
-// expandedSpellIdsMeta just above.
 function schoolGateMeta(schoolGate: SpellSchoolGate | null): Record<string, unknown> {
   return {
-    // `schools` is `string[] | null` (SpellSchoolGate) — branch on `!== null`,
-    // never truthiness, matching level-up-transaction.ts's assertOnSpellList
-    // convention for the identically-shaped `spellLists`/`cantripLists`.
+    // `schools` is `string[] | null` — branch on `!== null`, never truthiness (matches assertOnSpellList's convention in level-up-transaction.ts).
     ...(schoolGate !== null && schoolGate.schools !== null ? { spellSchools: schoolGate.schools } : {}),
     ...(schoolGate?.freePicks ? { freeSchoolPicks: schoolGate.freePicks } : {}),
   };
@@ -399,16 +230,7 @@ function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
   };
 }
 
-/**
- * The ordered choice-steps advancing `target.name` to `target.newLevel` grants.
- * Pure — no DB access. Each step is derived by diffing a rule function at the
- * new level vs one below; steps with a zero delta are omitted.
- *
- * The plan is computed for the CURRENTLY-KNOWN subclass: when `target.subclass`
- * is null (reaching the subclass level) only the `subclass` step is emitted —
- * subclass-derived choices can't be known until the subclass is picked, so the
- * ceremony re-plans after that step.
- */
+// Computed for the CURRENTLY-KNOWN subclass: when `target.subclass` is null (reaching the subclass level) only the `subclass` step is emitted — the ceremony re-plans after that step.
 export function buildLevelUpPlan(character: LevelUpPlanCharacter, target: TargetClassEntry): LevelUpStep[] {
   const ctx: PlanContext = {
     target,

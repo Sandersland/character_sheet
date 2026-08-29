@@ -1,9 +1,4 @@
-/**
- * Pins the intentional HTTP `status` each domain error carries (#1007). The
- * central `errorHandler` maps `err.status` to the response code, so these values
- * ARE the route contract — no route-local try/catch or message-string sniffing
- * derives them any more. Pure: no DB.
- */
+// Pins the intentional HTTP `status` each domain error carries (#1007): errorHandler maps `err.status` to the response code, so these values ARE the route contract.
 import { describe, expect, it } from "vitest";
 
 import { InvalidHitPointOperationError } from "@/lib/combat/hp-core.js";

@@ -1,10 +1,3 @@
-// Pure unit tests for buildSpeciesTraitsView (#1682) — no database. Proves the
-// collection logic in isolation: species-level traits (variantId: null) plus
-// the picked variant's own traits, never a sibling variant's; a legacy
-// `race`-name-only character (no species picked) resolves to empty, not a
-// crash; the returned improvements are the flat, unevaluated FeatImprovement[]
-// applyFeatLayer later feeds into the shared deriveImprovementBonuses/
-// deriveImprovementProficiencies evaluator (this function does no summing).
 import { describe, expect, it } from "vitest";
 
 import { buildSpeciesTraitsView } from "../species.js";
@@ -40,7 +33,6 @@ describe("buildSpeciesTraitsView (#1682)", () => {
 
     const view = buildSpeciesTraitsView(row);
     expect(view.traits.map((t) => t.name).sort()).toEqual(["Darkvision", "Dwarven Toughness"].sort());
-    // The Mountain-only row never leaks in for a Hill Dwarf character.
     expect(view.traits.some((t) => t.name === "Dwarven Armor Training")).toBe(false);
     expect(view.improvements).toEqual([{ target: "maxHp", amount: 1, perLevel: true }]);
   });

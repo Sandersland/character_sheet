@@ -1,13 +1,4 @@
-/**
- * Per-entry subclass reconciliation + clamp-on-read — issue #125.
- * Fixture: a Fighter 4 / Wizard 1 multiclass (XP 6500 → derived level 5). The
- * Wizard entry carries a subclass even though its per-class level (1) is below
- * Wizard's subclassLevel (3). This is an invalid state that both the read clamp
- * (serializeCharacter `classes`) and the write reconciler (reconcileSubclass)
- * must correct per-entry — the primary Fighter is well past its own grant level,
- * so only the secondary entry is affected.
- */
-
+// Fighter 4 / Wizard 1 multiclass: the Wizard entry's subclass is below its subclassLevel gate — both the read clamp (serializeCharacter) and the write reconciler (reconcileSubclass) must correct it per-entry, leaving the primary Fighter untouched.
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -29,7 +20,7 @@ const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "MC Subclass Fixture",
   alignment: "True Neutral",
-  experiencePoints: 6500, // derived level 5
+  experiencePoints: 6500,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -99,7 +90,6 @@ describe("per-entry subclass reconcile + clamp (#125)", () => {
   });
 
   it("reconcile-on-write clears the below-grant subclass on an XP op", async () => {
-    // Any XP op runs the level-gated reconcilers; keep the level at 5.
     const xp = await supertest(app)
       .post(`/api/characters/${FIXTURE_ID}/experience`)
       .set("Cookie", COOKIE)
@@ -113,11 +103,7 @@ describe("per-entry subclass reconcile + clamp (#125)", () => {
   });
 });
 
-// Entry-scoped maneuver reconcile + clamp for a SECONDARY Battle Master (#1177):
-// before the fix, both loadResourcesReconcileState and buildResourcesView derived
-// maneuverChoiceCount from classEntries[0] (the wizard primary) at total level —
-// undefined on a spellcaster primary, so the cap check was skipped and a level-
-// down never trimmed the secondary fighter's maneuvers at all.
+// maneuverChoiceCount must derive per-entry: loadResourcesReconcileState and buildResourcesView must not read classEntries[0] (the primary) at total level — undefined for a spellcaster primary skips the cap check entirely.
 describe("entry-scoped maneuver reconcile + clamp (#1177)", () => {
   const OWNER = "owner-1177-maneuver-reconcile";
   let cookie: string;
@@ -159,9 +145,7 @@ describe("entry-scoped maneuver reconcile + clamp (#1177)", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER);
     cookie = await authCookie(OWNER);
-    // #1524: production always sets classId/subclassId alongside the
-    // subclass string (routes/character/class.ts, level-up.ts); resolved
-    // here so these fixtures match that shape.
+    // Production always sets classId/subclassId alongside the subclass string — resolved here to match that shape.
     evocationWizardId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } })).id;
     evocationSubclassId = (await prisma.subclass.findFirstOrThrow({ where: { classId: evocationWizardId, name: "School of Evocation" } })).id;
     battleMasterFighterId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
@@ -176,7 +160,7 @@ describe("entry-scoped maneuver reconcile + clamp (#1177)", () => {
         id: CHAR_ID,
         name: "1177 Maneuver Reconcile Trim",
         ownerId: OWNER,
-        experiencePoints: 64000, // total level 10 (wizard 3 + fighter 7), no pending
+        experiencePoints: 64000,
         hitDice: { total: 10, die: "d8", spent: 0 },
         resources: resourcesWith(FIVE_MANEUVERS) as unknown as Prisma.InputJsonValue,
         classEntries: {
@@ -188,13 +172,11 @@ describe("entry-scoped maneuver reconcile + clamp (#1177)", () => {
       },
     });
 
-    // Level down by one (fighter 7→6 via reconcileClassEntryLevels, LIFO by
-    // position — the secondary loses the level). Fighter-6 Battle Master caps
-    // at 3 maneuvers (< the level-7 threshold of 5).
+    // reconcileClassEntryLevels trims LIFO by position, so the secondary (fighter) loses the level; fighter-6 Battle Master caps at 3 maneuvers.
     const xp = await supertest(app)
       .post(`/api/characters/${CHAR_ID}/experience`)
       .set("Cookie", cookie)
-      .send({ operations: [{ type: "set", value: 48000 }] }); // level 9 threshold
+      .send({ operations: [{ type: "set", value: 48000 }] });
     expect(xp.status).toBe(200);
     expect(xp.body.resources.maneuversKnown).toHaveLength(3);
 
@@ -222,10 +204,9 @@ describe("entry-scoped maneuver reconcile + clamp (#1177)", () => {
         id: CHAR_ID,
         name: "1177 Maneuver Reconcile Clamp",
         ownerId: OWNER,
-        experiencePoints: 48000, // total level 9 (wizard 3 + fighter 6), no pending
+        experiencePoints: 48000,
         hitDice: { total: 9, die: "d8", spent: 0 },
-        // Simulates a not-yet-reconciled character: 5 maneuvers stored even
-        // though the fighter entry is already at level 6 (cap 3).
+        // Simulates a not-yet-reconciled character: 5 maneuvers stored though the fighter entry is already at level 6 (cap 3).
         resources: resourcesWith(FIVE_MANEUVERS) as unknown as Prisma.InputJsonValue,
         classEntries: {
           create: [
@@ -238,8 +219,6 @@ describe("entry-scoped maneuver reconcile + clamp (#1177)", () => {
 
     const res = await supertest(app).get(`/api/characters/${CHAR_ID}`).set("Cookie", cookie);
     expect(res.status).toBe(200);
-    // Before the fix: maneuverChoiceCount was undefined (derived from the
-    // wizard primary) and maneuversKnown passed through all 5 unclamped.
     expect(res.body.resources.maneuverChoiceCount).toBe(3);
     expect(res.body.resources.maneuversKnown).toHaveLength(3);
 

@@ -1,8 +1,4 @@
-// #1588: clamp-on-read + skills[].expertise wire flag. A rogue's chosen
-// expertiseKnown skills set expertise:true on exactly those skills; storage
-// exceeding the level-derived expertiseChoiceCount (a level-down that hasn't
-// been reconciled yet) clamps on read, mirroring toolProficienciesKnown's own
-// clamp-on-read contract (character-serialize-snapshot.test.ts).
+// Clamp-on-read (#1588): storage exceeding the level-derived expertiseChoiceCount (an unreconciled level-down) clamps on read, mirroring toolProficienciesKnown's own contract.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -57,7 +53,7 @@ describe("skills[].expertise + resources.expertiseKnown clamp-on-read (#1588)", 
         ownerId: OWNER_ID,
         alignment: "Chaotic Neutral",
         rulesEdition: "EDITION_2014",
-        experiencePoints: 14000, // level 6
+        experiencePoints: 14000,
         initiativeBonus: 0,
         speed: 30,
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 12, charisma: 10 },
@@ -92,7 +88,7 @@ describe("skills[].expertise + resources.expertiseKnown clamp-on-read (#1588)", 
         ownerId: OWNER_ID,
         alignment: "Chaotic Neutral",
         rulesEdition: "EDITION_2014",
-        experiencePoints: 0, // level 1
+        experiencePoints: 0,
         initiativeBonus: 0,
         speed: 30,
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 12, charisma: 10 },

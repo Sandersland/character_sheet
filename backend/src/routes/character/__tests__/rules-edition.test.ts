@@ -7,9 +7,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { seededSpeciesAnchor } from "@/test-support/species.js";
 
-// #1285: the rulesEdition discriminator. Existing rows stamp EDITION_2024
-// because the shipped catalog is uniformly 2024 — stamping 2014 would point a
-// sheet at rules for which no content exists (audit on #1281).
+// Existing rows stamp EDITION_2024 because the shipped catalog is uniformly 2024 — 2014 would point a sheet at rules with no content (#1281).
 const OWNER_ID = "owner-rules-edition";
 let COOKIE: string;
 
@@ -20,9 +18,7 @@ const BASE = {
   abilityScores: { strength: 15, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
 };
 
-// #1684: the species anchor is resolved per the REQUESTED edition (a missing
-// rulesEdition defaults to 2024, same default the create route itself uses) —
-// Dwarf's 2014 row requires a variantId (Hill Dwarf) that its 2024 row doesn't.
+// The species anchor resolves per the REQUESTED edition (defaulting to 2024, same as the create route) — Dwarf's 2014 row requires a variantId (Hill Dwarf) its 2024 row doesn't.
 async function create(body: { rulesEdition?: string } & Record<string, unknown>) {
   const anchor = await seededSpeciesAnchor((body.rulesEdition as "EDITION_2014" | "EDITION_2024") ?? "EDITION_2024");
   return supertest(app).post("/api/characters").set("Cookie", COOKIE).send({ ...anchor, ...body });
@@ -63,9 +59,7 @@ describe("rulesEdition on the character wire (#1285)", () => {
     expect(res.body.rulesEdition).toBe("EDITION_2014");
   });
 
-  // #1436: the resolved label rides the key, so the sheet's edition badge is
-  // synchronous and the frontend holds no label table. Both editions, because a
-  // single-edition assertion also passes a hardcoded string.
+  // The label rides the key (frontend holds no label table) — both editions tested since a single-edition assertion would also pass a hardcoded string.
   it("GET /api/characters/:id serves rulesEditionLabel for both editions", async () => {
     const twentyFour = await create({ ...BASE, name: "RulesEdition Label 2024" });
     expect((await get(twentyFour.body.id)).body.rulesEditionLabel).toBe("2024 rules");
@@ -79,10 +73,7 @@ describe("rulesEdition on the character wire (#1285)", () => {
   });
 });
 
-// Write-once (#1281, 2026-07-25). These are regression pins, not red-first
-// tests: .strict() on updateCharacterSchema already rejects an unknown key, so
-// they pass before the change. Their value is failing the day someone adds
-// rulesEdition to a mutable schema.
+// Regression pins, not red-first: .strict() on updateCharacterSchema already rejects an unknown key — value is failing the day rulesEdition is added to a mutable schema.
 describe("rulesEdition is write-once (#1285)", () => {
   async function make2014() {
     const res = await create({ ...BASE, name: "RulesEdition Immutable", rulesEdition: "EDITION_2014" });

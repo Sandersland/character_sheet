@@ -23,34 +23,19 @@ import { RULES_EDITION_LABELS } from "@/lib/rules/edition.js";
 import { activeSessionForCampaign, getActiveSession } from "@/lib/session/sessions.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
-// Shared-campaign backbone (#246). Plain-REST (like journal.ts): no audit log,
-// no transaction-op pattern. Membership is identity state, access is gated via
-// assertCampaignMembership. Mounted after requireAuth, so req.user is always set.
-//
-// createCampaignSchema/joinCampaignSchema/attachCharacterSchema live in
-// @character-sheet/contracts (#1394) — rulesEdition is optional there (the
-// Prisma column default applies when omitted); the picker at campaign
-// creation is #1286, the column has carried it since #1285. Never patchable
-// after creation: there is no PATCH /campaigns/:id route, so "frozen once
-// set" holds by simple absence of a mutation path.
+// rulesEdition is write-once — there is no PATCH /campaigns/:id route; don't add one that touches it.
 
 export const campaignsRouter = Router();
 
-// Same opaque-token recipe as session.ts.
 function generateInviteCode(): string {
   return crypto.randomBytes(12).toString("base64url");
 }
 
-// Every campaign row on the wire carries its resolved edition label next to the
-// key (#1436, the #1322 precedent), so the client's edition badge needs neither a
-// label table of its own nor a /api/editions round-trip. Applied at each
-// campaign-returning res.json below — serializeCharacter carries its own, so the
-// attach handler's response needs nothing here.
+// Wrap every campaign-returning res.json in withEditionLabel (skip the attach handler — serializeCharacter carries its own).
 function withEditionLabel<T extends { rulesEdition: RulesEdition }>(row: T) {
   return { ...row, rulesEditionLabel: RULES_EDITION_LABELS[row.rulesEdition] };
 }
 
-// Standard include for campaign reads: members (with user) + their characters.
 const campaignInclude = {
   members: {
     include: {
@@ -59,10 +44,6 @@ const campaignInclude = {
   },
 };
 
-/**
- * POST /api/campaigns
- * Create a campaign + the creator's OWNER membership in one transaction.
- */
 campaignsRouter.post("/campaigns", async (req, res) => {
   const data = parseBodyOr400(createCampaignSchema, req.body, res);
   if (data === undefined) return;
@@ -71,8 +52,7 @@ campaignsRouter.post("/campaigns", async (req, res) => {
   const campaign = await prisma.campaign.create({
     data: {
       name: data.name,
-      // Omitted when absent so the column's own @default(EDITION_2024) applies
-      // (one literal, not duplicated here).
+      // Omitted when absent so the column's own @default(EDITION_2024) applies.
       ...(data.rulesEdition ? { rulesEdition: data.rulesEdition } : {}),
       ownerId: userId,
       inviteCode: generateInviteCode(),
@@ -84,10 +64,6 @@ campaignsRouter.post("/campaigns", async (req, res) => {
   res.status(201).json(withEditionLabel(campaign));
 });
 
-/**
- * GET /api/campaigns
- * Every campaign the caller is a member of, with their own role surfaced.
- */
 campaignsRouter.get("/campaigns", async (req, res) => {
   const userId = req.user!.id;
   const campaigns = await prisma.campaign.findMany({
@@ -99,16 +75,12 @@ campaignsRouter.get("/campaigns", async (req, res) => {
   res.json(
     campaigns.map((campaign) => ({
       ...withEditionLabel(campaign),
-      // The membership always exists (the WHERE filters to it); ?? satisfies the type.
+      // The membership always exists (the WHERE filters to it); ?? only satisfies the type.
       role: campaign.members.find((m) => m.userId === userId)?.role ?? "PLAYER",
     })),
   );
 });
 
-/**
- * GET /api/campaigns/:id
- * Members + each member's characters (id + name).
- */
 campaignsRouter.get("/campaigns/:id", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
@@ -127,12 +99,7 @@ campaignsRouter.get("/campaigns/:id", async (req, res) => {
   res.json({ ...withEditionLabel(campaign), role });
 });
 
-/**
- * DELETE /api/campaigns/:id
- * Owner-only. One atomic row delete: every campaign child cascades except
- * characters, which survive detached (Character.campaignId is SetNull). 409s
- * while a session is active so a delete can't silently end live play.
- */
+// Every campaign child cascades except characters, which survive detached (Character.campaignId is SetNull).
 const ACTIVE_SESSION_CONFLICT = "End the campaign's active session before deleting it";
 
 campaignsRouter.delete("/campaigns/:id", async (req, res) => {
@@ -163,10 +130,6 @@ campaignsRouter.delete("/campaigns/:id", async (req, res) => {
   res.status(204).end();
 });
 
-/**
- * POST /api/campaigns/join
- * Resolve a campaign by invite code and join as PLAYER (idempotent on @@unique).
- */
 campaignsRouter.post("/campaigns/join", async (req, res) => {
   const data = parseBodyOr400(joinCampaignSchema, req.body, res);
   if (data === undefined) return;
@@ -194,11 +157,7 @@ campaignsRouter.post("/campaigns/join", async (req, res) => {
   res.json(withEditionLabel(joined));
 });
 
-/**
- * POST /api/campaigns/:id/characters
- * Attach one of the caller's characters to the campaign. Returns the full
- * serialized character so the frontend can swap state in one assignment.
- */
+// Returns the full serialized character so the frontend can swap state in one assignment.
 campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
   const data = parseBodyOr400(attachCharacterSchema, req.body, res);
   if (data === undefined) return;
@@ -209,10 +168,7 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
   await assertCharacterAccess(prisma, userId, characterId, "edit");
   await assertCampaignMembership(prisma, userId, campaignId, "view");
 
-  // Blocked join on edition mismatch (#1286): a character's rulesEdition is
-  // write-once, so a mismatched campaign can never be joined, only refused —
-  // there is no conversion path to offer. Checked before the solo-session
-  // auto-close below so a doomed join doesn't have that side effect.
+  // Checked before the solo-session auto-close below so a doomed join doesn't have that side effect (#1286).
   const [character, campaign] = await Promise.all([
     prisma.character.findUniqueOrThrow({ where: { id: characterId }, select: { rulesEdition: true } }),
     prisma.campaign.findUniqueOrThrow({ where: { id: campaignId }, select: { rulesEdition: true } }),
@@ -228,14 +184,7 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
   // Settle a stale solo session (auto-close) before the guard read below (#1081).
   await getActiveSession(characterId);
 
-  // Attach + PC-entity auto-register in one transaction so the character is never
-  // attached without its wiki link. The conditional update guards a TOCTOU race:
-  // only a null or same-campaign FK matches, so a different-campaign attach
-  // matches nothing → count 0 → alreadyInCampaign, and a same-campaign re-attach
-  // is a no-op success (the @unique characterId link keeps entity creation
-  // idempotent). A live solo session blocks the attach (#1081): its events belong
-  // to the solo timeline, so it must be ended first. Re-checked inside the tx to
-  // close the TOCTOU window against a concurrent solo start.
+  // One transaction so the character is never attached without its wiki link; re-checks the solo-session guard (#1081) here to close a TOCTOU race.
   const outcome = await prisma.$transaction(
     async (tx): Promise<"attached" | "alreadyInCampaign" | "soloSessionActive"> => {
       const soloActive = await tx.session.findFirst({
@@ -244,11 +193,7 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
       });
       if (soloActive) return "soloSessionActive";
 
-      // rulesEdition is deliberately not written here: joining a campaign never
-      // converts a character's edition (write-once, #1281) — a mismatch is
-      // rejected above, before this transaction, never reconciled here.
-      // attachCharacterUpdate is extracted so campaign-attach.test.ts can pin
-      // that guarantee directly, bypassing the guard above (see its comment).
+      // rulesEdition is deliberately not written here: a mismatch is rejected above, before this transaction (write-once, #1281).
       const { count } = await attachCharacterUpdate(tx, characterId, campaignId);
       if (count === 0) return "alreadyInCampaign";
 

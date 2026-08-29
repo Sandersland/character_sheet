@@ -1,9 +1,3 @@
-// POST /api/characters — 2024 lineage casting-ability choice (#1683). The
-// Int/Wis/Cha choice a spell-granting lineage/legacy makes at creation,
-// snapshotted onto CharacterRace.castingAbility. Mirrors species-ability-
-// increases-create.test.ts's structure (real seeded Species/SpeciesVariant
-// rows, `species: constitution would exceed 20`-style distinct error text
-// per rejection case).
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -56,9 +50,7 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
       speciesId: elf.id,
       variantId: drowVariant.id,
       castingAbility: "charisma",
-      // #1690: every 2024 Elf lineage also carries the species-level Keen
-      // Senses trait — a real, required choice landed alongside this slice,
-      // not a stray field this test happens to satisfy.
+      // Every 2024 Elf lineage also carries the species-level Keen Senses trait — a real, required choice, not a stray field (#1690).
       speciesSkills: ["survival"],
     });
     expect(res.status).toBe(201);
@@ -70,8 +62,7 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
 
   it("400s with a distinct message when castingAbility is omitted for a spell-granting lineage", async () => {
     const { elf, drowVariant } = await drow();
-    // speciesSkills (#1690's Keen Senses) supplied so the 400 below is
-    // provably castingAbility's OWN rejection, not an earlier one.
+    // speciesSkills (#1690's Keen Senses) supplied so the 400 below is provably castingAbility's own rejection, not an earlier one.
     const res = await post({
       ...baseBody,
       speciesId: elf.id,
@@ -94,8 +85,6 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
     expect(res.status).toBe(400);
   });
 
-  // A 2024 Dragonborn dragon-type variant proves the "grants no spells"
-  // rejection (Dragonborn ancestry never grants a spell).
   it("400s a submitted castingAbility for a species/variant that grants no spells (Dragonborn ancestry)", async () => {
     const dragonborn = await prisma.species.findFirstOrThrow({
       where: { slug: "dragonborn", edition: "EDITION_2024" },
@@ -132,8 +121,7 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
   });
 
   it("a 2014 character never carries a castingAbility (no 2014 row grants a spell this slice)", async () => {
-    // Human (2014): no variants, so no variantId is needed — isolates this
-    // test to the castingAbility question alone.
+    // Human (2014) has no variants, so no variantId is needed — isolates this test to the castingAbility question alone.
     const human2014 = await prisma.species.findFirstOrThrow({ where: { slug: "human", edition: "EDITION_2014" } });
     const res = await post({
       ...baseBody,
@@ -147,10 +135,7 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
   });
 });
 
-// #1756 regression: High Elf's Cantrip pins its ability (Intelligence) in the
-// chooseCantrip spec, so a submitted castingAbility must be rejected with a
-// message DISTINCT from the "grants no spells" case — while the cantrip itself
-// still resolves Intelligence-keyed when no ability is submitted.
+// High Elf's Cantrip pins its ability (Intelligence) in the chooseCantrip spec — a submitted castingAbility is rejected with a message distinct from "grants no spells", while the cantrip still resolves Intelligence-keyed unsubmitted (#1756).
 describe("POST /api/characters — 2014 High Elf's fixed-ability cantrip (#1756)", () => {
   async function highElf2014() {
     const elf = await prisma.species.findFirstOrThrow({
