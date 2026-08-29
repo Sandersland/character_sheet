@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
-import type { ClassDefinition } from "@/lib/classes/types.js";
+import { SUBCLASS_IDENTITY } from "@/lib/classes/subclass-slug.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 import { CLASS_SUBCLASSES } from "./class-subclasses.fixture.js";
@@ -98,7 +98,7 @@ describe.each(MODULE_LESS_SUBCLASSES)("%s / %s resolves identity-only, same shap
   });
 });
 
-describe("real registry: the overlay still wins for every class still on the TS path", () => {
+describe("real registry: identity-only and fully row-driven subclasses resolve the same shape", () => {
   it("champion (identity-only in SUBCLASS_IDENTITY, no TS SubclassDefinition since fighter.ts's deletion) resolves to 'active but empty' with no rows supplied", async () => {
     const info = deriveResources("fighter", "champion", 3, ABILITIES, proficiencyBonusForLevel(3), { classRows: [], subclassRows: [] }, "EDITION_2024");
     expect(info).toBeNull();
@@ -140,14 +140,16 @@ describe("real registry: the overlay still wins for every class still on the TS 
   });
 });
 
-// No class has a TS subclasses map left to check against SUBCLASS_IDENTITY's nameKey, so this stays empty.
-const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {};
+describe("#1557 review — SUBCLASS_IDENTITY's classKeys match CLASS_SUBCLASSES exactly", () => {
+  // Ties SUBCLASS_IDENTITY to CLASS_SUBCLASSES so a class added to one without the other fails visibly.
+  it("every SUBCLASS_IDENTITY classKey is a member of CLASS_SUBCLASSES, and vice versa", () => {
+    const identityClasses = new Set(Object.values(SUBCLASS_IDENTITY).map((i) => i.classKey));
+    expect(identityClasses).toEqual(new Set(Object.keys(CLASS_SUBCLASSES)));
+  });
 
-describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () => {
-  // Ties to CLASS_SUBCLASSES so a class added to CLASSES but omitted here fails visibly.
-  it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard, Sorcerer, Bard, Paladin, Druid, Ranger and Monk, which have no TS module", () => {
-    expect(
-      new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard", "paladin", "druid", "ranger", "monk"]),
-    ).toEqual(new Set(Object.keys(CLASS_SUBCLASSES)));
+  it("that set is exactly the twelve classes — no TS ClassDefinition module exists for any of them any more", () => {
+    expect(new Set(Object.keys(CLASS_SUBCLASSES))).toEqual(
+      new Set(["fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard", "paladin", "druid", "ranger", "monk"]),
+    );
   });
 });

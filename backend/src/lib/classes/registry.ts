@@ -9,23 +9,13 @@ import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 import { choicesFromRows, derivedStatFromRows, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 import type { FeatImprovement } from "./resources-state.js";
 import { SUBCLASS_IDENTITY, type SubclassIdentity, type SubclassSlug } from "./subclass-slug.js";
-import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
+import type { ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
 
-// CLASSES is empty — every class now resolves through SUBCLASS_IDENTITY +
-// seeded ClassFeature rows; deriveBaseLayer tolerates the missing key.
-const CLASSES: Record<string, ClassDefinition> = {};
-
-// Subclass keys are global. Identity-only stubs seed first so a moduleless
-// subclass still resolves its seeded rows; a still-migrating class then
-// overlays its own stubs.
+// Subclass keys are global; every subclass resolves through SUBCLASS_IDENTITY
+// plus its seeded ClassFeature rows.
 const SUBCLASSES: Record<string, SubclassDefinition> = {};
 for (const [slug, { nameKey }] of Object.entries(SUBCLASS_IDENTITY) as [SubclassSlug, SubclassIdentity][]) {
   SUBCLASSES[nameKey] = { slug };
-}
-for (const classDef of Object.values(CLASSES)) {
-  for (const [subclassKey, subclassDef] of Object.entries(classDef.subclasses ?? {})) {
-    SUBCLASSES[subclassKey] = subclassDef;
-  }
 }
 
 export function resolveClassDie(source: string, info: DerivedClassInfo): number | null {
@@ -41,15 +31,6 @@ interface ClassLayer {
   improvements: FeatImprovement[];
 }
 
-// A resourceFn pool wins over a row-declared pool of the same key, so a class
-// mid-migration (resourceFn for some pools, rows for others) can never
-// double-declare a key.
-function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]): DerivedResource[] {
-  if (fromRows.length === 0) return fromFn;
-  const seenKeys = new Set(fromFn.map((p) => p.key));
-  return [...fromFn, ...fromRows.filter((p) => !seenKeys.has(p.key))];
-}
-
 // `subclassKey` is already gated on the subclass being ACTIVE — undefined
 // otherwise, which is also the "no override" input poolsFromRows expects.
 function activeSubclassRows(subclassKey: string | undefined, featureRows: ClassFeatureRowsCarrier | undefined): readonly ClassFeatureRow[] | undefined {
@@ -61,7 +42,6 @@ function activeSubclassRows(subclassKey: string | undefined, featureRows: ClassF
 // row's resourceKey that the active subclass also declares resolves from the
 // subclass's own row instead (druid wildShape's Circle of the Moon variant).
 function deriveBaseLayer(
-  classDef: ClassDefinition | undefined,
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
@@ -69,10 +49,8 @@ function deriveBaseLayer(
   featureRows: ClassFeatureRowsCarrier | undefined,
   edition: RulesEdition,
 ): ClassLayer {
-  const fnPools = classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey, edition) : [];
-  const rowPools = poolsFromRows(featureRows?.classRows ?? [], level, abilityScores, profBonus, edition, activeSubclassRows(subclassKey, featureRows));
   return {
-    pools: mergePoolSources(fnPools, rowPools),
+    pools: poolsFromRows(featureRows?.classRows ?? [], level, abilityScores, profBonus, edition, activeSubclassRows(subclassKey, featureRows)),
     features: featuresFromRows(featureRows?.classRows ?? [], level, "class", edition),
     improvements: improvementsFromRows(featureRows?.classRows ?? [], level, edition),
   };
@@ -80,13 +58,11 @@ function deriveBaseLayer(
 
 interface SubclassLayer extends ClassLayer {
   active: boolean;
-  def: SubclassDefinition | undefined;
   rowChoices: DerivedSubclassChoice[];
 }
 
-// EDITION_2024 always gates at 3; EDITION_2014 prefers the seeded
-// CharacterClass.subclassLevel — without it a moduleless class silently falls
-// back to the plain ?? 3 default instead of its real PHB'14 gate.
+// EDITION_2024 always gates at 3; EDITION_2014 uses the seeded
+// CharacterClass.subclassLevel, falling back to 3 inside subclassGateLevel when absent.
 function isSubclassActive(
   def: SubclassDefinition | undefined,
   level: number,
@@ -94,7 +70,7 @@ function isSubclassActive(
   seededSubclassLevel: number | undefined,
 ): def is SubclassDefinition {
   if (!def) return false;
-  return subclassActiveAt(level, seededSubclassLevel ?? def.grantLevel, edition);
+  return subclassActiveAt(level, seededSubclassLevel, edition);
 }
 
 function deriveSubclassLayer(
@@ -107,18 +83,12 @@ function deriveSubclassLayer(
 ): SubclassLayer {
   const def = SUBCLASSES[subclassKey];
   if (!isSubclassActive(def, level, edition, featureRows?.subclassLevel)) {
-    return { active: false, def, pools: [], features: [], improvements: [], rowChoices: [] };
+    return { active: false, pools: [], features: [], improvements: [], rowChoices: [] };
   }
-  // undefined, not subclassKey: a subclass's own resourceFn is already scoped
-  // to itself; the param exists so the BASE layer can resolve a pool-key
-  // collision against the active subclass.
-  const fnPools = def.resourceFn ? def.resourceFn(level, abilityScores, profBonus, undefined, edition) : [];
   const subclassRows = featureRows?.subclassRows ?? [];
-  const rowPools = poolsFromRows(subclassRows, level, abilityScores, profBonus, edition);
   return {
     active: true,
-    def,
-    pools: mergePoolSources(fnPools, rowPools),
+    pools: poolsFromRows(subclassRows, level, abilityScores, profBonus, edition),
     features: featuresFromRows(subclassRows, level, "subclass", edition),
     improvements: improvementsFromRows(subclassRows, level, edition),
     rowChoices: choicesFromRows(subclassRows, level, edition),
@@ -138,17 +108,6 @@ function mergeLayers(
   );
   const improvements = [...base.improvements, ...sub.improvements];
   return { resources, features, improvements };
-}
-
-function deriveSubclassClassExtras(
-  sub: SubclassLayer,
-  level: number,
-  abilityScores: Record<string, number>,
-  profBonus: number,
-  edition: RulesEdition,
-): ClassExtras | undefined {
-  if (!sub.active || !sub.def?.deriveExtras) return undefined;
-  return sub.def.deriveExtras(level, abilityScores, profBonus, edition);
 }
 
 // announcedSaveDC resolves via deriveAnnouncedSaveDC keyed off saveDcAbilities,
@@ -181,29 +140,14 @@ function combineRowExtras(fromClassRows: ClassExtras | undefined, fromSubclassRo
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
-// Defined-wins with the fn side last, so a row never silently overwrites a
-// still-live ExtrasFn value on a class mid-migration. Returns undefined (not
-// {}) when neither side contributes.
-function combineExtras(fromFn: ClassExtras | undefined, fromRows: ClassExtras | undefined): ClassExtras | undefined {
-  if (!fromFn && !fromRows) return undefined;
-  const merged = { ...fromRows, ...fromFn };
-  return Object.keys(merged).length > 0 ? merged : undefined;
-}
-
-// Def wins on a same-key collision (mergePoolSources' mid-migration rule);
-// the def side deletes once the last module retabs (#1353/#1503).
-function deriveSubclassChoiceList(sub: SubclassLayer, level: number): DerivedSubclassChoice[] | undefined {
-  if (!sub.active) return undefined;
-  const fromDef = (sub.def?.choices ?? [])
-    .map((c) => ({ key: c.key, label: c.label, catalogSource: c.catalogSource, count: c.count(level) }))
-    .filter((c) => c.count > 0);
-  const seenKeys = new Set(fromDef.map((c) => c.key));
-  const merged = [...fromDef, ...sub.rowChoices.filter((c) => !seenKeys.has(c.key))];
-  return merged.length > 0 ? merged : undefined;
+function deriveSubclassChoiceList(sub: SubclassLayer): DerivedSubclassChoice[] | undefined {
+  if (!sub.active || sub.rowChoices.length === 0) return undefined;
+  return sub.rowChoices;
 }
 
 // Trackable resources + feature descriptions for a class/subclass; null for an
 // unknown class with no data. Pure — safe to call in serializeCharacter.
+// `className`: unused — base layers are entirely row-driven; kept so call sites still read class-first.
 export function deriveResources(
   className: string,
   subclass: string | undefined,
@@ -213,14 +157,13 @@ export function deriveResources(
   featureRows: ClassFeatureRowsCarrier | undefined,
   edition: RulesEdition,
 ): DerivedClassInfo | null {
-  const classKey = (className ?? "").toLowerCase();
+  void className;
   const subclassKey = (subclass ?? "").toLowerCase();
 
   const sub = deriveSubclassLayer(subclassKey, level, abilityScores, profBonus, featureRows, edition);
   // Feed the active subclass into the base derivation so base-wins pool-key
   // collisions (e.g. druid wildShape) resolve to the subclass's variant (#906).
   const base = deriveBaseLayer(
-    CLASSES[classKey],
     level,
     abilityScores,
     profBonus,
@@ -232,15 +175,11 @@ export function deriveResources(
 
   // hasExtras must be computed BEFORE the null check below: with an absent
   // featureRows carrier, `features` can be empty even for a known class.
-  const rowExtras = combineRowExtras(
+  const extras = combineRowExtras(
     deriveRowExtras(featureRows?.classRows ?? [], level, edition, abilityScores, profBonus),
     sub.active ? deriveRowExtras(featureRows?.subclassRows ?? [], level, edition, abilityScores, profBonus) : undefined,
   );
-  const extras = combineExtras(
-    deriveSubclassClassExtras(sub, level, abilityScores, profBonus, edition),
-    rowExtras,
-  );
-  const subclassChoices = deriveSubclassChoiceList(sub, level);
+  const subclassChoices = deriveSubclassChoiceList(sub);
   const hasExtras = extras !== undefined || subclassChoices !== undefined;
 
   if (resources.length === 0 && features.length === 0 && !hasExtras) return null;

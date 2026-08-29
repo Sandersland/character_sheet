@@ -150,10 +150,11 @@ export interface DerivedFeature {
 
 /**
  * The bespoke, non-generic level-gated choice-cap fields a subclass may
- * contribute (#1317) — extra scalar mechanics the generic SubclassChoice
+ * contribute (#1317) — extra scalar mechanics the generic DerivedSubclassChoice
  * count (#899) doesn't model, which is why these stay hand-rolled. Adding a
  * field is a deliberate edit here, not a silent addition to the wider
- * DerivedClassInfo wire shape (the #1276 escape hatch this type closes).
+ * DerivedClassInfo wire shape (#1276's hatch is closed structurally —
+ * deriveRowExtras is the only writer and EXTRAS_FIELDS latches the field set).
  */
 export interface ClassExtras {
   /** How many picks the character may hold from a level-gated "choose N" cap at this level. */
@@ -204,23 +205,6 @@ export interface DerivedClassInfo extends ClassExtras {
   improvements?: FeatImprovement[];
 }
 
-/**
- * A generic level-gated "choose N options" feature declared on a subclass
- * (#899). Its only persisted state is the selection
- * (ResourcesMutableState.choicesKnown[key]); the option catalog lives as
- * GrantedAbility rows keyed by `catalogSource`. Distinct from the bespoke
- * maneuvers/tool-prof lists, which carry extra mechanics.
- */
-export interface SubclassChoice {
-  /** The choicesKnown map key and the learn/forget op target. */
-  key: string;
-  label: string;
-  /** GrantedAbility.source the option catalog is drawn from, e.g. "huntersPrey". */
-  catalogSource: string;
-  /** Level-derived number of options the character may choose (0 below the grant level). */
-  count: (level: number) => number;
-}
-
 export interface DerivedSubclassChoice {
   key: string;
   label: string;
@@ -247,74 +231,10 @@ export function subclassChoiceSwapCadence(catalogSource: string, edition: RulesE
   return catalogSource === "discipline" && edition === "EDITION_2014" ? "onLevelUp" : "never";
 }
 
-// `subclassKey`/`edition` are both required (never optional) so `edition` can
-// sit last (the subclassGateLevel pattern, #1499) — a defaulted-then-skipped
-// middle parameter can't coexist with a later required one. Implementations
-// may declare fewer parameters: TS structurally allows a function value with
-// fewer declared parameters than its target type, so only the monk resourceFn
-// (which needs `edition` for its Martial Arts die) declares the full list.
-export type ResourceFn = (
-  level: number,
-  abilityScores: Record<string, number>,
-  profBonus: number,
-  subclassKey: string | undefined,
-  edition: RulesEdition,
-) => DerivedResource[];
-
-/**
- * ClassExtras, plus an explicit `never` for every other DerivedClassInfo key.
- * The `never` half is what actually closes the #1276 hatch: TypeScript's
- * excess-property check fires only on a fresh object literal, so on
- * `Partial<ClassExtras>` alone a returned variable, a spread, or a
- * DerivedClassInfo-typed value still smuggles arbitrary fields through the
- * Object.assign overlay in deriveResources.
- */
-type ClassExtrasOnly = Partial<ClassExtras> &
-  Partial<Record<Exclude<keyof DerivedClassInfo, keyof ClassExtras>, never>>;
-
-/**
- * `edition` last, same rationale as ResourceFn (#1499) — no subclassKey since
- * an ExtrasFn is already scoped to one subclass.
- */
-export type ExtrasFn = (
-  level: number,
-  abilityScores: Record<string, number>,
-  profBonus: number,
-  edition: RulesEdition,
-) => ClassExtrasOnly;
-
 export interface SubclassDefinition {
   /**
    * Stable mechanics-identity join key (#1277) — must equal the seeded
    * Subclass row's own `slug`; the SubclassSlug type is what enforces it.
    */
   slug: SubclassSlug;
-  /**
-   * The PHB'14 level at which this subclass's features/resources/extras first
-   * apply — Cleric/Sorcerer/Warlock 1, Druid/Wizard 2, everything else (or
-   * absent) 3. Resolved through subclassActiveAt, which hardcodes 3 for
-   * EDITION_2024 regardless of this value — mirrors
-   * CharacterClass.subclassLevel, the catalog-column half of the same 2014
-   * gate (#1308/#1291).
-   */
-  grantLevel?: number;
-  // Optional (#1227): Fighter's subclasses carry no authored features — their
-  // text is literal seed data, and the seed treats an absent array as zero rows.
-  features?: AuthoredFeature[];
-  resourceFn?: ResourceFn;
-  deriveExtras?: ExtrasFn;
-  /**
-   * Generic "choose N from a catalog" features (#899). Declared as data — a
-   * new choose-N needs a SubclassChoice entry + seed rows, not a bespoke
-   * reconciler.
-   */
-  choices?: SubclassChoice[];
-}
-
-export interface ClassDefinition {
-  // Optional (#1227) — same rationale as SubclassDefinition.features.
-  features?: AuthoredFeature[];
-  resourceFn?: ResourceFn;
-  /** Keyed by lowercase subclass name (entry.subclass.toLowerCase()). */
-  subclasses?: Record<string, SubclassDefinition>;
 }

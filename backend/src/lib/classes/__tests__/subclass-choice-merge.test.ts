@@ -29,12 +29,9 @@ function fixtureChoiceRow(level: number, edition: ClassFeatureRow["edition"] = "
   };
 }
 
-// deriveSubclassChoiceList's DEF-WINS collision rule (`fromDef` beating
-// `sub.rowChoices` on a same-key match) is dead code now: no SubclassDefinition
-// declares `.choices` any more, so `fromDef` is unconditionally `[]`. Kept
-// until the ResourceFn/SubclassDefinition overlay is deleted; the cases below
-// pin the rows-only path against the shared fixture's Disciple row (EDITION_2014).
-describe("deriveSubclassChoiceList registry merge (#899/#1522) — rows-only path (no TS def.choices left to collide with)", () => {
+// Pins deriveSubclassChoiceList's rows-only path against the shared fixture's
+// Disciple row (EDITION_2014).
+describe("deriveSubclassChoiceList rows-only path (#899/#1522)", () => {
   const fourElementsDisciplinesRow = WAY_OF_THE_FOUR_ELEMENTS_ROWS.find((r) => r.name === "Disciple of the Elements");
   if (!fourElementsDisciplinesRow) throw new Error("fixture missing Disciple of the Elements row");
 

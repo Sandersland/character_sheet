@@ -15,7 +15,7 @@ export interface SubclassSeed {
   description: string;
   // Stable mechanics-identity join key (#1277) — see subclass-slug.ts's header.
   // Authored once per row at seed-authoring time (never derived at read time);
-  // must equal the SubclassDefinition's own `slug` in lib/classes/<class>.ts.
+  // must equal this slug's entry in SUBCLASS_IDENTITY.
   slug: SubclassSlug;
   // Omitted = shared (NULL column, valid in both editions, #1306). Path of
   // the Totem Warrior (Barbarian) is the first row to set this —
