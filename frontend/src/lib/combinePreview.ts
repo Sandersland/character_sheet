@@ -1,22 +1,9 @@
-// Pure preview logic for "what is lost by a combine" (#1943/#1946): the
-// single source of truth both the entity-detail Combine dialog
-// (CombineConfirmDialog, one duplicate) and the inbox's Review-duplicates
-// modal (ReviewDuplicatesModal, an N-way cluster) render from. `losers` is
-// every entity being absorbed into `survivor` and deleted — a pair-combine
-// passes a 1-length array. Genuinely N-way-only preview pieces (the live
-// summary line and its private-notes hedge, the redacted-mention warning)
-// stay in inboxCombinePreview.ts — their wording and inputs differ enough
-// from the single-duplicate dialog that folding them in here would just move
-// the fork, not remove it.
-
 import { ENTITY_TYPE_LABELS } from "@/lib/mentions";
 import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
 
-// Closed so a new category can't collide with an existing one under a typo'd
-// string — these are React list keys drawn from more than one producer
-// (combineDiscardedItems and preparedMergeDiscardedItem below,
-// hiddenSurvivorRedactsRevealedMentions in inboxCombinePreview.ts) rendered
-// into the same list by GoldWarningBox's DiscardedItemsBox.
+// losers is every entity absorbed into survivor (a pair-combine passes a 1-length array); N-way-only pieces (live summary, redacted-mention warning) stay in inboxCombinePreview.ts, not here.
+
+// Closed union so a typo'd string can't collide with an existing key — these are React list keys shared by combineDiscardedItems, preparedMergeDiscardedItem, and hiddenSurvivorRedactsRevealedMentions, rendered together by DiscardedItemsBox.
 export type CombineDiscardedItemKey =
   | "notes"
   | "aliases"
@@ -35,21 +22,10 @@ export function losersOf<T extends { id: string }>(entities: T[], survivorId: st
   return entities.filter((e) => e.id !== survivorId);
 }
 
-// "solo": the surrounding dialog already names the one loser in its own
-// heading (e.g. "Discarded with lili") — CombineConfirmDialog only, always
-// called with a 1-length `losers`. "named": no such heading exists, so every
-// label must name which losers it's about — ReviewDuplicatesModal, for ANY
-// cluster size including a 2-entity cluster (1 loser). The caller passes
-// this explicitly rather than it being inferred from `losers.length`: a
-// 1-loser cluster combine still renders under a bare "Discarded" heading, so
-// an unnamed label there would be just as ambiguous as a 3-loser one, and
-// re-picking the survivor radio would silently change the unnamed label's
-// referent with no visual change to the label itself.
+// "solo" assumes the caller's own heading already names the 1 loser (CombineConfirmDialog only); "named" labels must name each loser themselves (ReviewDuplicatesModal, any cluster size) — passed explicitly rather than inferred from losers.length, since a re-picked survivor could silently change an unnamed label's referent.
 export type DiscardLabelVoice = "solo" | "named";
 
-// What's lost when every entity in `losers` is combined into `survivor`:
-// only the categories some loser actually carries — an empty list means the
-// gold warning box doesn't render at all.
+// An empty result means the gold warning box doesn't render at all.
 export function combineDiscardedItems(
   losers: CampaignEntity[],
   survivor: CampaignEntity,
@@ -66,10 +42,7 @@ export function combineDiscardedItems(
     });
   }
 
-  // Named mode can't just list loser names here (as visibility/portrait do)
-  // — "Aliases — Lil, lili" reads as two alias VALUES in solo mode, so the
-  // same shape naming two near-identical LOSERS would be genuinely
-  // ambiguous. Naming each loser next to its own alias values disambiguates.
+  // Named mode can't just list loser names here like visibility/portrait do — "Aliases — Lil, lili" reads as alias VALUES, so naming each loser next to its own alias values disambiguates.
   const aliased = losers.filter((e) => e.aliases.length > 0);
   if (aliased.length > 0) {
     items.push({
@@ -109,15 +82,7 @@ export function combineDiscardedItems(
   return items;
 }
 
-// "N mentions in M journal entries move to <Survivor>": JournalEntryRef is
-// unique per (entry, entity) (see rewriteMentionTokens), so the mention count
-// and the distinct-entry count are always the same number here — one stat,
-// read twice. The trailing hedge is deliberate: rewriteMentionTokens touches
-// EVERY journal entry regardless of author or visibility, including players'
-// PRIVATE notes the DM can never read — so `count` (the viewer-scoped stat)
-// undercounts what actually moves. Naming an exact private count would leak
-// information the DM isn't supposed to have; the hedge says "some unknown
-// amount more" instead of a number.
+// count is read twice for both the mention and entry totals (JournalEntryRef is unique per entry+entity), but it undercounts since rewriteMentionTokens also touches players' PRIVATE notes — the trailing hedge avoids leaking an exact private count to the DM.
 export function combineMentionSummary(duplicate: CampaignEntity, survivorName: string): string {
   const count = duplicate.stats?.mentionCount ?? 0;
   const mentionWord = count === 1 ? "mention" : "mentions";
@@ -125,11 +90,7 @@ export function combineMentionSummary(duplicate: CampaignEntity, survivorName: s
   return `${count} ${mentionWord} in ${count} journal ${entryWord} move to ${survivorName}, plus any mentions in players' private notes`;
 }
 
-// The duplicate participates in a PREPARED identity merge on either side: as
-// the old identity (mergedEntityId), that row cascade-deletes with it — the
-// DM's secret prep silently vanishes; as the stand-in survivor
-// (survivorEntityId), the backend repoints it onto the real survivor instead.
-// Both are surprising enough to flag before an irreversible combine.
+// The mergedEntityId side cascade-deletes silently (the DM's secret prep vanishes); the survivorEntityId side gets repointed onto the real survivor instead — both surprising enough to flag before an irreversible combine.
 export function duplicateHasPreparedMerge(
   merges: CampaignEntityMerge[],
   duplicateId: string,
@@ -140,10 +101,7 @@ export function duplicateHasPreparedMerge(
   );
 }
 
-// The discarded-item form of duplicateHasPreparedMerge above, folded into
-// the same gold list combineDiscardedItems feeds — both CombineConfirmDialog
-// and ReviewDuplicatesModal render one consequence-preview list, not a gold
-// box plus a separately-styled warning for this one case.
+// The discarded-item form of duplicateHasPreparedMerge, folded into the same gold list combineDiscardedItems feeds rather than a separately-styled warning.
 export function preparedMergeDiscardedItem(
   losers: { id: string; name: string }[],
   merges: CampaignEntityMerge[],
@@ -160,11 +118,7 @@ export function preparedMergeDiscardedItem(
   };
 }
 
-// A REVEALED duplicate's mentions move onto a HIDDEN survivor: those journal
-// chips render as redacted "Hidden" text to players (MentionText) until the
-// survivor itself is revealed — surprising since the mentions used to be
-// readable. Both entities' `visibility` are plain wire fields, no extra fetch
-// needed.
+// A REVEALED duplicate's mentions moving onto a HIDDEN survivor render as redacted "Hidden" text to players (MentionText) until the survivor itself is revealed — surprising since they used to be readable.
 export function combineRedactedMentionWarning(
   duplicate: Pick<CampaignEntity, "visibility">,
   survivor: Pick<CampaignEntity, "visibility">,
@@ -172,15 +126,7 @@ export function combineRedactedMentionWarning(
   return duplicate.visibility === "REVEALED" && survivor.visibility === "HIDDEN";
 }
 
-// The duplicate's CampaignItemLink only moves onto an ITEM-typed survivor that
-// doesn't already front its own item (assertItemLinkMovable) — a survivor with
-// its own link 409s instead ("Both entities are linked to an item"), already
-// surfaced by the generic error path, so this only promises a transfer that
-// will actually happen. `duplicateFrontsItem` is the entity-detail page's own
-// `detail.item !== null` (fetchCampaignItemByEntity), the one place that
-// signal is already on the wire for the page being combined away;
-// `survivor.itemId` rides the entity list's own wire field (toWireEntity),
-// so no extra fetch is needed for either side.
+// Mirrors assertItemLinkMovable: a survivor already fronting its own item 409s instead, so this only promises a transfer that will actually happen; duplicateFrontsItem and survivor.itemId both ride existing wire fields, so no extra fetch is needed for either side.
 export function combineItemLinkTransferWarning(
   duplicateType: CampaignEntity["type"],
   survivor: Pick<CampaignEntity, "type" | "itemId">,

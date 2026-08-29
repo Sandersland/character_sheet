@@ -1,8 +1,3 @@
-/**
- * FourElementsSection — 2014-only Way of the Four Elements block (#1505); disciplines are
- * fixed at level-up (monk.ts), so unlike ManeuversSection there's no anytime-swap panel.
- */
-
 import { useEffect, useState } from "react";
 
 import { fetchDisciplines } from "@/api/client";
@@ -15,7 +10,6 @@ interface Props {
   onCast: (op: DisciplineOperation) => void;
 }
 
-// Remaining ki from the character's derived resource pools.
 function kiRemaining(character: Character): number {
   return character.resources?.pools.find((p) => p.key === "ki")?.remaining ?? 0;
 }
@@ -27,8 +21,7 @@ export default function FourElementsSection({ busy, onCast }: Props) {
 
   // No hasFetched ref: under StrictMode the ref would suppress the second
   // mount's fetch while the first's cleanup has already nulled `mounted`,
-  // dropping the result — the mounted flag alone is the StrictMode-safe
-  // pattern (mirrors ShadowArtsSection/DisciplinesSection's own comment).
+  // dropping the result — the mounted flag alone is the StrictMode-safe pattern.
   useEffect(() => {
     let mounted = true;
     fetchDisciplines(character.rulesEdition)

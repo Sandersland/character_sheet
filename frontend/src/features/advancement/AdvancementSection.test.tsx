@@ -17,8 +17,6 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// AdvancementSection reads useCurrentCharacter(), so every render seeds the
-// cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character) {
   return renderWithCharacter(<AdvancementSection />, character);
 }
@@ -42,9 +40,7 @@ function makeCharacter(advancements: AdvancementEntry[]): Character {
   } as unknown as Character;
 }
 
-// Separate from makeCharacter, which the entryDetail cases below depend on
-// holding zero slots — an open slot swaps the disabled button those render for
-// a live picker with a tab bar.
+// makeCharacter must keep advancementSlots.total at 0 — the entryDetail cases above depend on it.
 function makeCharacterWithSlot(rulesEdition: RulesEdition): Character {
   return {
     ...makeCharacter([]),
@@ -130,8 +126,6 @@ describe("AdvancementSection — feat picker edition (#1411)", () => {
     await user.click(screen.getByRole("button", { name: "Feat" }));
   }
 
-  // The second argument is the sheet's own level (#1438): the Overview panel asks
-  // the server for the set legal at the level the character is already at.
   it("fetches the 2014 catalog for a 2014 character", async () => {
     await openFeatTab("EDITION_2014");
     expect(fetchFeats).toHaveBeenCalledWith("EDITION_2014", 4);

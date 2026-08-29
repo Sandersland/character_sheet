@@ -9,8 +9,6 @@ interface CastStatSectionProps {
   onChange: (patch: Partial<ItemCapability>) => void;
 }
 
-// The Save DC / Attack bonus block for a castSpell: DC for save spells, attack
-// for attack spells, neither for utility/buff spells (#363 fallout).
 export default function CastStatSection({ cap, index, spellAttackType, spellcasterAttunable, onChange }: CastStatSectionProps) {
   const showDc = spellAttackType === "save";
   const showAttack = spellAttackType === "attack";

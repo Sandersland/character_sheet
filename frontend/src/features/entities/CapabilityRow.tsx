@@ -20,8 +20,7 @@ interface CapabilityRowProps {
   onRemove: () => void;
 }
 
-// One capability card: a kind picker, the kind's field subcomponent, and a shared
-// description. Changing kind replaces the whole draft; field edits are patches.
+// Changing kind (onReplace) swaps the whole draft; field edits (onChange) are patches.
 export default function CapabilityRow({ cap, index, spells, spellcasterAttunable, onChange, onReplace, onRemove }: CapabilityRowProps) {
   return (
     <li className="flex flex-col gap-2 rounded-control border border-parchment-200 bg-parchment-50 p-2.5">

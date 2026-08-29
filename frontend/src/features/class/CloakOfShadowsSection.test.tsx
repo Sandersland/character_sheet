@@ -15,9 +15,8 @@ const WARRIOR_OF_SHADOW_ACTION: AvailableAction = {
     "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible and move through creatures/objects as difficult terrain for 1 minute (or until incapacitated, or you end your turn in bright light). Flurry of Blows costs no focus while it lasts.",
 };
 
-// #1738: the 2014 Way of Shadow's Cloak of Shadows (L11) costs nothing and
-// has no duration cap — the served row carries no resourceKey at all, so
-// `enabled` is always true and `disabledReason` never appears.
+// The 2014 Way of Shadow's Cloak of Shadows served row carries no resourceKey,
+// so `enabled` is always true and `disabledReason` never appears (#1738).
 const WAY_OF_SHADOW_ACTION: AvailableAction = {
   key: "cloakOfShadows",
   name: "Cloak of Shadows",
@@ -40,8 +39,6 @@ function makeCharacter(
   } as unknown as Character;
 }
 
-// CloakOfShadowsSection reads useCurrentCharacter(), so every render seeds
-// the cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderSection(character: Character, props: Partial<React.ComponentProps<typeof CloakOfShadowsSection>> = {}) {
   const onActivate = vi.fn();
   renderWithCharacter(
@@ -74,8 +71,6 @@ describe("CloakOfShadowsSection", () => {
     expect(onActivate).not.toHaveBeenCalled();
   });
 
-  // Regression: a DIFFERENT invisibility source (e.g. the Invisibility spell)
-  // must not be mistaken for an active Cloak — the cast button stays offered.
   it("keeps offering the activation control when invisible from a DIFFERENT source", () => {
     const invisibleFromSpell: ConditionEntry = { key: "invisible", source: "Invisibility", appliedAt: new Date().toISOString() };
     renderSection(makeCharacter([invisibleFromSpell]));
@@ -107,7 +102,6 @@ describe("CloakOfShadowsSection", () => {
     expect(onActivate).not.toHaveBeenCalled();
   });
 
-  // #1738: the 2014 Way of Shadow shape — free, no cap, distinct reminder text.
   describe("2014 Way of Shadow (#1738)", () => {
     it("shows the free/no-duration-cap reminder and stays enabled with no cost gate", () => {
       renderSection(makeCharacter([], WAY_OF_SHADOW_ACTION));

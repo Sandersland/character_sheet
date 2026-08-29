@@ -8,9 +8,6 @@ interface AttuneToggleProps {
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
 }
 
-// The attune/unattune pill, shown only for items that require attunement.
-// Attuning a new item is blocked at the derived 3-item cap; the server also
-// enforces the snapshotted prerequisite and surfaces the reason on attempt.
 export default function AttuneToggle({ item, pending, atCap, onSubmit }: AttuneToggleProps) {
   const blocked = !item.attuned && atCap;
   const prereq = item.attunementPrereqText

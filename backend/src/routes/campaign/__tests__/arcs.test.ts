@@ -7,9 +7,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 
-// Campaign arcs (#863): owner-gated CRUD + session assignment + SetNull-on-delete.
-// Real Postgres, supertest against the shared `app`. File-prefixed fixture ids keep it
-// parallel-safe on the shared dev DB.
+// File-prefixed fixture ids keep this parallel-safe on the shared dev DB.
 
 const OWNER = "owner-arcs-owner";
 const PLAYER = "owner-arcs-player";
@@ -96,7 +94,6 @@ describe("arc CRUD — owner gating", () => {
 
   it("breaks a position tie deterministically by createdAt", async () => {
     const campaignId = await setupCampaign();
-    // Simulate two concurrent creates that both landed on position 0.
     await prisma.campaignArc.create({
       data: { campaignId, name: "Older", position: 0, createdAt: new Date("2026-01-01T00:00:00Z") },
     });
@@ -180,7 +177,6 @@ describe("session assignment + SetNull-on-delete", () => {
     expect(ok.status).toBe(200);
     expect(ok.body.arcId).toBe(arcId);
 
-    // Un-assign with null.
     const cleared = await agent(cookieOwner)
       .patch(`/api/campaigns/${campaignId}/sessions/${session.id}`)
       .send({ arcId: null });

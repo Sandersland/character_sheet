@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { BATTLE_MASTER_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
+import { BATTLE_MASTER_ROWS, HUNTER_ROWS, WAY_OF_THE_FOUR_ELEMENTS_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import {
   buildLevelUpPlan,
   type LevelUpPlanCharacter,
@@ -25,9 +25,7 @@ function char(
   return { abilityScores: ABILITIES, classEntries: [{ name, level, subclass }], spellEntries, edition: "EDITION_2024" };
 }
 
-// This suite validates SUBMISSIONS against step counts and never reads the HP
-// meta, so the die is required (#1380) but arbitrary here. Anything asserting on
-// HP numbers belongs in level-up-plan.test.ts, where each case names its own die.
+// hitDie is required (#1380) but arbitrary here — HP-number assertions belong in level-up-plan.test.ts instead.
 const ANY_DIE = "d10";
 
 function target(name: string, newLevel: number, subclass: string | null = null, subclassLevel?: number): TargetClassEntry {
@@ -59,23 +57,14 @@ describe("resolveLevelUpPlan — submission-free plan resolution (#886)", () => 
   });
 
   it("Fighter 2→3 with Battle Master chosen re-plans and splices the subclass step", () => {
-    // #1546 Part B-ii: maneuverChoiceCount/toolProfChoiceCount are ROW-driven
-    // now — the picked subclass's own rows must be supplied, mirroring what
-    // resolveLevelUpContext resolves via the ?subclassId= pick's
-    // Subclass.findUnique (level-up-transaction.ts's resolvePickedSubclass).
+    // maneuverChoiceCount/toolProfChoiceCount are row-driven — BATTLE_MASTER_ROWS mirrors what resolveLevelUpContext resolves via resolvePickedSubclass.
     const steps = resolveLevelUpPlan(char("fighter", 2), target("fighter", 3, null), "battle master", BATTLE_MASTER_ROWS);
     expect(steps.map((s) => s.kind)).toEqual(["hitPoints", "subclass", "maneuvers", "toolProficiency", "review"]);
     const replan = buildLevelUpPlan(char("fighter", 2), { ...target("fighter", 3, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });
     expect(steps.filter((s) => s.kind !== "subclass")).toEqual(replan);
   });
 
-  // Review finding 3: the re-plan branch specifically for a THIRD CASTER —
-  // target.subclassCasterRef is null (no persisted subclass yet, same as the
-  // Battle Master case above), and the newSpells step can only exist because
-  // resolveLevelUpPlan threads the 5th param, chosenSubclassCasterRef, into
-  // the replanned target. Without that threading this step silently vanishes
-  // (newSpellsStep's own early-return: count<=0 && cantrips<=0 && !canSwap) —
-  // exactly the live bug shape a missed `subclassCasterRef` regression takes.
+  // resolveLevelUpPlan's chosenSubclassCasterRef param must be threaded into the replanned target, or newSpellsStep's early-return (count<=0 && cantrips<=0 && !canSwap) silently drops this step.
   it("Fighter 2→3 picking Eldritch Knight for the FIRST time re-plans and emits a newSpells step via chosenSubclassCasterRef", () => {
     const steps = resolveLevelUpPlan(
       char("fighter", 2),
@@ -89,8 +78,6 @@ describe("resolveLevelUpPlan — submission-free plan resolution (#886)", () => 
     expect(newSpells.count).toBeGreaterThan(0);
     expect(newSpells.meta?.spellLists).toEqual(["wizard"]);
 
-    // Omitting chosenSubclassCasterRef (undefined, the pre-#1531-fix shape)
-    // must NOT produce the same plan — the newSpells step depends on it.
     const withoutRef = resolveLevelUpPlan(char("fighter", 2), target("fighter", 3, null), "Eldritch Knight", []);
     expect(withoutRef.map((s) => s.kind)).toEqual(["hitPoints", "subclass", "review"]);
   });
@@ -133,8 +120,6 @@ describe("validateLevelUpSubmission — count mismatches", () => {
           maneuvers: [maneuver("m1")],
           toolProficiencies: [{ type: "learnToolProficiency", name: "Smith's Tools" }],
         },
-        // #1546 Part B-ii: the plan can't surface a maneuvers step at all
-        // without the picked subclass's row-driven maneuverChoiceCount.
         BATTLE_MASTER_ROWS,
       ),
     ).toThrow(/expected 3 maneuvers/);
@@ -296,15 +281,11 @@ describe("validateLevelUpSubmission — known-spell swap (#1101)", () => {
   });
 });
 
-// #1503: the choose-N swap for Way of the Four Elements' fourElementsDisciplines
-// choice — the first choice whose swapCadence resolves "onLevelUp"
-// (subclassChoiceSwapCadence). Same shape as the known-spell swap suite above,
-// scoped per choiceKey instead of globally.
 describe("validateLevelUpSubmission — choose-N swap (#1503, Way of the Four Elements)", () => {
   function char4e(level: number): LevelUpPlanCharacter {
     return { abilityScores: ABILITIES, classEntries: [{ name: "monk", level, subclass: "way of the four elements" }], edition: "EDITION_2014" };
   }
-  const t4e = (newLevel: number) => target("monk", newLevel, "way of the four elements");
+  const t4e = (newLevel: number) => ({ ...target("monk", newLevel, "way of the four elements"), subclassFeatureRows: WAY_OF_THE_FOUR_ELEMENTS_ROWS });
   const learnDisc = (optionId: string): NonNullable<LevelUpSubmission["subclassChoices"]>[number] => ({
     type: "learnSubclassChoice",
     choiceKey: "fourElementsDisciplines",
@@ -336,13 +317,7 @@ describe("validateLevelUpSubmission — choose-N swap (#1503, Way of the Four El
     ).toThrow(/at most one/i);
   });
 
-  // #1101's own Wizard test picks a case where the NET matches the step's
-  // expected count exactly, so assertCounts passes silently and
-  // assert(SubclassChoice)Forgets is what actually rejects — a forget-only
-  // submission that also fails the count check would be rejected by
-  // assertCounts first with a less specific message. Monk 6→7 is neither an
-  // ASI level (4/8/12/16/19) nor a discipline-growth level (next threshold
-  // 11), so no subclassChoice step exists for fourElementsDisciplines at all.
+  // Monk 6→7 is neither an ASI level (4/8/12/16/19) nor a discipline-growth level (next threshold 11) — no subclassChoice step exists at all, so this pins assertSubclassChoiceForgets specifically, not assertCounts.
   it("rejects a forget on a level with no subclassChoice step for that key at all (no new discipline this level)", () => {
     expect(() =>
       validateLevelUpSubmission(char4e(6), t4e(7), null, {
@@ -356,13 +331,11 @@ describe("validateLevelUpSubmission — choose-N swap (#1503, Way of the Four El
     expect(() =>
       validateLevelUpSubmission(
         { abilityScores: ABILITIES, classEntries: [{ name: "ranger", level: 6, subclass: "hunter" }], edition: "EDITION_2024" },
-        target("ranger", 7, "hunter"),
+        { ...target("ranger", 7, "hunter"), subclassFeatureRows: HUNTER_ROWS },
         null,
         {
           ...base,
-          // 2 learns - 1 forget = net 1, matching the step's expected count
-          // (1) exactly, so assertCounts passes and the swap-cadence guard is
-          // what actually rejects this.
+          // net 1 matches the step's expected count, so assertCounts passes and the swap-cadence guard is what actually rejects this.
           subclassChoices: [
             { type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "opt-1" },
             { type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "opt-2" },
@@ -384,11 +357,7 @@ describe("validateLevelUpSubmission — choose-N swap (#1503, Way of the Four El
   });
 });
 
-// #1516: the maneuver swap — "Each time you learn new maneuvers, you can also
-// replace one maneuver you know with a different one" (PHB'14 Battle Master
-// p.73; SRD 5.2 carries the equivalent grant), unconditional whenever the
-// "maneuvers" step exists (choiceCountStep, level-up-plan.ts). Same shape as
-// the choose-N swap suite above, scoped to the single "maneuvers" step.
+// PHB'14 Battle Master p.73 maneuver swap; SRD 5.2 carries the equivalent grant (#1516).
 describe("validateLevelUpSubmission — maneuver swap (#1516, Battle Master)", () => {
   // maneuverChoiceCount thresholds (BATTLE_MASTER_ROWS): 3@3, 5@7, 7@10, 9@15.
   const bmTarget = (newLevel: number): TargetClassEntry => ({
@@ -419,10 +388,7 @@ describe("validateLevelUpSubmission — maneuver swap (#1516, Battle Master)", (
     ).toThrow(/at most one/i);
   });
 
-  // Fighter-3→4 is not a maneuver-growth level (3 at L3, still 3 at L4) — no
-  // "maneuvers" step exists at all, so PHB'14's "each time you learn new
-  // maneuvers" condition never fires here. (Fighter 4 is also an ASI level,
-  // so `advancement` is included to isolate the forget rejection.)
+  // Fighter 3→4 grants no new maneuvers (3 stays 3) — no "maneuvers" step exists. Fighter 4 is also an ASI level, so `advancement` isolates the forget rejection.
   it("rejects a forget on a level granting no new maneuvers (3→4)", () => {
     expect(() =>
       validateLevelUpSubmission(charBM(3), bmTarget(4), null, {
@@ -443,10 +409,7 @@ describe("validateLevelUpSubmission — maneuver swap (#1516, Battle Master)", (
     ).toThrow(/expected 2 maneuvers/i);
   });
 
-  // Code-review finding: assertCounts' negative-net branch (a forget with NO
-  // replacement learn at all) hardcoded "spell" for every domain — a Battle
-  // Master forgetting with zero learns got "replacement spell", not
-  // "replacement maneuver". swapUnitNoun keys the message off the step kind.
+  // swapUnitNoun keys the error message off the step kind, not a hardcoded "spell" — a Battle Master forget-with-no-learns must say "maneuver".
   it("names the maneuver (not 'spell') when a forget has no replacement learn at all", () => {
     expect(() =>
       validateLevelUpSubmission(charBM(6), bmTarget(7), null, {
@@ -456,11 +419,7 @@ describe("validateLevelUpSubmission — maneuver swap (#1516, Battle Master)", (
     ).toThrow(/replacement maneuver for every maneuver you swap out/i);
   });
 
-  // Code-review finding: on a no-growth level (no "maneuvers" step at all —
-  // canSwap is never true), 2 forgets must still say "does not allow
-  // swapping", not "at most one" (which wrongly implies exactly one forget
-  // WOULD be legal there). assertManeuverForgets checks canSwap before the
-  // length>1 guard for exactly this reason.
+  // assertManeuverForgets checks canSwap before the length>1 guard — on a no-growth level, 2 forgets must say "does not allow swapping", not "at most one" (which would wrongly imply one forget is legal there).
   it("rejects two forgets on a level granting no new maneuvers with the cadence message, not 'at most one'", () => {
     expect(() =>
       validateLevelUpSubmission(charBM(3), bmTarget(4), null, {
@@ -584,12 +543,8 @@ describe("validateLevelUpSubmission — subclass re-plan contract", () => {
         maneuvers: [maneuver("m1"), maneuver("m2"), maneuver("m3")],
         toolProficiencies: [{ type: "learnToolProficiency", name: "Smith's Tools" }],
       },
-      // #1546 Part B-ii: the picked subclass's own rows (mirrors the two
-      // fixes above in this file).
       BATTLE_MASTER_ROWS,
     );
-    // Effective plan mirrors buildLevelUpPlan for the chosen subclass, with the
-    // subclass step spliced after hitPoints (no advancement) and before maneuvers.
     expect(kinds(steps)).toEqual(["hitPoints", "subclass", "maneuvers", "toolProficiency", "review"]);
     const replan = buildLevelUpPlan(char("fighter", 2), { ...target("fighter", 3, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });
     expect(steps.filter((s) => s.kind !== "subclass")).toEqual(replan);

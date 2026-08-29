@@ -11,7 +11,6 @@ const CARD_MAX_HEIGHT = 320;
 const GAP = 12;
 const EDGE = 8;
 
-// Fixed-position beside the anchor: prefer right, flip left near the edge, clamp vertically.
 function cardPosition(anchor: DOMRect): { left: number; top: number } {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;

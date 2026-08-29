@@ -31,7 +31,6 @@ vi.mock("@/api/client", () => ({
 const planMock = vi.mocked(fetchLevelUpPlan);
 const submitMock = vi.mocked(submitLevelUp);
 
-// hitPoints/hitDice/abilityScores present because step 1 is the real HitPointsStep (#887).
 const character = {
   id: "c1",
   rulesEdition: "EDITION_2024",
@@ -81,7 +80,6 @@ describe("ChoiceStep in the ceremony", () => {
     await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
-    // Maneuvers step: real ChoiceStep renders the catalog; Continue stays off.
     expect(await screen.findByText("Riposte")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
 
@@ -131,9 +129,6 @@ describe("ChoiceStep in the ceremony", () => {
     );
   });
 
-  // #1422: the headline defect -- a subclassChoice step had no STEP_BODIES
-  // entry, so it rendered LevelUpStepPlaceholder (which writes nothing to the
-  // draft) and Continue stayed permanently disabled.
   it("gates Continue on a subclassChoice step until an option is picked, then submits the op with its choiceKey", async () => {
     planMock.mockResolvedValue(
       plan([

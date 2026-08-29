@@ -23,13 +23,13 @@ function spell(id: string, level: number, classes: string[]): CatalogSpell {
 }
 
 const CATALOG: CatalogSpell[] = [
-  spell("firebolt", 0, ["wizard", "sorcerer"]),   // cantrip — excluded
+  spell("firebolt", 0, ["wizard", "sorcerer"]),
   spell("shield", 1, ["wizard", "sorcerer"]),
   spell("mistyStep", 2, ["wizard", "sorcerer"]),
-  spell("fireball", 3, ["wizard", "sorcerer"]),   // above a level-2 ceiling
-  spell("cureWounds", 1, ["bard", "cleric"]),     // off-class for a wizard
-  spell("chaosBolt", 1, ["sorcerer"]),            // sorcerer-only — off every Magical Secrets list
-  spell("huntersMark", 1, ["ranger"]),            // ranger-only — off every served list except null
+  spell("fireball", 3, ["wizard", "sorcerer"]),
+  spell("cureWounds", 1, ["bard", "cleric"]),
+  spell("chaosBolt", 1, ["sorcerer"]),
+  spell("huntersMark", 1, ["ranger"]),
 ];
 
 describe("readNewSpellsMeta", () => {
@@ -55,9 +55,7 @@ describe("readNewSpellsMeta", () => {
     });
   });
 
-  // #1855: Eldritch Knight (2014) spell-school gate — served alongside
-  // spellLists but a SEPARATE facet (spellLists is class-membership,
-  // spellSchools is the wizard-list SCHOOL restriction).
+  // spellLists is class-membership; spellSchools is a separate wizard-list SCHOOL restriction (Eldritch Knight, 2014).
   it("reads spellSchools/freeSchoolPicks from meta (#1855)", () => {
     const step: LevelUpStep = {
       kind: "newSpells",
@@ -135,8 +133,7 @@ describe("spellListsLabel (#1440)", () => {
     expect(spellListsLabel(null)).toBe("any class's");
   });
 
-  // Not reachable via spellListsFor today (it always returns at
-  // least [key]) — a defensive guard against a future caller passing [].
+  // Not reachable via spellListsFor today (always returns ≥ [key]) — a defensive guard for a future caller passing [].
   it("renders an empty list as an empty string, not ', or undefined'", () => {
     expect(spellListsLabel([])).toBe("");
   });
@@ -152,11 +149,11 @@ describe("swappableKnownSpells (#1101)", () => {
 
   it("keeps user-learned leveled spells, dropping cantrips and granted/item spells", () => {
     const spells: Spell[] = [
-      known("firebolt", 0),                 // cantrip — excluded
-      known("shield", 1),                   // kept
-      known("mistyStep", 2),                // kept
-      known("hex", 1, "subclass"),          // granted — excluded
-      known("faerieFire", 1, "item"),       // item — excluded
+      known("firebolt", 0),
+      known("shield", 1),
+      known("mistyStep", 2),
+      known("hex", 1, "subclass"),
+      known("faerieFire", 1, "item"),
     ];
     expect(swappableKnownSpells(spells).map((s) => s.id)).toEqual(["shield", "mistyStep"]);
   });
@@ -187,7 +184,7 @@ describe("toggleForgetSpell (#1101)", () => {
       1,
     );
     expect(out.spellsForgotten).toEqual([]);
-    expect(out.spellsLearned).toEqual([learn("s1")]); // trimmed back to count
+    expect(out.spellsLearned).toEqual([learn("s1")]);
   });
 });
 
@@ -199,8 +196,6 @@ describe("eligibleNewSpells (#1440: takes the served spellLists, not className/m
 
   it("admits a spell on ANY of several served lists (the 2024 Magical Secrets case), still level-gated", () => {
     const eligible = eligibleNewSpells(CATALOG, { maxSpellLevel: 2, spellLists: ["bard", "cleric", "druid", "wizard"] });
-    // shield/mistyStep (wizard) + cureWounds (bard/cleric) admitted; chaosBolt
-    // (sorcerer-only) and huntersMark (ranger-only) excluded — off every served list.
     expect(eligible.map((s) => s.id)).toEqual(["shield", "mistyStep", "cureWounds"]);
   });
 
@@ -213,9 +208,6 @@ describe("eligibleNewSpells (#1440: takes the served spellLists, not className/m
     expect(eligibleNewSpells(null, { maxSpellLevel: 2, spellLists: ["wizard"] })).toEqual([]);
   });
 
-  // #1631: expandedSpellIds admits a spell off every served class list —
-  // chaosBolt is sorcerer-only (off the served ["wizard"] list) but IS admitted
-  // when its id is in the served expansion set, still subject to the ceiling.
   it("admits an off-list spell whose id is in the served expandedSpellIds (#1631)", () => {
     const eligible = eligibleNewSpells(CATALOG, { maxSpellLevel: 2, spellLists: ["wizard"], expandedSpellIds: ["chaosBolt"] });
     expect(eligible.map((s) => s.id)).toEqual(["shield", "mistyStep", "chaosBolt"]);
@@ -232,11 +224,7 @@ describe("eligibleNewSpells (#1440: takes the served spellLists, not className/m
   });
 });
 
-// #1855: the Eldritch Knight (2014) leveled-pick school gate is a DISPLAY
-// filter over the served spellSchools/freeSchoolPicks — never re-deriving
-// which schools or how many free picks (assertSpellSchoolEligibility, backend,
-// is the real enforcement). abjuration/evocation "on-list", every other
-// school "off-list".
+// Display filter only — assertSpellSchoolEligibility (backend) is the real enforcement of spellSchools/freeSchoolPicks.
 describe("spellSchoolEligible (#1855)", () => {
   it("unrestricted (spellSchools null) always admits, regardless of school or free picks", () => {
     expect(spellSchoolEligible({ school: "necromancy" }, null, 0, 0)).toBe(true);

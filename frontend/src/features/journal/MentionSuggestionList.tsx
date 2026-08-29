@@ -1,9 +1,3 @@
-// The @-tag autocomplete popover: entity matches + an optional create row (#609).
-// Presentation only — insert/create intent is delegated to the parent via
-// onSelect/onCreate; keyboard nav + open/close state live in useMentionEditor.
-// Two presentations (#785): an absolute top-full popover at md+, and an in-flow
-// keyboard-aware scroll list below md so it isn't clipped under the keyboard.
-
 import { useEffect, useRef, type Ref } from "react";
 
 import { Plus } from "@/components/ui/icons";
@@ -30,22 +24,17 @@ interface MentionSuggestionListProps {
   onSelect: (entityId: string) => void;
   onCreate: () => void;
   onHover: (index: number) => void;
-  /** Render in document flow (below md) instead of an absolute popover. */
   inFlow?: boolean;
-  /** Cap for the in-flow scroll list, derived from the keyboard-aware height. */
   maxHeight?: number;
-  /** Anchor the absolute popover above the field (dock composer) vs. below (default). */
   placement?: "above" | "below";
 }
 
-// max-h-[40vh] is the self-defending fallback — the caller normally caps via the
-// inline maxHeight style, but the list must stay bounded even without it.
+// max-h-[40vh] is a fallback bound — the list must stay bounded even without the caller's inline maxHeight.
 const IN_FLOW_CLASS =
   "mt-1 max-h-[40vh] overflow-y-auto rounded-card border border-parchment-200 bg-parchment-50 py-1 shadow-raised";
 const POPOVER_BASE =
   "absolute left-0 right-0 z-50 max-h-60 overflow-y-auto rounded-card border border-parchment-200 bg-parchment-50 py-1 shadow-raised";
-// Anchor below the field (default) or above it (dock composer, whose field sits at
-// the panel's bottom edge — a below-anchored list would spill off-screen).
+// POPOVER_ABOVE exists for the dock composer, whose field sits at the panel's bottom edge — below would spill off-screen.
 const POPOVER_BELOW = `${POPOVER_BASE} top-full mt-1`;
 const POPOVER_ABOVE = `${POPOVER_BASE} bottom-full mb-1`;
 
@@ -76,8 +65,7 @@ function MatchRow({ entity, index, active, survivor, activeRef, optionId, onSele
       }}
       onMouseEnter={() => onHover(index)}
     >
-      {/* Type-colored diamond: the ink identity, without the pill. The type
-          stays announced to screen readers via the sr-only label. */}
+      {/* Type is visual-only here; the sr-only label below announces it to screen readers. */}
       <span
         aria-hidden="true"
         className={`h-1.5 w-1.5 shrink-0 rotate-45 ${ENTITY_TYPE_DOT_CLASS[entity.type]}`}
@@ -135,8 +123,6 @@ function CreateRow({ index, active, creating, createName, createType, activeRef,
   );
 }
 
-// Keyboard-nav parity: keep the active option in view as the user arrows
-// (both variants — the md+ popover scrolls long match lists too).
 function useActiveOptionScroll(activeIndex: number) {
   const activeRef = useRef<HTMLLIElement>(null);
   useEffect(() => {

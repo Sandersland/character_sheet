@@ -1,11 +1,3 @@
-/**
- * Loads the `:id`-route character, decides load/error/not-found, then mounts
- * CurrentCharacterProvider around `children` — every character-scoped page
- * (CharacterSheetPage, JournalPage) shares this exact tri-state guard rather
- * than each re-deriving it (#1299 review: fallow flagged the duplicate once a
- * second page grew one).
- */
-
 import { useParams } from "react-router-dom";
 import type { ReactNode } from "react";
 

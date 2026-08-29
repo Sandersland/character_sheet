@@ -21,17 +21,13 @@ interface InventoryRowProps {
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
   // True when 3 items are already attuned — gates a new attune (5e cap).
   atCap?: boolean;
-  // Bundled Weapon Bond props (#1854) — see WeaponBondProps' own comment.
-  // Defaults to an ineligible no-op so callers that never touch Weapon Bond
-  // (most InventoryRow.test.tsx cases) don't have to pass it.
+  // Defaults to an ineligible no-op so callers that never touch Weapon Bond don't have to pass it.
   bond?: WeaponBondProps;
-  // Multi-select sell mode: a leading checkbox replaces the per-row actions.
   selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
 }
 
-// View-mode local UI state: prose disclosure + the two-step remove confirm.
 interface RowState {
   expanded: boolean;
   confirming: boolean;
@@ -49,7 +45,6 @@ function rowReducer(state: RowState, action: RowAction): RowState {
   }
 }
 
-// One inventory row: read-only display (Equip toggle + a kebab for Edit/Remove, prose disclosed on expand) or an inline edit form.
 export default function InventoryRow({
   item,
   mode,
@@ -71,11 +66,9 @@ export default function InventoryRow({
 
   const details = itemDetailParts(item);
 
-  // Multi-select sell mode: the row is just a checkbox + summary — none of
-  // the per-item controls/remove-confirm/activate/prose below apply, so this
-  // returns early rather than gating each of them on `!selectMode` (#1854:
-  // one branch here replaces four repeated `!selectMode &&` checks, keeping
-  // the view-mode body's own cyclomatic/cognitive score under the fallow gate).
+  // Returns early rather than gating each per-item control on `!selectMode`,
+  // keeping this component's cyclomatic/cognitive score under the fallow
+  // complexity gate.
   if (selectMode) {
     return (
       <li className="flex flex-col gap-1.5 py-2">

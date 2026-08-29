@@ -8,12 +8,10 @@ import { classSummary, isMulticlass } from "@/lib/multiclass";
 import type { CharacterSummary } from "@/types/character";
 
 interface CharacterSwitcherSheetProps {
-  /** The sheet currently open — gets the check, taps to itself just close. */
   currentId: string;
   onClose: () => void;
 }
 
-// Garnet identity chip, matching the header avatar.
 function Avatar({ name }: { name: string }) {
   return (
     <span className="flex h-9 w-9 flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-surface to-garnet-surface-deep font-display text-base font-semibold text-garnet-on-surface shadow-raised">
@@ -22,18 +20,11 @@ function Avatar({ name }: { name: string }) {
   );
 }
 
-// "Class Level" — CharacterSummary carries no HP, so the switcher shows the
-// same class/level the list page does (multiclass folds per-class levels in).
+// CharacterSummary carries no HP, so this shows class/level (multiclass folds per-class levels in).
 function classLine(c: CharacterSummary): string {
   return isMulticlass(c.classes) ? classSummary(c.classes, { name: c.class }) : `${c.class} ${c.level}`;
 }
 
-/**
- * Mobile character switcher (#1027) — the immersive shell hides `AppHeader`, so
- * tapping the header identity opens this sheet as the route back out. Lists owned
- * characters (reusing the list-page query), plus "All characters" → the list and
- * "New character" → creation. Mis-taps cost nothing: it swipe-dismisses.
- */
 export default function CharacterSwitcherSheet({ currentId, onClose }: CharacterSwitcherSheetProps) {
   const navigate = useNavigate();
   const { characters, error } = useCharacterList();

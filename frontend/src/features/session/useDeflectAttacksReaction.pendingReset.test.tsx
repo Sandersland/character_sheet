@@ -1,11 +1,3 @@
-/**
- * The redirect's `pending` flag must reset on BOTH failure paths (#1435): a
- * throwing mutation and a missing served spec. If it doesn't, once
- * `mutation.isPending` clears the button re-enables (`deflectRedirectAvailable`
- * goes true again) and a second click double-spends a focus/ki point — with the
- * error invisible (the result strip shows the toast, not mutation.error, after
- * the reaction is used). Both paths also surface a failure toast.
- */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act } from "@testing-library/react";
 
@@ -76,7 +68,6 @@ function renderReaction(redirect: AvailableAction, setReactionMessage = vi.fn())
   return { ...utils, setReactionMessage };
 }
 
-// The final setReactionMessage call is the failure branch's functional updater.
 function lastToast(setReactionMessage: ReturnType<typeof vi.fn>): string {
   const updater = setReactionMessage.mock.calls.at(-1)?.[0] as (prev: string | null) => string;
   return updater("");
@@ -112,7 +103,6 @@ describe("useDeflectAttacksReaction — pending resets on failure", () => {
 
     expect(result.current.deflectRedirectAvailable).toBe(false);
     expect(lastToast(setReactionMessage)).toMatch(/reload the character sheet/i);
-    // The mutation never fired — a missing spec must not hit the server.
     expect(mockApply).not.toHaveBeenCalled();
   });
 });

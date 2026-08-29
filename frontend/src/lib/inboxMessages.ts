@@ -1,9 +1,5 @@
 import type { InboxRow } from "@/types/character";
 
-// App-level inbox (#1946), the frontend sibling of #1945's derived rows. Pure
-// presentation logic only — no JSX, no network — so the row list, the bell,
-// and their tests all read the same message text off one function.
-
 export function inboxRowMessage(row: InboxRow): string {
   switch (row.kind) {
     case "DUPLICATE_CLUSTER":
@@ -25,9 +21,7 @@ export interface InboxCampaignGroup {
   rows: InboxRow[];
 }
 
-// Groups rows by campaign without re-sorting: the backend already orders rows
-// newest-signal-first, so a campaign's group position is wherever its first
-// row appeared.
+// Groups without re-sorting: the backend already orders rows newest-signal-first, so a group's position is wherever its first row appeared.
 export function groupInboxRowsByCampaign(rows: InboxRow[]): InboxCampaignGroup[] {
   const groups: InboxCampaignGroup[] = [];
   const byId = new Map<string, InboxCampaignGroup>();
@@ -49,20 +43,12 @@ function localMidnight(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
-// Relative "today"/"yesterday"/"N days ago" for a row's signalAt. Deliberately
-// NOT lib/formatJournalDate.ts's formatRelativeDay: that one buckets by UTC
-// calendar day, correct for a journal date (stored at UTC midnight, no real
-// time-of-day) but wrong here — signalAt is a real wall-clock instant, and
-// bucketing it by UTC day shows an off-by-one "yesterday" for any reader west
-// of UTC whose local evening is still UTC-tomorrow. This formatter buckets by
-// the READER's local calendar day instead. Falls back to an absolute local
-// date past 30 days; unparseable input returns verbatim.
+// Deliberately not formatRelativeDay: that one buckets by UTC calendar day (correct for a journal date), but signalAt is a real wall-clock instant, so this buckets by the READER's local calendar day instead.
 export function formatInboxSignalAge(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   const days = Math.round((localMidnight(new Date()) - localMidnight(d)) / DAY_MS);
-  // Strictly negative = a future local day (bad clock/data) — show the
-  // absolute date rather than an indefinite "today".
+  // Strictly negative = a future local day (bad clock/data) — show the absolute date rather than an indefinite "today".
   if (days < 0)
     return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   if (days === 0) return "today";

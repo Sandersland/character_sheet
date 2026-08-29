@@ -1,8 +1,4 @@
-// #1529: buildMergedArmorProficiencies/buildMergedWeaponProficiencies resolve
-// class grants through the class FK relation now, never `entry.name` — the
-// fix for #1388's class half (a lowercase and a display-name class-entry name
-// used to disagree on whether the SAME class's grants applied; with the
-// name-keyed lookup deleted, that failure mode is unrepresentable).
+// buildMergedArmorProficiencies/buildMergedWeaponProficiencies resolve class grants through the class FK relation, never entry.name (#1529) — a lowercase vs display-name entry can no longer disagree (#1388).
 import { describe, expect, it } from "vitest";
 
 import { buildMergedArmorProficiencies, buildMergedWeaponProficiencies } from "@/lib/character/serialize/proficiencies.js";
@@ -25,10 +21,7 @@ describe("buildMergedArmorProficiencies / buildMergedWeaponProficiencies — res
     expect(weaponLower.map((g) => g.name)).toEqual(["Simple Weapons", "Martial Weapons"]);
   });
 
-  // Mutation proof: the #1388 bug (a lowercase entry name losing armor/weapon
-  // proficiencies its display-name twin received) can no longer be WRITTEN as
-  // a test, because neither function reads `entry.name` at all any more —
-  // there is no code path left to feed a differing name into.
+  // Mutation proof: the #1388 bug can no longer be WRITTEN as a test — neither function reads entry.name any more, so there's no code path left to feed a differing name into.
   it("a homebrew entry (no class relation) grants nothing, even when its name matches a real class", () => {
     const homebrew = [{ name: "Fighter", class: null }] as unknown as { class: { armorProficiencies: string[] } | null }[];
     expect(buildMergedArmorProficiencies(homebrew, new Set())).toEqual([]);

@@ -1,10 +1,9 @@
 import { forwardRef, Suspense } from "react";
 import { Text } from "@react-three/drei";
 import type * as THREE from "three";
-// A bundled, same-origin font so troika renders the face numbers directly
-// instead of fetching its unicode-font-resolver data from a CDN — which the
-// single-origin CSP `connect-src` blocks (#408). Vite hashes this to a
-// self-hosted asset URL. woff (not woff2) — troika's parser can't read woff2.
+// Bundled same-origin so troika doesn't fetch its font-resolver data from a
+// CDN, which the single-origin CSP connect-src blocks (#408). woff, not
+// woff2 — troika's parser can't read woff2.
 import faceLabelFont from "@fontsource/source-sans-3/files/source-sans-3-latin-700-normal.woff";
 
 import {
@@ -32,23 +31,14 @@ interface DieMeshProps {
   position?: readonly [number, number, number];
 }
 
-/**
- * One die's visual representation: the resin-look body plus its per-face
- * number labels. Purely presentational — it owns no animation and no
- * per-roll state. The group transform is driven entirely by whatever forwards
- * a ref to it: `DiceRoller`'s scripted tween eases position/quaternion every
- * frame, while `PhysicsDiceRoller` copies a cannon-es body's position/
- * quaternion onto it every frame. This split is what lets both rollers share
- * an identical look without sharing (or forking) animation logic.
- */
+/** Purely presentational — the group transform is driven by whoever forwards
+ *  a ref: DiceRoller's scripted tween or PhysicsDiceRoller's body sync. */
 const DieMesh = forwardRef<THREE.Group, DieMeshProps>(function DieMesh(
   { geometry, groups, rounded, value, dropped, rolling, position = [0, 0, 0] },
   ref,
 ) {
-  // Only reveal that a die was dropped once the whole set has actually
-  // stopped — the result (and so `dropped`) may be known before the dice
-  // settle, but showing it mid-roll spoils which die "loses" before the
-  // others have a chance to land.
+  // Only reveal a dropped die once the whole set has stopped — showing it
+  // mid-roll spoils which die "loses" before the others have landed.
   const isResolvedDrop = dropped && !rolling;
   const bodyColor = isResolvedDrop ? DIE_BODY_COLOR_DROPPED : DIE_BODY_COLOR;
   const labelColor = isResolvedDrop ? DIE_LABEL_COLOR_DROPPED : DIE_LABEL_COLOR;
@@ -69,11 +59,9 @@ const DieMesh = forwardRef<THREE.Group, DieMeshProps>(function DieMesh(
           opacity={isResolvedDrop ? 0.55 : 1}
         />
       </mesh>
-      {/* Face labels are purely cosmetic and load their font via troika, which
-          suspends. Contain that suspension in its own boundary so a text-load
-          failure can only blank the numbers — it must never suspend (and thus
-          unmount) the parent die body / physics rig, which is the source of the
-          roll result (#408). */}
+      {/* Face labels load their font via troika, which suspends — contained
+          in its own boundary so that can only blank the numbers, never
+          unmount the parent die body / physics rig that owns the roll result (#408). */}
       <Suspense fallback={null}>
         {showFaceLabels &&
           groups.map((group, index) => (

@@ -1,8 +1,3 @@
-// Shape pin for the catalog grant/fork contracts locked in #1796 (epic #1795
-// 1/6). No route consumes them yet (Waves 4-6 build the actual endpoints) —
-// this is the schema's own regression test, same role spell-ops.ts's
-// customSpellSchema gets indirectly through custom-spells.test.ts's route
-// assertions, done directly here since there is no route yet.
 import { describe, expect, it } from "vitest";
 import { catalogForkSchema, catalogGrantSchema } from "@character-sheet/contracts";
 

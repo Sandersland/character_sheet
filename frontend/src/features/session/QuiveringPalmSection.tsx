@@ -1,21 +1,13 @@
-// Quivering Palm on the Attack sheet (#1245): a two-step vertical mirroring
-// StunningStrikeSection's shape. SET rides an Unarmed Strike hit (spend 4
-// focus — gated on currentRow, like Stunning Strike); once active, TRIGGER is
-// a Magic action, so it consumes the Action slot directly here (this section
-// only mounts inside the main Attack sheet, where the Action economy is
-// already in scope — mirrors handleFlurryAction/handleTwfAction bypassing the
-// generic dispatch to manage their own slot). Set/Trigger's state + the two
-// server round-trips live in useQuiveringPalmActions so this file stays a flat
-// JSX composition.
+// TRIGGER consumes the Action slot directly here rather than through the
+// generic dispatch, since this section only mounts inside the Attack sheet
+// where the Action economy is already in scope — mirrors
+// handleFlurryAction/handleTwfAction managing their own slot.
 
 import { useQuiveringPalmActions } from "@/features/session/useQuiveringPalmActions";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 
-// Why Set/Trigger are disabled, in priority order — surfaced as their tooltip
-// (mirrors OpenHandTechniqueSection's riderBlockedReason). Pulled out of the
-// JSX so the component itself stays a flat composition.
 function setBlockedReason(active: boolean, currentRow: AttackTallyRow | null): string | undefined {
   if (active) return "Vibrations already set";
   if (currentRow === null) return "Roll a hit first";
@@ -28,7 +20,6 @@ function triggerBlockedReason(active: boolean): string | undefined {
 
 interface QuiveringPalmSectionProps {
   turnState: TurnState & TurnStateActions;
-  /** The bound hit row Set rides on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
 }
 
@@ -38,7 +29,7 @@ export default function QuiveringPalmSection({
 }: QuiveringPalmSectionProps) {
   const { character } = useCurrentCharacter();
   const { quiveringPalm } = character;
-  // Rider.active is optional (#1316) — false, not absent, when vibrations aren't set.
+  // quiveringPalm.active is optional (#1316) — false, not absent, when vibrations aren't set.
   const active = quiveringPalm?.active ?? false;
   const { setDisabled, triggerDisabled, message, error, handleSet, handleTrigger } = useQuiveringPalmActions(
     character,
@@ -47,7 +38,6 @@ export default function QuiveringPalmSection({
     active,
   );
 
-  // Only a L17+ Warrior of the Open Hand has Quivering Palm.
   if (!quiveringPalm) return null;
 
   return (

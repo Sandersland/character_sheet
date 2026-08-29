@@ -25,8 +25,7 @@ vi.mock("@/api/client", () => ({
   fetchCampaignItems: vi.fn(),
   fetchItems: vi.fn(),
   deleteCampaign: vi.fn(),
-  // Listed only so the edition-badge spec can prove it is NEVER called — the
-  // badge reads the label served with the campaign row (#1436).
+  // Kept in the mock only so this spec can assert it's never called (#1436).
   fetchEditions: vi.fn(),
 }));
 
@@ -57,7 +56,6 @@ const CHARACTERS: CharacterSummary[] = [
   { id: "char-1", ownerId: "user-1", name: "Thordak", race: "Dwarf", class: "Fighter", level: 3 },
 ];
 
-// Surfaces the current pathname so tests can assert tab clicks update the URL.
 function LocationProbe() {
   const location = useLocation();
   return <span data-testid="location">{location.pathname}</span>;
@@ -78,7 +76,7 @@ function renderDetail(initialEntry = "/campaigns/camp-1") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // The entity + merge caches are module-level and leak across tests without a reset.
+  // Entity + merge caches are module-level and leak across tests without a reset.
   __resetCampaignEntitiesCacheForTests();
   __resetCampaignMergesCacheForTests();
   vi.mocked(client.fetchEntities).mockResolvedValue([]);
@@ -103,9 +101,7 @@ describe("CampaignDetailPage (#246)", () => {
 
     await screen.findByText("The Sunless Citadel");
     const select = await screen.findByLabelText(/your characters/i);
-    // fetchCharacters resolves independently of fetchCampaign; wait for the
-    // option to populate before selecting, else selectOptions races the fetch
-    // and intermittently sees the empty "No characters to add" select.
+    // fetchCharacters resolves independently of fetchCampaign; wait for the option before selecting to avoid a race.
     await screen.findByRole("option", { name: "Thordak" });
     await user.selectOptions(select, "char-1");
     await user.click(screen.getByRole("button", { name: /add character/i }));
@@ -114,8 +110,7 @@ describe("CampaignDetailPage (#246)", () => {
     await waitFor(() => expect(vi.mocked(client.fetchCampaign)).toHaveBeenCalledTimes(2));
   });
 
-  // #1286: the blocked-join error (naming both editions, stating the fix) is
-  // the backend's exact message, surfaced verbatim — no client-side rewrite.
+  // Error text is the backend's exact message, not rewritten client-side (#1286).
   it("surfaces the edition-mismatch error verbatim when the join is blocked", async () => {
     const user = userEvent.setup();
     vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign());
@@ -147,16 +142,11 @@ describe("CampaignDetailPage (#246)", () => {
 
     await screen.findByText("The Sunless Citadel");
     expect(await screen.findByDisplayValue(/\/join\/abc123$/)).toBeInTheDocument();
-    // "Owner" appears in both the header role badge and the roster.
     expect(screen.getAllByText("Owner").length).toBeGreaterThan(0);
   });
 
-  // #1286: displayed on the campaign header (not the character-list card).
-  // The editions cache is deliberately unseeded: after #1436 this page never
-  // calls useEditions, so "never requested" is the observable claim.
+  // Editions cache is deliberately unseeded — this page never calls useEditions (#1436).
   it("shows the campaign's rules edition in the header, with no /api/editions request", async () => {
-    // Both fields set explicitly — a fixture that derived the label from the key
-    // would be a re-implementation of the very mapping this issue moved server-side.
     vi.mocked(client.fetchCampaign).mockResolvedValue(
       makeCampaign({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }),
     );
@@ -256,7 +246,6 @@ describe("CampaignDetailPage tabs (#367)", () => {
   it("deep-links to the Codex tab at /campaigns/:id/codex", async () => {
     renderDetail("/campaigns/camp-1/codex");
 
-    // The campaign name also appears in the codex rail eyebrow — query the heading.
     await screen.findByRole("heading", { name: /The Sunless Citadel/ });
     expect(screen.getByRole("tab", { name: /codex/i })).toHaveAttribute(
       "aria-selected",

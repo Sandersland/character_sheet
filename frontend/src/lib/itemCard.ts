@@ -1,4 +1,3 @@
-// Pure detail-row derivation for the Codex item card — no JSX; CampaignItemCard maps these rows to its DetailRow primitive (#687).
 import type { CampaignItem } from "@/types/character";
 
 export interface ItemDetailRow {
@@ -6,7 +5,6 @@ export interface ItemDetailRow {
   value: string;
 }
 
-// "2d4 + 2" / "1d8 - 1" / null when count or faces is missing.
 export function diceLabel(count?: number, faces?: number, modifier?: number): string | null {
   if (!count || !faces) return null;
   const mod = modifier ? (modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`) : "";
@@ -38,7 +36,6 @@ function consumableRows(consumable: NonNullable<CampaignItem["consumable"]>): It
   return [{ label: "Effect", value: [dice, consumable.effectDescription].filter(Boolean).join(" — ") }];
 }
 
-/** Every row the card's mechanical-detail box shows, in display order. */
 export function itemDetailRows(item: CampaignItem): ItemDetailRow[] {
   const rows: ItemDetailRow[] = [];
   if (item.weight !== undefined) rows.push({ label: "Weight", value: `${item.weight} lb` });

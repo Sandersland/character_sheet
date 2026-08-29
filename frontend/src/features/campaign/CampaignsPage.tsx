@@ -19,11 +19,8 @@ const labelCls = "block text-xs font-semibold text-parchment-700";
 const primaryBtn =
   "rounded-control bg-garnet-surface px-4 py-2 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:opacity-40";
 
-// The create surface, extracted so CampaignsPage's own render stays a plain
-// switch over list-load state — #1436's editions gating pushed the combined
-// function past fallow's complexity gate. `editions` arrives as a prop rather
-// than from a second useEditions call so the page's error banner and this form
-// can never disagree about whether the rows have landed.
+// editions arrives as a prop, not a second useEditions() call, so the page's
+// error banner and this form can never disagree on whether rows have landed.
 function CreateCampaignForm({
   editions,
   onCreated,
@@ -35,18 +32,15 @@ function CreateCampaignForm({
   onError: (message: string | null) => void;
 }) {
   const [name, setName] = useState("");
-  // null = "the DM hasn't touched the picker", not "2024". A campaign's edition
-  // can never be changed, so a UI-side fallback would silently decide a field the
-  // DM can't undo (#1436) — the served default is the only default, and a reset
-  // back to null re-derives it rather than restating a second literal.
+  // null means "DM hasn't touched the picker" — a UI-side fallback here would
+  // silently decide an unchangeable field (#1436).
   const [rulesEdition, setRulesEdition] = useState<RulesEdition | null>(null);
   const [pending, setPending] = useState(false);
   const selectedEdition = rulesEdition ?? editions?.defaultEdition ?? null;
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault();
-    // Submit is disabled without both, so this is the type narrowing plus a
-    // belt-and-braces guard against ever posting a guessed edition.
+    // Belt-and-braces guard against ever posting a guessed edition; submit is already disabled without both.
     if (!name.trim() || !selectedEdition) return;
     setPending(true);
     onError(null);
@@ -79,9 +73,7 @@ function CreateCampaignForm({
       </div>
       <div className="flex flex-col gap-1.5">
         <span className={labelCls}>Rules edition</span>
-        {/* No picker at all until the rows arrive (#1436) — not a fallback-valued
-            one, not a raw EDITION_* key. The label and the irreversibility notice
-            still render so the field doesn't pop in. */}
+        {/* No picker until rows arrive (#1436) — never a fallback-valued one. Label + notice still render so the field doesn't pop in. */}
         {editions && selectedEdition && (
           <EditionPicker
             rows={editions.editions}
@@ -95,8 +87,7 @@ function CreateCampaignForm({
           is created.
         </p>
       </div>
-      {/* Disabled until an edition is actually known: a submit that fell back to
-          a literal would write an unchangeable field the DM never saw. */}
+      {/* Disabled until an edition is known — a fallback literal would write an unchangeable field the DM never saw. */}
       <button type="submit" className={primaryBtn} disabled={pending || !name.trim() || !selectedEdition}>
         Create campaign
       </button>
@@ -104,8 +95,6 @@ function CreateCampaignForm({
   );
 }
 
-// Campaigns hub: lists the campaigns the caller belongs to (real list endpoint),
-// plus a create surface. Each card links to the management detail page.
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [error, setError] = useState<string | null>(null);

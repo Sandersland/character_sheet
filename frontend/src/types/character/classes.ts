@@ -1,17 +1,8 @@
-/**
- * Class-feature wire types: resources, maneuvers, fighting styles, and their operations.
- */
-
 import type { EffectSpec } from "@character-sheet/shared-types";
-// OpenHandRider is used below (OpenHandRiderResult.rider) as well as
-// re-exported (the `export type` block further down) — a bare `export …
-// from` doesn't bind a local name, so it needs its own `import type` too.
+// A bare `export … from` doesn't bind a local name, so OpenHandRiderResult.rider
+// needs this import despite the re-export below.
 import type { OpenHandRider } from "@character-sheet/contracts";
 
-// The resource + Warrior-of-the-Elements op shapes are the single cross-tier
-// source of truth in shared-types (#1273); re-exported here so this module stays
-// the frontend's class-types entry point (flowing through the @/types/character
-// barrel).
 export type {
   CastElementalBurstOperation,
   ElementalDamageType,
@@ -31,21 +22,10 @@ export type {
   WarriorOfElementsOperation,
   WarriorOfElementsResult,
 } from "@character-sheet/shared-types";
-// The per-op audit payload keeps its frontend name: the shared declaration is
-// called ResourceOpAudit (what the server logs) where the client sees a result.
-// Aliasing keeps api/client.ts out of this diff — #1275 is rewriting that file.
+// Shared declaration is named ResourceOpAudit; aliased since the client sees it as a per-op result.
 export type { ResourceOpAudit as ResourceOpResult } from "@character-sheet/shared-types";
 
-// The Channel Divinity / Shadow Arts / maneuver / ability-op shapes are derived
-// from the route zod schemas in @character-sheet/contracts (#1370) — `import
-// type` only, so zod never enters the client bundle
-// (scripts/check-no-zod-in-client-bundle.sh). Only the names this tier
-// actually consumes are re-exported: CastManeuverOperation and
-// ActivateCloakOfShadowsOperation have zero frontend call sites (mirrored
-// backend-only in maneuvers.ts/shadow-arts.ts), and Hand of Harm / Hand of
-// Ultimate Mercy have no frontend feature at all yet, so none of those three
-// forward here — a forwarded-only name is a dead export under the repo-wide
-// fallow gate.
+// `import type` only, so zod never enters the client bundle.
 export type {
   AttemptStunningStrikeOperation,
   BondWeaponOperation,
@@ -68,7 +48,7 @@ export type AbilityCost =
   | { kind: "pool"; key: string; base: number; perStep?: number }
   | { kind: "none" };
 
-/** The Warrior of Shadow Shadow Art (Darkness) from GET /api/shadow-arts (flat 1-focus focus-cast spell). */
+/** A Warrior of Shadow Shadow Art from GET /api/shadow-arts. */
 export interface CatalogShadowArt {
   id: string;
   name: string;
@@ -78,27 +58,13 @@ export interface CatalogShadowArt {
   effect: EffectSpec;
 }
 
-/**
- * One selectable ki amount for a Way of the Four Elements discipline's cast
- * picker, and the roll it resolves to (#1505) — mirrors SpellEntry's
- * `effectRolls[]` (spellcasting.ts): the client picks a `ki` and reads the
- * matching `roll` verbatim off `CatalogDiscipline.steps`, it never computes
- * the ki-scaled dice count itself.
- */
+/** The client reads `roll` verbatim off the step — never computes ki-scaled dice. */
 export interface DisciplineCastStep {
   ki: number;
   roll: { count: number; faces: number; modifier: number };
 }
 
-/**
- * A Way of the Four Elements discipline (2014-only, #1503/#1505) from GET
- * /api/disciplines. `steps` is empty for a no-dice utility discipline (Shape
- * the Flowing River) and for `cost.kind !== "pool"`; the per-cast ki CAP by
- * monk level (`maxKiPerDiscipline`, backend) is enforced server-side at cast
- * time, never client-side — `steps` may offer more ki than a given monk can
- * currently afford, which the server refuses rather than the client
- * silently clamping (#1505's explicit AC).
- */
+/** 2014-only. Per-cast ki cap (`maxKiPerDiscipline`) is enforced server-side; never clamp client-side. */
 export interface CatalogDiscipline {
   id: string;
   name: string;
@@ -109,10 +75,9 @@ export interface CatalogDiscipline {
   steps: DisciplineCastStep[];
 }
 
-/** How a Channel Divinity option expresses through the declarative core (#419). */
 export type ChannelDivinityKind = "announce" | "buff" | "advantage" | "invisible" | "reminder";
 
-/** An entitled Channel Divinity option from GET /api/characters/:id/channel-divinity (#419). */
+/** From GET /api/characters/:id/channel-divinity. */
 export interface CatalogChannelDivinity {
   id: string;
   name: string;
@@ -123,16 +88,17 @@ export interface CatalogChannelDivinity {
   reminder: string;
 }
 
-/** Class/subclass feature + resource-pool types. */
 export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
 
 export interface ResourcePool {
   key: string;
   label: string;
   total: number;
-  die?: string;        // e.g. "d8"
+  die?: string;
   recharge: RechargeOn;
   description?: string;
+  // Rendered verbatim next to the description; never parsed.
+  details?: { label: string; value: string }[];
   used: number;
   remaining: number;
 }
@@ -144,12 +110,7 @@ export interface ClassFeature {
   source: "class" | "subclass";
 }
 
-/**
- * Where a maneuver's session UI lives — resolved from catalog data (no longer a
- * hardcoded frontend table). "attackRoll"/"damageRoll" fold the die into that
- * roll; "reaction"/"attackOption" consume a slot with reminder text; "effect" is
- * a gold strip (Evasive Footwork, Rally).
- */
+/** attackRoll/damageRoll fold into that roll; reaction/attackOption consume a slot; effect is a gold strip. */
 export type ManeuverPlacement =
   | "attackRoll"
   | "damageRoll"
@@ -157,19 +118,15 @@ export type ManeuverPlacement =
   | "effect"
   | "attackOption";
 
-/** A known maneuver entry on a character — per-character entry with catalog provenance. */
 export interface ManeuverEntry {
   id: string;
   maneuverId?: string;   // catalog GrantedAbility.id provenance — undefined for custom
   name: string;
   description: string;
-  // Session-UI routing snapshot from the catalog (undefined for custom/legacy
-  // → session components treat as "damageRoll").
+  // Undefined for custom/legacy — session components then treat it as "damageRoll".
   placement?: ManeuverPlacement;
   actionSlot?: "bonusAction" | "reaction" | null;
-  // #1381: resolved by deriveManeuverEffect (backend), dice tracking the
-  // character's current superiority die via resolveClassDie — never re-derived
-  // client-side. Undefined for a custom/legacy entry with no catalog provenance.
+  // Resolved by deriveManeuverEffect; never re-derived client-side. Undefined for custom/legacy.
   effect?: EffectSpec;
 }
 
@@ -227,56 +184,41 @@ export interface TriggerQuiveringPalmResult {
 export type QuiveringPalmResult = SetQuiveringPalmResult | TriggerQuiveringPalmResult;
 
 /**
- * One merged tool proficiency entry on the character wire type.
- * Creation-fixed profs (background/class) and level-gated subclass
- * profs (Student of War) are merged by serializeCharacter before sending.
+ * One tool proficiency on the wire — serializeCharacter merges creation-fixed
+ * (background/class) and level-gated subclass profs before sending.
  */
 export interface ToolProficiency {
   name: string;
   category: "artisan" | "gamingSet" | "musicalInstrument" | "other";
-  /** Where this proficiency came from ("item" = a magic item grant, #529). */
+  /** "item" means a magic item grant. */
   source: "background" | "class" | "subclass" | "item";
 }
 
-/** Armor category that a character is proficient with. */
 export type ArmorProficiencyCategory = "light" | "medium" | "heavy" | "shield";
 
-/**
- * One armor proficiency entry — derived at read time from class + species-trait
- * + feats (species grants arrive feat-sourced since the #1682
- * RACE_PROFICIENCY_GRANTS retirement). `category` identifies the armor type;
- * `source` is the highest-priority origin (class wins over feat when multiple
- * sources would grant the same category).
- */
+/** `source` is the highest-priority origin: class wins over feat for the same category. */
 export interface ArmorProficiency {
   category: ArmorProficiencyCategory;
   source: "class" | "feat";
 }
 
-/**
- * One weapon proficiency entry — derived at read time from class + species-trait
- * + feats (species grants arrive feat-sourced since #1682). `name` may be a
- * category ("Simple Weapons", "Martial Weapons") or a specific weapon
- * ("Longswords"). `source` is the highest-priority origin.
- */
+/** `name` may be a category or a specific weapon; `source` is the highest-priority origin. */
 export interface WeaponProficiency {
   name: string;
   source: "class" | "feat" | "item";
 }
 
-/** Level-gated tool proficiency entry within the resources JSON. */
 export interface ToolProfEntry {
-  id: string;   // per-character entry UUID
+  id: string;
   name: string; // matches a TOOLS entry name
 }
 
-/** Level-gated Expertise skill entry within the resources JSON (#1588). */
 export interface ExpertiseEntry {
-  id: string;    // per-character entry UUID
-  skill: string; // camelCase skill key, e.g. "stealth"
+  id: string;
+  skill: string; // camelCase skill key
 }
 
-/** One picked option of a subclass "choose N" feature (#899) — a snapshot, not mechanics. */
+/** A snapshot, not mechanics. */
 export interface ChoiceEntry {
   id: string;
   optionId?: string; // catalog provenance; absent for a custom (non-catalog) pick
@@ -284,28 +226,21 @@ export interface ChoiceEntry {
   description: string;
 }
 
-/** Derived class/subclass resource data merged with stored mutable state. */
 export interface CharacterResources {
   features: ClassFeature[];
   maneuverChoiceCount?: number;
-  /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
-  /** Number of Expertise skill picks at this level (#1588 — Rogue/Bard/Ranger/Wizard). */
   expertiseChoiceCount?: number;
   pools: ResourcePool[];
   maneuversKnown: ManeuverEntry[];
-  /** Level-gated tool proficiency choices (e.g. Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
-  /** Level-gated Expertise skill choices (#1588). */
   expertiseKnown: ExpertiseEntry[];
-  // buildResourcesPayload always sends both of these (subclassChoices defaults
-  // to [] server-side), so required here — optional would let the drift these
-  // two fields close (#1422) reopen.
+  // `buildResourcesPayload` always sends both, so required here — keep it that way.
   subclassChoices: { key: string; label: string; catalogSource: string; count: number }[];
   choicesKnown: Record<string, ChoiceEntry[]>;
 }
 
-/** One entry in `Character.classes` — structured multiclass-aware view. */
+/** Structured multiclass-aware view of one entry in `Character.classes`. */
 export interface ClassEntry {
   /** CharacterClassEntry row id — the levelUp "existing" target. */
   id: string;
@@ -314,36 +249,14 @@ export interface ClassEntry {
   subclass?: string;
   subclassId?: string;
   classId?: string;
-  /**
-   * Backend-computed (buildClassesView, #1598): true once this entry's
-   * subclass-gate level has passed AND (no subclass chosen yet, or the held
-   * one is `subclassUnavailable`). The frontend reads this rather than
-   * re-deriving `level >= subclassGateLevel` (CLAUDE.md: rules logic is
-   * backend-owned) — deriveNeedsSubclass, the mirror this replaced, also read
-   * TOTAL character level against the PRIMARY entry's subclass, wrong for
-   * multiclass.
-   */
+  /** Computed by `buildClassesView`; never re-derive `level >= subclassGateLevel` client-side. */
   needsSubclass: boolean;
-  /**
-   * True when this entry holds a subclass row edition-tagged for a DIFFERENT
-   * edition than the character's own (a catalog retag landing after the pick
-   * — fresh cross-edition picks are already blocked by crossEditionRejection,
-   * #1598). The name still renders (`subclass` above), but subclass features
-   * derive to zero, so the sheet must explain the split rather than hide it.
-   */
+  /** True when the held subclass is tagged for a different edition than the character's; name still renders but features derive to zero. */
   subclassUnavailable: boolean;
 }
 
-/**
- * Class operation types — mirror of `applyClassOperations`. Sent as
- * `{ operations: ClassOperation[] }` to POST /api/characters/:id/class/transactions.
- */
+// Sent as { operations: ClassOperation[] } to POST /api/characters/:id/class/transactions.
 export interface SetSubclassOperation { type: "setSubclass"; subclassId: string }
 
-// #1131/#1170: the frontend no longer dispatches an addClass op — the level-up
-// ceremony's class-choice step routes a multiclass-add through it (?classId=).
-// The backend addClass op stays for its other callers; the frontend mirror was
-// dead and is dropped.
-// #1137: setFightingStyle is gone — Fighting Style is now a feat taken via the
-// advancement endpoint (fightingStyle slot), not a class-scalar op.
+// Only ops the frontend dispatches are mirrored; `applyClassOperations` accepts more server-side.
 export type ClassOperation = SetSubclassOperation;

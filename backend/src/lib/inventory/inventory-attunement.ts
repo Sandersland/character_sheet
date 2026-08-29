@@ -10,10 +10,8 @@ import {
   itemBuffKey,
 } from "./inventory-types.js";
 
-// 5e: a character can attune to at most 3 magic items (SRD 5.1 / SRD 5.2,
-// "Attunement") — edition-invariant. Derived (counted from live rows), never
-// persisted. Exported so serializeCharacter's `attunementCap` and the 409 below
-// resolve to the SAME constant; keep it the only `3` in this file.
+// SRD 5.1 / SRD 5.2, "Attunement": a character can attune to at most 3 magic items (edition-invariant).
+// Exported so serializeCharacter's `attunementCap` and the 409 below resolve to the SAME constant; keep this the only `3` in this file.
 export const ATTUNEMENT_LIMIT = 3;
 
 export async function applyAttune(
@@ -28,21 +26,12 @@ export async function applyAttune(
     throw new InvalidInventoryOperationError(`${item.name} is already attuned`);
   }
 
-  // Prerequisite check against the snapshotted columns (5e "requires attunement
-  // by a …"). Loads only the identity facts the check needs.
   if (item.attunementPrereqKind) {
     const character = await tx.character.findUnique({
       where: { id: characterId },
       select: {
         alignment: true,
-        // #1684: species/variant relations, not raceSelection.name — the flat
-        // Race model is gone, and CharacterRace.name is a drifting DISPLAY
-        // snapshot (schema.prisma's own "free to drift independently" comment
-        // on the selections-model pattern); a mechanical prerequisite check
-        // should resolve against the catalog-linked identity instead. variant
-        // (more specific, e.g. "Hill Dwarf") wins over species ("Dwarf");
-        // raceSelection.name is the last fallback for a homebrew/no-species-FK
-        // character (raw-inserted fixtures with no speciesId).
+        // #1684: a mechanical check must resolve against the catalog-linked species/variant, not the drifting raceSelection.name display snapshot; variant wins over species, raceSelection.name is the last fallback for a no-speciesId fixture.
         raceSelection: { select: { name: true, species: { select: { name: true } }, variant: { select: { name: true } } } },
         classEntries: {
           select: { name: true, subclassRef: { select: { casterFraction: true, spellcastingAbility: true } } },
@@ -66,18 +55,9 @@ export async function applyAttune(
     }
   }
 
-  // Serializes concurrent applyAttune calls for the SAME character before the
-  // cap recount below: under Postgres' default READ COMMITTED, two concurrent
-  // requests can each read the pre-write attuned count while the other's
-  // UPDATE is still uncommitted, letting a 4th item attune past the cap
-  // (#1888, same shape as the weapon-bond cap race fixed in #1854). Locking
-  // the currently-attuned InventoryItem rows doesn't work here — the new row
-  // being attuned doesn't match the `attuned: true` predicate yet, so it's a
-  // phantom-read case; only a lock on the Character row itself blocks the
-  // second request until the first's count-then-update has committed.
+  // #1888 (same shape as #1854): under READ COMMITTED, two concurrent attunes can each read the pre-write count and both pass the cap — a phantom read, since the row being attuned doesn't match `attuned: true` yet. Locking the Character row (not the InventoryItem rows) is what serializes them.
   await tx.$queryRaw`SELECT id FROM "Character" WHERE id = ${characterId} FOR UPDATE`;
 
-  // Derived 3-item cap: count currently-attuned rows, reject the 4th with a 409.
   const attunedCount = await tx.inventoryItem.count({ where: { characterId, attuned: true } });
   if (attunedCount >= ATTUNEMENT_LIMIT) {
     throw new AttunementLimitError(

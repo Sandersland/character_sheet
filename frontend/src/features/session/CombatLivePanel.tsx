@@ -1,24 +1,3 @@
-/**
- * The live Combat tab (#960, unified #1086): when a session is live AND this
- * character is in it, the Combat tab renders THIS instead of the idle panel. It
- * fills the SAME CombatColumn as idle — turn slot = the live turn tracker, HP slot
- * = a compact HP card, conditions slot = CombatUtilityStrip (conditions ·
- * exhaustion · rest), log = a one-line row — so switching idle↔live moves only the
- * turn + HP slots and nothing else shifts. No abilities/skills rail, no persistent
- * log card: the log opens on demand in a right Drawer (desktop) or BottomSheet
- * (mobile).
- *
- * Consumes the #959 workspace providers: turn state via `useTurnStateContext()`
- * (never its own `useTurnState`), live session via `useLiveSession()`, and the
- * workspace `RollProvider` (threaded with the live `sessionId`). It owns only the
- * open-log UI state; the End/Leave lifecycle lives in the workspace + sheet header
- * (#979). The turn economy lives in the provider, so it survives a swipe away
- * (this panel stays mounted, hidden) and a remount.
- *
- * `active` = the Combat tab is the visible tab. The log overlay renders ONLY while
- * active, so a hidden panel's open drawer never floats over another tab.
- */
-
 import { useState } from "react";
 
 import BottomSheet from "@/components/ui/BottomSheet";
@@ -39,26 +18,22 @@ import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Session } from "@/types/character";
 
 interface CombatLivePanelProps {
-  /** The live joined session (participants included) — parent-guaranteed non-null. */
   session: Session;
-  /** The Combat tab is the visible tab — gates the log overlay render. */
   active: boolean;
 }
 
 export default function CombatLivePanel({ session, active }: CombatLivePanelProps) {
   const { character } = useCurrentCharacter();
+  // Turn state must come from useTurnStateContext(), never a local useTurnState — keeps the #959 workspace provider as the single source.
   const turnState = useTurnStateContext();
   const live = useLiveSession();
   const [showLog, setShowLog] = useState(false);
   const isBelowMd = useIsBelowMd();
 
-  // The panel is mounted only while live+joined, so turnState is non-null in
-  // practice; guard the render (never the hooks above) for safety.
   if (!turnState) return null;
 
   const openLog = () => setShowLog(true);
-  // Session.title is optional (a DM may not have named the sitting yet) — fall
-  // back to the session's date, mirroring CombatLogRow's own idle-row label.
+  // Mirrors CombatLogRow's idle-row title-fallback rule — keep both in sync.
   const logSubtitle = session.title ?? formatSessionDate(session.startedAt);
 
   return (
@@ -73,8 +48,6 @@ export default function CombatLivePanel({ session, active }: CombatLivePanelProp
             onOpenLog={openLog}
           />
         }
-        // Mobile keeps HP in the sheet header (#1085); desktop's canonical HP
-        // affordance is this compact card (the DesktopUtilityLine stopgap is gone).
         hpSlot={isBelowMd ? null : <LiveHpCard />}
         conditionsSlot={<CombatUtilityStrip />}
         logRow={
@@ -88,8 +61,6 @@ export default function CombatLivePanel({ session, active }: CombatLivePanelProp
         }
       />
 
-      {/* Overlay gated on `active` (mounted-hidden panel invariant, #960): an open
-          drawer must never float over another tab. */}
       {active && showLog &&
         (isBelowMd ? (
           <BottomSheet title="Session Log" subtitle={logSubtitle} onClose={() => setShowLog(false)}>
@@ -104,10 +75,7 @@ export default function CombatLivePanel({ session, active }: CombatLivePanelProp
   );
 }
 
-// The desktop live HP card (#1086): the meter wrapped in ManageHpButton, whose
-// dynamic accessible name carries the HP numbers. One canonical HP affordance for
-// desktop live play — the header dropped HP (#1085) and DesktopUtilityLine no
-// longer carries it.
+// ManageHpButton computes its own accessible name from the HP numbers, so this needs no aria-label.
 function LiveHpCard() {
   const { character } = useCurrentCharacter();
   const { hitPoints, hitDice } = character;

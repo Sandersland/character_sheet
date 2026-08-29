@@ -1,17 +1,6 @@
-/**
- * `ABILITY_REGISTRY` transaction-op schemas (backend/src/lib/classes/*.ts),
- * migrated one family at a time (#1370). Each op has exactly one declaration
- * here; the backend value-imports the schema and runs `.parse()`, and every
- * derived type is `z.infer` of that same schema — never a hand-written mirror.
- *
- * `warrior-of-elements` is deliberately excluded: its op types already live in
- * `packages/shared-types/src/class-resources.ts` (#1273), and its
- * `damageType` enum reads `ELEMENTAL_DAMAGE_TYPES`, a runtime const in
- * `backend/src/lib/classes/warrior-of-elements.ts` that this package may not
- * import (backend → contracts is one-directional). See the #1370 PR body /
- * follow-up issue for the shared-types/contracts overlap this leaves open.
- */
 import { z } from "zod";
+
+// warrior-of-elements ops are excluded: their damageType enum reads ELEMENTAL_DAMAGE_TYPES from the backend, which this package may not import (contracts -> backend is forbidden, .fallowrc.jsonc boundaries).
 
 /** `abilityId` is the catalog GrantedAbility.id. */
 export const castChannelDivinityOpSchema = z.object({
@@ -36,35 +25,18 @@ export const castShadowArtOpSchema = z.object({
 });
 export type CastShadowArtOperation = z.infer<typeof castShadowArtOpSchema>;
 
-/**
- * Cast a known Way of the Four Elements discipline (2014, #1503). `entryId` is
- * the KNOWN entry's id (choicesKnown["fourElementsDisciplines"][].id, not the
- * catalog GrantedAbility.id — mirrors castManeuver's entryId). `requestedKi`
- * overspends above the discipline's base ki cost to scale its damage dice
- * (EffectScaling "poolStep"); omitted spends the base cost. `roll` is the
- * client-computed damage total for a discipline that deals damage (mirrors
- * castSpell/castElementalBurst: the client rolls its own supernatural effect,
- * trusted server-side) — omitted for a discipline with no damage roll.
- */
+/** `entryId` is choicesKnown["fourElementsDisciplines"][].id (2014), not the catalog GrantedAbility.id; `roll` is the client's own computed damage total, omitted when the discipline deals none. */
 export const castDisciplineOpSchema = z.object({
   type: z.literal("castDiscipline"),
   entryId: z.string().min(1),
   requestedKi: z.number().int().positive().optional(),
-  // .positive(), not .nonnegative() — matches every sibling roll field in
-  // this file (castElementalBurst/triggerQuiveringPalm/dealHandOfHarm/
-  // useHandOfUltimateMercy). 0 is never legitimate: the minimum roll on any
-  // discipline's dice (e.g. 1d10) is 1, and disciplines.ts's own server-side
-  // check already rejects roll <= 0 for a damage discipline — this just
-  // catches the same rule one layer earlier, with a clearer validation error.
+  // positive, not nonnegative: 0 is not a die face; mirrors resolveDisciplineCast's own roll guard.
   roll: z.number().positive().optional(),
 });
 export type CastDisciplineOperation = z.infer<typeof castDisciplineOpSchema>;
 export type DisciplineOperation = CastDisciplineOperation;
 
-/**
- * Activate Cloak of Shadows (L17): spend 3 focus, become invisible. No catalog
- * id — unlike castShadowArt this is one fixed feature, not a granted-ability row.
- */
+/** No catalog id — unlike castShadowArt this is one fixed feature, not a granted-ability row. */
 export const activateCloakOfShadowsOpSchema = z.object({
   type: z.literal("activateCloakOfShadows"),
 });
@@ -72,10 +44,7 @@ export type ActivateCloakOfShadowsOperation = z.infer<typeof activateCloakOfShad
 
 export type ShadowArtOperation = CastShadowArtOperation | ActivateCloakOfShadowsOperation;
 
-/**
- * `usedThisTurn` is once-per-turn, client-asserted — the server has no session
- * turn state to cross-check it against.
- */
+/** `usedThisTurn` is once-per-turn, client-asserted — the server has no session turn state to cross-check it against. */
 export const attemptStunningStrikeOpSchema = z.object({
   type: z.literal("attemptStunningStrike"),
   usedThisTurn: z.boolean(),
@@ -83,14 +52,11 @@ export const attemptStunningStrikeOpSchema = z.object({
 export type AttemptStunningStrikeOperation = z.infer<typeof attemptStunningStrikeOpSchema>;
 export type StunningStrikeOperation = AttemptStunningStrikeOperation;
 
-// Shared by open-hand-technique.ts (the rider a Flurry hit imposes) and
-// frontend/src/types/character/classes.ts (api/abilities.ts's rider param) —
-// the one enum in this file re-exported from BOTH tiers rather than just the
-// frontend, since the backend has its own non-barrel consumer too.
 export const openHandRiderSchema = z.enum(["addle", "push", "topple"]);
+// OpenHandRider is also imported directly by the backend's open-hand-technique module — not frontend-only; don't remove as unused.
 export type OpenHandRider = z.infer<typeof openHandRiderSchema>;
 
-/** `usedThisTurn` is once-per-turn, client-asserted (mirrors attemptStunningStrike). */
+/** `usedThisTurn` is once-per-turn, client-asserted. */
 export const imposeOpenHandRiderOpSchema = z.object({
   type: z.literal("imposeOpenHandRider"),
   rider: openHandRiderSchema,
@@ -104,11 +70,7 @@ export const setQuiveringPalmOpSchema = z.object({
 });
 export type SetQuiveringPalmOperation = z.infer<typeof setQuiveringPalmOpSchema>;
 
-/**
- * Roll ownership: the 10d12 is the monk's own supernatural effect, so the client
- * rolls it and sends the total; the server only validates positivity and
- * narrates it. Same split as useHandOfUltimateMercy and dealHandOfHarm.
- */
+/** Client-rolled 10d12 total; the server only validates positivity, it does not re-roll. */
 export const triggerQuiveringPalmOpSchema = z.object({
   type: z.literal("triggerQuiveringPalm"),
   roll: z.number().positive(),
@@ -123,21 +85,13 @@ export const dealHandOfHarmOpSchema = z.object({
   usedThisTurn: z.boolean(),
   /** Client-rolled Martial Arts die + Wisdom modifier total (necrotic damage). */
   roll: z.number().positive(),
-  /**
-   * Flurry of Healing and Harm (L11, PHB'24 p.92): spend a free use from that
-   * pool instead of the base Focus pool. Still requires a level 11+ Warrior of
-   * Mercy; the once-per-turn limit above still applies.
-   */
+  /** Flurry of Healing and Harm (PHB'24 p.92): spends a free use from that pool instead of Focus; the once-per-turn limit above still applies. */
   freeFromFlurry: z.boolean().optional(),
 });
 export type DealHandOfHarmOperation = z.infer<typeof dealHandOfHarmOpSchema>;
 export type HandOfHarmOperation = DealHandOfHarmOperation;
 
-/**
- * Roll ownership: 4d10 + Wisdom modifier is the monk's own supernatural effect,
- * so — like triggerQuiveringPalm's 10d12 — the client rolls it and sends the
- * total; the server only validates positivity.
- */
+/** Client-rolled 4d10 + Wisdom modifier total; the server only validates positivity, it does not re-roll. */
 export const useHandOfUltimateMercyOpSchema = z.object({
   type: z.literal("useHandOfUltimateMercy"),
   roll: z.number().positive(),
@@ -145,12 +99,7 @@ export const useHandOfUltimateMercyOpSchema = z.object({
 export type UseHandOfUltimateMercyOperation = z.infer<typeof useHandOfUltimateMercyOpSchema>;
 export type HandOfUltimateMercyOperation = UseHandOfUltimateMercyOperation;
 
-/**
- * Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854): `inventoryItemId`
- * is the character's own InventoryItem row. bondWeapon enforces the L3+ EK
- * (2014) gate and the 2-weapon cap server-side; unbondWeapon is always legal
- * (mirrors unattune) so a stuck row can clear.
- */
+/** Eldritch Knight Weapon Bond (PHB'14 p.75): bondWeapon enforces the L3+ EK gate and 2-weapon cap server-side; unbondWeapon is always legal so a stuck row can clear. */
 export const bondWeaponOpSchema = z.object({
   type: z.literal("bondWeapon"),
   inventoryItemId: z.string().min(1),

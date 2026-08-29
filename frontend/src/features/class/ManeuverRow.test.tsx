@@ -35,9 +35,8 @@ describe("ManeuverRow — served die chip (#1381)", () => {
   });
 });
 
-// #1516: a maneuver replacement is bound to learn-time (PHB'14 Battle Master
-// p.73 / SRD 5.2 equivalent) and only offered inside the level-up ceremony's
-// own "maneuvers" step — the sheet's row renders no forget affordance at all.
+// A maneuver replacement is bound to learn-time (PHB'14 Battle Master p.73 /
+// SRD 5.2 equivalent) and only offered inside the level-up ceremony (#1516).
 describe("ManeuverRow — no forget affordance (#1516)", () => {
   it("renders no Forget button", () => {
     render(

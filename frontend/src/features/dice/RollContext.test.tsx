@@ -12,8 +12,6 @@ vi.mock("@/api/client", () => ({
   logRollAction: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Stub the 3D DiceRoller (mounts a Three.js Canvas that doesn't render in jsdom):
-// fire onResult once on mount with a fixed natural d20 (17) plus the spec modifier.
 const NATURAL = 17;
 vi.mock("@/features/dice/DiceRoller", () => ({
   default: function MockDiceRoller({
@@ -70,14 +68,13 @@ describe("RollProvider — rollAnimated + logging", () => {
 
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
 
-    // At settle the overlay hands off to the seal (17 + 5) and unmounts itself.
     const seal = await screen.findByTestId("roll-result-seal");
     expect(seal).toHaveTextContent("22");
     expect(screen.queryByTestId("dice-roller")).not.toBeInTheDocument();
 
     const [cid, payload] = mockLogRoll.mock.calls[0];
     expect(cid).toBe("char-1");
-    // No sessionId on the wire — the resolver derives it from the active session (#1861).
+    // No sessionId on the wire; the resolver derives it from the active session.
     expect(payload).toMatchObject({
       kind: "check",
       source: "Perception check",
@@ -103,7 +100,6 @@ describe("RollProvider — rollAnimated + logging", () => {
       </DiceRollStyleProvider>,
     );
 
-    // No 3D overlay; the seal carries the result and it still logs.
     const chip = await screen.findByTestId("roll-result-seal");
     expect(chip).toHaveTextContent("Perception check");
     expect(screen.queryByTestId("dice-roller")).not.toBeInTheDocument();
@@ -123,7 +119,6 @@ describe("RollProvider — rollAnimated + logging", () => {
       </RollProvider>,
     );
 
-    // The animated path resolves onto the seal even with nothing to log.
     expect(await screen.findByTestId("roll-result-seal")).toBeInTheDocument();
     expect(mockLogRoll).not.toHaveBeenCalled();
   });
@@ -144,7 +139,6 @@ describe("RollProvider — rollAnimated + logging", () => {
     function AdvantageRoll() {
       const { rollAnimated } = useRoll();
       useEffect(() => {
-        // Roll mode is per-roll now (#958): the surface pins it onto the spec.
         rollAnimated({ count: 1, faces: 20, modifier: 1, mode: "advantage" }, "Initiative", {
           kind: "initiative",
           source: "Initiative",
@@ -167,8 +161,6 @@ describe("RollProvider — rollAnimated + logging", () => {
     });
   });
 
-  // #1359: an advantage/disadvantage roll must carry its dropped d20 face
-  // onto the logged event, alongside the kept face already in `faces`.
   it("carries the dropped d20 face in droppedFaces on an advantage roll (quick style, real dice engine)", async () => {
     localStorage.setItem("cs:pref:diceRoll", "quick");
     const randomSpy = vi

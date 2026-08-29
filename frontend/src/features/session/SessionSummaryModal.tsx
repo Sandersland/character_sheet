@@ -7,16 +7,12 @@ import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { Session } from "@/types/character";
 
 interface SessionSummaryModalProps {
-  /** Owning character — needed to retroactively award XP to this session. */
+  /** Needed to retroactively award XP to this session, even though the modal is otherwise read-only. */
   characterId: string;
-  /** The ended session whose recap + participants are displayed. */
   session: Session;
   onClose: () => void;
 }
 
-// Read-only end-of-session recap (#245): the campaign aggregate, each
-// participant's contribution, the session's journals, and a retroactive "add
-// XP" affordance.
 export default function SessionSummaryModal({
   characterId,
   session,
@@ -26,8 +22,7 @@ export default function SessionSummaryModal({
     characterId,
     session,
   );
-  // Resolve @[<uuid>] tokens in note bodies to entity chips (plain text outside
-  // a campaign or before the entities load).
+  // Falls back to plain text outside a campaign or before entities load.
   const { byId } = useCampaignEntities(session.campaignId);
 
   return (
@@ -50,7 +45,6 @@ export default function SessionSummaryModal({
           campaignId={session.campaignId}
         />
 
-        {/* Retroactive awards only apply to a closed session — gate defensively. */}
         {session.status === "ended" && (
           <SessionAddXpForm
             characterId={characterId}

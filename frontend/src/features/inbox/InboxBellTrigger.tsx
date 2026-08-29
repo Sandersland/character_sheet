@@ -4,8 +4,6 @@ interface InboxBellTriggerProps {
   count: number;
 }
 
-// The bell glyph + unread-count badge (#1946), shared by the mobile button
-// and the desktop Popover's trigger prop — purely presentational, no state.
 export default function InboxBellTrigger({ count }: InboxBellTriggerProps) {
   return (
     <span className="relative flex h-8 w-8 items-center justify-center rounded-full hover:bg-parchment-100">

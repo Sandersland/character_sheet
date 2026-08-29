@@ -1,16 +1,6 @@
-// Assassinate (2014 Assassin L3+, #1526) — a manual "target is surprised"
-// toggle on the attack card, following Sneak Attack's own eligibility-toggle
-// pattern (#902): never auto-detected, a pure self-declared assertion (no
-// enemy/surprise state — modelling one is an explicit non-goal). PHB'14
-// p.97: "any hit you score against a creature that is surprised is a
-// critical hit." Checking the box while a to-hit roll is live and its
-// verdict hasn't settled calls the SAME `onCallCrit()` the manual "Crit!"
-// button (ResolutionRail's CallItStepContent) already uses — this is a
-// gated, attributed shortcut onto an already-audited mechanism, not a second
-// crit-decision path (the server never computes the crit itself either; it
-// only gates WHO may declare one, see resolve-action.ts's
-// assertAssassinateEligible). The advantage-vs-hasn't-acted-yet clause stays
-// reminder text — no initiative-order awareness lives here.
+// PHB'14 p.97: any hit scored against a surprised creature is a critical hit.
+// Checking the box calls the same onCallCrit() the manual Crit! button uses;
+// resolve-action.ts's assertAssassinateEligible re-gates eligibility server-side.
 
 import { useEffect } from "react";
 
@@ -19,9 +9,6 @@ import type { ResolutionView } from "@/features/session/useResolution";
 
 interface AssassinateSectionProps {
   resolutionView: ResolutionView;
-  /** Lifted into the picker's own per-swing local state (like riderEffects)
-   *  so it resets after every commit — a later, non-toggled swing starts
-   *  unchecked, matching #1526 AC "changes only that swing". */
   surprised: boolean;
   onSurprisedChange: (surprised: boolean) => void;
 }
@@ -34,10 +21,8 @@ export default function AssassinateSection({
   const { character } = useCurrentCharacter();
   const { toHitRoll, verdict, disabled, completed, onCallCrit } = resolutionView;
 
-  // Self-limiting: once onCallCrit sets the verdict, `verdict !== undefined`
-  // goes true and this stops firing — no "already fired" ref needed. Never
-  // upgrades a called miss (RAW: surprise doesn't turn a miss into a hit) —
-  // onCallCrit's own guard already refuses once `verdict === "miss"`.
+  // Self-limiting via verdict !== undefined; onCallCrit's own guard refuses
+  // once verdict === "miss" (surprise can't turn a miss into a hit).
   useEffect(() => {
     if (!surprised || disabled || completed) return;
     if (!toHitRoll || verdict !== undefined) return;

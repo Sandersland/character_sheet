@@ -4,11 +4,6 @@ import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
 import { createCharacter, uniqueName } from "./helpers/api";
 
-// #785: below md the @-mention suggestions must render in-flow inside the
-// Quick-capture BottomSheet — scrollable and clear of the sheet edge — not as an
-// absolute popover that clips under the on-screen keyboard. Desktop keeps the
-// popover. Here we seed a campaign with several entities, attach the character,
-// and drive the mobile flow.
 test("Quick capture: @-mention suggestions render in-flow and unclipped on mobile", async ({
   page,
 }) => {
@@ -40,18 +35,14 @@ test("Quick capture: @-mention suggestions render in-flow and unclipped on mobil
   const viewport = { width: 390, height: 844 };
   await page.setViewportSize(viewport);
   await page.goto(`/characters/${characterId}`);
-  // Mobile header has no h1 (#1027 — identity is a "Switch character" button);
-  // that button appearing confirms the sheet rendered.
+  // Mobile header has no h1 (#1027) — "Switch character" is the render signal.
   await expect(page.getByRole("button", { name: "Switch character" })).toBeVisible();
 
-  // Open the mobile Quick-capture BottomSheet and type an @-query.
   await page.keyboard.press("Control+j");
   const composer = page.getByRole("textbox", { name: /quick note/i });
   await expect(composer).toBeFocused();
   await composer.pressSequentially("@Al");
 
-  // The in-flow suggestion list shows, several rows visible, unclipped by the
-  // viewport bottom (no absolute popover hanging off the sheet edge).
   const listbox = page.getByRole("listbox", { name: /tag suggestions/i });
   await expect(listbox).toBeVisible();
   const options = listbox.getByRole("option");
@@ -62,7 +53,6 @@ test("Quick capture: @-mention suggestions render in-flow and unclipped on mobil
   expect(box, "listbox has a layout box").not.toBeNull();
   expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height + 1);
 
-  // Keyboard nav selects; arrowing keeps a highlighted active option.
   await composer.press("ArrowDown");
   await expect(listbox.locator('[aria-selected="true"]')).toHaveCount(1);
   await composer.press("Enter");

@@ -18,16 +18,13 @@ interface EntityForm {
   setNotes: (v: string) => void;
 }
 
-// Immediate-mode portrait wiring (#1617): the entity id exists, so selections
-// upload straight away. Provided only for the campaign OWNER — portrait
-// writes are owner-only, so non-owners get no control at all.
+// Selections upload immediately (#1617) since the entity id already exists; non-owners never get this prop, so they get no control at all.
 interface PortraitControlProps {
   imageUrl: string | null;
   onSelect: (file: File) => void;
   onRemove: () => void;
 }
 
-// The article's inline edit state (#842) — swaps in for the header + lead.
 export default function EntityEditForm({
   form,
   busy,

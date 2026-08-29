@@ -1,7 +1,3 @@
-// Pure 5e-rules sanity checks on SPECIES — no database, same role as
-// catalog-data.test.ts (CLASSES/BACKGROUNDS). Guards the roster-parity
-// invariants the epic names explicitly: neither edition's roster contains the
-// other's exclusives, and the PHB'14 Dwarf 25 ft / PHB'24 Dwarf 30 ft canary.
 import { describe, it, expect } from "vitest";
 
 import { SPECIES, speciesSeedSchema } from "../species-data.js";
@@ -52,10 +48,7 @@ describe("2014 roster (PHB'14, full subrace list, Variant Human excluded)", () =
     expect(variantNames("Gnome")).toEqual(["Forest Gnome", "Rock Gnome"]);
   });
 
-  // #1751: Astral Elf (Spelljammer, non-PHB) uses a Tasha's-era floating spread
-  // AND is the one variant that REPLACES rather than adds to its base species'
-  // ability increase — an Astral Elf gets ONLY the floating +2/+1, never the
-  // base Elf's +2 DEX (which every real subrace does stack on).
+  // Astral Elf replaces its base species' ability increases instead of adding to them (#1751).
   it("Astral Elf carries a single floating-3 spread and the abilityIncreasesReplace flag", () => {
     const elf = roster2014.find((s) => s.name === "Elf");
     const astral = elf?.variants?.find((v) => v.slug === "astral");
@@ -153,7 +146,6 @@ describe("2024 roster (PHB'24)", () => {
       "Gold Dragonborn", "Green Dragonborn", "Red Dragonborn", "Silver Dragonborn", "White Dragonborn",
     ].sort();
     expect(dragonborn?.variants?.map((v) => v.name).sort()).toEqual(expectedNames);
-    // Same 10 dragon types in BOTH editions (epic review decision 7).
     const dragonborn2014 = speciesFor("EDITION_2014").find((s) => s.name === "Dragonborn");
     expect(dragonborn2014?.variants?.map((v) => v.name).sort()).toEqual(expectedNames);
   });

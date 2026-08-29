@@ -1,9 +1,4 @@
-// --- Subclass spell-list-expansion seeder (#1631) -----------------------------
-// The executable counterpart to subclass-spell-list-expansions.ts's DATA
-// (SUBCLASS_SPELL_LIST_EXPANSIONS) — mirrors seed-granted-spells.ts's shape
-// (split out of seed.ts the same way, so a test can drive the upsert and
-// prune directly), minus the gateLevel/castingAbility resolution that family
-// carries (this one has neither column).
+// The executable counterpart to SUBCLASS_SPELL_LIST_EXPANSIONS — unlike seedSubclassGrantedSpells, this table has no gateLevel/castingAbility columns to resolve.
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import { resolveEditionRow, upsertEditionRow } from "../../src/lib/rules/catalog-edition.js";
 import { resolveCatalogSpellId } from "./resolve-catalog-spell.js";
@@ -16,11 +11,7 @@ interface ExpansionSubclassRow {
   edition: SeedEdition | null;
 }
 
-// Candidate for a SHARED (untagged) expansion row: the shared NULL Subclass
-// row, else a SOLE tagged candidate — mirrors sharedGrantCandidate
-// (seed-granted-spells.ts) exactly; no row in SUBCLASS_SPELL_LIST_EXPANSIONS
-// is untagged today, but this keeps the two families' resolution identical
-// for whichever homebrew/future content adds one.
+// Candidate for a SHARED (untagged) expansion row: the shared NULL Subclass row, else a SOLE tagged candidate — mirrors sharedGrantCandidate. No row here is untagged today, but this keeps both families' resolution identical for future content that adds one.
 function sharedExpansionCandidate(candidates: ExpansionSubclassRow[]): ExpansionSubclassRow | undefined {
   const shared = candidates.find((c) => c.edition === null);
   if (shared) return shared;
@@ -45,9 +36,6 @@ function resolveExpansionSubclass(
   return resolved ?? throwUnresolvedExpansionSubclass(candidates, e);
 }
 
-// Resolve one list-expansion seed row's subclass + catalog spell to ids and
-// upsert it by (subclassId, spellId, edition) — mirrors upsertGrantedSpell
-// minus the gateLevel/castingAbility columns.
 async function upsertExpansionSpell(
   prisma: PrismaClient,
   classIds: Map<string, string>,
@@ -76,12 +64,8 @@ async function upsertExpansionSpell(
   return { id: row.id, subclassSlug: subclass.slug };
 }
 
-// Prune the rows a retag strands — mirrors pruneStaleGrantedSpells exactly
-// (same identity shape: a row's identity is the (subclassId, spellId) FK
-// pair, not a name/key/slug column, so this prunes by collected seeded ids
-// scoped to the slugs this run actually touched). No character-reference
-// guard needed: nothing references SubclassSpellListExpansion rows; the
-// choosable pool is re-derived from the surviving rows on every read.
+// A row's identity is the (subclassId, spellId) FK pair, not a name/key/slug column, so this prunes by collected seeded ids scoped to the slugs this run touched.
+// No character-reference guard needed: nothing references SubclassSpellListExpansion rows; the choosable pool is re-derived from the surviving rows on every read.
 async function pruneStaleExpansionSpells(
   prisma: PrismaClient,
   seededIds: readonly string[],
@@ -95,10 +79,8 @@ async function pruneStaleExpansionSpells(
   });
 }
 
-// Subclass spell-list expansions (#1631). Runs after subclasses AND spells
-// are seeded — same ordering constraint as seedSubclassGrantedSpells.
-// `expansions` is parameterizable so a test can drive a fabricated retag
-// against its own fixture subclass (the seedSubclassGrantedSpells idiom).
+// #1631: must run after subclasses AND spells are seeded — same ordering constraint as seedSubclassGrantedSpells.
+// `expansions` is parameterizable so a test can drive a fabricated retag against its own fixture subclass.
 export async function seedSubclassSpellListExpansions(
   prisma: PrismaClient,
   classIds: Map<string, string>,

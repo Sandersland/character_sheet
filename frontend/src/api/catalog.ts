@@ -2,15 +2,13 @@ import type { CatalogFeat, CatalogSpell, EditionsResponse, Item, ReferenceData }
 import type { GrantWire, RulesEdition } from "@character-sheet/shared-types";
 import { jsonBody, request, send } from "@/api/http";
 
-// A query param (not a header, #1325): there is no Cache-Control anywhere in
-// backend/src and Express's default weak ETag is on, so a header could let
-// HTTP hand a 2014 payload to a 2024 request underneath a correct TanStack
-// queryKey. A query param makes that structurally impossible.
+// A query param, not a header (#1325): there is no Cache-Control in
+// backend/src and Express's default weak ETag is on, so a header could hand
+// a 2014 payload to a 2024 request underneath a correct TanStack queryKey.
 export async function fetchReference(edition: RulesEdition): Promise<ReferenceData> {
   return request<ReferenceData>(`/reference?edition=${edition}`, undefined, "Failed to fetch reference data");
 }
 
-// Feeds the inventory editor's "add from catalog" picker (Phase B).
 export async function fetchItems(): Promise<Item[]> {
   return request<Item[]>("/items", undefined, "Failed to fetch items");
 }
@@ -19,30 +17,20 @@ export async function fetchItems(): Promise<Item[]> {
 export interface SpellCatalogFilter {
   className?: string;
   maxLevel?: number;
-  // #1631: a chosen subclass's list-expansion (e.g. The Fiend's Expanded
-  // Spell List) widens `className`'s own membership filter with spells NOT
-  // on the class's own list. Ignored server-side when className is absent —
-  // see GET /api/spells's own comment.
+  // A chosen subclass's list-expansion (e.g. The Fiend's Expanded Spell
+  // List) widens `className`'s own filter with spells not on the class
+  // list. Ignored server-side when className is absent.
   subclassId?: string;
-  // #1811, epic #1795 9/9: the character the picker is learning FOR. Present,
-  // the server resolves visibility for that character's own campaign — a
-  // spell shared/granted into it, or a DM's CAMPAIGN override, reaches the
-  // picker (see spells.ts's resolveCharacterViewer). Absent, behavior is
-  // unchanged (GLOBAL + the caller's own USER entries) — the creation
-  // ceremony has no character yet and stays on that path.
+  // The character the picker is learning for. Present, the server resolves
+  // that character's own campaign's shared/granted spells and DM CAMPAIGN
+  // overrides (spells.ts's resolveCharacterViewer). Absent, behavior is
+  // unchanged (GLOBAL + the caller's own USER entries) — used by the
+  // creation ceremony, which has no character yet.
   characterId?: string;
 }
 
-// Feeds the spellcasting section's "learn from catalog" picker.
 // Ordered by level then name server-side; no client-side re-sort needed.
-//
-// `edition` is required and the route 400s without it (#1712, same shape as
-// fetchFeats/fetchReference) — every caller passes the VIEWING character's
-// edition (or the creation draft's chosen edition, before a character exists)
-// so a 2014 request never sees a 2024-only row. `class`/`maxLevel` stay
-// optional, following fetchFeats' asiLevel pattern: the creation ceremony
-// asks for one class's legal band and the server applies the eligibility
-// rule (#1377), while the sheet's picker wants the whole (one-edition) catalog.
+// `edition` is required — the route 400s without it (#1712).
 export async function fetchSpells(edition: RulesEdition, filter: SpellCatalogFilter = {}): Promise<CatalogSpell[]> {
   const params = new URLSearchParams({ edition });
   if (filter.className !== undefined) params.set("class", filter.className);
@@ -52,20 +40,13 @@ export async function fetchSpells(edition: RulesEdition, filter: SpellCatalogFil
   return request<CatalogSpell[]>(`/spells?${params.toString()}`, undefined, "Failed to fetch spell catalog");
 }
 
-// Feeds the advancement section's feat picker — same role as fetchManeuvers.
-// Ordered alphabetically server-side. `edition` is required and the route 400s
-// without it (#1411), for the same reason fetchReference above carries it as a
-// query param rather than a header.
-//
-// `asiLevel` asks the server to apply the PHB'24 ASI-slot eligibility rule
-// (#1438) — omit it and the whole edition catalog comes back, which is what the
-// Fighting Style picker and the level-up review step need, since both read rows
-// that rule rejects by design.
-//
-// `classNames` asks the server to apply the Fighting Style class gate (#1495)
-// via fightingStyleFeatOfferedForClasses — a 2014 character's picker sees only
-// the PHB'14 subset its class(es) grant. Omit it (or pass []) for the
-// unfiltered catalog, same "absent = no narrowing" shape as asiLevel.
+// Ordered alphabetically server-side. `edition` is required — the route
+// 400s without it (#1411).
+// `asiLevel` applies the PHB'24 ASI-slot eligibility rule (#1438); omit it
+// for the unfiltered catalog.
+// `classNames` applies the Fighting Style class gate (#1495) via
+// fightingStyleFeatOfferedForClasses; omit (or pass []) for the unfiltered
+// catalog.
 export async function fetchFeats(
   edition: RulesEdition,
   asiLevel?: number,
@@ -81,22 +62,15 @@ export async function fetchFeats(
   );
 }
 
-// The only catalog call in this module that takes NO edition, and deliberately
-// so (#1436): it is what the client reads in order to CHOOSE one, so it must be
-// answerable before any edition is settled. Adding a param here "for symmetry"
-// would make the edition picker depend on the answer it exists to produce.
+// Deliberately takes no edition (#1436): this is what the client reads to
+// CHOOSE one, so it must be answerable before any edition is settled.
 export async function fetchEditions(): Promise<EditionsResponse> {
   return request<EditionsResponse>("/editions", undefined, "Failed to fetch rules editions");
 }
 
-// Grant CRUD (#1799, epic #1795 4/6): the owner of a USER-scope catalog entry
-// (a homebrew spell) shares/unshares it into a campaign they belong to.
-// Ownership-scoped plain REST against grants.ts, same idempotent-POST /
-// deleteMany-DELETE shape that route documents — a second identical POST is
-// a 200, not a 409/500, and DELETE 204s even if the grant is already gone, so
-// neither call site here needs to know the entry's CURRENT grant state up
-// front (there is no GET …/grants list endpoint — see ShareSpellSheet's own
-// comment for how the UI copes with that).
+// Idempotent: a duplicate POST is a 200 (not 409/500), and DELETE 204s even
+// if the grant is already gone — so neither call site needs to know the
+// entry's current grant state up front.
 export async function shareCatalogEntry(entryId: string, campaignId: string): Promise<GrantWire> {
   return request<GrantWire>(
     `/catalog/entries/${entryId}/grants`,
@@ -113,15 +87,12 @@ export async function unshareCatalogEntry(entryId: string, campaignId: string): 
   );
 }
 
-/** POST …/fork request body (#1800, epic #1795 5/6) — mirrors catalogForkSchema's own shape. */
+/** POST …/fork body — mirrors catalogForkSchema's shape. */
 export type CatalogForkTarget = { scope: "USER" } | { scope: "CAMPAIGN"; campaignId: string };
 
-// Fork (#1800, epic #1795 5/6): a self-contained deep copy of a visible
-// catalog entry into the caller's own USER stash ("make my version"), or —
-// for a campaign's DM only — into that campaign's CAMPAIGN scope ("override
-// for campaign"). The response's `spell` is the SAME served shape GET
-// /api/spells rows carry (CatalogSpell), so the caller can add it straight to
-// a locally-held catalog list without a refetch.
+// The response's `spell` is the same shape GET /api/spells rows carry
+// (CatalogSpell), so the caller can add it straight to a locally-held
+// catalog list without a refetch.
 export async function forkCatalogEntry(entryId: string, target: CatalogForkTarget): Promise<{ entryId: string; spell: CatalogSpell }> {
   return request<{ entryId: string; spell: CatalogSpell }>(
     `/catalog/entries/${entryId}/fork`,

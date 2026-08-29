@@ -1,21 +1,10 @@
-/**
- * Ability cost abstraction — one payer for "what a class ability costs".
- *
- * Decouples "cast a spell / use an ability" from "spend the resource it costs".
- * A cost is declared as a slot (level-N spell slot, with Mystic Arcanum
- * fallback), a pool spend (focus, superiority dice, …), or none (cantrips). The
- * single payer payAbilityCostInTx() charges it inside a caller-supplied
- * transaction and returns a human label + the effective upcast/overspend step.
- *
- * Import direction is one-way: spellcasting → ability-cost → resources. The
- * InvalidSpellcastingOperationError lives here (moved from spellcasting.ts) and
- * is re-exported there so existing importers keep resolving it unchanged.
- */
+// Import direction is one-way: spellcasting -> ability-cost -> resources.
+// InvalidSpellcastingOperationError is re-exported from spellcasting.ts so existing importers keep resolving it unchanged.
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { applySpendResourceInTx, type SpendResourceOperation } from "@/lib/classes/resources.js";
 
-// status → the 400 the central `errorHandler` maps (client op-validation error).
+// status = 400 maps to the client op-validation error via the central errorHandler.
 export class InvalidSpellcastingOperationError extends Error {
   status = 400;
 }
@@ -25,7 +14,6 @@ export type AbilityCost =
   | { kind: "pool"; key: string; base: number; perStep?: number }
   | { kind: "none" };
 
-// Flat cost columns snapshotted from a catalog row (a GrantedAbility catalog row).
 export interface AbilityCostColumns {
   costKind?: string | null;
   costPoolKey?: string | null;
@@ -33,11 +21,8 @@ export interface AbilityCostColumns {
   costPerStep?: number | null;
 }
 
-// Adapter over the flat cost columns — mirrors readEffectSpec in effects.ts.
-// costKind "slot" (#1687) reuses costBase as AbilityCost's minLevel — the same
-// column pool already carries, no dedicated costMinSlotLevel column: a slot
-// cost and a pool cost never coexist on one row, so one Int? column can name
-// either "minimum slot level" or "base pool spend" depending on costKind.
+// Mirrors readEffectSpec in effects.ts.
+// costKind "slot" (#1687) reuses costBase as minLevel — a slot cost and a pool cost never coexist on one row, so one Int? column serves both meanings.
 export function readAbilityCost(row: AbilityCostColumns): AbilityCost {
   if (row.costKind === "slot") {
     return { kind: "slot", minLevel: row.costBase ?? 1 };
@@ -69,10 +54,6 @@ export interface PaidCost {
   effectiveStep: number;
 }
 
-// The verb/noun pair paySlotCost's below-minLevel error interpolates — lets a
-// generic ability (#1687) read as "use a level-N ability" instead of the
-// spell-cast wording "cast a level-N spell", without a second copy of the
-// error or a per-caller message string threaded all the way through.
 export interface SlotCostSubject {
   verb: string;
   noun: string;
@@ -80,8 +61,7 @@ export interface SlotCostSubject {
 
 const SPELL_SLOT_SUBJECT: SlotCostSubject = { verb: "cast", noun: "spell" };
 
-// The generic-ability wording (#1687) — row-driven abilities (castAbilityWithSlotInTx)
-// pass this so their below-minLevel error never says "spell".
+// Row-driven abilities (castAbilityWithSlotInTx) pass this so their below-minLevel error never says "spell" (#1687).
 export const ABILITY_SLOT_SUBJECT: SlotCostSubject = { verb: "use", noun: "ability" };
 
 export async function payAbilityCostInTx(
@@ -100,8 +80,6 @@ export async function payAbilityCostInTx(
   }
 }
 
-// Required slot/arcanum maps + totals a slot-cost payment mutates/reads —
-// narrowed out of the optional PayCostContext fields once by the caller.
 interface SlotPayState {
   slotsUsed: Record<string, number>;
   arcanumUsed: Record<string, number>;
@@ -117,7 +95,6 @@ function requireSlotPayState(ctx: PayCostContext): SlotPayState {
   return { slotsUsed, arcanumUsed, slotTotals, arcanaTotals };
 }
 
-// Spends one level-`slotLevel` spell slot, or throws if none remain.
 function spendSlot(state: SlotPayState, slotLevel: number, minLevel: number): string {
   const used = state.slotsUsed[String(slotLevel)] ?? 0;
   const total = state.slotTotals[slotLevel] ?? 0;
@@ -129,7 +106,6 @@ function spendSlot(state: SlotPayState, slotLevel: number, minLevel: number): st
   return `L${slotLevel} slot${upcasting ? ` (upcast from L${minLevel})` : ""}`;
 }
 
-// Spends one level-`slotLevel` Mystic Arcanum charge, or throws if already used.
 function spendArcanum(state: SlotPayState, slotLevel: number): string {
   const used = state.arcanumUsed[String(slotLevel)] ?? 0;
   const total = state.arcanaTotals[slotLevel] ?? 0;
@@ -173,7 +149,7 @@ async function payPoolCost(
   cost: Extract<AbilityCost, { kind: "pool" }>,
   requested?: number,
 ): Promise<PaidCost> {
-  // perStep is reserved for F3 (per-step effect scaling); unused here.
+  // perStep is reserved for future per-step effect scaling (F3) — unused here.
   const op: SpendResourceOperation = { type: "spendResource", key: cost.key, amount: requested };
   const audit = await applySpendResourceInTx(ctx.tx, ctx.characterId, op, ctx.batchId, ctx.sessionId);
   return { label: audit.summary, effectiveStep: (requested ?? cost.base) - cost.base };

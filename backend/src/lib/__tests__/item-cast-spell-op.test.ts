@@ -68,10 +68,6 @@ async function used(itemId: string, capId: string) {
   return use.used;
 }
 
-// The derived item-spell entry id carries the capability id suffix (#528 review
-// fix — keeps two castSpell caps for the same spell distinct). The capability id
-// is minted by the fixture (capId) rather than read back from a dropped table
-// (#1649), so this is a plain string build, not a DB read.
 function entryIdFor(itemId: string, spellId: string, capId: string): string {
   return `item:${itemId}:${spellId}:${capId}`;
 }
@@ -81,9 +77,7 @@ describe("castItemSpell op (#528)", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
-    // upsertEditionRow, not .upsert(): Spell's business key is now (name,
-    // edition) (#1710), and this fixture spell is edition-neutral.
-    // catalogEntryId (#1796) is resolved first — required, no default.
+    // upsertEditionRow, not .upsert(): Spell's business key is (name, edition); this fixture spell is edition-neutral.
     const catalogEntryId = await makeCatalogEntry({ name: SPELL.name });
     const spell = await upsertEditionRow(
       prisma.spell,
@@ -96,9 +90,7 @@ describe("castItemSpell op (#528)", () => {
 
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { ownerId: OWNER_ID } });
-    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
-    // #1796) — the reverse cascade doesn't exist (the supertype stays
-    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    // Deleting the CatalogEntry cascades the Spell row; the reverse cascade doesn't exist, so deleting only the Spell would orphan the entry.
     await prisma.catalogEntry.deleteMany({ where: { name: SPELL.name, kind: "SPELL" } });
   });
 
@@ -142,11 +134,10 @@ describe("castItemSpell op (#528)", () => {
     expect((ev.data as Record<string, unknown>).source).toBe("item");
     expect((ev.data as Record<string, unknown>).dc).toBe(15);
 
-    // Character spell state carries no slots spent — the item resource was used instead.
     const char = await prisma.character.findUniqueOrThrow({ where: { id: characterId }, select: { spellcasting: true } });
     const sc = char.spellcasting as { slotsUsed?: Record<string, number>; spells?: unknown[] };
     expect(Object.values(sc.slotsUsed ?? {}).reduce((a, b) => a + b, 0)).toBe(0);
-    // Derived item spells are never persisted into the blob.
+    // Derived item spells are never persisted into the spellcasting blob.
     expect(sc.spells ?? []).toHaveLength(0);
   });
 
@@ -163,7 +154,6 @@ describe("castItemSpell op (#528)", () => {
     await applyHitPointOperations(characterId, [{ type: "shortRest", rolls: [] }]);
     expect(await used(itemId, capId)).toBe(0);
 
-    // Castable again after the rest.
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
     expect(await used(itemId, capId)).toBe(1);
   });
@@ -175,14 +165,13 @@ describe("castItemSpell op (#528)", () => {
     expect(await used(itemId, capId)).toBe(1);
 
     await applyHitPointOperations(characterId, [{ type: "shortRest", rolls: [] }]);
-    expect(await used(itemId, capId)).toBe(1); // short rest does NOT recharge a long-rest resource
+    expect(await used(itemId, capId)).toBe(1);
 
     await applyHitPointOperations(characterId, [{ type: "longRest" }]);
     expect(await used(itemId, capId)).toBe(0);
   });
 
   it("resolves a wielder-mode DC to the caster's own spell save DC", async () => {
-    // Wizard L3, INT 16 → +3 mod, prof +2 → spell save DC 13.
     const wizScores = { strength: 8, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 };
     const { characterId, itemId, capId } = await makeHolder("wizard", wizScores, { dcMode: "wielder", dcValue: null });
     const entryId = entryIdFor(itemId, spellId, capId);
@@ -203,7 +192,7 @@ describe("castItemSpell op (#528)", () => {
     const ev = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "castSpell" } });
     const undone = await revertBatch(prisma, characterId, ev.batchId!);
     expect(undone.ok).toBe(true);
-    expect(await used(itemId, capId)).toBe(0); // the use is refunded, not silently lost
+    expect(await used(itemId, capId)).toBe(0);
   });
 
   it("does not track uses for an at-will item spell", async () => {

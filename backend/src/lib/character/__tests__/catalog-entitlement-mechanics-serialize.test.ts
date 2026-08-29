@@ -1,18 +1,3 @@
-// serializeCharacter's read-time MECHANICS override for a learned catalog
-// spell whose lineage has a winning fork (#1806, epic #1795 7/7) — extends
-// #1798's catalog.{scope,isFork,forkedFromId} wiring (see the sibling
-// catalog-entitlement-serialize.test.ts) to the spell's actual MECHANICS
-// (dice/description), resolved through the SAME lineage-winner computation
-// that file's tests pin, never a second precedence path. Real Postgres via
-// the actual HTTP routes for catalog authoring/grant/fork; a direct-DB
-// character fixture (same pattern as the sibling file) so this file only
-// exercises serializeCharacter itself.
-//
-// A DM's CAMPAIGN-scope fork edit now goes through the real PATCH
-// /api/spells/custom/:id route (#1808, epic #1795 8/8 closed the gap this
-// comment used to describe — assertSpellOwnership's second admitted path,
-// lib/auth/access.ts): "the DM changed the dice" below is a real PATCH call,
-// same as the USER-scope fork case that already exercised the route.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -25,8 +10,8 @@ import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
 
 const DM = "owner-catalog-mech-dm";
-const MEMBER_A = "owner-catalog-mech-member-a"; // never forks; sees the precedence-correct winner
-const MEMBER_B = "owner-catalog-mech-member-b"; // forks their own USER copy
+const MEMBER_A = "owner-catalog-mech-member-a";
+const MEMBER_B = "owner-catalog-mech-member-b";
 
 let cookieDm: string;
 let cookieMemberA: string;
@@ -93,10 +78,6 @@ beforeAll(async () => {
     .send({ name: "Catalog Mechanics Serialize Campaign", rulesEdition: "EDITION_2014" });
   campaignId = campaign.body.id;
 
-  // A damage spell (dice present, and effectKind "damage" so a USER-fork PATCH
-  // through customSpellSchema — which accepts only "damage"/"heal" — stays
-  // legal) with at least one class, so learnSpell's snapshot has real dice to
-  // compare against later.
   const seeded = await prisma.spell.findFirstOrThrow({
     where: { edition: "EDITION_2014", effectKind: "damage", effectDiceCount: { not: null }, effectDiceFaces: { not: null } },
     orderBy: { name: "asc" },
@@ -152,10 +133,6 @@ describe("serializeCharacter — catalog fork MECHANICS override (#1806, epic #1
     expect(before!.effectDiceFaces).toBe(6);
     expect(before!.catalog?.isFork).toBe(false);
 
-    // No fork exists — the origin row changing directly must NOT re-hydrate
-    // the already-learned snapshot (CLAUDE.md "derive, don't persist" cuts
-    // the other way here: a stored snapshot is the persisted source of truth
-    // until a FORK's lineage actually outranks it).
     await prisma.spell.update({
       where: { id: homebrewSpellId },
       data: { description: "Mutated directly, no fork.", effectDiceCount: 9, effectDiceFaces: 12 },
@@ -204,8 +181,6 @@ describe("serializeCharacter — catalog fork MECHANICS override (#1806, epic #1
     const newDice = { effectDiceCount: seededDice.effectDiceCount + 5, effectDiceFaces: 20 };
 
     try {
-      // The DM edits the fork's dice through the real PATCH route (#1808,
-      // epic #1795 8/8) — assertSpellOwnership's CAMPAIGN-DM path.
       const patch = await agent(cookieDm).patch(`/api/spells/custom/${forkedSpell.id}`).send({
         name: forkedSpell.name,
         level: forkedSpell.level,
@@ -233,14 +208,9 @@ describe("serializeCharacter — catalog fork MECHANICS override (#1806, epic #1
       expect(after).toBeDefined();
       expect(after!.effectDiceCount).toBe(newDice.effectDiceCount);
       expect(after!.effectDiceFaces).toBe(newDice.effectDiceFaces);
-      // Identity — the learned entry's own id and catalog spellId provenance
-      // — is preserved; only mechanics are overlaid.
       expect(after!.id).toBe(learnedEntryId);
       expect(after!.spellId).toBe(seededSpellId);
       expect(after!.name).toBe(seededSpellName);
-      // characterA is MEMBER_A's, not the DM's — editable: false (#1808
-      // leak-fix, epic #1795 8/9): a non-DM member must never be told they
-      // can edit the DM's CAMPAIGN fork.
       expect(after!.catalog).toEqual({ entryId: forkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId, editable: false });
     } finally {
       await prisma.catalogEntry.delete({ where: { id: forkEntryId } });
@@ -317,13 +287,11 @@ describe("serializeCharacter — catalog fork MECHANICS override (#1806, epic #1
       const bSpells = await serializeSpells(characterBId);
       const bSpell = bSpells.find((s) => s.spellId === seededSpellId);
       expect(bSpell!.description).toBe(playerDescription);
-      // characterB is MEMBER_B's own USER fork — editable: true.
       expect(bSpell!.catalog).toEqual({ entryId: userForkEntryId, scope: "USER", isFork: true, forkedFromId: seededEntryId, editable: true });
 
       const aSpells = await serializeSpells(characterAId);
       const aSpell = aSpells.find((s) => s.spellId === seededSpellId);
       expect(aSpell!.description).toBe(campaignDescription);
-      // characterA is MEMBER_A's, not the DM's — editable: false.
       expect(aSpell!.catalog).toEqual({ entryId: campaignForkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId, editable: false });
     } finally {
       await prisma.catalogEntry.delete({ where: { id: userForkEntryId } });

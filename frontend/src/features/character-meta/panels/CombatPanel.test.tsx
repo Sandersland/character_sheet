@@ -20,7 +20,6 @@ vi.mock("@/api/client", () => ({
   fetchSession: vi.fn().mockResolvedValue({ id: "s-old", events: [] }),
 }));
 
-// The doorway card reads useSessionDoorway directly; drive it to a "start" summary.
 vi.mock("@/features/session/useSessionDoorway", () => ({ useSessionDoorway: vi.fn() }));
 
 // Stub the 3D DiceRoller: the real one mounts a Three.js Canvas jsdom can't render.
@@ -147,7 +146,7 @@ describe("CombatPanel (idle #1086)", () => {
     expect(row).toHaveTextContent("Last session · The Sunless Citadel");
 
     await user.click(row);
-    // The overlay (BottomSheet on jsdom's default mobile) carries the log title.
+    // jsdom's default viewport is below md, so this renders as a BottomSheet, not a Drawer.
     expect(await screen.findByRole("heading", { name: "Session Log" })).toBeInTheDocument();
   });
 

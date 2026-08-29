@@ -7,20 +7,9 @@ import type { CampaignEntity } from "@/types/character";
 
 const NONE_ENTITIES: CampaignEntity[] = [];
 
-// The Review-duplicates modal (#1946) needs more than an InboxDuplicateEntity
-// carries — notes/aliases/portrait for the Discarded box, PREPARED merges for
-// the "combining drops it" warning — so it fetches the campaign's full,
-// stats-included entity list rather than trusting the inbox row's summary
-// shape. Distinct query key from useCampaignEntities' plain list (see
-// campaignKeys.entitiesWithStats) so this stats-shaped response never
-// clobbers that cache. Merges reuse the existing useCampaignMerges hook
-// rather than re-registering the same query here — same cache key
-// (campaignKeys.merges), so both consumers share one entry regardless.
+// entitiesWithStats is a distinct query key from useCampaignEntities' plain list (so it can't clobber that cache); merges are read through the shared useCampaignMerges cache entry (campaignKeys.merges) instead of a separate query.
 //
-// `isLoading`/`isError` fold BOTH queries: the caller's previewReady gate
-// needs to know the merges list is settled, not just present-or-empty, or a
-// still-in-flight merges fetch lets the Discarded box render as complete
-// while a "Prepared identity merges" item is still on its way (#1949).
+// isLoading/isError fold in the merges query too, so previewReady doesn't treat an in-flight merges fetch as already-complete (#1949).
 export function useReviewClusterEntities(campaignId: string) {
   const entitiesQuery = useQuery({
     queryKey: campaignKeys.entitiesWithStats(campaignId),

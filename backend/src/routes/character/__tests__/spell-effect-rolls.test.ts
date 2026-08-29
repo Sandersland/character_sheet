@@ -1,10 +1,4 @@
-/**
- * #1381: spell rows serve a resolved `effect` (EffectSpec) and `effectRolls`
- * (one resolved roll per castable slot level) instead of the client re-deriving
- * cantrip scaling / upcast dice / heal-modifier from the raw catalog columns.
- * Harness mirrors spellcasting.test.ts (real Postgres, supertest + the shared `app`).
- */
-
+// Spell rows serve a resolved effect (EffectSpec) and effectRolls (one resolved roll per castable slot level) instead of the client re-deriving cantrip scaling/upcast dice/heal-modifier from raw catalog columns (#1381).
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -32,8 +26,6 @@ function spells(res: { body: { spellcasting: { spells: SpellRow[] } } }): SpellR
   return res.body.spellcasting.spells;
 }
 
-// Fire Bolt cantrip + Fireball, snapshotted flat effect columns (no catalog
-// dependency, mirrors FIXTURE_SPELLCASTING_JSON in spellcasting.test.ts).
 const FIRE_BOLT = {
   id: "fixture-fire-bolt",
   name: "Fire Bolt",
@@ -174,12 +166,11 @@ describe("GET /api/characters/:id — heal modifier only on heal rows (#1381)", 
         skills: [],
         toolProficiencies: [],
         currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
-        experiencePoints: 900, // level 3
+        experiencePoints: 900,
         abilityScores: { strength: 12, dexterity: 10, constitution: 14, intelligence: 8, wisdom: 16, charisma: 10 },
         hitPoints: { current: 24, max: 24, temp: 0 },
         hitDice: { total: 3, die: "d8" },
-        // Fireball is not a real Cleric spell — included here purely to prove
-        // resolveEffectSpec never applies the heal-modifier arm to a damage row.
+        // Fireball is not a real Cleric spell — included here purely to prove resolveEffectSpec never applies the heal-modifier arm to a damage row.
         spellcasting: { slotsUsed: {}, spells: [CURE_WOUNDS, FIREBALL] } as Prisma.InputJsonValue,
         classEntries: { create: [{ name: "cleric", classId: cls.id, position: 0 }] },
       },
@@ -195,7 +186,6 @@ describe("GET /api/characters/:id — heal modifier only on heal rows (#1381)", 
     const res = await agent().get(`/api/characters/${CLERIC_ID}`);
     const cureWounds = spells(res).find((s) => s.name === "Cure Wounds")!;
     const fireball = spells(res).find((s) => s.name === "Fireball")!;
-    // WIS 16 → +3 modifier.
     expect(cureWounds.effectRolls![0].roll.modifier).toBe(3);
     expect(fireball.effectRolls!.every((e) => e.roll.modifier === 0)).toBe(true);
   });
@@ -246,7 +236,7 @@ describe("POST /api/characters/:id/experience — cantrip roll updates in the sa
 
     const res = await agent()
       .post(`/api/characters/${LEVELUP_ID}/experience`)
-      .send({ operations: [{ type: "award", amount: 3800 }] }); // 2700+3800=6500 → level 5
+      .send({ operations: [{ type: "award", amount: 3800 }] });
 
     expect(res.status).toBe(200);
     expect(spells(res).find((s) => s.name === "Fire Bolt")!.effectRolls).toEqual([

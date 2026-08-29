@@ -40,7 +40,7 @@ describe("createFsBlobStore", () => {
     const store = createFsBlobStore(dir);
     await store.put("crashed", body, options);
 
-    // Simulate a crash after delete's first rm: meta is gone, data survives.
+    // Simulates a crash after delete's first rm: meta gone, data survives.
     await rm(path.join(dir, "meta", "crashed.json"));
 
     expect(await store.exists("crashed")).toBe(false);
@@ -52,8 +52,7 @@ describe("createFsBlobStore", () => {
     const store = createFsBlobStore(dir);
     await store.put("racing", body, options);
 
-    // Simulate a concurrent delete landing between get's readMeta and stat:
-    // meta still present, data already gone.
+    // Simulates a concurrent delete landing between get's readMeta and stat.
     await rm(path.join(dir, "objects", "racing"));
 
     await expect(store.get("racing")).rejects.toBeInstanceOf(BlobNotFoundError);

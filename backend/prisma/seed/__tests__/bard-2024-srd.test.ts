@@ -1,12 +1,4 @@
-// #1224 commit 2 of 3: Bard's real SRD 5.2 (2024) content. Every assertion
-// below is pinned against an actual SRD 5.2 VALUE (a feature name, a level, a
-// mechanical clause) transcribed from the SRD 5.2.1 raw markdown
-// (downfallx/dnd-5e-srd-markdown, classes.md — base class + College of Lore)
-// or mirror-sourced from three independent, non-scraper PHB'24 secondary
-// sources (College of Valor — see bard-features.ts's own header for the
-// citations) — never against "differs from the 2014 row", which a garbage
-// 2024 paraphrase would also satisfy. Mirrors cleric-2024-srd.test.ts's
-// row()/hasRow() shape (same file, same BARD_FEATURES export).
+// Pinned against actual SRD 5.2 values (SRD 5.2.1 raw markdown, classes.md) or PHB'24 secondary sources — never against "differs from 2014", which a garbage paraphrase would also satisfy.
 import { describe, expect, it } from "vitest";
 
 import { BARD_FEATURES } from "../bard-features.js";
@@ -17,7 +9,6 @@ function rowsNamed(subclassSlug: string | null, name: string) {
   return BARD_FEATURES.filter((r) => r.subclassSlug === subclassSlug && r.name === name);
 }
 
-/** Exactly one row for (subclassSlug, name, edition), or the test fails with a precise locator. */
 function row(subclassSlug: string | null, name: string, edition: Edition) {
   const found = rowsNamed(subclassSlug, name).filter((r) => r.edition === edition);
   expect(found, `${subclassSlug ?? "(base)"}/${name}/${edition}`).toHaveLength(1);
@@ -101,9 +92,7 @@ describe("Countercharm (#1224): level-shift 6 -> 7 + full rewrite to a Reaction 
     expect(r.description).toContain("30 feet");
     expect(r.description).not.toContain("As an action");
     expect(r.description).not.toContain("performance");
-    // "advantage on saves" and not "…on saving throws": the 2014 row's own
-    // wording is what a stale copy would carry, so only that exact phrase can
-    // fail here.
+    // Checks for the 2014 row's exact "advantage on saves" wording — only a stale copy would carry it.
     expect(r.description).not.toContain("advantage on saves");
   });
 
@@ -267,9 +256,7 @@ describe("structural: the @@unique([classId, subclassId, name, edition]) constra
   });
 });
 
-// Supplementary sweep, not primary evidence (a same-name rewrite can still
-// pass a "differs" check while being a garbage paraphrase — the assertions
-// above, pinned to real SRD 5.2 values, are what actually proves correctness).
+// Supplementary sweep, not primary evidence — a same-name rewrite could pass a "differs" check while being a garbage paraphrase.
 describe("supplementary: every forked name's two descriptions differ", () => {
   it("for every name present under both editions, 2014 text !== 2024 text", () => {
     const byNameSlug = new Map<string, Map<Edition, string>>();

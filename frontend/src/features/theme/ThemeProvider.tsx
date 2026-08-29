@@ -1,12 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- provider module co-exports its use* hook beside the component; same-file hook+provider is intentional, HMR-only caveat */
-/**
- * App-wide theme context. Persists the player's light/dark/system preference
- * (via useThemePreference) and reflects the resolved theme onto
- * `document.documentElement.dataset.theme`, which drives the `[data-theme]`
- * overrides in index.css. A pre-paint inline script in index.html applies the
- * same value before React mounts to avoid a flash of the wrong theme.
- */
-
+// A pre-paint inline script in index.html applies the same theme value before React mounts, to avoid a flash of the wrong theme.
 import {
   createContext,
   useContext,
@@ -34,14 +27,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [preference, setPreference] = useThemePreference();
   const [resolved, setResolved] = useState<ResolvedTheme>(() => resolveTheme(preference));
 
-  // Reflect the resolved theme onto the document so the CSS overrides apply.
   useEffect(() => {
     const next = resolveTheme(preference);
     setResolved(next);
     document.documentElement.dataset.theme = next;
   }, [preference]);
 
-  // While following the OS, re-resolve when the system scheme flips.
   useEffect(() => {
     if (preference !== "system") return;
     if (typeof window === "undefined" || !window.matchMedia) return;

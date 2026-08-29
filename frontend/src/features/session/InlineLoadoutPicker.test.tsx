@@ -20,8 +20,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// `allowedSlots` is served (#1433) and `bagItemsForSlot` reads it — a fixture
-// omitting it throws rather than degrading, so the cast must still supply it.
+// bagItemsForSlot reads allowedSlots directly; a fixture omitting it throws rather than degrading.
 function weapon(over: Partial<InventoryItem>, twoHanded = false): InventoryItem {
   return {
     category: "weapon",
@@ -36,7 +35,7 @@ function weapon(over: Partial<InventoryItem>, twoHanded = false): InventoryItem 
 }
 
 const longsword = weapon({ id: "ls", name: "Longsword", equipped: true, equippedSlot: "MAIN_HAND" });
-const dagger = weapon({ id: "dg", name: "Dagger" }); // bag, one-handed
+const dagger = weapon({ id: "dg", name: "Dagger" });
 const shield = {
   ...weapon({ id: "sh", name: "Shield", equipped: true, equippedSlot: "OFF_HAND" }),
   category: "armor",
@@ -64,12 +63,8 @@ function makeTurnState(
   } as unknown as TurnState & TurnStateActions;
 }
 
-// Fully exhausted: no free interaction, no attack credits, no action.
 const EXHAUSTED_BUDGET = { attackEquipCredits: 0, freeInteractionUsed: true };
 
-// Hosts the picker with the real useLoadoutSwap hook — the same swap economy the
-// production Action-sheet resolution wires, so the ops/consume/refund assertions
-// carry over from the old LoadoutSwapRow test.
 function Harness({
   character,
   turnState,
@@ -82,14 +77,11 @@ function Harness({
 }
 
 function renderPicker(character: Character, turnState: TurnState & TurnStateActions) {
-  mockApply.mockResolvedValue(character); // returned char isn't asserted here
+  mockApply.mockResolvedValue(character);
   return renderWithCharacter(<Harness character={character} turnState={turnState} />, character);
 }
 
-// A turnState whose spend/consume mocks actually mutate the object (mirroring
-// the useTurnState reducer) — needed for a two-swap-in-one-test regression:
-// the plain vi.fn() stub in makeTurnState never updates, so a second swap in
-// the same test would never see the first swap's spend.
+// The plain vi.fn() stub in makeTurnState never updates state, so a second swap in the same test would never see the first swap's spend.
 function makeLiveTurnState(
   actionsRemaining: number,
   budget: { attackEquipCredits?: number; freeInteractionUsed?: boolean } = {},
@@ -116,16 +108,13 @@ function makeLiveTurnState(
   return state;
 }
 
-// Reads the character live from the cache — needed so a second interaction in
-// the same test sees the hand-occupancy change useLoadoutSwap's first cache
-// write produced (#1284: no more local onUpdate/setState re-render seam).
+// Reads the character live from the cache so a second interaction sees the hand-occupancy change useLoadoutSwap's first cache write produced.
 function LiveHarness({ turnState }: { turnState: TurnState & TurnStateActions }) {
   const { character } = useCurrentCharacter();
   const loadout = useLoadoutSwap(character, turnState);
   return <InlineLoadoutPicker turnState={turnState} loadout={loadout} />;
 }
 
-/** Scope queries to one hand's card ("Main hand" / "Off hand"). */
 function handCard(heading: string) {
   const label = screen.getByText(new RegExp(`^${heading}`));
   return within(label.closest('[data-testid="hand-card"]') as HTMLElement);
@@ -135,7 +124,6 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
   it("shows the current loadout label and per-hand occupants", () => {
     renderPicker(makeChar([longsword, dagger]), makeTurnState(1));
     expect(screen.getByText(/Now wielding/)).toBeInTheDocument();
-    // Longsword appears in the summary line + the Main-hand card header.
     expect(screen.getAllByText("Longsword").length).toBeGreaterThan(0);
   });
 
@@ -152,11 +140,11 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
 
   it("swapping into the occupied main hand costs the Action when the budget can't cover 2 units", async () => {
     const user = userEvent.setup();
-    const turnState = makeTurnState(1); // fresh budget: only 1 unit (the free interaction)
+    const turnState = makeTurnState(1);
     renderPicker(makeChar([longsword, dagger]), turnState);
 
     const main = handCard("Main hand");
-    await user.click(main.getByRole("button", { name: "Change" })); // expand main hand
+    await user.click(main.getByRole("button", { name: "Change" }));
     await user.click(main.getByRole("button", { name: "Swap in" }));
 
     await waitFor(() => expect(mockApply).toHaveBeenCalled());
@@ -171,7 +159,7 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
 
   it("swapping into the occupied main hand is FREE when it rides an attack credit + the free interaction", async () => {
     const user = userEvent.setup();
-    const turnState = makeTurnState(1, { attackEquipCredits: 1 }); // 1 attack made this turn
+    const turnState = makeTurnState(1, { attackEquipCredits: 1 });
     renderPicker(makeChar([longsword, dagger]), turnState);
 
     const main = handCard("Main hand");
@@ -196,30 +184,28 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
 
   it("0 actions with a fresh budget: the occupied hand toggle stays reachable — Stow is free, a full swap is blocked", async () => {
     const user = userEvent.setup();
-    renderPicker(makeChar([longsword, dagger]), makeTurnState(0)); // fresh budget: 1 unit left
+    renderPicker(makeChar([longsword, dagger]), makeTurnState(0));
 
     const main = handCard("Main hand");
     const toggle = main.getByRole("button", { name: "Change" });
-    expect(toggle).toBeEnabled(); // 1 unit still covers the cheapest interaction (Stow)
+    expect(toggle).toBeEnabled();
     await user.click(toggle);
 
-    // The dagger swap needs 2 units (stow + draw) — budget only has 1 → blocked.
     const swapRow = within(main.getByRole("list")).getByText("Dagger").closest("li") as HTMLElement;
     expect(within(swapRow).getByRole("button")).toBeDisabled();
     expect(within(swapRow).getByText(/No free interaction or Action left/)).toBeInTheDocument();
 
-    // Stow only needs 1 unit — still free and clickable.
     expect(main.getByRole("button", { name: "Stow" })).toBeEnabled();
   });
 
   it("filling an EMPTY hand is free (paid from the interaction budget, no Action spent)", async () => {
     const user = userEvent.setup();
-    const turnState = makeTurnState(1); // fresh budget
-    renderPicker(makeChar([dagger]), turnState); // both hands empty
+    const turnState = makeTurnState(1);
+    renderPicker(makeChar([dagger]), turnState);
 
     const main = handCard("Main hand");
-    await user.click(main.getByRole("button", { name: "Equip" })); // expand main hand
-    await user.click(within(main.getByRole("list")).getByRole("button", { name: "Equip" })); // the dagger option
+    await user.click(main.getByRole("button", { name: "Equip" }));
+    await user.click(within(main.getByRole("list")).getByRole("button", { name: "Equip" }));
 
     await waitFor(() =>
       expect(mockApply).toHaveBeenCalledWith("c1", [{ type: "equip", inventoryItemId: "dg", slot: "MAIN_HAND" }]),
@@ -239,8 +225,8 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
     renderPicker(makeChar([longsword, offDagger, greataxe]), turnState);
 
     const main = handCard("Main hand");
-    await user.click(main.getByRole("button", { name: "Change" })); // expand main hand
-    await user.click(main.getByRole("button", { name: "Swap in" })); // Greataxe
+    await user.click(main.getByRole("button", { name: "Change" }));
+    await user.click(main.getByRole("button", { name: "Swap in" }));
 
     await waitFor(() =>
       expect(mockApply).toHaveBeenCalledWith("c1", [
@@ -258,7 +244,7 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
     renderPicker(makeChar([longsword, dagger, dagger2]), makeTurnState(1));
 
     const main = handCard("Main hand");
-    await user.click(main.getByRole("button", { name: "Change" })); // expand main hand
+    await user.click(main.getByRole("button", { name: "Change" }));
     expect(main.getAllByText("Dagger")).toHaveLength(1);
     expect(main.getByText("×2")).toBeInTheDocument();
   });
@@ -269,7 +255,7 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
     renderPicker(makeChar([longsword]), turnState);
 
     const main = handCard("Main hand");
-    await user.click(main.getByRole("button", { name: "Change" })); // expand main hand
+    await user.click(main.getByRole("button", { name: "Change" }));
     await user.click(main.getByRole("button", { name: "Stow" }));
 
     await waitFor(() =>
@@ -284,7 +270,7 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
 
   it("refund reverses an Action-paid swap and returns the Action", async () => {
     const user = userEvent.setup();
-    const turnState = makeTurnState(1); // fresh budget → occupied swap costs the Action
+    const turnState = makeTurnState(1);
     renderPicker(makeChar([longsword, dagger]), turnState);
 
     const main = handCard("Main hand");
@@ -307,7 +293,7 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
 
   it("refund reverses a budget-paid swap and returns the interaction budget", async () => {
     const user = userEvent.setup();
-    const turnState = makeTurnState(1, { attackEquipCredits: 1 }); // rides the attack credit + free interaction
+    const turnState = makeTurnState(1, { attackEquipCredits: 1 });
     renderPicker(makeChar([longsword, dagger]), turnState);
 
     const main = handCard("Main hand");
@@ -333,10 +319,9 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
     const afterStow = makeChar([{ ...ls, equipped: false, equippedSlot: undefined }, dg]);
     mockApply.mockResolvedValue(afterStow);
 
-    const turnState = makeLiveTurnState(1); // fresh: 1 action, the free interaction unspent, no attack credits
+    const turnState = makeLiveTurnState(1);
     renderWithCharacter(<LiveHarness turnState={turnState} />, makeChar([ls, dg]));
 
-    // First: Stow the main hand (1 unit) — paid from the free interaction.
     await user.click(handCard("Main hand").getByRole("button", { name: "Change" }));
     await user.click(handCard("Main hand").getByRole("button", { name: "Stow" }));
     await waitFor(() =>
@@ -347,23 +332,18 @@ describe("InlineLoadoutPicker (#815, interaction-budget model #1165)", () => {
     );
     expect(turnState.freeInteractionUsed).toBe(true);
 
-    // Second: draw the dagger into the now-empty main hand (1 unit) — the
-    // free interaction is spent and no attack credits were earned, so this
-    // falls back to the Action rather than blocking. The bag now also offers
-    // the just-stowed Longsword, so scope to the Dagger row specifically.
+    // The bag now also offers the just-stowed Longsword, so scope to the Dagger row specifically.
     await user.click(handCard("Main hand").getByRole("button", { name: "Equip" }));
     const daggerRow = within(handCard("Main hand").getByRole("list"))
       .getByText("Dagger")
       .closest("li") as HTMLElement;
     await user.click(within(daggerRow).getByRole("button", { name: "Equip" }));
     await waitFor(() => expect(turnState.consumeAction).toHaveBeenCalledOnce());
-    expect(turnState.spendInteractionBudget).toHaveBeenCalledOnce(); // only the FIRST swap used it
+    expect(turnState.spendInteractionBudget).toHaveBeenCalledOnce();
 
-    // Refund reverses the SECOND (Action-paid) swap, not the first.
     await user.click(await screen.findByRole("button", { name: /Refund/ }));
     await waitFor(() => expect(turnState.refundAction).toHaveBeenCalledOnce());
     expect(turnState.refundInteractionBudget).not.toHaveBeenCalled();
-    // The first spend is irrecoverable — the free interaction stays spent.
     expect(turnState.freeInteractionUsed).toBe(true);
   });
 });

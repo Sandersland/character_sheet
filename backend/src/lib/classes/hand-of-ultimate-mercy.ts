@@ -1,20 +1,5 @@
-// Hand of Ultimate Mercy (Warrior of Mercy L17, PHB'24 p.92 — not in SRD 5.2,
-// gap-fill content, #1248). Magic action: expend 5 Focus + 1 use of the
-// dedicated handOfUltimateMercy pool (its own long-rest gate) to touch a
-// creature that died no more than 24 hours ago and return it to life with
-// 4d10 + Wisdom modifier hit points, ending Blinded/Deafened/Paralyzed/
-// Poisoned/Stunned.
-//
-// Target-rider modeling (mirrors Quivering Palm / Stunning Strike): this app
-// tracks no NPC/monster combatant, and a revival's target is by definition
-// not the acting character, so the HP restored + conditions ended are
-// narrated only — no HP/condition column is written for anyone. The "dead
-// no more than 24 hours" clause is DM-adjudicated narrative, like Quivering
-// Palm's day-count duration.
-//
-// Roll ownership: 4d10 + Wisdom modifier is the monk's own supernatural
-// effect, so — like Quivering Palm's 10d12 and Second Wind's 1d10 — the
-// client rolls it and sends the total; the server only validates positivity.
+// Hand of Ultimate Mercy, PHB'24 p.92 — not in SRD 5.2 (gap-fill content, #1248).
+// No target/HP/condition model: everything about the revived creature is narrated only. The client rolls 4d10 + Wisdom modifier and sends the total; the server only validates positivity.
 
 import type { HandOfUltimateMercyOperation, UseHandOfUltimateMercyOperation } from "@character-sheet/contracts";
 
@@ -44,8 +29,7 @@ function monkEntry(row: HandOfUltimateMercyRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
-// Resolved via slug (#1277: FK preferred, exact normalized name as fallback).
-// Was substring-matched on the word "mercy", same as hand-of-harm.ts's copy.
+// Resolved via slug (FK preferred, exact normalized name as fallback) — same pattern as Hand of Harm's own isWarriorOfMercy copy.
 function isWarriorOfMercy(row: HandOfUltimateMercyRow): boolean {
   const monk = monkEntry(row);
   return !!monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-mercy";
@@ -66,9 +50,7 @@ async function useHandOfUltimateMercy(
     throw new InvalidHandOfUltimateMercyOperationError("useHandOfUltimateMercy requires a positive hit point roll");
   }
 
-  // Spend the dedicated 1/long-rest pool before the 5-Focus cost, so an
-  // already-used Hand of Ultimate Mercy this rest fails fast without touching
-  // Focus (both spends share this transaction, so either failure rolls back both).
+  // Spend the 1/long-rest pool before the 5-Focus cost so an already-used Hand of Ultimate Mercy fails fast without touching Focus — both spends share this transaction, so either failure rolls back both.
   await applySpendResourceInTx(
     tx, characterId, { type: "spendResource", key: "handOfUltimateMercy" }, batchId, sessionId
   );
@@ -93,10 +75,7 @@ async function useHandOfUltimateMercy(
   return { hpRestored: op.roll, summary };
 }
 
-/**
- * Applies a batch of Hand of Ultimate Mercy operations atomically. Mirrors
- * applyQuiveringPalmOperations: one batchId, state re-read per op.
- */
+// Mirrors applyQuiveringPalmOperations: one batchId, state re-read per op.
 export async function applyHandOfUltimateMercyOperations(
   characterId: string,
   operations: HandOfUltimateMercyOperation[],

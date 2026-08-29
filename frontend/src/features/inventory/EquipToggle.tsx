@@ -6,7 +6,6 @@ interface EquipToggleProps {
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
 }
 
-// The equip/unequip pill; equippability is gated by the parent row.
 export default function EquipToggle({ item, pending, onSubmit }: EquipToggleProps) {
   return (
     <button

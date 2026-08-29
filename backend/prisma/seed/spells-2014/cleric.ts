@@ -1,85 +1,11 @@
-// PHB'14 (2014) Cleric spell list — content slice of epic #1517 (#1715).
-// Per the epic's row-ownership rule (tie-break Wizard > Cleric > Druid > Bard >
-// Sorcerer > Warlock > Paladin > Ranger), Cleric is 2nd priority, so this file
-// authors every spell on 1-2 class lists where Cleric is the highest-priority
-// class present (i.e. Wizard is NOT on that spell's list). A spell on 3+ lists
-// (e.g. Cure Wounds, Guardian of Faith is NOT one of these — see below) is
-// authored in shared.ts (#1713) instead; this file never re-transcribes one,
-// only relies on shared.ts already fanning "cleric" into its classes[] (verified:
-// every 3+-list PHB'14 Cleric spell already carries a cleric membership row in
-// shared.ts, so no membership-only edits were needed there for this slice).
-// Wizard-owned 2-list spells Cleric also gets (Continual Flame, Gentle Repose,
-// Animate Dead, Arcane Eye, Antimagic Field) are likewise already tagged with
-// cleric membership in wizard.ts (#1714) — not re-authored here either.
-//
-// Source: dnd5eapi.co's 2014 spell set (/api/2014/classes/cleric/spells,
-// cross-checked against /api/2014/spells for the full 319-spell 2014 dataset
-// wizard.ts's own header cites). All 46 rows this slice owns ARE present in
-// that dataset — unlike the Wizard slice, this one has zero hand-transcribed
-// or non-SRD spells to scrutinize. Cited SRD 5.1 as a whole (this file's own
-// convention, matching wizard.ts/shared.ts) rather than per-row. Structured
-// effect fields (effectKind/dice/save/saveEffect/upcast) are derived from that
-// same API response's damage/dc JSON, then individually audited against each
-// row's own prose — see spells-2014-cleric-data.test.ts's prose-vs-field audit
-// block, copied from the Wizard slice's pattern (#1714) since dnd5eapi's own
-// dc/damage fields have documented gaps (found there on 9 rows).
-//
-// Two of THIS file's rows hit that same gap: Sanctuary (dc: null despite "must
-// first make a wisdom saving throw") and Spirit Guardians (dc AND damage both
-// null despite "wisdom saving throw... 3d8 radiant damage ... or half as much
-// damage"). Both hand-fixed from their own prose, same as Wizard's Levitate/Web.
-//
-// Scraping artifacts cleaned: dnd5eapi's "the GM" restored to this repo's "the
-// DM" (Augury, Calm Emotions, Command, Commune, Conjure Celestial, Hallow,
-// Planar Ally — 7 rows), and markdown "***Heading.***" sub-labels (Command's
-// Approach/Drop/Flee/Grovel/Halt, Contagion's five disease names, Create or
-// Destroy Water's Create/Destroy halves, Dispel Evil and Good's Break
-// Enchantment/Dismissal, Hallow's bound-effect list) stripped of their
-// asterisks — SpellDetailCard has no markdown parser. Inline "- " dash bullet
-// lists (Augury's omens, Divine Word's HP thresholds, Thaumaturgy's six
-// effects) are left as prose, matching shared.ts/wizard.ts's own precedent
-// (Bigby's Hand, Mordenkainen's Magnificent Mansion already do this).
-// Hallow's "such as ores or trolls" is the official SRD 5.1 text verbatim
-// (confirmed against a second independent source, open5e) — not a scraping
-// artifact of this repo's own pipeline, so left untouched rather than silently
-// "corrected" away from the cited document.
-//
-// Structured-field calls worth flagging for the rules-accuracy pass:
-// - Forbiddance: 5d10 damage triggers automatically (no attack roll, no save —
-//   matches Magic Missile's "unconditional hit" shape), and the type is the
-//   CASTER'S CHOICE (radiant or necrotic) each time the spell is cast, not a
-//   spell-level constant — effectKind stays "damage" (real, fixed dice) but
-//   damageType is intentionally absent, the same shape as Chromatic Orb/Fire
-//   Shield in wizard.ts.
-// - Spirit Guardians: damage type is radiant OR necrotic depending on the
-//   CASTER's alignment (good/neutral vs. evil) at the moment of casting, not a
-//   choice made per-cast and not a spell-level constant either — same
-//   "damageType iff effectKind 'damage', except..." exception as Forbiddance.
-// - Flame Strike: 4d6 fire AND 4d6 radiant in ONE instance, no single
-//   damageType fits — matches wizard.ts's Meteor Swarm/Ice Storm precedent
-//   exactly (utility row: effectKind/saveEffect left unset despite the "half
-//   as much damage" prose, attackType/saveAbility still set).
-// - Guardian of Faith: the 20 radiant damage (and Meld Into Stone's 6d6/50
-//   bludgeoning self-harm numbers) are FLAT integers, not dice — inexpressible
-//   in effectDiceCount/effectDiceFaces, so these stay utility rows with the
-//   numbers carried only in prose, matching the 2024 SPELLS row's own Aid
-//   precedent ("Flat +5 HP-max... is inexpressible as a dice heal — utility
-//   row").
-// - Spiritual Weapon: PHB'14's real upcast rate is "+1d8 for every TWO slot
-//   levels above 2nd" — genuinely different from the 2024 SRD 5.2 revision's
-//   "+1d8 per slot level" (see the 2024 SPELLS row's own upcastDicePerLevel:
-//   1). upcastDicePerLevel is a per-1-level-only field, so reusing that 2024
-//   value here would silently bleed the 2024 mechanic into a 2014 row — the
-//   exact edition-mixing bug a prior slice's Chromatic Orb draft committed.
-//   Left unset; the description's own "every two slot levels" text is the only
-//   carrier of this rule.
-// - Aid, Heal, Mass Heal: all heal a FLAT integer (or flat-per-slot-level)
-//   amount, not dice — utility rows, matching Aid's existing 2024 SPELLS
-//   precedent exactly.
+// SRD 5.1 (dnd5eapi.co's 2014 spell set).
+// Cleric is 2nd in the row-ownership tie-break (Wizard > Cleric > Druid >
+// Bard > Sorcerer > Warlock > Paladin > Ranger); this file owns only 1-2-list
+// spells where Cleric is highest priority — 3+-list spells live in
+// shared.ts, Wizard-owned 2-list spells in wizard.ts.
 import type { CatalogSpell } from "../spells.js";
 
 export const CLERIC_SPELLS_2014: CatalogSpell[] = [
-  // ── Cantrips ──────────────────────────────────────────────────────────────
   {
     name: "Guidance",
     level: 0,
@@ -145,7 +71,6 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     classes: ["cleric"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // ── Level 1 ───────────────────────────────────────────────────────────────
   {
     name: "Bane",
     level: 1,
@@ -252,9 +177,6 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "You ward a creature within range against attack. Until the spell ends, any creature who targets the warded creature with an attack or a harmful spell must first make a wisdom saving throw. On a failed save, the creature must choose a new target or lose the attack or spell. This spell doesn't protect the warded creature from area effects, such as the explosion of a fireball. If the warded creature makes an attack or casts a spell that affects an enemy creature, this spell ends.",
     classes: ["cleric"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a small silver mirror" },
-    // dnd5eapi's own dc field is null despite the prose clearly gating on a
-    // wisdom save — same API-gap class the Wizard slice found on Levitate/Web
-    // (#1714). Hand-added from this row's own text, not a separate guess.
     attackType: "save",
     saveAbility: "wisdom",
   },
@@ -269,14 +191,10 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "A shimmering field appears and surrounds a creature of your choice within range, granting it a +2 bonus to AC for the duration.",
     classes: ["cleric", "paladin"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a small parchment with a bit of holy text written on it" },
-    // Flat +2 AC — matches the 2024 SPELLS row's own buffTarget:"ac" precedent
-    // exactly (identical mechanic both editions); rides the #383 additive `ac`
-    // breakdown channel, drops when concentration breaks.
     effectKind: "buff",
     buffTarget: "ac",
     buffModifier: 2,
   },
-  // ── Level 2 ───────────────────────────────────────────────────────────────
   {
     name: "Aid",
     level: 2,
@@ -287,9 +205,7 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "Your spell bolsters your allies with toughness and resolve. Choose up to three creatures within range. Each target's hit point maximum and current hit points increase by 5 for the duration. At Higher Levels. When you cast this spell using a spell slot of 3rd level or higher, a target's hit points increase by an additional 5 for each slot level above 2nd.",
     classes: ["cleric", "paladin"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a tiny strip of white cloth" },
-    // Flat +5 HP-max/current is inexpressible as a dice heal — utility row,
-    // matches the 2024 SPELLS row's own Aid precedent (same spell, PHB'14 text
-    // adds "tiny" to the material — SRD 5.2 narrowed it, a real edition diff).
+    // Flat +5 HP, not dice — utility row (no effectKind).
   },
   {
     name: "Augury",
@@ -347,11 +263,8 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     effectDiceCount: 1,
     effectDiceFaces: 8,
     damageType: "force",
-    // upcastDicePerLevel deliberately UNSET: PHB'14's real rate is "+1d8 for
-    // EVERY TWO slot levels above 2nd," not per-level — the 2024 SPELLS row's
-    // upcastDicePerLevel:1 is the SRD 5.2 revision and would edition-mix if
-    // reused here (see file header). The description's own text is the only
-    // carrier of this row's actual upcast rule.
+    // upcastDicePerLevel deliberately unset: PHB'14 upcasts every two slot
+    // levels, not per-level like the 2024 row.
   },
   {
     name: "Warding Bond",
@@ -363,11 +276,10 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "This spell wards a willing creature you touch and creates a mystic connection between you and the target until the spell ends. While the target is within 60 feet of you, it gains a +1 bonus to AC and saving throws, and it has resistance to all damage. Also, each time it takes damage, you take the same amount of damage. The spell ends if you drop to 0 hit points or if you and the target become separated by more than 60 feet. It also ends if the spell is cast again on either of the connected creatures. You can also dismiss the spell as an action.",
     classes: ["cleric"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a pair of platinum rings worth at least 50gp each, which you and the target must wear for the duration" },
-    // Not modeled via buffTarget: the +1 AC rides alongside a +1 save bonus,
-    // full damage resistance, and a two-way damage-sharing link — more than
-    // the generic additive `ac` channel's single-number shape covers.
+    // Not modeled via buffTarget: bundles a save bonus, damage resistance,
+    // and a two-way damage-sharing link beyond the `ac` channel's
+    // single-number shape.
   },
-  // ── Level 3 ───────────────────────────────────────────────────────────────
   {
     name: "Beacon of Hope",
     level: 3,
@@ -440,12 +352,8 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "You call forth spirits to protect you. They flit around you to a distance of 15 feet for the duration. If you are good or neutral, their spectral form appears angelic or fey (your choice). If you are evil, they appear fiendish. When you cast this spell, you can designate any number of creatures you can see to be unaffected by it. An affected creature's speed is halved in the area, and when the creature enters the area for the first time on a turn or starts its turn there, it must make a wisdom saving throw. On a failed save, the creature takes 3d8 radiant damage (if you are good or neutral) or 3d8 necrotic damage (if you are evil). On a successful save, the creature takes half as much damage. At Higher Levels. When you cast this spell using a spell slot of 4th level or higher, the damage increases by 1d8 for each slot level above 3rd.",
     classes: ["cleric"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a holy symbol" },
-    // dnd5eapi's own dc AND damage fields are both null despite the prose
-    // clearly describing a wisdom save and 3d8 damage — same API-gap class as
-    // Flaming Sphere/Scorching Ray (#1714). damageType is deliberately absent
-    // (radiant if good/neutral, necrotic if evil — the CASTER's alignment at
-    // cast time, not a single constant), the same exception shape as
-    // Chromatic Orb.
+    // damageType intentionally absent: radiant or necrotic depends on the
+    // caster's alignment at cast time, not a per-cast choice.
     attackType: "save",
     saveAbility: "wisdom",
     saveEffect: "half",
@@ -454,7 +362,6 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     effectDiceFaces: 8,
     upcastDicePerLevel: 1,
   },
-  // ── Level 4 ───────────────────────────────────────────────────────────────
   {
     name: "Death Ward",
     level: 4,
@@ -476,13 +383,10 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "A Large spectral guardian appears and hovers for the duration in an unoccupied space of your choice that you can see within range. The guardian occupies that space and is indistinct except for a gleaming sword and shield emblazoned with the symbol of your deity. Any creature hostile to you that moves to a space within 10 feet of the guardian for the first time on a turn must succeed on a dexterity saving throw. The creature takes 20 radiant damage on a failed save, or half as much damage on a successful one. The guardian vanishes when it has dealt a total of 60 damage.",
     classes: ["cleric"],
     components: { verbal: true, somatic: false, material: false },
-    // 20 radiant damage is a FLAT integer, not dice — inexpressible in
-    // effectDiceCount/effectDiceFaces (matches Aid's flat-heal precedent), so
-    // this stays a utility row despite the save/half-damage prose.
+    // 20 radiant damage is flat, not dice — utility row (no effectKind).
     attackType: "save",
     saveAbility: "dexterity",
   },
-  // ── Level 5 ───────────────────────────────────────────────────────────────
   {
     name: "Commune",
     level: 5,
@@ -505,10 +409,8 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "Your touch inflicts disease. Make a melee spell attack against a creature within your reach. On a hit, you afflict the creature with a disease of your choice from any of the ones described below. At the end of each of the target's turns, it must make a constitution saving throw. After failing three of these saving throws, the disease's effects last for the duration, and the creature stops making these saves. After succeeding on three of these saving throws, the creature recovers from the disease, and the spell ends. Since this spell induces a natural disease in its target, any effect that removes a disease or otherwise ameliorates a disease's effects apply to it. Blinding Sickness. Pain grips the creature's mind, and its eyes turn milky white. The creature has disadvantage on wisdom checks and wisdom saving throws and is blinded. Filth Fever. A raging fever sweeps through the creature's body. The creature has disadvantage on strength checks, strength saving throws, and attack rolls that use Strength. Flesh Rot. The creature's flesh decays. The creature has disadvantage on Charisma checks and vulnerability to all damage. Mindfire. The creature's mind becomes feverish. The creature has disadvantage on intelligence checks and intelligence saving throws, and the creature behaves as if under the effects of the confusion spell during combat. Seizure. The creature is overcome with shaking. The creature has disadvantage on dexterity checks, dexterity saving throws, and attack rolls that use Dexterity. Slimy Doom. The creature begins to bleed uncontrollably. The creature has disadvantage on constitution checks and constitution saving throws. In addition, whenever the creature takes damage, it is stunned until the end of its next turn.",
     classes: ["cleric", "druid"],
     components: { verbal: true, somatic: true, material: false },
-    // The melee spell attack is what applies the disease (attackType
-    // "attack"); the recurring constitution saving throws afterward only
-    // determine whether the disease locks in or is thrown off, not this
-    // spell's initial resolution.
+    // attackType is the initial melee attack; the recurring constitution
+    // saves afterward only determine whether the disease persists.
     attackType: "attack",
   },
   {
@@ -522,9 +424,8 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "Shimmering energy surrounds and protects you from fey, undead, and creatures originating from beyond the Material Plane. For the duration, celestials, elementals, fey, fiends, and undead have disadvantage on attack rolls against you. You can end the spell early by using either of the following special functions. Break Enchantment. As your action, you touch a creature you can reach that is charmed, frightened, or possessed by a celestial, an elemental, a fey, a fiend, or an undead. The creature you touch is no longer charmed, frightened, or possessed by such creatures. Dismissal. As your action, make a melee spell attack against a celestial, an elemental, a fey, a fiend, or an undead you can reach. On a hit, you attempt to drive the creature back to its home plane. The creature must succeed on a charisma saving throw or be sent back to its home plane (if it isn't there already). If they aren't on their home plane, undead are sent to the Shadowfell, and fey are sent to the Feywild.",
     classes: ["cleric", "paladin"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "holy water or powdered silver and iron" },
-    // Two alternate special functions (Break Enchantment: no roll at all;
-    // Dismissal: melee spell attack + charisma save) — no single attackType
-    // fits the spell as a whole, matching Bigby's Hand's multi-branch shape.
+    // Two alternate branches (no roll; melee attack + save) — no single
+    // attackType fits, so none is set.
   },
   {
     name: "Flame Strike",
@@ -536,9 +437,8 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "A vertical column of divine fire roars down from the heavens in a location you specify. Each creature in a 10-foot-radius, 40-foot-high cylinder centered on a point within range must make a dexterity saving throw. A creature takes 4d6 fire damage and 4d6 radiant damage on a failed save, or half as much damage on a successful one. At Higher Levels. When you cast this spell using a spell slot of 6th level or higher, the fire damage or the radiant damage (your choice) increases by 1d6 for each slot level above 5th.",
     classes: ["cleric"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "pinch of sulfur" },
-    // fire AND radiant in one instance can't fit one damageType — matches
-    // wizard.ts's Meteor Swarm/Ice Storm precedent: stays a utility row
-    // (effectKind/saveEffect unset) despite the save + half-damage prose.
+    // Two damage types (fire + radiant) in one instance — no single
+    // damageType fits, so effectKind/saveEffect stay unset.
     attackType: "save",
     saveAbility: "dexterity",
   },
@@ -555,7 +455,6 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     attackType: "save",
     saveAbility: "charisma",
   },
-  // ── Level 6 ───────────────────────────────────────────────────────────────
   {
     name: "Blade Barrier",
     level: 6,
@@ -586,11 +485,9 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "You create a ward against magical travel that protects up to 40,000 square feet of floor space to a height of 30 feet above the floor. For the duration, creatures can't teleport into the area or use portals, such as those created by the gate spell, to enter the area. The spell proofs the area against planar travel, and therefore prevents creatures from accessing the area by way of the Astral Plane, Ethereal Plane, Feywild, Shadowfell, or the plane shift spell. In addition, the spell damages types of creatures that you choose when you cast it. Choose one or more of the following: celestials, elementals, fey, fiends, and undead. When a chosen creature enters the spell's area for the first time on a turn or starts its turn there, the creature takes 5d10 radiant or necrotic damage (your choice when you cast this spell). When you cast this spell, you can designate a password. A creature that speaks the password as it enters the area takes no damage from the spell. The spell's area can't overlap with the area of another forbiddance spell. If you cast forbiddance every day for 30 days in the same location, the spell lasts until it is dispelled, and the material components are consumed on the last casting.",
     classes: ["cleric"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a sprinkling of holy water, rare incense, and powdered ruby worth at least 1,000 gp" },
-    // No attack roll or save gates this damage — it triggers automatically
-    // (matches Magic Missile's "unconditional hit" shape). damageType is
-    // deliberately absent: radiant or necrotic is the CASTER's choice each
-    // time the spell is cast, not a spell-level constant (same exception
-    // shape as Chromatic Orb/Fire Shield).
+    // Damage triggers automatically, no attack/save. damageType intentionally
+    // absent: radiant or necrotic is the caster's choice each cast, not a
+    // constant.
     effectKind: "damage",
     effectDiceCount: 5,
     effectDiceFaces: 10,
@@ -623,8 +520,7 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "Choose a creature that you can see within range. A surge of positive energy washes through the creature, causing it to regain 70 hit points. This spell also ends blindness, deafness, and any diseases affecting the target. This spell has no effect on constructs or undead. At Higher Levels. When you cast this spell using a spell slot of 7th level or higher, the amount of healing increases by 10 for each slot level above 6th.",
     classes: ["cleric", "druid"],
     components: { verbal: true, somatic: true, material: false },
-    // Flat 70 (+10/slot level) HP is inexpressible as a dice heal — utility
-    // row, matches Aid's precedent.
+    // Flat 70 (+10/slot) HP, not dice — utility row (no effectKind).
   },
   {
     name: "Heroes' Feast",
@@ -659,7 +555,6 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     classes: ["cleric"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // ── Level 7 ───────────────────────────────────────────────────────────────
   {
     name: "Conjure Celestial",
     level: 7,
@@ -696,7 +591,6 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     classes: ["cleric", "bard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a diamond worth at least 1,000gp, which the spell consumes" },
   },
-  // ── Level 8 ───────────────────────────────────────────────────────────────
   {
     name: "Holy Aura",
     level: 8,
@@ -709,7 +603,6 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     classes: ["cleric"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a tiny reliquary worth at least 1,000gp containing a sacred relic, such as a scrap of cloth from a saint's robe or a piece of parchment from a religious text" },
   },
-  // ── Level 9 ───────────────────────────────────────────────────────────────
   {
     name: "Mass Heal",
     level: 9,
@@ -720,8 +613,7 @@ export const CLERIC_SPELLS_2014: CatalogSpell[] = [
     description: "A flood of healing energy flows from you into injured creatures around you. You restore up to 700 hit points, divided as you choose among any number of creatures that you can see within range. Creatures healed by this spell are also cured of all diseases and any effect making them blinded or deafened. This spell has no effect on undead or constructs.",
     classes: ["cleric"],
     components: { verbal: true, somatic: true, material: false },
-    // Flat 700 HP is inexpressible as a dice heal — utility row, matches Aid's
-    // precedent.
+    // Flat 700 HP, not dice — utility row (no effectKind).
   },
   {
     name: "True Resurrection",

@@ -1,8 +1,6 @@
 import type { AuthProviderInfo, AuthUser } from "@/types/auth";
 import { apiFetch, rawFetch, request, send } from "@/api/http";
 
-// The enabled sign-in providers — drives the login screen's buttons (data-driven
-// so adding a provider server-side needs no frontend change). Public endpoint.
 export async function fetchAuthProviders(): Promise<AuthProviderInfo[]> {
   const data = await request<{ providers: AuthProviderInfo[] }>(
     "/auth/providers",
@@ -12,9 +10,8 @@ export async function fetchAuthProviders(): Promise<AuthProviderInfo[]> {
   return data.providers;
 }
 
-// The current session's user, or null when not signed in. Uses rawFetch (not
-// apiFetch) so an expected 401 here does NOT trip the global unauthorized
-// handler — this IS the "are we signed in?" probe.
+// Uses rawFetch (not apiFetch): an expected 401 here must not trip the
+// global unauthorized handler — this IS the signed-in probe.
 export async function fetchMe(): Promise<AuthUser | null> {
   const response = await rawFetch("/auth/me");
   if (response.status === 401) return null;
@@ -25,7 +22,6 @@ export async function fetchMe(): Promise<AuthUser | null> {
   return data.user;
 }
 
-// End the session server-side and clear the cookie.
 export async function logout(): Promise<void> {
   await send("/auth/logout", { method: "POST" }, "Failed to log out");
 }

@@ -1,9 +1,3 @@
-// #1778: exactly one full-height SpellPicker visible at a time. Stacking two
-// independent SpellPickers (each `flex-1 … overflow-y-auto`) split the card's
-// height between them — fine with one group, but a species cantrip group
-// collapsed both to ~1 visible row. A segmented control swaps between groups
-// instead of scrolling them side by side. Presentational only: it owns just
-// the active-tab index, no fetching or eligibility logic.
 import { useState } from "react";
 
 import Segmented from "@/components/ui/Segmented";
@@ -29,9 +23,7 @@ export default function SpellPickerTabs({ groups }: { groups: SpellPickerGroup[]
         label="Spell group"
         className="shrink-0"
       />
-      {/* The segment caption above already carries this group's selected/cap —
-          an empty override suppresses SpellPicker's own default headline so
-          the count isn't printed twice. */}
+      {/* headline="" suppresses SpellPicker's own default so the count isn't printed twice; the segment caption above already shows it. */}
       <SpellPicker groups={[groups[index]]} headline="" />
     </div>
   );

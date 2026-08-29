@@ -6,7 +6,6 @@ import type { ItemCategory } from "@/types/character";
 
 type SetForm = Dispatch<SetStateAction<FormState>>;
 
-// The form's controlled-input setters, factored out of CampaignItemForm.
 export function buildFormSetters(setForm: SetForm) {
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -17,12 +16,10 @@ export function buildFormSetters(setForm: SetForm) {
     setForm((f) => ({ ...f, category: next, slot: next === "gear" ? f.slot : "" }));
   }
 
-  // Single "Value" field writes one denomination and clears the rest.
   function setSingleValue(amount: string) {
     setForm((f) => ({ ...f, costCp: "", costSp: "", costGp: "", costPp: "", [COST_KEYS[f.valueUnit]]: amount }));
   }
 
-  // Switching the unit carries the current amount to the new denomination.
   function setValueUnit(unit: CurrencyUnit) {
     setForm((f) => ({
       ...f,

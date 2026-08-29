@@ -5,10 +5,6 @@ import { z } from "zod";
 import { appRedirectUri } from "@/lib/core/config.js";
 import type { AuthProvider, NormalizedProfile } from "./types.js";
 
-// The provider-agnostic OAuth 2.0 authorization-code + PKCE flow: build the
-// authorize URL, round-trip the state/verifier through a transaction cookie,
-// exchange the code for tokens, and fetch + normalize the userinfo profile.
-
 const oauthTxSchema = z.object({
   provider: z.string().min(1),
   state: z.string().min(1),
@@ -38,7 +34,6 @@ export function safeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-// Build the provider authorize URL for a start request.
 export function buildAuthorizeUrl(
   provider: AuthProvider,
   params: { state: string; challenge: string },
@@ -80,8 +75,7 @@ export function tokenColumns(token: TokenResponse): TokenColumns {
   return {
     accessToken: token.access_token,
     refreshToken: token.refresh_token ?? null,
-    // Store an absolute epoch-seconds expiry so callers don't have to remember
-    // when the row was written.
+    // Absolute epoch-seconds expiry, so callers don't have to remember when the row was written.
     expiresAt: token.expires_in ? Math.floor(Date.now() / 1000) + token.expires_in : null,
     tokenType: token.token_type ?? null,
     scope: token.scope ?? null,
@@ -89,8 +83,7 @@ export function tokenColumns(token: TokenResponse): TokenColumns {
   };
 }
 
-// Exchange the authorization code for tokens (PKCE: code_verifier, no secret in
-// the URL). Returns null on any non-200 so the caller can answer 502.
+// PKCE: code_verifier, no secret in the URL. Returns null on any non-200 so the caller can answer 502.
 export async function exchangeCode(
   provider: AuthProvider,
   code: string,
@@ -111,8 +104,7 @@ export async function exchangeCode(
     body: body.toString(),
   });
   if (!response.ok) return null;
-  // A malformed-but-200 token body must surface as 502 (the caller maps null →
-  // 502), not a ZodError escaping to the 500 handler. Parse defensively.
+  // A malformed-but-200 body must surface as 502, not a ZodError escaping to the 500 handler.
   try {
     return tokenResponseSchema.parse(await response.json());
   } catch {
@@ -120,7 +112,7 @@ export async function exchangeCode(
   }
 }
 
-// Fetch the provider's userinfo and normalize it. Returns null on a non-200.
+// Returns null on a non-200.
 export async function fetchProfile(
   provider: AuthProvider,
   accessToken: string,
@@ -129,8 +121,7 @@ export async function fetchProfile(
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) return null;
-  // mapProfile zod-parses the userinfo; a malformed-but-200 body must surface as
-  // 502, not a ZodError → 500.
+  // mapProfile zod-parses the userinfo; a malformed-but-200 body must surface as 502, not a ZodError → 500.
   try {
     return provider.mapProfile(await response.json());
   } catch {

@@ -1,12 +1,3 @@
-// End-to-end proof against the REAL seeded content (#1535, not a fixture
-// class): a 2024 character offers and grants the genuine PHB'24 package —
-// items AND its option's GP landing in currency — while a 2014 character of
-// the same class still gets PHB'14's, unaffected. Barbarian is the simplest
-// class (one option with no open picks) for the edition-resolution + gold
-// proof; Bard/Monk cover the two real non-weapon open picks #1535 lands
-// (starting-equipment-tool-picks.test.ts already proves the underlying
-// filter/bound-choice branches in isolation against a fixture class — this
-// file proves the real seeded rows actually carry that shape).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -71,8 +62,7 @@ describe("real EDITION_2024 Barbarian package vs. real EDITION_2014 (#1535)", ()
     // Explorer's Pack expands via PACK_CONTENTS — its own name never lands.
     expect(inventory.find((i) => i.name === "Explorer's Pack")).toBeUndefined();
     expect(inventory.find((i) => i.name === "Backpack")).toBeDefined();
-    // 2014's Barbarian package has no Handaxe/Explorer's-Pack GP at all (0);
-    // 15 only exists on the 2024 option, so a nonzero-15 match is edition-specific.
+    // 2014's Barbarian package carries 0 gold; 15 only exists on the 2024 option, so a nonzero-15 match is edition-specific.
     expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 15, pp: 0 });
   });
 
@@ -99,20 +89,11 @@ describe("real EDITION_2024 Barbarian package vs. real EDITION_2014 (#1535)", ()
     const inventory: { name: string; quantity: number }[] = response.body.inventory;
     expect(inventory.find((i) => i.name === "Greataxe")).toBeDefined();
     expect(inventory.find((i) => i.name === "Javelin")?.quantity).toBe(4);
-    // Every EDITION_2014 option carries gold: 0 — no 15 GP surprise from the
-    // sibling 2024 row.
+    // Every EDITION_2014 option carries gold: 0 — no 15 GP surprise from the sibling 2024 row.
     expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 0, pp: 0 });
   });
 
-  // Mutation proof (see this PR's report for the full red output): hardcoding
-  // loadClassEquipmentDef's (classId, edition) lookup to always resolve
-  // EDITION_2014 (character-create.ts) turns 3 of this file's 4 tests red —
-  // the 2024 Barbarian test above (its Greataxe/15-GP option no longer
-  // exists on the 2014 row) plus both open-pick tests below (Bard/Monk's
-  // 2014 packages have a different group count, so `selections` no longer
-  // matches). Only the 2014 Barbarian test above stays green, proving this
-  // suite genuinely depends on per-edition resolution rather than a
-  // coincidence.
+  // Mutation proof: hardcoding loadClassEquipmentDef's (classId, edition) lookup to always resolve EDITION_2014 turns 3 of this file's 4 tests red, proving the suite genuinely depends on per-edition resolution.
 });
 
 describe("real EDITION_2024 Bard package: the musical-instrument open pick (#1535)", () => {
@@ -182,7 +163,6 @@ describe("real EDITION_2024 Monk package: the tool-bound open pick (#1535)", () 
           classes: [{ name: "Monk" }],
           rulesEdition: "EDITION_2024",
           toolChoices: ["Flute"],
-          // Chose Flute proficiency, but tries to take the Drum for the bound pick.
           startingEquipment: { mode: "package", selections: [{ optionIndex: 0, openPicks: ["Drum"] }] },
         }),
       );

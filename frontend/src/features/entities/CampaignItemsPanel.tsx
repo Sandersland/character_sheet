@@ -8,19 +8,12 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface CampaignItemsPanelProps {
   campaignId: string;
-  /** Member characters, so the DM can pick an award target. */
   characters: { id: string; name: string; ownerId: string }[];
   /** The campaign's edition, used only to pick a /reference cache slot (#1437). */
   edition: RulesEdition;
 }
 
-// Owner-only Manage-tab panel (#380): authors DM campaign items via two paths —
-// clone-from-SRD-catalog (pre-fills the form from a chosen Item) and from-scratch
-// with category-conditional detail fields. The shared form is recomposed (#542)
-// into labelled fieldsets with progressive disclosure. Each create auto-registers
-// a HIDDEN ITEM entity; reveal/edit/delete here keep the shared Codex cache in sync.
-// All state, queries (#1299) and mutations live in useCampaignItemsPanelController
-// — this component is a template over what it returns.
+// Each create auto-registers a HIDDEN ITEM entity; every operation here must keep the shared Codex entity cache in sync.
 export default function CampaignItemsPanel({ campaignId, characters, edition }: CampaignItemsPanelProps) {
   const {
     items,

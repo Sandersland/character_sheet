@@ -32,8 +32,6 @@ describe("TurnDeathSaves (#736)", () => {
   it("shows the death-save tracker at 0 HP without a redundant wrapper card", () => {
     const character = makeCharacter(0);
     renderWithCharacter(<TurnDeathSaves />, character);
-    // DeathSaveTracker supplies its own garnet card + heading; the old outer
-    // "Dying — death saves" wrapper is gone (single card, #744 review).
     expect(screen.getByText(/Unconscious — Roll Death Saves/i)).toBeInTheDocument();
     expect(screen.queryByText(/Dying — death saves/i)).not.toBeInTheDocument();
   });

@@ -1,9 +1,4 @@
-// AC (#1495, 2026-08-03 issue comment #4): for every (class, edition) with
-// fightingStyleFeatLevel != null, the offered Fighting Style set must be
-// NON-EMPTY — asserted against the REAL seeded catalog, not assumed. The
-// level-up ceremony's fightingStyleFeatStep (level-up-plan.ts) is mandatory
-// whenever this delta is positive, so a gate that empties the offered set
-// would hard-block level-up rather than degrade.
+// fightingStyleFeatStep is mandatory whenever this delta is positive, so an empty offered set would hard-block level-up rather than degrade.
 import { describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -18,10 +13,7 @@ describe("Fighting Style class gate (#1495) — offered set is never empty for a
   const grantingClasses = CLASSES.filter((c) => c.fightingStyleFeatLevel != null);
 
   it("catalog-data.ts still names Fighter/Paladin/Ranger as the only Fighting Style-granting classes", () => {
-    // Not a hard requirement of the rule itself, but a canary: if a new class
-    // gains fightingStyleFeatLevel later, this test's own list below (and the
-    // seeded Feat.classes rows) need a matching update or the AC below could
-    // pass vacuously for the wrong reason.
+    // Canary against a new granting class silently passing the AC below vacuously.
     expect(grantingClasses.map((c) => c.name).sort()).toEqual(["Fighter", "Paladin", "Ranger"]);
   });
 

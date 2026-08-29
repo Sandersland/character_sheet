@@ -1,5 +1,3 @@
-// Shared presentational primitives for the TurnHub slots.
-
 import type { IconType } from "react-icons";
 
 import { ChevronRight } from "@/components/ui/icons";
@@ -32,34 +30,18 @@ interface TurnSlotCardProps {
   tone: SlotTone;
   used: boolean;
   usedLabel?: string;
-  /** Optional count chip beside the title (e.g. "×2" when two actions remain). */
   badge?: string;
-  /** When provided, renders the Use affordance; omit for a static row (no action left). */
   onUse?: () => void;
-  /** Accessible name for the Use affordance — "Use Action/Bonus/Reaction" for tests + a11y. */
   useLabel: string;
-  /**
-   * Keep the Use affordance tappable even when `used` is true — the Action
-   * slot needs this so its free-only menu mode (interaction budget, #1165)
-   * stays reachable after the Action itself is spent.
-   */
+  /** Keeps the Use affordance tappable after `used` is true, for ActionSlot's free-only menu mode. */
   alwaysTappable?: boolean;
   children?: React.ReactNode;
 }
 
-/**
- * A turn-economy slot rendered as a large tap target (#729). Desktop: a bordered
- * card with a solid "Use" button (unchanged). Mobile (#1028): a full-bleed ~64pt
- * row — icon tile, slot name + untruncated preview, a "Ready"/used state and a
- * chevron — where the whole row is the tap target opening the picker sheet.
- * Any counters/results render as `children` beneath the row.
- */
 export function TurnSlotCard(props: TurnSlotCardProps) {
   return useIsBelowMd() ? <MobileSlotRow {...props} /> : <DesktopSlotCard {...props} />;
 }
 
-// Mobile full-bleed row (#1028): whole row taps into the picker; children (attack
-// counters, reaction result) render below it, not nested inside the button.
 function MobileSlotRow({
   icon: Icon,
   title,
@@ -141,10 +123,7 @@ function DesktopSlotCard({
         >
           <Icon className="h-5 w-5" />
         </span>
-        {/* Text column owns all the flex slack (`min-w-0 flex-1`); the icon tile
-            and Use button are both `shrink-0`, so the slot TITLE never gets
-            crowded into an ellipsis (#986) — the title has no `truncate`, so a
-            long name wraps rather than clips. Only the subtitle/preview ellipsizes. */}
+        {/* Icon tile and Use button are shrink-0 so the title (no truncate) wraps instead of ellipsizing; only the preview truncates. */}
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-parchment-800">
             {title}
@@ -235,7 +214,6 @@ export function AttackCounter({
   );
 }
 
-/** Inline outcome strip shown in the Reaction slot after the reaction is spent. */
 export function ReactionResult({
   message,
   tone = "gold",

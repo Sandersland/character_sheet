@@ -1,10 +1,4 @@
-/**
- * Each union below used to be `(typeof TUPLE)[number]`, so the route's zod schema
- * and the wire type could not drift. Moving the unions to shared-types (#1273)
- * left the tuples behind as separate declarations — these assertions are what
- * now fails when a value is added to one side only.
- */
-
+// #1273: these tuples and their shared-types unions are separate declarations; this assertion is what fails if a value is added to only one side.
 import { describe, expectTypeOf, it } from "vitest";
 
 import {

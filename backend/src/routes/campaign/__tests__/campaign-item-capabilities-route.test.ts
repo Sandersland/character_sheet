@@ -6,8 +6,6 @@ import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 
-// DM authoring of passiveBonus capabilities + attunement prerequisite persists
-// and round-trips through the campaign-item route (#546).
 const OWNER = "owner-campaign-item-caps-route";
 
 describe("campaign item capabilities route (#546)", () => {
@@ -114,7 +112,6 @@ describe("campaign item capabilities route (#546)", () => {
   });
 
   it("applies the wielder-mode guard on PATCH the same as on create (#528)", async () => {
-    // A spellcaster-attunable item may author a wielder-mode castSpell.
     const created = await supertest(app)
       .post(`/api/campaigns/${campaignId}/items`)
       .set("Cookie", cookie)
@@ -139,15 +136,12 @@ describe("campaign item capabilities route (#546)", () => {
       attackMode: "wielder",
     };
 
-    // While the item stays spellcaster-attunable, the wielder-mode cap is allowed.
     const ok = await supertest(app)
       .patch(`/api/campaigns/${campaignId}/items/${created.body.id}`)
       .set("Cookie", cookie)
       .send({ capabilities: [wielderCap] });
     expect(ok.status).toBe(200);
 
-    // Dropping the spellcaster prereq alongside a wielder-mode cap is rejected —
-    // the PATCH guard resolves the prereq from the request (now "class").
     const rejected = await supertest(app)
       .patch(`/api/campaigns/${campaignId}/items/${created.body.id}`)
       .set("Cookie", cookie)

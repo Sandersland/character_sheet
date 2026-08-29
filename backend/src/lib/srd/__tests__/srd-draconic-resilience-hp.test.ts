@@ -2,9 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { draconicResilienceMaxHpBonus } from "@/lib/srd/srd.js";
 
-// PHB'14 p.106: subclassLevel 1 (Sorcerous Origin at 1st level, the seeded
-// Sorcerer catalog value) is EDITION_2014's real gate; EDITION_2024 always
-// gates at 3 regardless of subclassLevel (subclassGateLevel's own rule).
+// PHB'14 p.106: subclassLevel 1 is EDITION_2014's real gate; EDITION_2024 always gates at 3 via subclassGateLevel's own rule.
 describe("draconicResilienceMaxHpBonus (#1123)", () => {
   describe("2014 — flat +1/sorcerer level from L1", () => {
     it("L1 → +1", () => {

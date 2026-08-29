@@ -1,17 +1,10 @@
-// Persistent inline roll result for one attack row (#745). After a player taps
-// Attack / Damage / Critical, the 3D-dice animation + toast are transient — this
-// keeps the number on the row so they can read it back to their DM. Presentational
-// only: the crit/miss/total/tone derivation lives in resultLineView (#778).
-
 import { resultLineView } from "@/lib/attackResult";
 import type { RollResult } from "@/lib/dice";
 
 interface AttackResultLineProps {
   result: RollResult;
   kind: "attack" | "damage";
-  /** Damage type shown after the total (damage rolls only). */
   damageType?: string;
-  /** Maneuver-summed total; overrides the raw roll total when set (non-null). */
   overrideTotal?: number | null;
 }
 

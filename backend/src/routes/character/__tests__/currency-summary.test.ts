@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { currencyAdjustSummary } from "@/routes/character/characters.js";
 
-// Pure-logic oracle for the currencyAdjust timeline summary (extracted from the
-// PATCH /characters/:id handler) — pins the byte-identical delta string.
-
 describe("currencyAdjustSummary", () => {
   it("lists each changed denomination with a signed delta, pp→cp order", () => {
     expect(

@@ -11,9 +11,8 @@ import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { Session } from "@/types/character";
 
 interface SessionsModalProps {
-  /** Owning character — still needed for the recap's retroactive XP form. */
+  /** Still needed for the recap's retroactive XP form. */
   characterId: string;
-  /** Campaign whose session history is listed; undefined when uncampaigned. */
   campaignId?: string;
   onClose: () => void;
 }
@@ -26,9 +25,6 @@ function formatDate(iso: string): string {
   });
 }
 
-// One session row: title/date + status badge + a recap link when one exists.
-// Split out (mirrors CampaignItemRow) so SessionsModal's own render stays a
-// simple loading/error/empty/list switch, not a nested per-row branch too.
 function SessionRow({ session, onSelect }: { session: Session; onSelect: (s: Session) => void }) {
   const hasSummary = Boolean(session.summary);
   return (
@@ -59,10 +55,8 @@ function SessionRow({ session, onSelect }: { session: Session; onSelect: (s: Ses
 }
 
 // Error and list are siblings, not exclusive branches: query-core sets
-// status:'error' even when `data` is retained, so a failed background
-// refetch of a warm cache must show the error line ALONGSIDE the last-known
-// list, not instead of it (re-review — an early-return-on-error regressed
-// this).
+// status:'error' even when `data` is retained, so a failed background refetch
+// of a warm cache must show the error line alongside the last-known list.
 function SessionsListBody({
   list,
   error,
@@ -97,31 +91,21 @@ function SessionsListBody({
   );
 }
 
-/**
- * Lists a campaign's play sessions (newest first, #245). Clicking an ended
- * session opens its read-only recap (SessionSummaryModal). This is the entry
- * point for reviewing a past shared session from the character sheet.
- */
 export default function SessionsModal({ characterId, campaignId, onClose }: SessionsModalProps) {
   const [selected, setSelected] = useState<Session | null>(null);
 
-  // staleTime:0 (overriding the global 30s), same rationale as the doorway
-  // (#1299): every open must confirm with the network so a just-ended session
-  // can't render as stale — the cached list is only a placeholder until then.
-  // Query-cache-backed replaces a hand-rolled module-level Map (docs/frontend.md
-  // forbids it) — stale-while-revalidate is what useQuery already does.
+  // staleTime:0 overrides the global 30s: every open must confirm with the
+  // network so a just-ended session can't render as stale.
   const { data: sessions, isError } = useQuery({
     queryKey: sessionKeys.campaignList(campaignId),
     queryFn: campaignId ? () => fetchCampaignSessions(campaignId) : skipToken,
     staleTime: 0,
   });
 
-  // Uncampaigned characters have no shared sessions — render an empty list.
   const list = campaignId ? (sessions ?? null) : [];
   const error = isError ? "Couldn't load sessions — try again." : null;
   const showSpinner = useDelayedFlag(list === null && !error);
 
-  // While a past session's recap is open, render it on top of the list.
   if (selected) {
     return (
       <SessionSummaryModal

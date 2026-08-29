@@ -9,7 +9,6 @@ import {
 import { formatDuration } from "@/lib/sessionRecap";
 import type { ParticipantSummary } from "@/types/character";
 
-// One party member's contribution + time present in the shared session.
 export default function ParticipantRecapCard({ summary }: { summary: ParticipantSummary }) {
   return (
     <div className="flex flex-col gap-2 rounded-card border border-parchment-200 bg-parchment-50/60 p-3">

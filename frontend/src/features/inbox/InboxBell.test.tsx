@@ -21,13 +21,6 @@ vi.mock("@/api/client", () => ({
   combineEntities: (...args: unknown[]) => combineEntities(...args),
 }));
 
-// Freshly "now" (not a fixed fixture date): formatInboxSignalAge's calendar-
-// day diff against Date.now() lands on "today" for any signalAt this close
-// to test execution, without pinning down system time and risking a
-// userEvent + fake-timer interaction (see CampaignInviteLink.test.tsx's own
-// note on that). Exact bucket wording ("yesterday", "N days ago") is
-// formatInboxSignalAge's own unit-tested territory (lib/inboxMessages.test.ts)
-// — this file only checks that signalAt actually reaches the row.
 const NOW_ISO = new Date().toISOString();
 
 const DUPLICATE_ROW: InboxRow = {
@@ -95,9 +88,6 @@ describe("InboxBell", () => {
     fetchInbox.mockResolvedValue([]);
     renderBell();
     await waitFor(() => expect(fetchInbox).toHaveBeenCalled());
-    // DesktopInboxPopover stays mounted (so an already-open popover survives
-    // rows going empty — see the "survives" test below); only ITS trigger
-    // content is hidden, which is what "hidden entirely" actually means here.
     expect(screen.queryByRole("button", { name: /inbox/i })).not.toBeInTheDocument();
   });
 
@@ -109,9 +99,6 @@ describe("InboxBell", () => {
     await user.click(screen.getByRole("button", { name: "Review duplicates" }));
     expect(screen.getByRole("dialog", { name: "Review duplicates" })).toBeInTheDocument();
 
-    // Simulate the feed going empty out from under the open modal (e.g. some
-    // other tab dismissed/resolved the last flag) — only the trigger's
-    // visibility may depend on rows, per #1946 follow-up.
     getQueryClient().setQueryData(inboxKeys.all, []);
 
     await waitFor(() =>
@@ -127,7 +114,7 @@ describe("InboxBell", () => {
     expect(within(trigger).getByText("2")).toBeInTheDocument();
   });
 
-  it("opens a popover under the bell listing grouped rows with a DM only badge", async () => {
+  it("opens a popover under the bell listing grouped rows with no DM framing", async () => {
     fetchInbox.mockResolvedValue([DUPLICATE_ROW, CHRONICLING_ROW]);
     const user = userEvent.setup();
     renderBell();
@@ -135,14 +122,13 @@ describe("InboxBell", () => {
 
     const panel = screen.getByRole("dialog", { name: /inbox/i });
     expect(within(panel).getByText("Curse of Strahd")).toBeInTheDocument();
-    expect(within(panel).getByText("DM only")).toBeInTheDocument();
+    expect(within(panel).queryByText(/DM/)).not.toBeInTheDocument();
     expect(
       within(panel).getByText("Lil · lili · Lili look like duplicates of each other."),
     ).toBeInTheDocument();
     expect(
       within(panel).getByText("4 entries have been mentioned but have no description yet."),
     ).toBeInTheDocument();
-    // Trailing relative-time meta off signalAt (#1946 follow-up).
     expect(within(panel).getAllByText("today")).toHaveLength(2);
   });
 
@@ -186,7 +172,6 @@ describe("InboxBell", () => {
     await user.click(screen.getByRole("button", { name: "Disregard" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent("Failed to dismiss inbox flag");
-    // Rolled back — the row is back and the trigger's badge count is intact.
     expect(
       await screen.findByText("4 entries have been mentioned but have no description yet."),
     ).toBeInTheDocument();
@@ -205,7 +190,6 @@ describe("InboxBell", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: /inbox/i })).not.toBeInTheDocument(),
     );
-    // The sheet itself — not just the (now-hidden) trigger — is unaffected.
     expect(screen.getByRole("dialog", { name: "Inbox" })).toBeInTheDocument();
   });
 
@@ -217,8 +201,8 @@ describe("InboxBell", () => {
     await user.click(await screen.findByRole("button", { name: /inbox/i }));
 
     const sheet = screen.getByRole("dialog", { name: "Inbox" });
-    expect(within(sheet).getByText("1 for the DM")).toBeInTheDocument();
-    // Full-width 44px mobile action targets.
+    expect(within(sheet).getByText("1 item")).toBeInTheDocument();
+    expect(within(sheet).queryByText(/DM/)).not.toBeInTheDocument();
     const openCodex = within(sheet).getByRole("button", { name: "Open codex" });
     expect(openCodex.className).toMatch(/min-h-11/);
   });

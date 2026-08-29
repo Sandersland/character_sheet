@@ -1,13 +1,7 @@
 /**
- * 2014 Monk ki action route tests (#1500) — Flurry of Blows / Patient
- * Defense / Step of the Wind / Deflect Missiles' throw-back, exercised
- * through the real HTTP stack (POST /api/characters/:id/actions/transactions),
- * mirroring actions-monk-focus.test.ts's pattern but for the "ki" pool.
- *
- * SRD 5.1 / PHB'14 p.77: each of the three base ki-spend options is a flat
- * 1-ki cost with no free variant, unlike 2024's free/paid pair — so
- * patientDefenseKi/stepOfTheWindKi are each a SINGLE action key, not a
- * two-menu-entry pair.
+ * SRD 5.1 / PHB'14 p.77: each ki-spend option is a flat 1-ki cost with no
+ * free variant, so patientDefenseKi/stepOfTheWindKi are each a single action
+ * key, unlike 2024's free/paid pair.
  */
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -25,9 +19,7 @@ const MONK_ID = "test-actions-monk-ki";
 const MONK_CATALOG_NAME = "Actions Monk Ki Test Monk";
 let monkClassId: string;
 
-// XP threshold for level 3 (single-class): Deflect Missiles grants at L3;
-// Flurry/Patient Defense/Step of the Wind already active at L2.
-const L3_XP = 900;
+const L3_XP = 900; // single-class monk level 3 (Deflect Missiles gates here)
 
 const MONK_BASE = {
   id: MONK_ID,
@@ -87,6 +79,53 @@ function pool(body: { resources: { pools: Array<{ key: string; used: number; rem
   return body.resources.pools.find((p) => p.key === key)!;
 }
 
+async function seedKiActionRows(classId: string) {
+  await prisma.classFeature.deleteMany({ where: { classId } });
+  await prisma.classFeature.createMany({
+    data: [
+      {
+        classId, subclassId: null, name: "Ki", level: 2, edition: "EDITION_2014",
+        description: "You have a pool of Ki Points equal to your monk level.",
+        resourceKey: "ki", resourceLabel: "Ki Points", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      },
+      {
+        classId, subclassId: null, name: "Flurry of Blows", level: 2, edition: "EDITION_2014",
+        description: "Immediately after taking the Attack action, spend 1 ki to make two unarmed strikes as a bonus action.",
+        resourceKey: "flurryOfBlows", activationCost: "bonusAction", costKind: "pool", costPoolKey: "ki", costBase: 1, count: 2, actionOnly: true,
+      },
+      {
+        classId, subclassId: null, name: "Patient Defense", level: 2, edition: "EDITION_2014",
+        description: "Spend 1 ki to take the Dodge action as a bonus action.",
+        resourceKey: "patientDefenseKi", activationCost: "bonusAction", costKind: "pool", costPoolKey: "ki", costBase: 1,
+        regrants: ["dodge"], actionOnly: true,
+      },
+      {
+        classId, subclassId: null, name: "Step of the Wind", level: 2, edition: "EDITION_2014",
+        description: "Spend 1 ki to take the Disengage or Dash action as a bonus action; your jump distance is doubled for the turn.",
+        resourceKey: "stepOfTheWindKi", activationCost: "bonusAction", costKind: "pool", costPoolKey: "ki", costBase: 1,
+        regrants: ["disengage", "dash"], actionOnly: true,
+      },
+      {
+        classId, subclassId: null, name: "Deflect Missiles — Throw Back", level: 3, edition: "EDITION_2014",
+        description: "Once Deflect Missiles catches a missile, spend 1 ki to make a ranged attack with it.",
+        resourceKey: "deflectMissilesThrow", activationCost: "free", costKind: "pool", costPoolKey: "ki", costBase: 1, actionOnly: true,
+      },
+      {
+        classId, subclassId: null, name: "Focus", level: 2, edition: "EDITION_2024",
+        description: "You have a pool of Focus Points equal to your monk level.",
+        resourceKey: "focus", resourceLabel: "Focus Points", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      },
+      {
+        classId, subclassId: null, name: "Flurry of Blows", level: 2, edition: "EDITION_2024",
+        description: "Immediately after the Attack action, spend 1 focus to make two Unarmed Strikes as a Bonus Action (three at Heightened Focus, monk L10).",
+        resourceKey: "flurryOfBlows", activationCost: "bonusAction", costKind: "pool", costPoolKey: "focus", costBase: 1, count: 2, actionOnly: true,
+      },
+    ],
+  });
+}
+
 describe("POST /:id/actions/transactions — 2014 Monk ki actions (#1500)", () => {
   afterAll(async () => {
     await prisma.characterClass.deleteMany({ where: { name: MONK_CATALOG_NAME } });
@@ -109,6 +148,7 @@ describe("POST /:id/actions/transactions — 2014 Monk ki actions (#1500)", () =
       update: {},
     });
     monkClassId = cls.id;
+    await seedKiActionRows(monkClassId);
     await createMonk();
   });
 
@@ -157,10 +197,6 @@ describe("POST /:id/actions/transactions — 2014 Monk ki actions (#1500)", () =
     expect(pool(res.body, "ki")).toMatchObject({ used: 1, remaining: 2 });
   });
 
-  // LIFO undo (#758): revert-batch must restore the ki pool exactly, the same
-  // generic path every other resource spend (focus/wildShape/channelDivinity/
-  // etc.) already proves — mirrors shadow-arts-cast.test.ts's own
-  // "revert refunds focus" pattern, just against the new "ki" pool key.
   it("logs an undoable spend: revert restores the ki pool (LIFO undo, #758)", async () => {
     const spent = await executeAction("patientDefenseKi");
     expect(spent.status).toBe(200);
@@ -174,7 +210,7 @@ describe("POST /:id/actions/transactions — 2014 Monk ki actions (#1500)", () =
   });
 
   it("spending flurryOfBlows, patientDefenseKi, and stepOfTheWindKi in the same turn draws down the shared ki pool correctly", async () => {
-    // Level-3 monk: 3 ki total. Three 1-ki spends drain it to 0; a fourth 400s.
+    // Level-3 monk: 3 ki total.
     const first = await executeAction("flurryOfBlows");
     expect(first.status).toBe(200);
     expect(pool(first.body, "ki")).toMatchObject({ used: 1, remaining: 2 });
@@ -192,9 +228,6 @@ describe("POST /:id/actions/transactions — 2014 Monk ki actions (#1500)", () =
   });
 });
 
-// A 2024 monk sibling — proves the SAME actionKey ("flurryOfBlows") resolves
-// to the CORRECT pool per edition end-to-end, not just at the unit layer
-// (actions.test.ts already pins ACTION_EFFECT_FN.flurryOfBlows's pure output).
 describe("POST /:id/actions/transactions — flurryOfBlows spends focus (not ki) for a 2024 monk", () => {
   const MONK_2024_ID = "test-actions-monk-ki-2024-sibling";
 
@@ -219,6 +252,7 @@ describe("POST /:id/actions/transactions — flurryOfBlows spends focus (not ki)
       update: {},
     });
     monkClassId = cls.id;
+    await seedKiActionRows(monkClassId);
     await prisma.character.create({
       data: {
         ...MONK_BASE,

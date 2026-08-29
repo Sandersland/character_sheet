@@ -1,8 +1,4 @@
-// Auth/authorization HTTP errors. Each carries a numeric `status` that the
-// terminal errorHandler (lib/core/error-handler.ts) maps straight to the response,
-// so a route — or a helper like assertCharacterAccess — can just `throw` one
-// and get the right status + the standard `{ error }` JSON shape with no
-// per-route plumbing.
+// Each carries a numeric `status` that errorHandler maps straight to the response, so a route can just `throw` one and get the right status + the standard `{ error }` JSON shape.
 
 export class AuthenticationError extends Error {
   readonly status = 401;

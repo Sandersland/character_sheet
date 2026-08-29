@@ -12,19 +12,10 @@ import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 import { PORTRAIT_FIELD, portraitMultipart, sendStoredPortrait } from "@/lib/storage/portrait-http.js";
 import { PORTRAIT_CONTENT_TYPE, reencodePortrait } from "@/lib/storage/portrait-image.js";
 
-/**
- * Character portrait pipeline (#1615): upload (multipart re-encode → blob
- * store → portraitKey), serve (streamed with the immutable cache contract),
- * delete. POST and DELETE return the full serialized character, same as every
- * other character mutation. Dedicated REST endpoints rather than a
- * transaction op because a multipart binary body cannot ride a JSON ops
- * array, and — like the cosmetic PATCH fields the portrait used to be one of
- * — no audit events are written.
- */
+// Dedicated REST endpoints, not a transaction op, because a multipart binary body cannot ride a JSON ops array; no audit events are written.
 export const portraitRouter = Router({ mergeParams: true });
 
-// Authorization runs BEFORE portraitMultipart so a non-owner can never make
-// the server buffer a multi-megabyte body.
+// Authorization runs BEFORE portraitMultipart so a non-owner can never make the server buffer a multi-megabyte body.
 portraitRouter.post<{ id: string }>(
   "/",
   async (req, _res, next) => {
@@ -40,13 +31,11 @@ portraitRouter.post<{ id: string }>(
 
     const characterId = req.params.id;
     const webp = await reencodePortrait(req.file.buffer, req.file.mimetype);
-    // A fresh uuid per upload is what versions the wire URL (derivePortraitUrl
-    // reads it back as ?v=), making the immutable cache header safe.
+    // A fresh uuid per upload is what versions the wire URL (derivePortraitUrl reads it back as ?v=), making the immutable cache header safe.
     const key = `portraits/characters/${characterId}/${randomUUID()}.webp`;
     await getBlobStore().put(key, webp, { contentType: PORTRAIT_CONTENT_TYPE });
 
-    // Blob first, then the key swap, then old-blob cleanup: a crash between
-    // steps leaves at worst an orphaned blob, never a key pointing nowhere.
+    // Blob first, then the key swap, then old-blob cleanup: a crash between steps leaves at worst an orphaned blob, never a key pointing nowhere.
     // Concurrent uploads race benignly (last write wins; one blob may orphan).
     const previousKey = await storedPortraitKey(characterId);
     const updated = await prisma.character.update({
@@ -65,8 +54,7 @@ portraitRouter.get<{ id: string }>("/", async (req, res) => {
   await sendStoredPortrait(res, await storedPortraitKey(req.params.id));
 });
 
-// Idempotent: deleting an absent portrait is a no-op 200 — the response is
-// the serialized character either way.
+// Idempotent: deleting an absent portrait is a no-op 200 — the response is the serialized character either way.
 portraitRouter.delete<{ id: string }>("/", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 

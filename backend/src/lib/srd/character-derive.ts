@@ -3,25 +3,16 @@ import { abilityModifier, hitDieFace } from "@/lib/srd/math.js";
 
 export interface ToolProficiencyEntry {
   name: string;
-  /** Origin of the proficiency — used to distinguish creation-fixed entries
-   *  (never trimmed on level-down) from subclass-granted ones (reconciled).
-   *  No "race"/"species" source: the flat Race model never actually seeded a
-   *  toolProficiencies row (confirmed empty, #1684), and no species-granted
-   *  tool proficiency mechanism exists yet either — nothing produces one. */
   source: "background" | "class";
 }
 
 export interface DeriveCharacterInput {
   abilityScores: Record<string, number>;
   skillProficiencies: string[];
-  /** Tool proficiencies granted by background / class at creation. */
   toolProficiencies?: ToolProficiencyEntry[];
 }
 
 export interface DeriveCharacterCatalog {
-  // #1684: the pruned flat Race model's replacement anchor — the resolved
-  // species/variant's speed (variant speedOverride wins, else the species'
-  // own speed; character-create.ts's resolveSpeciesSelection computes it).
   species: { speed: number };
   characterClass: { hitDie: string; savingThrows: string[] };
 }
@@ -33,18 +24,12 @@ export interface DerivedCharacterFields {
   initiativeBonus: number;
   savingThrowProficiencies: string[];
   skills: { name: string; ability: string; proficient: boolean }[];
-  /** Creation-fixed tool proficiencies (background / class / race).
-   *  Stored in Character.toolProficiencies Json column; never reconciled on level-down. */
+  // Never reconciled on level-down.
   toolProficiencies: ToolProficiencyEntry[];
   currency: { cp: number; sp: number; gp: number; pp: number };
   spellcasting: null;
 }
 
-/**
- * Derives a newly-created level-1 character's mechanical fields from the
- * player's choices (ability scores, chosen skill proficiencies) plus the
- * resolved race/class catalog rows. Pure function — no DB access.
- */
 export function deriveCreatedCharacter(
   input: DeriveCharacterInput,
   catalog: DeriveCharacterCatalog

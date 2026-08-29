@@ -11,13 +11,6 @@ describe("useActiveResolution", () => {
     expect(result.current.activeResolution?.resolver.kind).toBe("item-picker");
   });
 
-  // Regression (#1676): Song of Defense's "slot-picker" resolverKind is the
-  // first row-driven kind (no ACTION_RESOLVERS entry) that also needs
-  // openResolution:true (planActionClick). Before this fix, handleActionClick
-  // called `openResolution(key)` with no action, so this hook's own internal
-  // `resolverFor(key)` call (no action) could never synthesize the wire
-  // fallback — the sheet silently never opened, caught only by browser
-  // verification, not any prior unit test.
   it("opens a row-driven resolver (#1528 wire fallback) only when the AvailableAction is passed", () => {
     const action: AvailableAction = {
       key: "songOfDefense",
@@ -28,9 +21,6 @@ describe("useActiveResolution", () => {
     };
     const { result } = renderHook(() => useActiveResolution());
 
-    // Without the action, resolverFor("songOfDefense") matches nothing in
-    // ACTION_RESOLVERS and has no wire data to fall back to — no-ops, same
-    // as the pre-fix bug this test pins.
     act(() => result.current.openResolution("songOfDefense"));
     expect(result.current.activeResolution).toBeNull();
 

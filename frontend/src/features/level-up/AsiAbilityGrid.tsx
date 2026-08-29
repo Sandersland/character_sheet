@@ -1,5 +1,4 @@
-// Bespoke ASI grid for the level-up ceremony (#888) — mockup-faithful two-column
-// steppers. All point math (2-point cap, per-score cap-20) stays in useAsiDraft.
+// Point math (2-point cap, per-score cap-20) lives in useAsiDraft — don't duplicate it here.
 
 import type { AsiDraft } from "@/features/advancement/useAsiDraft";
 import { ABILITY_OPTIONS, abilityModifier, formatModifier } from "@/lib/abilities";

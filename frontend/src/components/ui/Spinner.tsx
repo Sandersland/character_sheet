@@ -1,12 +1,9 @@
 interface SpinnerProps {
-  /** "page" centers a larger spinner in a full-screen container; "inline" is a
-   *  small spinner centered within its parent block. */
   variant?: "page" | "inline";
   className?: string;
 }
 
-// Shared loading spinner. Pair with `useDelayedFlag` so it only ever appears
-// for genuinely slow loads — fast loads should render nothing at all.
+// Pair with useDelayedFlag so it only appears for genuinely slow loads.
 export default function Spinner({ variant = "inline", className }: SpinnerProps) {
   const page = variant === "page";
   const wrapper = page

@@ -7,8 +7,6 @@ import {
   type MergeEdge,
 } from "@/lib/activity/entity-merges.js";
 
-// Jenkins → Vecna → Whispered One, plus a second identity (Oldman) merged into
-// Vecna. One edge (Oldman→Vecna) is only PREPARED to exercise the filter.
 const merges: MergeEdge[] = [
   { mergedEntityId: "jenkins", survivorEntityId: "vecna", status: "EXECUTED" },
   { mergedEntityId: "vecna", survivorEntityId: "whispered", status: "EXECUTED" },

@@ -9,41 +9,12 @@ import { featOfferedForAsiSlot, fightingStyleFeatOfferedForClasses, type FeatCat
 
 export const featsRouter = Router();
 
-// Feeds the advancement section's feat picker — same role as GET /api/maneuvers.
-// Ordered alphabetically server-side.
-//
-// `?edition=` is REQUIRED (#1411), following referenceRouter's precedent
-// (#1325): absent 400s, unrecognized 400s, and every served response goes
-// through resolveEditionCatalog's exact-then-NULL-fallback ordering. Optional
-// -with-unfiltered-fallback was rejected even though it reads as the safer
-// migration: it makes the guard conventional rather than structural, because
-// the next `fetchFeats()`-shaped caller silently reintroduces a flat cross
-// -edition picker and nothing anywhere fails. A required param moves that
-// mistake to compile time on the client and to a 400 on the wire.
-//
-// `?asiLevel=` is OPTIONAL (#1438): with it the response is exactly the
-// ASI-slot-legal set for that level per featOfferedForAsiSlot, which is the
-// picker's only gate now that the frontend mirror of that rule is deleted.
-// Without it the whole edition catalog is served, because the non-ASI consumers
-// need rows the ASI gate rejects by design — the Fighting Style picker reads
-// fighting_style, and the level-up review step resolves an id to a name for an
-// already-committed pick.
-//
-// `?classes=` is OPTIONAL (#1495): a comma-separated class-name list gating
-// the offered set to fightingStyleFeatOfferedForClasses — the picker's only
-// gate now that the frontend never re-derives PHB'14's per-class Fighting
-// Style subset. Applied to every row (not just fighting_style ones), in JS
-// over the resolved catalog, same layer as the asiLevel filter above (#1495's
-// own refinement note: a class-scope param follows that pattern rather than
-// splitting filtering across layers) — harmless for every other category,
-// since their Feat.classes is always `[]` (unrestricted).
-//
-// `?classes=` and `?asiLevel=` together 400 rather than silently combining:
-// featOfferedForAsiSlot always rejects fighting_style (Origin/Fighting Style
-// come from backgrounds/classes, never an ASI slot), so asiLevel's own filter
-// strips every fighting_style row before classes ever runs — the two params
-// serve disjoint feat categories, and letting them compose would return a
-// response that looks class-scoped but silently ignores that scope.
+// GET /api/feats
+// `?edition=` required (400 if absent or unrecognized). `?asiLevel=` optional:
+// filters to the ASI-slot-legal set for that level. `?classes=` optional:
+// filters to fightingStyleFeatOfferedForClasses. The two together 400 rather
+// than silently combining, since asiLevel's filter already strips every
+// fighting_style row before classes could apply.
 featsRouter.get("/feats", async (req, res) => {
   const edition = requireEditionOr400(req, res);
   if (edition === undefined) return;
@@ -67,9 +38,6 @@ featsRouter.get("/feats", async (req, res) => {
     orderBy: { name: "asc" },
   });
   const resolved = resolveEditionCatalog(feats, edition, (f) => f.name);
-  // Gate the raw row, not the mapped payload below: the payload turns a NULL
-  // levelPrerequisite into `undefined`, which the rule reads the same way today
-  // but needn't forever — the rule's input is the catalog row.
   const asiFiltered =
     asiLevel === undefined
       ? resolved

@@ -1,6 +1,4 @@
-// The options region of a Choose-N step (#896): optional filter box, the
-// loading/error/empty states, and the selectable rows. Presentational —
-// ChoiceStep owns which options and selection state to feed it.
+// Presentational; ChoiceStep owns which options and selection state to feed it.
 
 import Spinner from "@/components/ui/Spinner";
 import ChoiceOptionCard from "@/features/level-up/ChoiceOptionCard";

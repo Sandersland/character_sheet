@@ -1,30 +1,18 @@
-/**
- * Pure Way of the Four Elements row derivations (#1505) — selects/formats served
- * `CatalogDiscipline.steps` only; never computes dice counts or the ki cap itself.
- */
+// Selects/formats served CatalogDiscipline.steps only; never computes dice counts or the ki cap itself.
 
 import type { CatalogDiscipline, DisciplineCastStep } from "@/types/character";
 
-/** Every served step the character can currently afford — filtered by the ki
- *  in the pool, never by the real per-cast cap (that's server-enforced at
- *  cast time; offering more than the cap here is fine, since a cast over it
- *  is refused BY THE SERVER, not silently clamped client-side). */
+// Filtered by the ki in the pool, never by the real per-cast cap — that's server-enforced at cast time, so offering more than the cap here is fine.
 export function affordableSteps(discipline: CatalogDiscipline, kiAvailable: number): DisciplineCastStep[] {
   return discipline.steps.filter((s) => s.ki <= kiAvailable);
 }
 
-/** Everything DisciplineRow derives from its props. */
 export interface DisciplineCastView {
-  /** Flat ki cost — 0 for a `cost.kind !== "pool"` row (none exist today, but the type allows one). */
   costBase: number;
-  /** False for a no-dice utility discipline (e.g. Shape the Flowing River) — it still costs ki, just rolls nothing. */
   hasDice: boolean;
-  /** Affordable ki amounts + their rolls, only when hasDice. */
   options: DisciplineCastStep[];
-  /** True once more than one affordable amount exists — worth showing a picker. */
   scalable: boolean;
   canAfford: boolean;
-  /** "1 ki" (flat) / "1-6 ki" (scalable, capped at what's affordable) / "no cost". */
   kiLabel: string;
 }
 
@@ -40,9 +28,6 @@ export function disciplineCastView(discipline: CatalogDiscipline, kiAvailable: n
   return { costBase, hasDice, options, scalable, canAfford, kiLabel };
 }
 
-/** The step a cast actually uses: the live selection if it's still a valid
- *  (affordable) option, else the cheapest one. Undefined when the
- *  discipline has no dice at all. */
 export function effectiveStep(view: DisciplineCastView, selectedKi: number | undefined): DisciplineCastStep | undefined {
   if (!view.hasDice || view.options.length === 0) return undefined;
   return view.options.find((s) => s.ki === selectedKi) ?? view.options[0];

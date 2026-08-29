@@ -4,9 +4,8 @@ import { applyExperienceOperations, fetchSession } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Session } from "@/types/character";
 
-// "Add XP to this session" — awards XP tagged to this (already-ended) session
-// via the explicit-sessionId override, then refreshes the session so the
-// participant's stats + the recap update in place.
+// sessionId is an explicit override — it tags the XP award to this
+// already-ended session rather than the character's live session.
 export default function SessionAddXpForm({
   characterId,
   sessionId,
@@ -18,8 +17,7 @@ export default function SessionAddXpForm({
 }) {
   const [open, setOpen] = useState(false);
   const [xp, setXp] = useState("");
-  // Session-refresh failures (fetchSession, after a successful award) keep
-  // their own slot — mutation.error only covers the award call itself.
+  // mutation.error covers only the award call; a post-award refresh failure gets its own slot.
   const [refreshError, setRefreshError] = useState<string | null>(null);
 
   const mutation = useCharacterMutation({
@@ -39,14 +37,11 @@ export default function SessionAddXpForm({
     setRefreshError(null);
     try {
       await mutation.mutateAsync(parsed);
-      // Re-fetch the session to pick up its freshly recomputed summaries.
       const refreshed = await fetchSession(characterId, sessionId);
       onAwarded(refreshed);
       setXp("");
       setOpen(false);
     } catch (err) {
-      // A failed award surfaces via mutation.error already; this only catches
-      // a failed post-award fetchSession refresh.
       if (mutation.error === null) setRefreshError(err instanceof Error ? err.message : "Failed to award XP.");
     }
   }

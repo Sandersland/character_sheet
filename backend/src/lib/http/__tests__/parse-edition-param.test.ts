@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 
-// A minimal res double capturing status + json, so the helper can be exercised
-// without an Express app (verbatim from parse-body.test.ts's mockRes).
 function mockRes() {
   const res = {
     statusCode: 0,
@@ -40,9 +38,7 @@ describe("requireEditionOr400", () => {
     expect(res.body).toEqual({ error: "Missing required query parameter: edition" });
   });
 
-  // A distinct message from the absent case on purpose: two 400s are
-  // indistinguishable by status alone, and the whole point of a required param
-  // is that the caller learns which mistake it made.
+  // Distinct message from the absent case — two 400s are indistinguishable by status alone.
   it("400s an unrecognized value with the unknown-edition message", () => {
     const res = mockRes();
     expect(requireEditionOr400(reqWith({ edition: "xyzzy" }), res)).toBeUndefined();

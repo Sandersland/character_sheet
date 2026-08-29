@@ -74,7 +74,6 @@ describe("applyDamageInTx / applyTempHpInTx shared in-tx HP mutation (#816)", ()
       await expect(
         prisma.$transaction((tx) => applyDamageInTx(tx, id, -5, BATCH, null)),
       ).rejects.toThrowError(new InvalidHitPointOperationError("damage amount must be positive"));
-      // No mutation on the rejected path.
       expect((await hp(id)).current).toBe(30);
     });
 
@@ -126,7 +125,7 @@ describe("applyDamageInTx / applyTempHpInTx shared in-tx HP mutation (#816)", ()
     }
 
     it("bumps HP + hit dice + class entry and emits one reversible levelUp event under the caller's batchId", async () => {
-      const character = await levelUpFixture(300); // derives level 2 → one pending level-up
+      const character = await levelUpFixture(300);
       const entryId = character.classEntries[0].id;
 
       await prisma.$transaction((tx) =>
@@ -137,7 +136,7 @@ describe("applyDamageInTx / applyTempHpInTx shared in-tx HP mutation (#816)", ()
         where: { id: character.id },
         include: { classEntries: true },
       });
-      expect(normalizeHitPoints(row.hitPoints)).toMatchObject({ current: 35, max: 35 }); // d8 average = 5
+      expect(normalizeHitPoints(row.hitPoints)).toMatchObject({ current: 35, max: 35 });
       expect(normalizeHitDice(row.hitDice).total).toBe(2);
       expect(row.classEntries[0].level).toBe(2);
 
@@ -159,7 +158,7 @@ describe("applyDamageInTx / applyTempHpInTx shared in-tx HP mutation (#816)", ()
     });
 
     it("throws when there is no pending level-up (hd.total >= derived level)", async () => {
-      const character = await levelUpFixture(0); // derives level 1, hd.total already 1
+      const character = await levelUpFixture(0);
       await expect(
         prisma.$transaction((tx) =>
           applyLevelUpHpInTx(tx, character.id, { type: "levelUp", method: "average" }, LEVELUP_BATCH, null),

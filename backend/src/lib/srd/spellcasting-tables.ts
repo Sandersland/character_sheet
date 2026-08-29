@@ -2,10 +2,6 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { abilityModifier } from "@/lib/srd/math.js";
 
-// Maps a class name (lowercase) to the ability that governs its spellcasting.
-// Used to derive spellSaveDC and spellAttackBonus at read time.
-// Warlock uses Pact Magic (single-level slots, short-rest recharge) and Paladin/
-// Ranger use the half-caster table — all handled by deriveSpellcasting below.
 const SPELLCASTING_ABILITY: Readonly<Record<string, string>> = {
   wizard: "intelligence",
   sorcerer: "charisma",
@@ -17,17 +13,11 @@ const SPELLCASTING_ABILITY: Readonly<Record<string, string>> = {
   ranger: "wisdom",
 };
 
-// Classes that use the standard full-caster progression below.
 const FULL_CASTER_CLASSES = new Set(["wizard", "sorcerer", "cleric", "druid", "bard"]);
 
-// Half-casters (Paladin, Ranger) — gain spellcasting at class level 2 and use
-// the half-caster slot table below (equivalent to the full table at ceil(level/2)).
 const HALF_CASTER_CLASSES = new Set(["paladin", "ranger"]);
 
-// Standard 5e full-caster slot table (PHB p. 114 / Basic Rules spell table).
-// Verified byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`.
-// Outer key: character level 1–20.  Inner key: slot level 1–9.
-// Only non-zero slot counts are listed; missing slot levels have 0 slots.
+// PHB p. 114 / Basic Rules spell table. Verified byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`.
 export const FULL_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
    1: { 1: 2 },
    2: { 1: 3 },
@@ -51,9 +41,7 @@ export const FULL_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, 
   20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 },
 };
 
-// Multiclass spell-slot table (PHB p. 164). Per RAW it is byte-for-byte the
-// full-caster table, so we alias it rather than duplicate 20 rows — the shared
-// table is what keeps single-class output identical to deriveSpellcasting.
+// PHB p. 164 — byte-for-byte the full-caster table; aliased rather than duplicated.
 export const MULTICLASS_SPELL_SLOTS = FULL_CASTER_SLOTS;
 
 export interface DerivedSpellcastingInfo {
@@ -61,19 +49,11 @@ export interface DerivedSpellcastingInfo {
   spellSaveDC: number;
   spellAttackBonus: number;
   slotTotals: Array<{ level: number; total: number }>;
-  /**
-   * Warlock Mystic Arcanum — one free cast per long rest of a spell at each
-   * listed level (6th–9th). Empty for every non-Warlock caster. Each entry has
-   * `total: 1`; used counts are tracked separately in the stored blob.
-   */
+  // Mystic Arcanum: one free cast per long rest at each listed level (6th-9th); empty for non-Warlock casters.
   arcana: Array<{ level: number; total: number }>;
 }
 
-// Half-caster slot table (Paladin / Ranger). Verified column-by-column against
-// SRD 5.1 (#1507): levels 2-20 match exactly; only level 1 forks (SRD 5.2 grants
-// two 1st-level slots there, SRD 5.1 has none — spellcastingStartLevel gates
-// that, not this table, so the table itself takes no `edition`). Outer key:
-// character level 1–20.
+// Half-caster slot table (Paladin/Ranger). Verified against SRD 5.1 (#1507): levels 2-20 match; level 1 forks (SRD 5.2 grants two 1st-level slots, SRD 5.1 has none) but spellcastingStartLevel gates that, not this table.
 const HALF_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
    1: { 1: 2 },
    2: { 1: 2 },
@@ -97,10 +77,7 @@ const HALF_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>
   20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2 },
 };
 
-// Warlock Pact Magic (PHB p. 106). Byte-identical between SRD 5.1 and SRD 5.2
-// (#1507) — no `edition`. Unlike other casters, every Pact slot is the same
-// (highest) level, and they recharge on a SHORT rest. Maps warlock level to the
-// single slot level and the number of slots at that level.
+// PHB p. 106. Byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`. Every Pact slot is the same (highest) level and recharges on a short rest.
 const PACT_MAGIC_SLOTS: Readonly<Record<number, { slotLevel: number; count: number }>> = {
    1: { slotLevel: 1, count: 1 },
    2: { slotLevel: 1, count: 2 },
@@ -124,11 +101,7 @@ const PACT_MAGIC_SLOTS: Readonly<Record<number, { slotLevel: number; count: numb
   20: { slotLevel: 5, count: 4 },
 };
 
-// Warlock Mystic Arcanum (PHB p. 108). The 11/13/15/17 gate levels are
-// byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`. At levels
-// 11/13/15/17 the warlock learns one spell of level 6/7/8/9 respectively,
-// castable once per long rest without a Pact slot. Returns the arcanum spell
-// levels available at a given warlock level.
+// PHB p. 108. Byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`.
 function mysticArcanumLevels(warlockLevel: number): number[] {
   const levels: number[] = [];
   if (warlockLevel >= 11) levels.push(6);
@@ -138,45 +111,19 @@ function mysticArcanumLevels(warlockLevel: number): number[] {
   return levels;
 }
 
-// The Subclass catalog columns third-caster identity resolves from (#1531) —
-// any object carrying these two fields satisfies it, so a full Prisma
-// `subclassRef` relation (character-include.ts includes every scalar column)
-// or a narrow `{ select: { casterFraction, spellcastingAbility } }` projection
-// both work with no adapter. Replaces THIRD_CASTER_SUBCLASSES, the lowercase-
-// name-keyed lookup this module used to gate every third-caster check on — the
-// last name-keyed subclass lookup in lib/srd/, and #1339's failure shape: a
-// renamed or homebrew subclass could silently inherit or lose the mechanic. A
-// caster-fraction fact now lives on the `Subclass` row instead, where the join
-// is an FK (resolveSubclassSlug's own identity, #1277), never a string match.
-//
-// `casterFraction` is narrowed to the schema's `SubclassCasterFraction` enum
-// (review finding 1), not a bare `string`: thirdCasterAbilityOf gates
-// everything below on `!== "third"`, so an unrecognized value (a typo, a
-// future half/full-caster backfill) must fail to compile at the call site
-// instead of silently comparing false at runtime — the value-shaped twin of
-// #1339's name-shaped failure. The Prisma enum's generated type IS this
-// literal union already, so `entry.subclassRef` (any select/include carrying
-// the column) satisfies this interface structurally, with no cast needed at
-// any call site.
+// casterFraction is narrowed to a literal enum, not a bare string, so an unrecognized value fails to compile at the call site rather than silently comparing false at runtime.
 export interface SubclassCasterRef {
   casterFraction: "third" | null;
   spellcastingAbility: string | null;
 }
 
-// Eldritch Knight and Arcane Trickster are the only seeded third casters
-// today — both Intelligence, both the same slot table below. Resolves every
-// third-caster check in this module off the Subclass row's OWN columns,
-// never off `subclassRef`'s free-text `name`.
+// Resolves off the Subclass row's own columns, never subclassRef's free-text name.
 function thirdCasterAbilityOf(subclassRef: SubclassCasterRef | null | undefined): string | null {
   if (!subclassRef || subclassRef.casterFraction !== "third") return null;
   return subclassRef.spellcastingAbility;
 }
 
-// Third-caster slot table (PHB Fighter/Rogue spell slot table). EK/AT are in
-// neither SRD; re-verified against a PHB'14 transcription during the #1507
-// build and byte-identical to the PHB'24 table — no `edition`.
-// Spellcasting starts at class level 3 (when the subclass is gained).
-// Outer key: character level; inner key: spell slot level.
+// PHB Fighter/Rogue spell slot table. Re-verified against PHB'14 during #1507 and byte-identical to PHB'24 — no `edition`. Starts at class level 3.
 const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
    3: { 1: 2 },
    4: { 1: 3 },
@@ -198,10 +145,7 @@ const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number
   20: { 1: 4, 2: 3, 3: 3, 4: 1 },
 };
 
-// How much each class contributes to the combined multiclass caster level:
-// full = +level, half = +floor(level/2), third = +floor(level/3), pact = tracked
-// separately (never merged), none = non-caster. Third casters are resolved by
-// subclass (Eldritch Knight / Arcane Trickster) via thirdCasterAbilityOf.
+// full = +level, half = +floor(level/2), third = +floor(level/3); pact is tracked separately (never merged); none = non-caster.
 export type CasterFraction = "full" | "half" | "third" | "pact" | "none";
 
 export const CASTER_FRACTION_BY_CLASS: Readonly<Record<string, CasterFraction>> = {
@@ -215,21 +159,13 @@ export const CASTER_FRACTION_BY_CLASS: Readonly<Record<string, CasterFraction>> 
   warlock: "pact",
 };
 
-// Verified edition-invariant (#1507): SRD 5.1's multiclass text ("…and half
-// your levels (rounded down) in the paladin and ranger classes…") is the same
-// rule as SRD 5.2's — no `edition`.
-/** Caster fraction for a class (third casters resolved via the Subclass row). "none" for non-casters. */
+// Verified edition-invariant (#1507): SRD 5.1's multiclass text ("…and half your levels (rounded down) in the paladin and ranger classes…") matches SRD 5.2 — no `edition`.
 export function casterFractionFor(className: string, subclassRef?: SubclassCasterRef | null): CasterFraction {
   if (thirdCasterAbilityOf(subclassRef)) return "third";
   return CASTER_FRACTION_BY_CLASS[className.toLowerCase()] ?? "none";
 }
 
-// Spellcasting profile of one class entry, or null for a non-caster. SRD 5.2
-// collapsed the known/prepared split — every caster now prepares (see
-// PREPARED_SPELLS_BY_CLASS). SRD 5.1 still has the split (see casterModelFor,
-// #1507), but the fraction/ability pair below is verified edition-invariant
-// (SRD 5.1's multiclass text matches SRD 5.2's), so this profile itself takes
-// no `edition`.
+// Fraction/ability pair is edition-invariant (verified against SRD 5.1's multiclass text) — no `edition` param.
 function casterProfile(
   className: string,
   subclassRef?: SubclassCasterRef | null,
@@ -243,7 +179,6 @@ function casterProfile(
   return { fraction, ability: SPELLCASTING_ABILITY[key] };
 }
 
-// Levels a class entry adds to the combined multiclass caster level.
 function casterLevelContribution(fraction: CasterFraction, level: number): number {
   if (fraction === "full") return level;
   if (fraction === "half") return Math.floor(level / 2);
@@ -251,10 +186,7 @@ function casterLevelContribution(fraction: CasterFraction, level: number): numbe
   return 0; // pact + none never contribute to the merged pool
 }
 
-// SRD 5.2 prepared-spell counts, indexed by (class level − 1). 2024 rules: every
-// caster prepares a fixed table count (no longer ability mod + level). Bard,
-// Cleric, and Druid share one column; Paladin and Ranger share the half-caster
-// column and prepare from level 1.
+// SRD 5.2 prepared-spell counts, indexed by (class level − 1). Bard/Cleric/Druid share one column; Paladin/Ranger share the half-caster column.
 const FULL_CASTER_PREPARED = [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22] as const;
 const HALF_CASTER_PREPARED = [2, 3, 4, 5, 6, 6, 7, 7, 9, 9, 10, 10, 11, 11, 12, 12, 14, 14, 15, 15] as const;
 
@@ -269,42 +201,21 @@ export const PREPARED_SPELLS_BY_CLASS: Readonly<Record<string, readonly number[]
   ranger: HALF_CASTER_PREPARED,
 };
 
-// Third-caster (Eldritch Knight / Arcane Trickster) prepared counts, indexed by
-// (class level − 3) — spellcasting begins at level 3 (PHB'24 Fighter/Rogue tables).
-// #1507: reused as-is for EDITION_2014 — EK/AT are in neither SRD, so this column
-// was re-verified against PHB'14 pp. 74-75 (Fighter, Eldritch Knight) / pp. 97-98
-// (Rogue, Arcane Trickster) during the #1507 build and is byte-identical to the
-// SRD 5.2 Prepared Spells column above. One array serves both editions — do not
-// "fix" the missing fork.
+// Third-caster prepared counts, indexed by (class level − 3); starts at level 3 (PHB'24 Fighter/Rogue tables).
+// Re-verified against PHB'14 pp. 74-75 (Fighter/Eldritch Knight) / pp. 97-98 (Rogue/Arcane Trickster) — byte-identical to the SRD 5.2 column above. One array serves both editions — do not "fix" the missing fork.
 const THIRD_CASTER_PREPARED = [3, 4, 4, 4, 5, 6, 6, 7, 8, 8, 9, 10, 10, 11, 11, 11, 12, 13] as const;
 
-// SRD 5.1 Spells Known (2014 "known" casters — Bard/Sorcerer/Ranger; Warlock
-// reuses PREPARED_SPELLS_BY_CLASS.warlock below, see preparedSpellCountAt).
-// Cleric/Druid/Wizard/Paladin are "prepared" casters in SRD 5.1 too, computed by
-// formula (ability modifier + level, or half-level for Paladin) rather than a
-// table — see preparedSpellCountAt's EDITION_2014 branch.
+// SRD 5.1 Spells Known (2014 known casters — Bard/Sorcerer/Ranger; Warlock reuses PREPARED_SPELLS_BY_CLASS.warlock, see preparedSpellCountAt).
+// Cleric/Druid/Wizard/Paladin are "prepared" casters computed by formula instead — see preparedSpellCountAt's EDITION_2014 branch.
 const SPELLS_KNOWN_BY_CLASS_2014: Readonly<Record<string, ReadonlyArray<number | null>>> = {
-  // SRD 5.1 Bard table, "Spells Known" column, levels 1-20.
   bard: [4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 15, 16, 18, 19, 19, 20, 22, 22, 22],
-  // SRD 5.1 Sorcerer table, "Spells Known" column, levels 1-20.
   sorcerer: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 12, 13, 13, 14, 14, 15, 15, 15, 15],
-  // SRD 5.1 Ranger table, "Spells Known" column, levels 1-20. Level 1 is a dash
-  // (—) in the book — null here, not 0 — because the Ranger has no Spellcasting
-  // feature at all until level 2 (spellcastingStartLevel gates this, not the 0).
+  // Level 1 is a dash (—) in the book — null here, not 0 — because Ranger has no Spellcasting feature until level 2.
   ranger: [null, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11],
 };
 
-/**
- * The level a class's spellcasting (slots AND prepared/known cap) begins —
- * read by BOTH deriveSpellcasting's half/third-caster branches and
- * preparedSpellCountAt's null-return (#1507 D4), so the slot table and the cap
- * can never disagree about whether a class casts at all at a given level.
- * 3 for a third-caster subclass (PHB'24 Fighter/Rogue tables, both editions);
- * 2 for a 2014 Paladin/Ranger (PHB'14 p. 84/92: Spellcasting is a 2nd-level
- * feature, the level-1 slot row is five dashes); 1 otherwise (SRD 5.2 half-
- * casters cast from level 1 — CLAUDE.md's "half-caster from level 2" clause
- * names only levels 2+, where the two editions' slot tables already agree).
- */
+// Read by both deriveSpellcasting and preparedSpellCountAt (#1507 D4) so the slot table and the cap can never disagree.
+// 3 for a third-caster subclass (PHB'24 Fighter/Rogue tables); 2 for a 2014 Paladin/Ranger (PHB'14 p. 84/92); 1 otherwise (SRD 5.2 half-casters cast from level 1).
 export function spellcastingStartLevel(
   className: string,
   subclassRef: SubclassCasterRef | null | undefined,
@@ -315,49 +226,28 @@ export function spellcastingStartLevel(
   return 1;
 }
 
-// SRD 5.1 "known" caster count: Bard/Sorcerer/Ranger read the fixed Spells
-// Known table directly. `key` is already lowercased and already confirmed
-// present in SPELLS_KNOWN_BY_CLASS_2014 by the caller.
+// SRD 5.1 known-caster count. `key` is already lowercased and confirmed present in SPELLS_KNOWN_BY_CLASS_2014 by the caller.
 function knownSpellCount2014(key: string, level: number): number | null {
   return SPELLS_KNOWN_BY_CLASS_2014[key][Math.min(20, level) - 1] ?? null;
 }
 
-// SRD 5.1 "prepared" caster formula: Cleric/Druid/Wizard use
-// `ability modifier + class level` (min 1); Paladin uses
-// `ability modifier + floor(class level / 2)` (min 1) — PHB'14 pp. 56-59/
-// 64-67/82-85/112-115, each "minimum of one spell" verbatim in the class
-// text. `key` is already lowercased by the caller.
+// SRD 5.1 prepared-caster formula: Cleric/Druid/Wizard use ability modifier + class level (min 1); Paladin uses ability modifier + floor(class level / 2) (min 1) — PHB'14 pp. 56-59/64-67/82-85/112-115.
 function preparedFormulaCount2014(key: string, level: number, abilityScores: Record<string, number>): number | null {
   const ability = SPELLCASTING_ABILITY[key];
-  if (!ability) return null; // non-caster class
+  if (!ability) return null;
   const mod = abilityModifier(abilityScores[ability] ?? 10);
   if (key === "paladin") return Math.max(1, mod + Math.floor(level / 2));
   if (key === "cleric" || key === "druid" || key === "wizard") return Math.max(1, mod + level);
-  return null; // non-caster class
+  return null;
 }
 
-// SRD 5.1 branch of preparedSpellCountAt, split out (and split again into the
-// two helpers above) to keep cyclomatic complexity under the repo's health
-// gate. `key` is already lowercased by the caller. Warlock reuses
-// PREPARED_SPELLS_BY_CLASS.warlock rather than knownSpellCount2014's table
-// (verified identical, see that array's comment) — one array serving two
-// call shapes, not a third table.
+// `key` is already lowercased by the caller. Warlock reuses PREPARED_SPELLS_BY_CLASS.warlock rather than a 2014 table of its own — verified identical — one array serving two call shapes.
 function preparedSpellCount2014(key: string, level: number, abilityScores: Record<string, number>): number | null {
   if (key in SPELLS_KNOWN_BY_CLASS_2014) return knownSpellCount2014(key, level);
   if (key === "warlock") return PREPARED_SPELLS_BY_CLASS.warlock[Math.min(20, Math.max(1, level)) - 1] ?? null;
   return preparedFormulaCount2014(key, level, abilityScores);
 }
 
-/**
- * Prepared/known-spell count for one class entry at its level, or null when the
- * entry is not a caster at that level (non-caster, or below spellcastingStartLevel).
- * Third casters resolve via `subclass`.
- *
- * SRD 5.2: a fixed per-class table count (PREPARED_SPELLS_BY_CLASS).
- *
- * SRD 5.1: dispatches to preparedSpellCount2014 above (see its comment for the
- * per-class breakdown).
- */
 export function preparedSpellCountAt(
   className: string,
   level: number,
@@ -381,18 +271,7 @@ export function preparedSpellCountAt(
   return table[Math.min(20, Math.max(1, level)) - 1] ?? null;
 }
 
-/**
- * Prepared/known-spell cap: preparedSpellCountAt summed across every caster
- * class entry for multiclass (#1507 D9: a mixed-model multiclass sums into one
- * cap — imprecise for a 2014 known+prepared mix, accepted and recorded rather
- * than deferred). Returns null only when no entry is a caster. Pure function —
- * no DB access, safe to call in serializeCharacter.
- *
- * Deliberate-coupling latch (#1507 D2): this is the ONE function both
- * reconcilePreparedSpells (lib/leveling/level-reconciliation.ts, the write-side
- * reconciler) and buildSpellcastingView (lib/character/serialize/spellcasting.ts,
- * the read-side clamp) call — never two inline copies of the cap.
- */
+// Deliberate-coupling latch (#1507 D2): the one function both reconcilePreparedSpells and buildSpellcastingView call — never two inline copies of the cap.
 export function derivePreparedSpellLimit(
   classEntries: ReadonlyArray<{ name: string; level: number; subclassRef?: SubclassCasterRef | null }>,
   abilityScores: Record<string, number>,
@@ -409,20 +288,9 @@ export function derivePreparedSpellLimit(
   return anyCaster ? total : null;
 }
 
-// 2014 "known" casters (SRD 5.1's "Spells Known of 1st Level and Higher"
-// heading): Bard, Sorcerer, Warlock, Ranger, and EK/AT — a chosen spell is
-// immediately castable, no separate preparation step (D5/D7). Cleric, Druid,
-// Wizard, Paladin carry SRD 5.1's "Preparing and Casting Spells" heading
-// instead — same "prepared" model as every SRD 5.2 caster.
+// SRD 5.1 "Spells Known of 1st Level and Higher": Bard, Sorcerer, Warlock, Ranger, and EK/AT know spells outright. Cleric, Druid, Wizard, Paladin carry "Preparing and Casting Spells" instead — same model as SRD 5.2.
 const KNOWN_CASTER_CLASSES_2014: ReadonlySet<string> = new Set(["bard", "sorcerer", "warlock", "ranger"]);
 
-/**
- * Whether a class entry's chosen spells are immediately castable ("known") or
- * must be prepared from a wider list ("prepared"); null for a non-caster.
- * SRD 5.2 collapsed the split — every caster is "prepared". SRD 5.1 forks per
- * class per the KNOWN_CASTER_CLASSES_2014 set above (EK/AT resolve via
- * `subclass`, same as every third-caster check in this module).
- */
 export function casterModelFor(
   className: string,
   subclassRef: SubclassCasterRef | null | undefined,
@@ -430,19 +298,12 @@ export function casterModelFor(
 ): "known" | "prepared" | null {
   const isThirdCaster = Boolean(thirdCasterAbilityOf(subclassRef));
   const key = className.toLowerCase();
-  if (!isThirdCaster && CASTER_FRACTION_BY_CLASS[key] === undefined) return null; // non-caster
+  if (!isThirdCaster && CASTER_FRACTION_BY_CLASS[key] === undefined) return null;
   if (edition !== "EDITION_2014") return "prepared";
   return isThirdCaster || KNOWN_CASTER_CLASSES_2014.has(key) ? "known" : "prepared";
 }
 
-/**
- * D5 multiclass resolution: "known" only when EVERY caster class entry is a
- * known caster; "prepared" otherwise (the permissive UI — a mixed-model
- * multiclass character gets prepare-style affordances everywhere); null when no
- * entry is a caster. The ONE combiner both buildSpellcastingView (the served
- * wire field) and applyLearnSpellOp (D7, lib/spellcasting/spellcasting.ts) call
- * — never two inline copies.
- */
+// The one combiner both buildSpellcastingView and applyLearnSpellOp call — never two inline copies.
 export function casterModelForEntries(
   classEntries: ReadonlyArray<{ name: string; subclassRef?: SubclassCasterRef | null }>,
   edition: RulesEdition,
@@ -459,12 +320,7 @@ export function casterModelForEntries(
   return allKnown ? "known" : "prepared";
 }
 
-// #1511 D4: user-facing nouns for the served caster model — served, never
-// composed client-side (CLAUDE.md: the frontend never originates a rule). A
-// known caster's chosen spells are never "prepared" in the SRD 5.1 sense, so
-// the meter/roster noun and the rune's locked-state word both fork off the
-// same casterModel this module already computes; this map carries no rules
-// text of its own, only the copy naming a model decided above.
+// Served, never composed client-side — the frontend never originates a rule. Carries no rules text of its own, only the copy naming the model casterModelFor/casterModelForEntries already decided.
 export const CASTER_MODEL_LABELS: Record<
   "known" | "prepared",
   { preparedLabel: string; alwaysAvailableLabel: string }
@@ -473,10 +329,7 @@ export const CASTER_MODEL_LABELS: Record<
   prepared: { preparedLabel: "Prepared", alwaysAvailableLabel: "Always prepared" },
 };
 
-// Cantrips known, as [minLevel, count] breakpoints (highest applicable wins).
-// Verified byte-identical between SRD 5.1 and SRD 5.2 (#1507) for all six
-// progressions — no `edition`. Paladin/Ranger prepare no cantrips. Drives
-// levelUpCantripPicks (#1131).
+// [minLevel, count] breakpoints, highest applicable wins. Verified byte-identical between SRD 5.1 and SRD 5.2 (#1507) — no `edition`.
 const CANTRIP_BREAKPOINTS: Readonly<Record<string, ReadonlyArray<readonly [number, number]>>> = {
   bard: [[1, 2], [4, 3], [10, 4]],
   cleric: [[1, 3], [4, 4], [10, 5]],
@@ -487,7 +340,6 @@ const CANTRIP_BREAKPOINTS: Readonly<Record<string, ReadonlyArray<readonly [numbe
 };
 const THIRD_CASTER_CANTRIPS: ReadonlyArray<readonly [number, number]> = [[3, 2], [10, 3]];
 
-/** Cantrips known at a class level (SRD 5.2); 0 for Paladin/Ranger and non-casters. */
 export function cantripsKnownAtLevel(className: string, level: number, subclassRef?: SubclassCasterRef | null): number {
   const breakpoints = thirdCasterAbilityOf(subclassRef)
     ? THIRD_CASTER_CANTRIPS
@@ -498,11 +350,8 @@ export function cantripsKnownAtLevel(className: string, level: number, subclassR
   return count;
 }
 
-// How a caster changes its prepared spells (SRD 5.2): "onLevelUp" replaces one on
-// gaining a class level (Bard/Sorcerer/Warlock + EK/AT); "oneOnLongRest" swaps one
-// per long rest (Paladin/Ranger); "anyOnLongRest" re-prepares freely on a long
-// rest (Cleric/Druid/Wizard). Swap TIMING is not enforced (#1127 decision) — only
-// the cap is; this drives the level-up new-spell step and swap affordance.
+// SRD 5.2: "onLevelUp" replaces one on a class level (Bard/Sorcerer/Warlock + EK/AT); "oneOnLongRest" swaps one per long rest (Paladin/Ranger); "anyOnLongRest" re-prepares freely (Cleric/Druid/Wizard).
+// Swap TIMING is not enforced (#1127) — only the cap is.
 export type SwapCadence = "onLevelUp" | "oneOnLongRest" | "anyOnLongRest";
 
 const SWAP_CADENCE_BY_CLASS: Readonly<Record<string, SwapCadence>> = {
@@ -516,15 +365,8 @@ const SWAP_CADENCE_BY_CLASS: Readonly<Record<string, SwapCadence>> = {
   ranger: "oneOnLongRest",
 };
 
-/**
- * Swap cadence for a class (EK/AT resolve via subclass to onLevelUp); null for a
- * non-caster. Forks for 2014 Ranger and Paladin: SRD 5.1 Ranger — "when you gain
- * a level in this class, you can choose one of the ranger spells you know and
- * replace it" (a level-up swap, not the SRD 5.2 `oneOnLongRest`); SRD 5.1
- * Paladin has no swap restriction at all (it's a re-prepare "prepared" caster
- * from the start, grouped with Cleric/Druid/Wizard's `anyOnLongRest`, not
- * SRD 5.2's `oneOnLongRest`). The other six classes agree with 2024.
- */
+// Forks for 2014 Ranger (SRD 5.1: "when you gain a level ... you can choose one of the ranger spells you know and replace it" — a level-up swap, not SRD 5.2's oneOnLongRest)
+// and 2014 Paladin (no swap restriction — grouped with Cleric/Druid/Wizard's anyOnLongRest, not SRD 5.2's oneOnLongRest).
 export function swapCadenceFor(
   className: string,
   subclassRef: SubclassCasterRef | null | undefined,
@@ -539,7 +381,6 @@ export function swapCadenceFor(
   return SWAP_CADENCE_BY_CLASS[key] ?? null;
 }
 
-/** One caster class's derived per-class spellcasting stats in a multiclass character. */
 export interface MulticlassCasterClass {
   className: string;
   subclass: string | null;
@@ -549,7 +390,6 @@ export interface MulticlassCasterClass {
   casterFraction: CasterFraction;
 }
 
-/** Merged multiclass spellcasting: combined slots + per-class stats + separate Pact Magic. */
 export interface MulticlassSpellcastingInfo {
   combinedCasterLevel: number;
   slotTotals: Array<{ level: number; total: number }>;
@@ -558,15 +398,9 @@ export interface MulticlassSpellcastingInfo {
   arcana: Array<{ level: number; total: number }>;
 }
 
-/** One caster class after its per-entry save DC / attack bonus are resolved. */
 type CombinedEntry = { name: string; level: number; subclassRef?: SubclassCasterRef | null; fraction: CasterFraction };
 
-/**
- * The combined-pool slot totals. A lone contributing caster uses its own class
- * table (odd-level half/third rows differ from the multiclass floor math) so
- * single-class output stays byte-for-byte identical with deriveSpellcasting;
- * two+ casters use the multiclass floor table keyed by combined caster level.
- */
+// A lone caster uses its own class table (odd-level half/third rows differ from the multiclass floor math) so single-class output stays byte-for-byte identical with deriveSpellcasting; two+ casters use the multiclass floor table.
 function resolveCombinedSlotTotals(
   combinedEntries: CombinedEntry[],
   combinedCasterLevel: number,
@@ -586,19 +420,8 @@ function resolveCombinedSlotTotals(
   return [];
 }
 
-/**
- * Derives merged spellcasting for a full (possibly multiclass) class list per
- * the PHB p. 164 multiclass rules: sum full levels, half of half-caster levels,
- * a third of third-caster levels, then read the combined caster level against
- * the multiclass slot table. Warlock Pact Magic (and Mystic Arcanum) is kept
- * separate — never merged into the combined pool.
- *
- * When exactly one class contributes to the combined pool, its own class table
- * is used (via deriveSpellcasting) so single-class output stays byte-for-byte
- * identical — the multiclass floor math only kicks in with two+ casters.
- *
- * Pure function — no DB access, safe to call in serializeCharacter.
- */
+// PHB p. 164 multiclass rules: sum full levels, half of half-caster levels, a third of third-caster levels, then read the combined caster level against the multiclass slot table.
+// Warlock Pact Magic (and Mystic Arcanum) stays separate — never merged into the combined pool. Pure — safe to call in serializeCharacter.
 export function deriveMulticlassSpellcasting(
   classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null; subclassRef?: SubclassCasterRef | null }>,
   abilityScores: Record<string, number>,
@@ -620,9 +443,7 @@ export function deriveMulticlassSpellcasting(
     const spellAttackBonus = proficiencyBonus + abilityMod;
     classes.push({
       className: entry.name,
-      // Display-only (never consulted for resolution — profile above already
-      // resolved off entry.subclassRef): the drifting free-text name a player
-      // may have edited (schema.prisma's own comment on this column).
+      // Display-only — never consulted for resolution; profile above already resolved off entry.subclassRef.
       subclass: entry.subclass ?? null,
       ability: profile.ability,
       spellSaveDC,
@@ -631,7 +452,6 @@ export function deriveMulticlassSpellcasting(
     });
 
     if (profile.fraction === "pact") {
-      // Warlock Pact Magic stays separate from the combined pool.
       const p = PACT_MAGIC_SLOTS[Math.min(20, Math.max(1, entry.level))];
       if (p) pact = { slotLevel: p.slotLevel, count: p.count, spellSaveDC, spellAttackBonus };
       arcana = mysticArcanumLevels(entry.level).map((level) => ({ level, total: 1 }));
@@ -645,26 +465,7 @@ export function deriveMulticlassSpellcasting(
   return { combinedCasterLevel, slotTotals, classes, pact, arcana };
 }
 
-/**
- * Derives the mechanical spellcasting stats (ability, save DC, attack bonus,
- * slot totals, Mystic Arcanum charges) from a character's class, level, ability
- * scores, and proficiency bonus. Returns null for non-casters — callers fall
- * back to the stored blob.
- *
- * Covers full casters, half-casters (Paladin/Ranger), Warlock Pact Magic, and
- * the third-caster subclasses (Eldritch Knight / Arcane Trickster).
- *
- * Pure function — no DB access, safe to call in serializeCharacter.
- *
- * @param subclassRef The class entry's Subclass catalog row (casterFraction/
- *   spellcastingAbility columns), or null/undefined — used to detect third-caster
- *   subclasses (Eldritch Knight / Arcane Trickster) which grant their own
- *   INT-based spellcasting (#1531: resolved off the row, never a name match).
- * @param edition Half-caster start level forks here (#1507 D4): SRD 5.1
- *   Paladin/Ranger have no Spellcasting feature until level 2, gated via
- *   spellcastingStartLevel — the shared predicate that also gates
- *   preparedSpellCountAt, so the slot table and the cap can never disagree.
- */
+// Pure — safe to call in serializeCharacter. subclassRef is used to detect third-caster subclasses (#1531: resolved off the row, never a name match).
 export function deriveSpellcasting(
   className: string,
   characterLevel: number,
@@ -673,8 +474,6 @@ export function deriveSpellcasting(
   subclassRef: SubclassCasterRef | null | undefined,
   edition: RulesEdition,
 ): DerivedSpellcastingInfo | null {
-  // Builds the standard save-DC / attack-bonus pair plus a sorted slotTotals
-  // array from a per-level slot row, for a given governing ability.
   const fromSlotRow = (
     ability: string,
     slotRow: Readonly<Record<number, number>>,
@@ -693,8 +492,7 @@ export function deriveSpellcasting(
     };
   };
 
-  // Check third-caster subclasses first — they grant spellcasting independent
-  // of the base class's caster status (Fighter/Rogue are not casters without them).
+  // Check third-caster subclasses first — they grant spellcasting independent of the base class's caster status (Fighter/Rogue are not casters without them).
   const thirdCasterAbility = thirdCasterAbilityOf(subclassRef);
   if (thirdCasterAbility) {
     if (characterLevel < spellcastingStartLevel(className, subclassRef, edition)) return null;
@@ -706,15 +504,14 @@ export function deriveSpellcasting(
 
   const classKey = className.toLowerCase();
   const ability = SPELLCASTING_ABILITY[classKey];
-  if (!ability) return null; // non-caster class
+  if (!ability) return null;
 
   if (FULL_CASTER_CLASSES.has(classKey)) {
     return fromSlotRow(ability, FULL_CASTER_SLOTS[Math.min(20, Math.max(1, characterLevel))] ?? {});
   }
 
   if (HALF_CASTER_CLASSES.has(classKey)) {
-    // SRD 5.2: half-casters cast from level 1; SRD 5.1 from level 2 (#1507 D4) —
-    // spellcastingStartLevel is the one shared gate for both.
+    // SRD 5.2 half-casters cast from level 1; SRD 5.1 from level 2 — spellcastingStartLevel is the shared gate.
     if (characterLevel < spellcastingStartLevel(className, subclassRef, edition)) return null;
     return fromSlotRow(ability, HALF_CASTER_SLOTS[Math.min(20, Math.max(1, characterLevel))] ?? {});
   }
@@ -729,136 +526,52 @@ export function deriveSpellcasting(
   return null;
 }
 
-/**
- * Number of new spells a class offers on reaching `level`. Wizard scribes a flat
- * 2 into its spellbook per level from level 2 up — edition-invariant (PHB'14
- * p. 114 / PHB'24 p. 115 carry the identical "add two wizard spells" clause, see
- * WIZARD_LEVEL1_SPELLBOOK_SIZE's own comment). onLevelUp-cadence classes offer
- * the prepared/known-count delta (swapCadenceFor, forked below): Bard/Sorcerer/
- * Warlock + EK/AT in BOTH editions, plus the 2014 Ranger (SRD 5.1's per-class
- * "when you gain a level … replace it with another spell" clause — the 2024
- * Ranger re-prepares on a rest instead and offers no level-up pick). Every other
- * class returns 0 after its level-1 initial picks.
- *
- * `edition` forks the table this reads (#1509 D2): a 2014 known caster's delta
- * comes from SPELLS_KNOWN_BY_CLASS_2014 via preparedSpellCountAt's EDITION_2014
- * branch — the SAME lookup #1507's caps already route through, so this needs no
- * second table and no new symbol.
- */
+// Wizard scribes a flat 2 into its spellbook per level from level 2 up — edition-invariant (PHB'14 p. 114 / PHB'24 p. 115).
+// onLevelUp-cadence classes offer the prepared/known-count delta (swapCadenceFor); 2014 Ranger is also onLevelUp (SRD 5.1's per-class replace-a-spell clause).
+// A 2014 known caster's delta reads through preparedSpellCountAt's EDITION_2014 branch — the same lookup #1507's caps already use, no second table.
 export function levelUpSpellPicks(
   className: string,
   level: number,
   subclassRef: SubclassCasterRef | null | undefined,
   edition: RulesEdition,
 ): number {
-  // #1131: a fresh level-1 entry (creation or multiclass-add) picks its full
-  // prepared count — including re-prepare classes, which offer no picks after.
-  // A 2014 half-caster (Paladin/Ranger) below spellcastingStartLevel has no
-  // spellcasting feature yet, so preparedSpellCountAt returns null here — `?? 0`
-  // reads that as "nothing to pick", not a table miss (#1509 D3; this is also
-  // the multiclass-add path).
-  // #1513: Wizard is the exception — a level-1 pick fills the spellbook (6),
-  // not the prepared count (4); WIZARD_LEVEL1_SPELLBOOK_SIZE is the one place
-  // that number lives, shared with level1SpellPicksFor.
+  // A fresh level-1 entry picks its full prepared count. A 2014 half-caster below spellcastingStartLevel returns null here — `?? 0` reads that as nothing to pick, not a table miss.
+  // Wizard is the exception: a level-1 pick fills the spellbook (6), not the prepared count (4) — WIZARD_LEVEL1_SPELLBOOK_SIZE is the one place that number lives, shared with level1SpellPicksFor.
   if (level <= 1) {
     if (className.toLowerCase() === "wizard") return WIZARD_LEVEL1_SPELLBOOK_SIZE;
     return preparedSpellCountAt(className, 1, subclassRef, {}, edition) ?? 0;
   }
   if (className.toLowerCase() === "wizard") return 2;
   if (swapCadenceFor(className, subclassRef, edition) !== "onLevelUp") return 0;
-  // #1509 D3: a previous-level count of null (below spellcastingStartLevel — a
-  // 2014 Ranger reading its own level 1) reads as 0, not "no data": the class
-  // had nothing to compare against, so the whole level-N count is new. Same
-  // null-safe read the fresh-entry branch above uses.
+  // Same null-safe read as above: a previous-level null (below spellcastingStartLevel) means nothing to compare against, so the whole level-N count is new.
   const now = preparedSpellCountAt(className, level, subclassRef, {}, edition) ?? 0;
   const prev = preparedSpellCountAt(className, level - 1, subclassRef, {}, edition) ?? 0;
   return Math.max(0, now - prev);
 }
 
-/**
- * Number of new cantrips a class offers on reaching `level` (SRD 5.2) — the
- * cantrips-known delta from N-1 to N (full count at level 1). 0 for Paladin/Ranger
- * and non-casters. #1131 wires this into the level-up newSpells step and creation.
- */
 export function levelUpCantripPicks(className: string, level: number, subclassRef?: SubclassCasterRef | null): number {
   const now = cantripsKnownAtLevel(className, level, subclassRef);
   const prev = level <= 1 ? 0 : cantripsKnownAtLevel(className, level - 1, subclassRef);
   return Math.max(0, now - prev);
 }
 
-/** Bard Magical Secrets (SRD 5.2): from level 10, level-up picks may come from the Bard/Cleric/Druid/Wizard lists. */
+// SRD 5.2: from level 10, picks may come from Bard/Cleric/Druid/Wizard lists.
 export function bardMagicalSecretsAt(className: string, level: number): boolean {
   return className.toLowerCase() === "bard" && level >= 10;
 }
 
-/** Class lists a spell pick may come from, per facet. `null` = unrestricted.
- * Named for the resolver (spellListsFor), not Magical Secrets — it also carries
- * the third-caster (EK/AT → wizard) redirect, which is not a Secrets rule (#1825). */
+// Named for the resolver (spellListsFor), not Magical Secrets — it also carries the third-caster (EK/AT → wizard) redirect (#1825).
 export interface SpellPickLists {
-  /** Class lists a leveled pick may come from; null = unrestricted (PHB'14 "from any class"). */
+  // null = unrestricted (PHB'14 "from any class").
   spells: string[] | null;
-  /** Class lists a cantrip pick may come from; null = unrestricted (PHB'14 "…or a cantrip"). */
+  // null = unrestricted (PHB'14 "...or a cantrip").
   cantrips: string[] | null;
 }
 
-/**
- * The single resolver for "which spell list(s) may this character pick
- * from" (#1825) — every caller (the level-up gate, the catalog picker route)
- * must resolve through this one function so they can never diverge. Owns
- * three rules, checked in order:
- *
- * 1. Third-caster subclasses (Eldritch Knight / Arcane Trickster) draw from
- *    the WIZARD list, not their base class's own list — PHB'14 p. 75
- *    (Eldritch Knight) / p. 98 (Arcane Trickster), byte-identical in PHB'24.
- *    This is the #1825 fix: the old default branch assumed the spell-list key
- *    equals the lowercased class name, which for Fighter/Rogue is
- *    "fighter"/"rogue" — no catalog spell is ever on those lists, so the New
- *    Spells step served an empty picker for a level-3 Eldritch Knight/Arcane
- *    Trickster. Resolved via thirdCasterAbilityOf off the caller-supplied
- *    `subclassRef` (#1531: the Subclass row's own casterFraction/
- *    spellcastingAbility columns) — the same resolver every other third-caster
- *    check in this module uses, never a name or slug match of its own.
- * 2. Bard Magical Secrets, edition-forked (folds in the former
- *    `magicalSecretsSpellLists`, now a delegate below for callers/tests still
- *    naming it) — governs BOTH the leveled-spell and the cantrip facet of a
- *    level-up pick, because the two editions disagree on whether it broadens
- *    cantrips.
- *
- *    SRD 5.2 / PHB'24 p. 53, *Magical Secrets* (Bard, level 10): "Whenever you
- *    reach a Bard level (including this level) and the Prepared Spells number
- *    in the Bard Features table increases, you can choose any of your new
- *    prepared spells from the Bard, Cleric, Druid, and Wizard spell lists" —
- *    a standing broadening from level 10 up (`>= 10`, not `=== 10`), hence
- *    `spells` widens but `cantrips` does not: the trigger is the Prepared
- *    Spells number, which only covers level 1+ spells — the Cantrips column
- *    is a separate table untouched by this feature.
- *
- *    PHB'14 p. 54, *Magical Secrets* (Bard, 10th/14th/18th level): "Choose two
- *    spells from any class, including this one. A spell you choose must be of
- *    a level you can cast, as shown on the Bard table, or a cantrip." Both
- *    facets are therefore unrestricted (`null`) under 2014.
- *
- *    Recorded limitation: PHB'14 grants this as *two of* the picks at
- *    10th/14th/18th, drawn from one shared two-pick budget (a cantrip taken
- *    this way comes out of the same budget as a leveled spell). This codebase
- *    models `spellsLearned`/`cantripsLearned` as separate buckets sized by the
- *    2024 tables (`levelUpSpellPicks`/`levelUpCantripPicks`/
- *    `CANTRIP_BREAKPOINTS`), which are not forked per edition — epic #1281
- *    owns that fork. With no single budget to draw from, the closest
- *    available mapping is: at a qualifying 2014 Bard level, neither facet is
- *    class-restricted. This is not full PHB'14 fidelity.
- * 3. Every other class/level: its own list on both facets (`[key]`).
- *
- * Also known: class membership lives in the SpellClass join, keyed off the
- * parent Spell row rather than carrying its own edition column (#1711) —
- * today's seeded catalog is 2024-only; the 2014 by-class content slices
- * (#1713-#1721) are what populate 2014-tagged Spell/SpellClass rows.
- *
- * `subclass` is ALSO the deliberate seam for PHB'24 College of Lore *Magical
- * Discoveries* (level 6, a Cleric/Druid/Wizard cantrip OR a spell you have
- * slots for) and PHB'14 *Additional Magical Secrets* (6th level, any class) —
- * both remain content debt for #1281, not implemented here.
- */
+// PHB'14 p. 75 (Eldritch Knight) / p. 98 (Arcane Trickster), byte-identical in PHB'24: third-caster subclasses draw from the wizard list, not their base class's own list.
+// Bard Magical Secrets forks by edition on both the leveled-spell and cantrip facet. SRD 5.2 / PHB'24 p. 53: prepared spells may be chosen from the Bard, Cleric, Druid, and Wizard lists from level 10 up;
+// cantrips do not widen, since the trigger is the Prepared Spells number, which doesn't cover cantrips. PHB'14 p. 54: "Choose two spells from any class... or a cantrip" — both facets unrestricted (null) under 2014.
+// Recorded limitation: PHB'14 grants this as two picks from one shared budget; this codebase models spells/cantrips as separate buckets sized by the 2024 tables, so at a qualifying 2014 Bard level neither facet is class-restricted — not full PHB'14 fidelity.
 export function spellListsFor(
   className: string,
   level: number,
@@ -869,9 +582,7 @@ export function spellListsFor(
 
   const key = className.toLowerCase();
   if (key !== "bard" || level < 10) return { spells: [key], cantrips: [key] };
-  // Exhaustive switch, not `if (edition === "EDITION_2014") … else …` (#1527):
-  // the if/else shape let an unrecognized third edition silently take the SRD
-  // 5.2 Magical Secrets branch instead of failing loudly.
+  // Exhaustive switch, not `if (edition === "EDITION_2014") … else …` (#1527): the if/else shape let an unrecognized third edition silently take the SRD 5.2 Magical Secrets branch instead of failing loudly.
   switch (edition) {
     case "EDITION_2014":
       return { spells: null, cantrips: null };
@@ -884,22 +595,14 @@ export function spellListsFor(
   }
 }
 
-/** @deprecated Renamed to spellListsFor (#1825), which also fixes the EK/AT
- * redirect this name's own bug report was filed against — kept only so an
- * existing caller/test naming this symbol keeps compiling. */
+/** @deprecated Renamed to spellListsFor (#1825); kept for existing callers. */
 export const magicalSecretsSpellLists = spellListsFor;
 
-// Fighter levels PHB'14 p. 74 grants a free "any school of magic" leveled
-// pick at: the 3rd-level initial grant includes one ("two of these spells
-// must be from the abjuration or evocation school"), and 8th/14th/20th each
-// grant one further spell "of any school of magic". One free pick per level
-// lines up exactly with THIRD_CASTER_PREPARED's own new-spell delta at each
-// of these four levels (always exactly 1) — no separate count to persist.
+// PHB'14 p. 74: Fighter grants a free "any school" leveled pick at 3rd, 8th, 14th, and 20th level — one per level, matching THIRD_CASTER_PREPARED's own delta at each (always exactly 1), so no separate count is persisted.
 const EK_FREE_SCHOOL_LEVELS = new Set([3, 8, 14, 20]);
 
-/** Result of eldritchKnightSpellSchoolGate: `schools` is the restricted set a
- * leveled pick must belong to (null = unrestricted), `freePicks` is how many
- * of THIS level-up's leveled picks may ignore it. */
+// schools: restricted set a leveled pick must belong to, null = unrestricted.
+// freePicks: how many of this level-up's picks may ignore it.
 export interface SpellSchoolGate {
   schools: string[] | null;
   freePicks: number;
@@ -907,27 +610,9 @@ export interface SpellSchoolGate {
 
 const EK_UNRESTRICTED_SCHOOL_GATE: SpellSchoolGate = { schools: null, freePicks: 0 };
 
-/**
- * Eldritch Knight leveled-spell school restriction (#1855). Callers gate this
- * to the Eldritch Knight subclass themselves — via resolveSubclassSlug
- * (classes/subclass-slug.ts), never a name literal — so this function only
- * encodes the LEVEL math, a pure (fighterLevel, edition) → gate like
- * subclassGateLevel. Never applies to cantrips (PHB'14's restriction names
- * only the "wizard spells you know", not cantrips) or to Arcane Trickster
- * (out of #1855's scope, tracked separately).
- *
- * PHB'14 p. 74, Eldritch Knight Spellcasting: "Two of the spells you learn at
- * [3rd level] must be Abjuration or Evocation spells... You can use your
- * Spell Mastery... The spells you learn at 8th, 14th, and 20th level can come
- * from any school of magic." SRD 5.1 has no Eldritch Knight (a PHB-only
- * fighter subclass in that edition), so EDITION_2014 below is the only rules
- * text this cites.
- *
- * PHB'24 dropped the restriction — a 2024 Eldritch Knight draws freely from
- * the whole wizard spell list (widely reported change; PHB'24's own EK
- * feature text is unverified/PARKED, #1531, so no page citation is claimed
- * here beyond "the restriction is gone").
- */
+// Callers gate this to Eldritch Knight themselves — never a name literal — so this only encodes the LEVEL math. Never applies to cantrips or Arcane Trickster.
+// PHB'14 p. 74, Eldritch Knight Spellcasting: two of the spells learned at 3rd level must be Abjuration or Evocation; spells learned at 8th, 14th, and 20th level can come from any school. SRD 5.1 has no Eldritch Knight.
+// PHB'24 dropped the restriction — its own EK feature text is unverified/PARKED (#1531), so no page citation is claimed here beyond "the restriction is gone".
 export function eldritchKnightSpellSchoolGate(fighterLevel: number, edition: RulesEdition): SpellSchoolGate {
   switch (edition) {
     case "EDITION_2014":
@@ -941,15 +626,7 @@ export function eldritchKnightSpellSchoolGate(fighterLevel: number, edition: Rul
   }
 }
 
-/**
- * Highest spell level a class can cast/scribe at `level` — the ceiling on spells
- * learnable at level-up. Derived from the slot table (max slot level) rather than
- * re-encoding thresholds; 0 when the class has no spellcasting yet (non-casters,
- * a 2014 Paladin/Ranger below level 2 — the #1508 AC this closes: a served
- * `level1SpellPicks` with spells > 0 alongside maxSpellLevel === 0 is
- * incoherent, so callers must treat 0 here as "not casting yet", never clamp
- * it to 1). Third-caster subclasses resolve via `subclass`.
- */
+// Derived from the slot table's max slot level rather than re-encoding thresholds. 0 means not casting yet (non-caster, or a 2014 Paladin/Ranger below level 2) — callers must never clamp that to 1 (#1508).
 export function maxSpellLevelForClass(
   className: string,
   level: number,
@@ -962,23 +639,9 @@ export function maxSpellLevelForClass(
   return derived.slotTotals.reduce((max, slot) => Math.max(max, slot.level), 0);
 }
 
-// #1510: SRD 5.1's level-1 CREATION-time spell picks — a fixed table, not the
-// ongoing ability-mod-driven cap preparedSpellCountAt computes. The owner's
-// rationale-correcting comment on #1510 (2026-07-29) records three distinct
-// caster shapes, only some of which have a creation-time list at all:
-//   - "known" (Bard/Sorcerer/Warlock): a fixed personal list, chosen here and
-//     swappable per swapCadenceFor's onLevelUp cadence.
-//   - "prepared from the full class list" (Cleric/Druid): NO personal list
-//     exists in PHB'14 — the WIS-mod cap governs a subset re-prepared every
-//     long rest (derivePreparedSpellLimit). There is nothing to pick at
-//     creation, so 0 is the faithful count, not a placeholder or a guess.
-//   - "spellbook" (Wizard): a personal list distinct in SIZE from what's
-//     prepared daily — served by WIZARD_LEVEL1_SPELLBOOK_SIZE below (#1513),
-//     not this table, since the same split also has to reach EDITION_2024
-//     (this table is 2014-only).
-// Paladin/Ranger are absent entirely: SRD 5.1 grants no Spellcasting feature
-// at level 1 at all (spellcastingStartLevel gates them out below; this table
-// is never consulted for them).
+// SRD 5.1 level-1 CREATION-time spell picks — a fixed table, not preparedSpellCountAt's ongoing ability-mod-driven cap. Three caster shapes: "known" (Bard/Sorcerer/Warlock) get a fixed personal list here, swappable per swapCadenceFor's onLevelUp cadence;
+// "prepared from the full class list" (Cleric/Druid) has no personal list in PHB'14 — the WIS-mod cap governs a subset re-prepared every long rest, so 0 is the faithful creation-time count, not a placeholder;
+// "spellbook" (Wizard) is served by WIZARD_LEVEL1_SPELLBOOK_SIZE below instead, since the split also has to reach EDITION_2024. Paladin/Ranger are absent: SRD 5.1 grants no Spellcasting feature at level 1 at all.
 const LEVEL1_CREATION_SPELLS_2014: Readonly<Record<string, number>> = {
   // known — SRD 5.1: "You know four 1st-level spells of your choice from the bard spell list."
   bard: 4,
@@ -992,49 +655,13 @@ const LEVEL1_CREATION_SPELLS_2014: Readonly<Record<string, number>> = {
   druid: 0,
 };
 
-// Wizard's level-1 SPELLBOOK size — distinct from its PREPARED count
-// (preparedSpellCountAt / PREPARED_SPELLS_BY_CLASS.wizard[0] === 4), which
-// #1513 fixes a conflation of. Both editions agree on six, so this constant
-// carries no `edition` parameter and is the ONE place the number 6 lives —
-// level1SpellPicksFor's `spells`/`spellbookSize` fields and
-// levelUpSpellPicks's level<=1 branch both read it, never a second copy.
-// SRD 5.1, Wizard, "Your Spellbook": "At 1st level, you have a spellbook
-// containing six 1st-level wizard spells of your choice." SRD 5.2, Wizard
-// level 1, Spellcasting: the spellbook starts with six level-1 wizard spells;
-// the Prepared Spells column (4 at level 1) is a separate, smaller number.
+// Wizard's level-1 SPELLBOOK size — distinct from its PREPARED count (preparedSpellCountAt / PREPARED_SPELLS_BY_CLASS.wizard[0] === 4). The ONE place the number 6 lives — level1SpellPicksFor and levelUpSpellPicks's level<=1 branch both read it, never a second copy.
+// SRD 5.1, Wizard, "Your Spellbook": a level-1 spellbook contains six 1st-level wizard spells of the player's choice. SRD 5.2 agrees; its separate Prepared Spells column (4 at level 1) is a different number.
 const WIZARD_LEVEL1_SPELLBOOK_SIZE = 6;
 
-/**
- * The level-1 CREATION-time spell picks a class offers, per edition — folds in
- * #1377's maxSpellLevel so `reference.ts` and `creationSpellCountError` (#1510
- * D4) resolve the served and enforced counts through this ONE function, never
- * two inline copies.
- *
- * `null` = no Spells step this creation: a non-caster, or below
- * spellcastingStartLevel (a 2014 Paladin/Ranger, or a level-1 third-caster
- * subclass in either edition — neither has Spellcasting yet).
- *
- * `spells: 0` = a cantrips-only step (2014 Cleric/Druid — see
- * LEVEL1_CREATION_SPELLS_2014's comment for why 0 is correct, not a
- * placeholder). `maxSpellLevel` is 0 in that case too (the cantrips-only seam
- * #1377 built — `spells.test.ts` pins `?maxLevel=0` as legal, not a floor of
- * 1) — a served `spells: n > 0` alongside `maxSpellLevel: 0` would be the
- * incoherent shape #1508 already flagged for the null case, so this keeps the
- * same discipline for the zero case.
- *
- * SRD 5.2: reuses preparedSpellCountAt's fixed table directly (no separate
- * 2024 table to keep in sync) — EXCEPT Wizard, whose creation pick is its
- * spellbook size, not its prepared count (#1513, WIZARD_LEVEL1_SPELLBOOK_SIZE).
- * SRD 5.1: the fixed table above (Wizard excepted the same way); cantrips are
- * verified byte-identical between both editions (cantripsKnownAtLevel takes no
- * `edition`), so one call serves both branches.
- *
- * `spellbookSize` (#1513) is present, and equal to `spells`, ONLY for Wizard —
- * it marks that this class's creation-pick count is the spellbook size, not
- * the prepared cap, so a consumer can never mistake one for the other. Every
- * other class omits the key; the prepared cap itself is never served here —
- * callers read it from preparedSpellCountAt / derivePreparedSpellLimit.
- */
+// Folds in #1377's maxSpellLevel so reference.ts and creationSpellCountError (#1510 D4) resolve served and enforced counts through this ONE function, never two inline copies.
+// null = no Spells step (non-caster, or below spellcastingStartLevel). spells: 0 = a cantrips-only step (2014 Cleric/Druid) with maxSpellLevel also 0 — never a placeholder (#1508's incoherent-shape rule applies here too).
+// spellbookSize is present, and equal to spells, ONLY for Wizard, marking that its creation-pick count is the spellbook size, not the prepared cap.
 export function level1SpellPicksFor(
   className: string,
   subclassRef: SubclassCasterRef | null | undefined,
@@ -1048,7 +675,7 @@ export function level1SpellPicksFor(
     : edition === "EDITION_2014"
       ? (LEVEL1_CREATION_SPELLS_2014[className.toLowerCase()] ?? null)
       : preparedSpellCountAt(className, 1, subclassRef, {}, edition);
-  if (spells == null) return null; // non-caster
+  if (spells == null) return null;
 
   const cantrips = cantripsKnownAtLevel(className, 1, subclassRef);
   const maxSpellLevel = spells === 0 ? 0 : maxSpellLevelForClass(className, 1, subclassRef, edition);

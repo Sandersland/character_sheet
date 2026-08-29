@@ -1,12 +1,5 @@
-/**
- * ManeuverRow — renders a single known maneuver with an expandable
- * description. Purely presentational: no API calls, no forget action — a
- * maneuver replacement is bound to learn-time (#1516: PHB'14 Battle Master
- * p.73 / SRD 5.2 equivalent), so the only forget affordance lives inside the
- * level-up ceremony's own maneuvers step, never on the sheet. Renders through
- * AbilityRowShell (shared with ShadowArtRow).
- */
-
+// A maneuver replacement is bound to learn-time (PHB'14 Battle Master p.73 /
+// SRD 5.2 equivalent), so this row renders no forget affordance (#1516).
 import AbilityRowShell from "@/features/class/AbilityRowShell";
 import type { ManeuverEntry } from "@/types/character";
 
@@ -15,8 +8,7 @@ interface Props {
 }
 
 export default function ManeuverRow({ entry }: Props) {
-  // #1381: the served superiority-die faces (deriveManeuverEffect, backend) —
-  // pure chrome over a resolved value, never re-derived here.
+  // The served superiority-die faces are pure chrome over a resolved value, never re-derived here.
   const dieFaces = entry.effect?.dice?.faces;
 
   return (

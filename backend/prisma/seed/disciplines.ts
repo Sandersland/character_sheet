@@ -1,43 +1,9 @@
-// ── Elemental Discipline catalog (Way of the Four Elements, 2014-only) ──────
-// PHB'14 pp. 80–81 — Way of the Four Elements is NOT in SRD 5.1, so every
-// description below is transcribed from PHB'14 knowledge, not the SRD. Each
-// row is a GrantedAbility (source "discipline", edition "EDITION_2014")
-// consumed by the generic subclass-choice picker (GET
-// /api/subclass-choices/discipline) and the discipline cast handler
-// (lib/classes/disciplines.ts). 16 rows, not 17: Elemental Attunement is
-// PHB'14 p.80's free, always-known, uncapped discipline — it is a
-// DerivedFeature (monk-features.ts) plus a DERIVED_ACTIONS reminder
-// (actions.ts), never a catalog row a player picks or forgets.
-//
-// Structural reference ONLY for the costKind/costBase/costPerStep +
-// EffectSpec column shapes: `34f5a4cf^:backend/prisma/seed/disciplines.ts`
-// (repo owner decision, 2026-07-29) — its RULES VALUES are not trustworthy
-// (no page citations, one citing the wrong book). Two known errors it
-// carried are corrected here: Fist of Four Thunders casts Thunderwave, whose
-// damage is 2d8 (not 3d8), and Eternal Mountain Defense's own text states
-// "you must be a 13th-level monk to use this discipline" (not 17th) — a
-// PHB errata-shaped anomaly: it is offered among the 11th-level tier's
-// choices (alongside Mist Stance/Ride the Wind/Flames of the Phoenix, whose
-// 4-ki cost a monk can pay from level 3 onward) but its own 5-ki cost isn't
-// payable until level 13 (PHB'14 p.80's Elemental Disciplines table caps a
-// single cast at 4 ki through level 12), so PHB'14 states the 13th-level
-// gate directly on the discipline's own text rather than leaving it an
-// unusable pick for two levels.
-//
-// The per-cast ki cap (min(6, 2 + floor((monkLevel-1)/4)) -> 2/3/4/5/6 at
-// L3/L5/L9/L13/L17) is enforced in lib/classes/disciplines.ts
-// (maxKiPerDiscipline), not here — this module carries no logic at all
-// (a pure content array only, per scripts/check-seed-data-modules.sh).
-//
-// costBase for every spell-equivalent discipline is exactly one more than
-// the underlying spell's level (Thunderwave 1st -> 2 ki, Shatter 2nd -> 3 ki,
-// Fireball 3rd -> 4 ki, Stoneskin 4th -> 5 ki, Cone of Cold 5th -> 6 ki) —
-// PHB'14 p.80's own worked example ("spend 3 ki points to cast [Burning
-// Hands] as a 2nd-level spell" from Sweeping Cinder Strike's 2-ki base).
-// costPerStep is set only where the discipline's own text allows spending
-// EXTRA ki to add damage dice (Fangs of the Fire Snake, Fist of Unbroken Air,
-// Water Whip, Gong of the Summit, Sweeping Cinder Strike) — the others cast a
-// spell at a fixed level with no upcast option through the discipline itself.
+// PHB'14 pp. 80-81 — Way of the Four Elements is not in SRD 5.1, so every description below is transcribed from PHB'14, not the SRD.
+// Each row is a GrantedAbility (source "discipline") consumed by the generic subclass-choice picker (GET /api/subclass-choices/discipline) and disciplineCastSteps.
+// 16 rows, not 17: Elemental Attunement (PHB'14 p.80's free, always-known, uncapped discipline) is a DerivedFeature plus a DERIVED_ACTIONS reminder, never a catalog row a player picks or forgets.
+// The per-cast ki cap (min(6, 2 + floor((monkLevel-1)/4)) -> 2/3/4/5/6 at L3/L5/L9/L13/L17) is enforced by maxKiPerDiscipline, not here — this module is a pure content array only.
+// costBase for every spell-equivalent discipline is exactly one more than the underlying spell's level (Thunderwave 1st -> 2 ki ... Cone of Cold 5th -> 6 ki) — PHB'14 p.80's own worked example ("spend 3 ki points to cast [Burning Hands] as a 2nd-level spell" from Sweeping Cinder Strike's 2-ki base).
+// costPerStep is set only where the discipline's own text allows spending extra ki to add damage dice (Fangs of the Fire Snake, Fist of Unbroken Air, Water Whip, Gong of the Summit, Sweeping Cinder Strike) — the others cast a spell at a fixed level with no upcast option.
 import type { SeedEdition } from "./edition.js";
 
 export interface DisciplineSeed {
@@ -259,9 +225,7 @@ export const DISCIPLINES: DisciplineSeed[] = [
     costPoolKey: "ki",
     costBase: 5,
     description:
-      // Offered among the 11th-level tier's picks, but PHB'14's own text on
-      // this discipline states the 13th-level gate directly — see this
-      // module's header comment for why minLevel is 13, not 11 or 17.
+      // Offered among the 11th-level tier's picks, but PHB'14's own text states the 13th-level gate directly: its 5-ki cost isn't payable until level 13 (PHB'14 p.80's Elemental Disciplines table caps a single cast at 4 ki through level 12).
       "You must be at least a 13th-level monk to use this discipline. Spend 5 ki to cast stoneskin on yourself, resisting nonmagical bludgeoning, piercing, and slashing damage for up to 1 hour (concentration). PHB'14 p.81.",
   },
   {

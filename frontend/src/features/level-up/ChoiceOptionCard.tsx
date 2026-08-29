@@ -1,5 +1,4 @@
-// One selectable option row in a Choose-N step (#896). Presentational only —
-// selection/disable logic lives in ChoiceStep.
+// Presentational only; selection/disable logic lives in ChoiceStep.
 
 import type { ChoiceOption } from "@/lib/levelUpChoices";
 

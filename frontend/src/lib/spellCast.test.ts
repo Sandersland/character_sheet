@@ -17,12 +17,7 @@ function spell(overrides: Partial<Spell>): Spell {
   } as Spell;
 }
 
-// #1381: fixtures now carry served effectRolls (the backend's resolved rolls)
-// instead of raw effect columns — computeCastSpec/planCast are lookups, not
-// rule re-derivations. The cantrip-scaling-across-levels and heal-modifier
-// GOLDEN cases that used to live here migrated to the backend test that
-// proves the rule (spell-effect-rolls.test.ts) — this file only pins the
-// lookup mechanics.
+// computeCastSpec/planCast are lookups into the served effectRolls, not rule re-derivations — the rule itself is proven by the backend's spell-effect-rolls.test.ts.
 const fireball = spell({
   name: "Fireball",
   level: 3,

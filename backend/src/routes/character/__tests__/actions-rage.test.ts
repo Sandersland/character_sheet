@@ -1,38 +1,3 @@
-/**
- * Rage route tests (#458) — the full package exercised through the real HTTP
- * stack (POST /api/characters/:id/actions/transactions), not the pure fns.
- *
- * These pin what the route's own level-lookup + orchestrator produce, which the
- * pure-function (actions.test.ts) and helper-level (active-effects-durable) tests
- * cannot reach:
- *   - the route queries classEntries and derives the +2/+3/+4 melee-damage bonus
- *     server-side (level 1 / 9 / 16), never trusting the client
- *   - activating Rage applies a while-active meleeDamage buff carrying the b/p/s
- *     resistDamageTypes and spends one rage use, atomically under one batchId with
- *     a spendResource + buffApplied event pair
- *   - b/p/s damage auto-halves while raging (integration with #456) through the
- *     real HP route, and un-halves once Rage ends
- *   - manual endRage clears the buff but does NOT refund the rage use (early end
- *     ≠ refund — endRage's op list is clearBuff only)
- *   - LIFO revert of the activation restores the pool AND removes the buff together
- *
- * Real Postgres in each test; supertest against the shared `app`.
- *
- * #1223 UPDATE: Rage's resource pool moved off lib/classes/barbarian.ts's
- * resourceFn (which resolved purely off the classEntry NAME, "barbarian",
- * regardless of its `classId`) onto the seeded Barbarian ClassFeature rows'
- * own descriptor columns — deriving the pool now requires the real seeded
- * "Barbarian" CharacterClass's `classId` FK so the row relation resolves.
- * This file previously used testing.md's uniquely-named bespoke-catalog-row
- * pattern (a fresh "Actions Rage Test Barbarian" CharacterClass per run) to
- * avoid touching seeded rows; that pattern is no longer viable for Rage
- * specifically, since a bespoke class row has no seeded ClassFeature rows of
- * its own, and no test-only class can carry the real Rage pool without
- * duplicating barbarian-features.ts's authored content — findFirstOrThrow
- * against the real "Barbarian" catalog row instead (read-only; nothing here
- * writes to or deletes seeded rows).
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -47,10 +12,7 @@ let COOKIE: string;
 const BARB_ID = "test-actions-rage-barbarian";
 let barbClassId: string;
 
-// XP thresholds: L1 = 0, L9 = 48000, L16 = 195000. The rage-count pool derives
-// from the XP-driven serialized level; the route derives the melee-damage bonus
-// from the persisted per-class entry level — a real single-class barbarian keeps
-// both in lockstep, so each fixture sets XP and classEntry level together.
+// The rage pool derives from the XP-derived level; the melee-damage bonus derives from the persisted classEntry level — fixtures set both together.
 const L1 = { xp: 0, level: 1 };
 const L9 = { xp: 48000, level: 9 };
 const L16 = { xp: 195000, level: 16 };
@@ -159,7 +121,6 @@ describe("POST /:id/actions/transactions — Rage (#458)", () => {
     expect(buff!.modifier).toBe(2);
     expect(buff!.resistDamageTypes).toEqual(["bludgeoning", "piercing", "slashing"]);
 
-    // Level-1 barbarian has 2 rages; one spent.
     expect(pool(res.body, "rage")).toMatchObject({ used: 1, remaining: 1 });
   });
 
@@ -188,7 +149,7 @@ describe("POST /:id/actions/transactions — Rage (#458)", () => {
     await executeAction("rage");
     const res = await damage(12, "bludgeoning");
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(34); // 40 - (12 halved to 6)
+    expect(res.body.hitPoints.current).toBe(34);
   });
 
   it("does NOT halve non-matching (fire) damage while raging — resistance is b/p/s only", async () => {
@@ -196,7 +157,7 @@ describe("POST /:id/actions/transactions — Rage (#458)", () => {
     await executeAction("rage");
     const res = await damage(12, "fire");
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(28); // 40 - 12 taken in full, not halved
+    expect(res.body.hitPoints.current).toBe(28);
   });
 
   it("endRage clears the buff and resistance, and does NOT refund the rage use", async () => {
@@ -206,12 +167,11 @@ describe("POST /:id/actions/transactions — Rage (#458)", () => {
     const ended = await executeAction("endRage");
     expect(ended.status).toBe(200);
     expect(ragebuff(ended.body)).toBeUndefined();
-    // Early end never refunds the use — endRage's op list is clearBuff only.
+    // Early end does not refund the rage use — endRage's op list is clearBuff only.
     expect(pool(ended.body, "rage")).toMatchObject({ used: 1, remaining: 1 });
 
-    // Resistance is gone: subsequent bludgeoning damage is un-halved.
     const res = await damage(12, "bludgeoning");
-    expect(res.body.hitPoints.current).toBe(28); // 40 - 12, full
+    expect(res.body.hitPoints.current).toBe(28);
   });
 
   it("LIFO revert of the activation restores the pool and removes the buff together", async () => {
@@ -224,7 +184,7 @@ describe("POST /:id/actions/transactions — Rage (#458)", () => {
       .set("Cookie", COOKIE)
       .post(`/api/characters/${BARB_ID}/events/${batchId}/revert`);
     expect(revert.status).toBe(200);
-    expect(ragebuff(revert.body)).toBeUndefined(); // buff removed
-    expect(pool(revert.body, "rage")).toMatchObject({ used: 0, remaining: 2 }); // spend undone
+    expect(ragebuff(revert.body)).toBeUndefined();
+    expect(pool(revert.body, "rage")).toMatchObject({ used: 0, remaining: 2 });
   });
 });

@@ -10,16 +10,12 @@ interface InventoryRowControlsProps {
   pending: boolean;
   atCap: boolean;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
-  // Bundled (#1854) — see WeaponBondProps' own comment for why bond/unbond's
-  // four related props travel as one object rather than four discrete props.
   bond: WeaponBondProps;
 }
 
-// The item-shape-gated action pills (use / equip / attune / bond), shared
-// between InventoryRow (desktop) and ItemDetailControls (mobile detail
+// Shared between InventoryRow (desktop) and ItemDetailControls (mobile detail
 // sheet) — kept as its own component, not inlined into either caller, so
-// neither one's cyclomatic/cognitive score crosses the fallow complexity
-// gate (.fallowrc.jsonc).
+// neither one's cyclomatic/cognitive score crosses the fallow complexity gate.
 export default function InventoryRowControls({ item, pending, atCap, onSubmit, bond }: InventoryRowControlsProps) {
   return (
     <>

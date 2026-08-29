@@ -21,6 +21,6 @@ export function useReferenceData(edition: RulesEdition | null | undefined) {
   });
 
   // `error` means "nothing to show" — a failed background refetch must not
-  // discard catalog data already on screen. See useCharacter for the same guard.
+  // discard catalog data already on screen.
   return { reference: data ?? null, error: isError && data === undefined };
 }

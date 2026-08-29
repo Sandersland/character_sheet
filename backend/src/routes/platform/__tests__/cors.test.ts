@@ -1,12 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
-// The SPA sends `credentials: "include"` so the session cookie flows
-// cross-origin (dev: 5173 → 4000). That requires CORS to allow credentials AND
-// echo a concrete origin (never `*`). Probed via the public health route.
-
-// createApp reads CORS_ORIGIN via the frozen config snapshot, so each test
-// stubs env then re-imports app fresh (vi.resetModules) to observe it.
+// Credentialed cross-origin cookies require CORS to echo a concrete origin, never `*`; createApp reads CORS_ORIGIN via a frozen config snapshot, so each test stubs env then re-imports fresh.
 async function appWithCorsOrigin(value: string) {
   vi.stubEnv("CORS_ORIGIN", value);
   vi.resetModules();

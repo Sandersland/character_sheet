@@ -6,10 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import * as barrel from "@/api/client";
 
-// #1270: locks the post-split shape of frontend/src/api/ so the domain cut
-// can't silently regress back into one file, and so client.ts can't grow a
-// function body again. The 108-name list is the exact public surface today —
-// changing it on purpose (new endpoint) means editing this list on purpose.
+// EXPECTED_EXPORTS pins api/'s exact public surface (#1270) — add a new
+// export here on purpose, not by accident.
 const EXPECTED_EXPORTS = [
   "addCharacterToCampaign",
   "advanceCombatRound",
@@ -127,16 +125,13 @@ function apiSourceFiles(): string[] {
   return readdirSync(API_DIR).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
 }
 
-// PIN (passes today): the exact export set, so a dropped `export *` in any
-// domain-move commit fails loudly instead of silently shrinking the barrel.
 describe("api barrel surface", () => {
   it("exports exactly the 108 documented names", () => {
     const actual = Object.keys(barrel).sort();
     expect(actual).toEqual(EXPECTED_EXPORTS);
   });
 
-  // Keeps the domain cut from collapsing back toward one file — the ceiling is
-  // what makes a growing module split instead of absorb.
+  // Keeps the domain cut from collapsing back into one file.
   it("every module in frontend/src/api/ is <= 250 lines", () => {
     const oversized = apiSourceFiles()
       .map((f) => ({ f, lines: readFileSync(join(API_DIR, f), "utf8").split("\n").length }))
@@ -145,16 +140,14 @@ describe("api barrel surface", () => {
     expect(oversized).toEqual([]);
   });
 
-  // A function body here means a call site could start importing behaviour from
-  // the barrel, which is what re-creates the convergence point #1270 removed.
+  // A function body here would let call sites import behavior from the
+  // barrel — the exact convergence point #1270 removed.
   it("client.ts is a pure barrel — declares no functions", () => {
     const source = readFileSync(join(API_DIR, "client.ts"), "utf8");
     expect(source).not.toMatch(/\bfunction\b/);
   });
 
-  // Makes CLAUDE.md's "fetch only touches the API layer" invariant machine-
-  // checkable: one chokepoint means the 401 handler and credentials mode can
-  // never be bypassed by a domain module reaching for fetch directly.
+  // Makes CLAUDE.md's fetch-only-in-api-layer rule machine-checkable.
   it("only api/http.ts calls fetch(...)", () => {
     const offenders = apiSourceFiles()
       .filter((f) => f !== "http.ts")

@@ -5,13 +5,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { attachCharacterUpdate } from "@/lib/campaign/campaign-attach.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 
-// #1286: the route's edition-mismatch guard reads fresh DB state on every
-// request, so a mismatched pair can never reach this write through the real
-// HTTP endpoint — that's exactly why a same-edition regression pin can never
-// detect a converting write injected here. This test calls the extracted
-// function DIRECTLY, seeding a DB-level mismatch, bypassing the guard entirely
-// (it never touches the route or supertest) so the pin exercises exactly the
-// line a converting write would live on.
+// Calls attachCharacterUpdate directly, bypassing the route's edition-mismatch guard (which reads fresh DB state and would 409 this pair) — the only way to exercise this line with a mismatched pair.
 const OWNER_ID = "owner-campaign-attach";
 let CHARACTER_ID: string;
 let CAMPAIGN_ID: string;
@@ -57,8 +51,6 @@ afterAll(async () => {
 
 describe("attachCharacterUpdate (#1286)", () => {
   it("sets campaignId only — a DB-seeded mismatched pair's rulesEdition survives unchanged", async () => {
-    // The seeded pair disagrees (2014 vs 2024); the route's guard would 409
-    // this exact pair. Calling the function directly skips that guard.
     await prisma.$transaction((tx) => attachCharacterUpdate(tx, CHARACTER_ID, CAMPAIGN_ID));
 
     const after = await prisma.character.findUniqueOrThrow({

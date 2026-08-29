@@ -1,14 +1,12 @@
 /**
  * #1345: a client-supplied catalog id must not resolve against the OTHER
- * edition's row. Covers all seven sites the plan audit found (the issue named
- * three) — grouped by chunk below. Modelled on rules-edition-seam.test.ts:
- * real Postgres, characters built over HTTP with explicit rulesEdition.
+ * edition's row.
  *
- * Fixture rows are built through upsertEditionRow (compound keys containing
- * `edition` reject a literal null on findUnique/upsert — catalog-edition.ts).
- * afterAll deletes fixtures by NAME, never by an id/classId var that could be
- * undefined if beforeAll threw partway (an undefined classId reads to Prisma
- * as "no filter" and would delete the real catalog).
+ * Fixture rows use upsertEditionRow — compound keys containing `edition`
+ * reject a literal null on findUnique/upsert. afterAll deletes fixtures by
+ * NAME, never an id/classId var that could be undefined if beforeAll threw
+ * partway (an undefined id reads to Prisma as "no filter" and would delete
+ * the real catalog).
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -37,11 +35,6 @@ beforeAll(async () => {
 });
 
 describe("Chunk 1 — Feat / advancement.takeFeat (lib/leveling/advancement.ts:353)", () => {
-  // The seeded Alert fork (#1306's worked example) is unusable here: the
-  // Alert 2024 row is "origin"-gated, rejected by featOfferedForAsiSlot
-  // BEFORE the guard runs — a naive test against Alert would pass for the
-  // wrong reason. This trio is "general" category, reachable through the ASI
-  // slot at level 4.
   const FEAT_2014 = "XEd General 2014";
   const FEAT_2024 = "XEd General 2024";
   const FEAT_SHARED = "XEd General Shared";
@@ -78,7 +71,7 @@ describe("Chunk 1 — Feat / advancement.takeFeat (lib/leveling/advancement.ts:3
     await prisma.feat.deleteMany({ where: { name: { in: [FEAT_2014, FEAT_2024, FEAT_SHARED] } } });
   });
 
-  // Level 4 (XP 2700) → one ASI slot (advancement.test.ts:20 convention).
+  // Level 4 (XP 2700) → one ASI slot.
   async function createCharacter(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string) {
     const anchor = await seededSpeciesAnchor(rulesEdition);
     const res = await agent()
@@ -250,14 +243,9 @@ describe("Chunk 3 — Subclass / character-create.resolveSubclass (lib/character
   let subIdShared: string;
 
   beforeAll(async () => {
-    // subclassLevel 1: subclassGateLevel(_, "EDITION_2024") returns 3
-    // UNCONDITIONALLY (effective-levels.ts), so ANY 2024 character 400s at
-    // the pre-existing gate check regardless of this guard — a 2024 fixture
-    // here would pass for the wrong reason. Only a 2014 character reaches
-    // creation-time subclass resolution at all (gate 1), so the cross-edition
-    // test below must use one, and must assert on the edition wording
-    // specifically (not just status 400) or it can't be told apart from the
-    // gate rejection.
+    // subclassGateLevel(_, "EDITION_2024") returns 3 unconditionally, so only
+    // a 2014 character reaches creation-time subclass resolution — the test
+    // below asserts on edition wording, not just status 400.
     const cls = await prisma.characterClass.upsert({
       where: { name: CLASS_NAME },
       create: {
@@ -344,6 +332,8 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
   let maneuverIdShared: string;
   let choiceId2014: string;
   let choiceIdShared: string;
+  let rangerClassId: string;
+  let hunterSubclassId: string;
 
   beforeAll(async () => {
     const cls = await prisma.characterClass.upsert({
@@ -360,12 +350,6 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
       update: { subclassLevel: 3 },
     });
     classId = cls.id;
-    // #1546 Part B-ii: Battle Master's maneuver/tool choice-count caps (the
-    // "once the choice count is reached" 400s below) are ROW-driven now
-    // (fighter.ts's deriveExtras is gone) — a bespoke Subclass row with no
-    // ClassFeature children would silently lose them, same failure mode
-    // fighterResourceRowsData's own header describes for the base class
-    // (#1546 Part B-i, Ruling 2). Shared helper, not a per-file copy.
     const bm = await upsertEditionRow(
       prisma.subclass,
       { classId, name: BM_SUBCLASS_NAME, edition: null },
@@ -387,6 +371,11 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
     maneuverIdShared = (await mkGranted(MANEUVER_SHARED, "maneuver", null)).id;
     choiceId2014 = (await mkGranted(CHOICE_2014, "huntersPrey", "EDITION_2014")).id;
     choiceIdShared = (await mkGranted(CHOICE_SHARED, "huntersPrey", null)).id;
+
+    const rangerClass = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Ranger" } });
+    const hunterSubclass = await prisma.subclass.findFirstOrThrow({ where: { classId: rangerClass.id, name: "Hunter" }, orderBy: { id: "asc" } });
+    rangerClassId = rangerClass.id;
+    hunterSubclassId = hunterSubclass.id;
   });
 
   afterEach(async () => {
@@ -400,10 +389,7 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
     await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
   });
 
-  // Level-3 Battle Master Fighter, created via Prisma directly (not HTTP) so
-  // rulesEdition takes the column default EDITION_2024 — mirrors
-  // resources.test.ts's fixture shape (learnManeuver has no creation-flow
-  // analog to exercise over HTTP).
+  // Created via Prisma directly (not HTTP) so rulesEdition defaults to EDITION_2024.
   async function createBattleMaster() {
     await prisma.character.create({
       data: {
@@ -451,9 +437,7 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
     expect(learned).toBeDefined();
   });
 
-  // Level-7 Hunter Ranger, mirroring subclass-choices.test.ts's fixture — the
-  // subclass key "hunter" drives deriveResources directly (no Subclass
-  // catalog row needed).
+  // The subclass key "hunter" drives deriveResources directly; no Subclass catalog row needed.
   async function createHunter() {
     await prisma.character.create({
       data: {
@@ -473,7 +457,7 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
         currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
         spellcasting: Prisma.JsonNull,
         resources: Prisma.JsonNull,
-        classEntries: { create: [{ name: "ranger", subclass: "hunter", position: 0, level: 7 }] },
+        classEntries: { create: [{ name: "ranger", subclass: "hunter", classId: rangerClassId, subclassId: hunterSubclassId, position: 0, level: 7 }] },
       },
     });
   }
@@ -501,12 +485,9 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
 });
 
 describe("Chunk 5 — Subclass / level-up plan preview ?subclassId= (#1414)", () => {
-  // Deliberately shares no substring with a real class name: buildLevelUpPlan
-  // derives every step from the class NAME, so an "XEd Fighter" would pull in
-  // real Fighter features (fighting style, Extra Attack) and the assertions
-  // would stop being about this guard. Nothing here asserts on the `steps`
-  // array or a step's `meta` — the plan's step shape is another issue's
-  // surface, and coupling to it buys no coverage of the edition guard.
+  // CLASS_NAME must share no substring with a real class: buildLevelUpPlan
+  // derives its steps from the class name, so e.g. "XEd Fighter" would pull
+  // in real Fighter features and the assertions would stop testing this guard.
   const CLASS_NAME = "XEd Vanguard";
   const SUB_2014 = "XEd LvlSub 2014";
   const SUB_2024 = "XEd LvlSub 2024";
@@ -552,10 +533,9 @@ describe("Chunk 5 — Subclass / level-up plan preview ?subclassId= (#1414)", ()
     await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
   });
 
-  // Defaults put newLevel at 3 — equal to subclassGateLevel under BOTH editions
-  // (the catalog column is 3 and 2024 hardcodes 3), so the plan carries a
-  // subclass step for either fixture. `level: 5` overrides give a level-up whose
-  // plan has NO subclass step (the ordering proof below).
+  // Defaults put newLevel at 3, matching subclassGateLevel for both editions
+  // (catalog column 3, 2024 hardcodes 3); the `entryLevel: 5` override below
+  // gives a plan with no subclass step, for the ordering proof.
   async function createCharacter(
     rulesEdition: "EDITION_2014" | "EDITION_2024",
     name: string,
@@ -655,12 +635,8 @@ describe("Chunk 5 — Subclass / level-up plan preview ?subclassId= (#1414)", ()
     expect(res.body.target).toBeUndefined();
   });
 
-  // AC 4a (rewritten): the issue's original AC asked for the commit 400 to be
-  // TELLABLE APART from the preview's by message text, which is unsatisfiable —
-  // both now come from the same crossEditionRejection call in
-  // resolveLevelUpContext and surface through `{ error: error.message }`, so
-  // they are byte-identical over HTTP by construction. Identity is the property
-  // worth pinning: one rejection, one wording, wherever the player meets it.
+  // Both paths call crossEditionRejection via resolveLevelUpContext, so
+  // identical wording is the property this test pins.
   it("(AC 4a) the commit path's rejection is string-equal to the preview's", async () => {
     const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024e");
     const preview = await getPlan(id, classEntryId, subId2014);
@@ -669,11 +645,9 @@ describe("Chunk 5 — Subclass / level-up plan preview ?subclassId= (#1414)", ()
     expect(commit.body.error).toBe(preview.body.error);
   });
 
-  // AC 4b (rewritten): the ordering proof the message text can't give. At
-  // newLevel 5 the plan carries NO subclass step, so resolveEffectivePlan's
-  // "does not include a subclass choice" is what a submission carrying a
-  // subclassId gets today. Seeing the cross-edition message instead proves
-  // resolveLevelUpContext ran — and rejected — before validateLevelUpSubmission.
+  // At newLevel 5 the plan has no subclass step, so seeing the cross-edition
+  // message (not resolveEffectivePlan's "no subclass choice") proves
+  // resolveLevelUpContext rejects before validateLevelUpSubmission runs.
   it("(AC 4b) rejects on edition before the plan's no-subclass-step check", async () => {
     const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024f", {
       xp: 6500,
@@ -686,9 +660,9 @@ describe("Chunk 5 — Subclass / level-up plan preview ?subclassId= (#1414)", ()
     expect(res.body.error).not.toMatch(/does not include a subclass choice/);
   });
 
-  // AC 4c (rewritten): the error CLASS is what distinguishes this rejection from
-  // applySetSubclass's InvalidClassOperationError — over HTTP both are a 400
-  // with the same text, so only a direct lib call can assert which one threw.
+  // Only a direct lib call can distinguish this InvalidLevelUpError from
+  // applySetSubclass's InvalidClassOperationError — over HTTP both are an
+  // identical 400.
   it("(AC 4c) resolveLevelUpContext itself rejects with InvalidLevelUpError", async () => {
     const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024g");
     await expect(
@@ -696,10 +670,8 @@ describe("Chunk 5 — Subclass / level-up plan preview ?subclassId= (#1414)", ()
     ).rejects.toBeInstanceOf(InvalidLevelUpError);
   });
 
-  // AC 5 (kept, re-labelled): a REGRESSION guard, not data-loss prevention. The
-  // level-up batch is already atomic, so this passed before the guard too — it
-  // exists so a future refactor that moves the rejection inside the write
-  // transaction (or splits the batch) turns red here.
+  // Regression guard: the level-up batch is already atomic, so this only
+  // matters if a future refactor moves the rejection inside the write transaction.
   it("(AC 5 regression guard) a rejected commit leaves level, hit dice and subclass untouched", async () => {
     const { id, classEntryId } = await createCharacter("EDITION_2024", "XEd LevelUp 2024h");
     const res = await commitLevelUp(id, classEntryId, subId2014);

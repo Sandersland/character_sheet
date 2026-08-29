@@ -1,8 +1,4 @@
-// Collapsed disclosure for the optional spell swap (#1101): an onLevelUp-cadence
-// caster may forget one user-learned leveled spell in exchange for an extra
-// learn. The candidate list comes from swappableKnownSpells; picking one stages
-// the forget. #1509 D5: the "known"/"prepared" noun in the disclosure label and
-// empty state is the served casterModel, never hardcoded.
+// #1509: the "known"/"prepared" noun in the disclosure label and empty state is the served casterModel, never hardcoded.
 import { useState } from "react";
 
 import { casterModelNoun } from "@/lib/newSpells";

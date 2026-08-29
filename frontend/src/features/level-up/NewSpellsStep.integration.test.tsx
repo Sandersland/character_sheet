@@ -27,7 +27,6 @@ function spell(id: string, level: number): CatalogSpell {
   };
 }
 
-// hitPoints/hitDice/abilityScores present because step 1 is the real HitPointsStep (#887).
 const character = {
   id: "c1",
   rulesEdition: "EDITION_2024",
@@ -40,7 +39,6 @@ const character = {
   spellcasting: { slots: [], arcana: [], spells: [] },
 } as unknown as Character;
 
-// A known caster (sorcerer) whose book carries one swap candidate (#1101).
 const swapCaster = {
   ...character,
   classes: [{ id: "entry-1", name: "sorcerer", level: 4 }],
@@ -84,7 +82,6 @@ describe("NewSpellsStep in the ceremony", () => {
     await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
-    // New Spells step: real NewSpellsStep renders the eligible catalog; Fireball (L3) is above the ceiling.
     expect(await screen.findByText("Shield")).toBeInTheDocument();
     expect(screen.queryByText("Fireball")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
@@ -123,7 +120,6 @@ describe("NewSpellsStep in the ceremony", () => {
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     expect(await screen.findByText(/No new spells at this level, but you may swap one prepared spell/i)).toBeInTheDocument();
-    // Swap is optional — Continue is enabled with nothing chosen.
     expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
   });
 
@@ -138,13 +134,9 @@ describe("NewSpellsStep in the ceremony", () => {
     await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
-    // #1509: this fixture's character is EDITION_2024, so a Sorcerer's served
-    // casterModel is "prepared" — matching the swap-only test above, which
-    // already asserted "prepared spell" text for this same class/edition.
-    // Before the swap: one learn satisfies the count-1 step.
+    // This fixture's EDITION_2024 Sorcerer serves casterModel "prepared" (#1509).
     await user.click(await screen.findByRole("button", { name: /swap a prepared spell/i }));
     await user.click(await screen.findByRole("button", { name: /OldKnown/ }));
-    // Now the cap is 2 — pick both.
     await user.click(screen.getByRole("button", { name: "Add Shield" }));
     await user.click(screen.getByRole("button", { name: "Add MistyStep" }));
 

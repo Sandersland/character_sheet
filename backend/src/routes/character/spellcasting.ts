@@ -47,9 +47,7 @@ const restoreSlotOpSchema = z.object({
   level: z.number().int().min(1).max(9),
 });
 
-// Wizard Arcane Recovery (#904): recover expended slots totalling up to
-// ceil(wizardLevel/2) slot-levels, none above 5th. The lib enforces the cap,
-// the >5th rule, and the once-per-long-rest gate.
+// Wizard Arcane Recovery (#904): the lib enforces the cap (ceil(level/2) slot-levels, none above 5th) and the once-per-long-rest gate.
 const arcaneRecoveryOpSchema = z.object({
   type: z.literal("arcaneRecovery"),
   slots: z
@@ -81,15 +79,13 @@ const dropConcentrationOpSchema = z.object({
   type: z.literal("dropConcentration"),
 });
 
-// Dismiss an active while-active spell buff by its spell entry id (#363) — e.g.
-// ending Mage Armor early. Concentration buffs end via dropConcentration instead.
+// Dismiss an active while-active spell buff by its spell entry id (#363) — e.g. ending Mage Armor early. Concentration buffs end via dropConcentration instead.
 const dismissBuffOpSchema = z.object({
   type: z.literal("dismissBuff"),
   entryId: z.string().min(1),
 });
 
-// Sorcerer Font of Magic (#903): SP↔slot conversion. toSlot is capped at 5th
-// level (the cost table); toSorceryPoints accepts any slot level.
+// Sorcerer Font of Magic (#903): SP↔slot conversion. toSlot is capped at 5th level (the cost table); toSorceryPoints accepts any slot level.
 const convertSorceryPointsOpSchema = z.object({
   type: z.literal("convertSorceryPoints"),
   direction: z.enum(["toSlot", "toSorceryPoints"]),
@@ -117,18 +113,7 @@ const transactionsRequestSchema = z.object({
 
 /**
  * POST /api/characters/:id/spellcasting/transactions
- * Intent-bearing batch mutation for spell state — mirrors
- * POST /api/characters/:id/inventory/transactions. Operations:
- *   castSpell  — cast a known spell, expend its slot (if leveled), log the roll
- *   expendSlot — bare slot expenditure (no spell association)
- *   restoreSlot — restore one expended slot (undo mis-click)
- *   learnSpell — add a catalog spell by spellId
- *   forgetSpell — remove a spell from the spellbook by entryId
- *   prepareSpell / unprepareSpell — toggle preparation on a non-cantrip
- *
- * Returns the full updated character on success (same shape as all other
- * endpoints — re-fetched with characterInclude so derived spellcasting fields
- * reflect the new state).
+ * Returns the full updated character, re-fetched with characterInclude so derived spellcasting fields reflect the new state.
  */
 makeTransactionsEndpoint({
   router: spellcastingRouter,

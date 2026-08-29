@@ -16,10 +16,7 @@ beforeEach(() => {
 
 const character = { id: "char-1", rulesEdition: "EDITION_2014" } as unknown as Character;
 
-// The catalog is edition-scoped server-side (#1412), so the picker must ask for
-// the OWNING character's edition — the sheet has no ceremony context to inherit
-// one from, which is why this panel reads useCurrentCharacter itself. A
-// hardcoded edition would typecheck and render identically.
+// Guards against a hardcoded edition, which would typecheck and render identically.
 describe("AddManeuverPanel", () => {
   it("fetches the catalog for the owning character's edition on first expand", async () => {
     const user = userEvent.setup();

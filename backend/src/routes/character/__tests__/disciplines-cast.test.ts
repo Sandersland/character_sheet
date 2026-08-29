@@ -1,11 +1,7 @@
 /**
- * Way of the Four Elements discipline cast endpoint (2014-only, #1503):
- * POST /abilities/disciplines/transactions. Real Postgres + supertest.
- * Fixture is a Way of the Four Elements monk whose XP sets the level and
- * whose `resources.choicesKnown.fourElementsDisciplines` seeds known
- * disciplines directly (the learn/forget flow itself is the generic
- * learnSubclassChoice/forgetSubclassChoice machinery, already covered by
- * resources.ts's own tests — this file covers the CAST).
+ * Way of the Four Elements discipline cast endpoint (2014-only, #1503). The
+ * fixture seeds `resources.choicesKnown.fourElementsDisciplines` directly,
+ * bypassing learnSubclassChoice — this file covers only the cast.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -71,9 +67,6 @@ let classId: string;
 let subclassId: string;
 let disciplinesByName: Record<string, { id: string }>;
 
-// Seeds resources.choicesKnown.fourElementsDisciplines directly — bypasses
-// the learn flow (already covered generically by resources.ts tests) so this
-// file's own fixtures can pin a known entryId per test.
 function knownDiscipline(entryId: string, name: string) {
   return { id: entryId, optionId: disciplinesByName[name].id, name, description: "fixture" };
 }
@@ -114,13 +107,18 @@ describe("Discipline cast endpoint (#1503)", () => {
     });
     classId = cls.id;
 
-    // castDiscipline is row-driven now (#1912) — assertFourElementsMonk's
-    // guard (disciplines.ts) reads the entry's OWN subclassRef.features, a
-    // real DB relation, unlike the retired DERIVED_ACTIONS gate (which
-    // resolved off the subclass DISPLAY NAME alone and needed no such row).
-    // Mirrors warrior-of-elements.test.ts's own bespoke-subclass-plus-row
-    // pattern: a throwaway Subclass row under THIS bespoke class, carrying
-    // just the one ClassFeature row this file's casts need.
+    await prisma.classFeature.deleteMany({ where: { classId, subclassId: null } });
+    await prisma.classFeature.create({
+      data: {
+        classId, subclassId: null, name: "Ki", level: 2, edition: "EDITION_2014",
+        description: "You have a pool of Ki Points equal to your monk level.",
+        resourceKey: "ki", resourceLabel: "Ki Points", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      },
+    });
+
+    // assertFourElementsMonk reads the entry's own subclassRef.features — a
+    // real Subclass row is required, not just a display name.
     const sub = await prisma.subclass.findFirst({ where: { classId, name: "Way of the Four Elements Test Subclass" } });
     const subRow =
       sub ??
@@ -163,12 +161,9 @@ describe("Discipline cast endpoint (#1503)", () => {
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
   });
 
-  // Concentration is asserted by reading `spellcasting` straight off the DB
-  // row, not the serialized wire body: `spellcasting` is omitted from the
-  // wire entirely for a character with zero granted spells (spellcasting.ts's
-  // own `granted.length === 0 && …` early-return) — this fixture's throwaway
-  // test subclass grants none (Way of the Four Elements grants no spells in
-  // real content either), so the DB is the only reliable read here.
+  // `spellcasting` is omitted from the wire body for a character with zero
+  // granted spells (spellcasting.ts), so concentration must be read from the
+  // DB row directly.
   async function dbConcentratingOn(): Promise<unknown> {
     const row = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { spellcasting: true } });
     return (row!.spellcasting as { concentratingOn: unknown } | null)?.concentratingOn ?? null;
@@ -211,10 +206,8 @@ describe("Discipline cast endpoint (#1503)", () => {
     expect(res.body.error).toMatch(/1-2 ki at monk level 3/);
   });
 
-  // #1505 (found via the discipline cast UI's own browser verification): a
-  // discipline with no `costPerStep` (Fist of Four Thunders, flat 2 ki) has
-  // no PHB'14 "spend additional ki" clause at all — overspending it must be
-  // refused, not silently accepted for an unchanged roll.
+  // A discipline with no costPerStep (flat cost, e.g. Fist of Four Thunders)
+  // has no PHB'14 "spend additional ki" clause — overspending it must be rejected.
   it("rejects overspending a non-scalable discipline (Fist of Four Thunders, flat 2 ki) even within the per-cast cap", async () => {
     await createMonk(XP_L5, [knownDiscipline("e1", "Fist of Four Thunders")]);
     const res = await cast([{ type: "castDiscipline", entryId: "e1", requestedKi: 3, roll: 10 }]);
@@ -287,8 +280,6 @@ describe("Discipline cast endpoint (#1503)", () => {
     expect((reverted!.spellcasting as { concentratingOn: unknown }).concentratingOn).toBeNull();
   });
 
-  // #1503 AC: castDiscipline's audit trail is exactly a spendResource +
-  // castDiscipline pair (+ a concentration event for a concentrating cast).
   it("pins the audit trail of a non-concentrating cast (spendResource + castDiscipline, no concentration event)", async () => {
     await createMonk(XP_L3, [knownDiscipline("e1", "Fangs of the Fire Snake")]);
     const res = await cast([{ type: "castDiscipline", entryId: "e1", roll: 7 }]);

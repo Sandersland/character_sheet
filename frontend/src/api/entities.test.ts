@@ -14,7 +14,6 @@ import {
   updateEntity,
 } from "@/api/entities";
 
-// New direct coverage (#1270) — previously only exercised transitively.
 describe("fetchEntities", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

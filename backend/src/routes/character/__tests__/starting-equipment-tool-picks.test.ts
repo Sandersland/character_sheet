@@ -1,15 +1,4 @@
-// Open picks widen past weapons (#1564 commit 4). openPickFilterError today
-// hard-requires catalogItem.category === "weapon"; two PHB'24 entries need
-// more: Bard's "musical instrument of your choice" (a genuine open pick over
-// the instrument pool, filter.toolCategory) and Monk's "Artisan's Tools or
-// Musical Instrument chosen for the tool proficiency above" (bound to a
-// choice the player already made, boundToToolChoice — a free pick would let
-// a Monk take an instrument they have no proficiency with, which the book
-// does not permit). A fixture class (same "safe from assertEveryClassEdition
-// HasPackage" reasoning as starting-equipment-edition.test.ts) proves all
-// three branches in isolation; the real Bard/Monk EDITION_2024 packages (#1535)
-// exercise the same two non-weapon branches end-to-end in
-// starting-equipment-2024-content.test.ts.
+// openPickFilterError hard-required catalogItem.category === "weapon"; widened for toolCategory (Bard's musical instrument) and boundToToolChoice (Monk's tool bound to an already-made proficiency choice) (#1564).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -37,8 +26,7 @@ let fixtureClassId: string;
 let human2014Id: string;
 const createdCharacterIds: string[] = [];
 
-// Every group has exactly one option so `optionIndex: 0` is always valid;
-// each test varies only the open-pick choice under test.
+// Every group has exactly one option so `optionIndex: 0` is always valid; each test varies only the open-pick choice under test.
 function selections(weaponPick: string, instrumentPick: string, boundPick: string) {
   return {
     mode: "package" as const,
@@ -169,7 +157,6 @@ describe("open picks widen past weapons (#1564)", () => {
     expect(ok.status).toBe(201);
     createdCharacterIds.push(ok.body.id);
 
-    // Chose Flute proficiency, but tries to take the Drum for the bound pick.
     const rejected = await supertest
       .agent(app)
       .set("Cookie", COOKIE)

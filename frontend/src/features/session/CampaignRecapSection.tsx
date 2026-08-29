@@ -5,8 +5,6 @@ import { ItemBadgeList, StatTile } from "@/features/session/RecapPrimitives";
 import { formatDuration, formatTimeRange, type SummarizedParticipant } from "@/lib/sessionRecap";
 import type { CampaignRecap } from "@/types/character";
 
-// The party-wide aggregate: time window, headline tiles, secondary facts,
-// per-domain recap groups, and (multiplayer only) per-participant cards.
 export default function CampaignRecapSection({
   recap,
   participants,
@@ -51,7 +49,6 @@ export default function CampaignRecapSection({
 
       <RecapDomainGroups recap={recap} />
 
-      {/* Participants — multiplayer only (#278). */}
       {showParticipants && (
         <div className="flex flex-col gap-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">

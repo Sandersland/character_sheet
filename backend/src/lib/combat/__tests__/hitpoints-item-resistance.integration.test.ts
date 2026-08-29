@@ -97,7 +97,6 @@ describe("item-granted resistance halves damage via #456 flow (#529)", () => {
     await applyHitPointOperations(characterId, [{ type: "damage", amount: 10, damageType: "poison" }]);
     expect(await current(characterId)).toBe(30);
 
-    // Unattune → immunity drops, full damage again.
     await prisma.inventoryItem.update({ where: { id: amulet.id }, data: { attuned: false } });
     await applyHitPointOperations(characterId, [{ type: "damage", amount: 10, damageType: "poison" }]);
     expect(await current(characterId)).toBe(20);

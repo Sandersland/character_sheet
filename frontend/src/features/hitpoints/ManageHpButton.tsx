@@ -5,28 +5,15 @@ import HpSheetBody from "@/features/hitpoints/HpSheetBody";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface Props {
-  /** Styling for the trigger button — the host supplies its own chip/tile shell. */
   className?: string;
-  /** The visual readout rendered inside the trigger (HP value, meter, etc.). */
   children: ReactNode;
 }
 
-/**
- * A tappable HP control (#982): renders `children` inside a button labelled
- * "Manage hit points" that opens the shared "Hit Points" `BottomSheet`
- * (`HpSheetBody` — the single damage/heal/temp editing surface). The entry point
- * differs by surface: the mobile mini-header vitals carry it, while on desktop
- * the header dropped HP (#1085) so the live-Combat `CombatUtilityStrip` carries
- * it during play. The sheet stays open after an apply, so a player can chain
- * damage/heal without re-opening it.
- */
 export default function ManageHpButton({ className, children }: Props) {
   const { character } = useCurrentCharacter();
   const [open, setOpen] = useState(false);
 
-  // Dynamic accessible name so a screen-reader user hears the HP numbers, not
-  // just "Manage hit points" (#989 review). The visual readout is aria-hidden'd
-  // by the label, so the temp value must ride along here too.
+  // Button content is aria-hidden by this label, so temp must ride along here too (#989).
   const { current, max, temp } = character.hitPoints;
   const label =
     `Manage hit points: ${current} of ${max}` + (temp > 0 ? ` (+${temp} temp)` : "");

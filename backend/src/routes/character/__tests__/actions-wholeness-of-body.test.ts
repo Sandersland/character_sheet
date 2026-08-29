@@ -1,13 +1,4 @@
-/**
- * Wholeness of Body route tests (#1245) — the Warrior of the Open Hand's
- * Bonus-Action heal exercised through the real HTTP stack (POST
- * /api/characters/:id/actions/transactions), mirroring
- * actions-monk-focus.test.ts's pattern for the Monk's own resource pools.
- *
- * SRD 5.2: Bonus Action, regain Martial Arts die + Wisdom modifier HP; usable
- * max(1, Wis mod) times per long rest (the #1228 wholenessOfBody pool this
- * spends already encodes that count — see monk.ts's subclass resourceFn).
- */
+// SRD 5.2
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -24,7 +15,6 @@ const MONK_ID = "test-actions-wholeness-of-body";
 const MONK_CATALOG_NAME = "Actions Wholeness Of Body Test Monk";
 let monkClassId: string;
 
-// XP threshold for level 6 (single-class).
 const L6_XP = 14000;
 
 const MONK_BASE = {
@@ -40,7 +30,7 @@ const MONK_BASE = {
     dexterity: 16,
     constitution: 12,
     intelligence: 10,
-    wisdom: 14, // +2 mod → wholenessOfBody pool total 2
+    wisdom: 14,
     charisma: 8,
   },
   savingThrowProficiencies: ["strength", "dexterity"],
@@ -54,14 +44,35 @@ interface ActivityEvent {
   data?: Record<string, unknown>;
 }
 
+async function seedWholenessOfBodyRow(classId: string): Promise<string> {
+  const existing = await prisma.subclass.findFirst({ where: { classId, slug: "actions-wholeness-of-body-route-test" } });
+  const sub =
+    existing ??
+    (await prisma.subclass.create({
+      data: { classId, name: "Warrior of the Open Hand Route Test", description: "Test fixture subclass.", slug: "actions-wholeness-of-body-route-test" },
+    }));
+  await prisma.classFeature.deleteMany({ where: { subclassId: sub.id } });
+  await prisma.classFeature.create({
+    data: {
+      classId, subclassId: sub.id, name: "Wholeness of Body", level: 6, edition: "EDITION_2024",
+      description: "row text",
+      resourceKey: "wholenessOfBody", resourceRecharge: "longRest",
+      resourceTotals: [{ minLevel: 6, total: { abilityMod: "wisdom", min: 1 } }],
+      activationCost: "bonusAction", costKind: "pool", costPoolKey: "wholenessOfBody", costBase: 1,
+    },
+  });
+  return sub.id;
+}
+
 async function createMonk() {
+  const subclassId = await seedWholenessOfBodyRow(monkClassId);
   await prisma.character.create({
     data: {
       ...MONK_BASE,
       experiencePoints: L6_XP,
       ownerId: OWNER_ID,
       classEntries: {
-        create: [{ name: "monk", classId: monkClassId, position: 0, level: 6, subclass: "Warrior of the Open Hand" }],
+        create: [{ name: "monk", classId: monkClassId, subclassId, position: 0, level: 6, subclass: "Warrior of the Open Hand" }],
       },
     },
   });
@@ -115,10 +126,10 @@ describe("POST /:id/actions/transactions — Wholeness of Body (#1245)", () => {
   });
 
   it("spends 1 use and heals the client-rolled amount (Martial Arts die + Wis mod)", async () => {
-    const res = await executeAction("wholenessOfBody", 7); // e.g. 1d8 rolled 5 + Wis +2
+    const res = await executeAction("wholenessOfBody", 7);
     expect(res.status).toBe(200);
-    expect(pool(res.body, "wholenessOfBody")).toMatchObject({ used: 1, remaining: 1 }); // Wis +2 → 2 uses
-    expect(res.body.hitPoints.current).toBe(17); // 10 + 7
+    expect(pool(res.body, "wholenessOfBody")).toMatchObject({ used: 1, remaining: 1 });
+    expect(res.body.hitPoints.current).toBe(17);
   });
 
   it("the spend is logged as a session/activity spendResource event", async () => {
@@ -141,6 +152,6 @@ describe("POST /:id/actions/transactions — Wholeness of Body (#1245)", () => {
     const res = await executeAction("wholenessOfBody");
     expect(res.status).toBe(200);
     expect(pool(res.body, "wholenessOfBody")).toMatchObject({ used: 1, remaining: 1 });
-    expect(res.body.hitPoints.current).toBe(10); // unchanged
+    expect(res.body.hitPoints.current).toBe(10);
   });
 });

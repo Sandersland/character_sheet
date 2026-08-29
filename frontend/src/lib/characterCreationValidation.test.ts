@@ -17,8 +17,6 @@ const VALID_IDENTITY = {
   backgroundName: "Soldier",
 };
 
-// A two-group package: group 0 has a martial-weapon open pick, group 1 is a
-// simple either/or with no nested pick.
 const startingEquipment: ClassStartingEquipment = {
   groups: [
     {
@@ -74,8 +72,7 @@ describe("missingRequirements", () => {
     ]);
   });
 
-  // #1680: a variant-bearing species (2014 Dwarf) cannot Continue without a
-  // variant — mirrors the subclass-required pattern (an id-presence gate).
+  // Mirrors the subclass-required pattern (an id-presence gate) (#1680).
   it("flags a missing variant only when the species requires one", () => {
     expect(
       missingRequirements({
@@ -97,7 +94,6 @@ describe("missingRequirements", () => {
       })
     ).toEqual([]);
 
-    // Variantless species (2014 Human) — no Variant label even though none is chosen.
     expect(
       missingRequirements({
         ...VALID_IDENTITY,
@@ -151,7 +147,6 @@ describe("missingRequirements", () => {
     const draft: EquipmentDraft = {
       mode: "package",
       selections: [
-        // Option 0 chosen but its open pick is still empty.
         { optionIndex: 0, openPicks: [""] },
         { optionIndex: 0, openPicks: [] },
       ],
@@ -192,10 +187,7 @@ describe("missingRequirements", () => {
   });
 });
 
-// #1565: the background's OWN package, same completeness rule as the class
-// equipment block above but on the two backgroundStartingEquipment/
-// backgroundEquipmentDraft fields, with a distinct "Background equipment:"
-// label prefix so the two never collide.
+// Same completeness rule as the class equipment block, on separate fields with a distinct label prefix so the two never collide (#1565).
 describe("missingRequirements — background equipment (#1565)", () => {
   const backgroundEquipment: ClassStartingEquipment = {
     groups: [
@@ -247,7 +239,6 @@ describe("missingRequirements — background equipment (#1565)", () => {
       backgroundStartingEquipment: backgroundEquipment,
       backgroundEquipmentDraft: backgroundDraft,
     });
-    // Only the CLASS group is incomplete — the background one (complete) adds nothing.
     expect(result).toEqual(['Equipment: choose "Primary weapon"']);
   });
 });

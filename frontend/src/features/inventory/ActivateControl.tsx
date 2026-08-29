@@ -7,9 +7,6 @@ interface ActivateControlProps {
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
 }
 
-// Activate/deactivate control for an item's activatedEffect capability (#543).
-// Shows the activation type + duration reminder, remaining uses, and toggles the
-// seeded self-buff. Absent unless the item exposes `activated` (has the capability).
 export default function ActivateControl({ item, pending, onSubmit }: ActivateControlProps) {
   const a = item.activated;
   if (!a) return null;

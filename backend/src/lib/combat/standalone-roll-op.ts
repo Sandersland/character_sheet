@@ -1,21 +1,13 @@
 /**
- * Standalone-roll op (#1861) — the `logRoll` arm of the resolve-action
- * resolver's op union. A player-driven ability check / saving throw /
- * initiative roll (RollContext) or the tally-resolve inline damage roll
- * (useTallyResolve) commits here now, NOT through the retired fire-and-forget
- * POST .../sessions/:id/roll route. Writing it through the SAME resolver as a
- * weapon swing / spell cast is what makes it a real batched, trivially-
- * undoable audit event instead of a fire-and-forget log entry — which in turn
- * let the `category != "roll"` LIFO-undo skip in activity.ts be deleted (a
- * standalone roll never blocks a real batch's undo because it is itself the
- * next undoable batch in the LIFO chain).
+ * Standalone-roll op (#1861) — the `logRoll` arm of the resolve-action resolver's op union. A
+ * player-driven ability check/saving throw/initiative roll, or the tally-resolve inline damage roll,
+ * commits here as a real batched, trivially-undoable audit event (a standalone roll is itself the next
+ * undoable batch in the LIFO chain, so it never blocks a real batch's undo).
  *
- * The persisted event is deliberately UNCHANGED from what the old logRollEvent
- * wrote: category "roll", type ROLL_EVENT_TYPES[kind], the same
- * RollEventData-shaped `data`, before/after null (a roll mutates no character
- * state). The session-log feed dispatches on event TYPE (checkRoll/saveRoll/
- * initiativeRoll/damageRoll), so its rendering is untouched — only the write
- * path (batched + resolver-owned batchId + returns the character) changed.
+ * The persisted event matches what the retired logRollEvent wrote: category "roll", type
+ * ROLL_EVENT_TYPES[kind], the same RollEventData-shaped `data`, before/after null (a roll mutates no
+ * character state). The session-log feed dispatches on event TYPE, so its rendering is untouched —
+ * only the write path (batched + resolver-owned batchId) changed.
  */
 import { z } from "zod";
 
@@ -34,7 +26,7 @@ const ROLL_EVENT_TYPES: Record<RollEventKind, EventType> = {
 
 // `.strict()` rejects unknown keys — these persist verbatim into a durable
 // event log, so an attacker-supplied extra key must 400, not ride along
-// (mirrors roll-components' own rationale, and the retired route's ROLL_CHECKS).
+// (mirrors roll-components' own rationale).
 const modeSourceSchema = z
   .object({
     mode: z.enum(["advantage", "disadvantage", "flat"]),
@@ -71,8 +63,7 @@ export const standaloneRollOperationSchema = z.object({
   modeSources: z.array(modeSourceSchema).max(20).optional(),
   attackComponents: attackComponentsSchema.optional(),
   damageComponents: damageComponentsSchema.optional(),
-  // target/outcome are RESERVED on RollEventData and never accepted — see that
-  // type's doc comment (self-or-announce, no enemy/target model).
+  // target/outcome are RESERVED on RollEventData and never accepted (self-or-announce, no enemy/target model).
 });
 
 export type StandaloneRollOperation = z.infer<typeof standaloneRollOperationSchema>;

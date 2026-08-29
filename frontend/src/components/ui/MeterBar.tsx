@@ -5,27 +5,19 @@ interface MeterBarProps {
   max: number;
   tone?: MeterTone;
   label?: string;
-  /** Track sizing override; defaults to the full-width 10px desktop bar. */
   className?: string;
 }
 
 const TONE_FILL: Record<MeterTone, string> = {
-  // Deliberately NOT garnet-surface (#994): a meter fill's contrast reference is
-  // its own parchment-200 track, not the page. garnet-surface measures 2.65:1
-  // there and would fail SC 1.4.11 in dark. garnet-meter (#1403) is a dedicated
-  // non-inverting token frozen to today's garnet-600 values (3.95:1 dark /
-  // 3.56:1 light against the track) — see index.css's @theme comment.
+  // Not garnet-surface (#994): against the parchment-200 track (not the page)
+  // it measures 2.65:1, failing WCAG SC 1.4.11 in dark. garnet-meter (#1403) is
+  // frozen to garnet-600 values (3.95:1 dark / 3.56:1 light) to stay compliant.
   garnet: "bg-garnet-meter",
   arcane: "bg-arcane-500",
   gold: "bg-gold-500",
   vitality: "bg-vitality-500",
 };
 
-/**
- * Horizontal resource meter (HP, spell slot pool, etc). Color alone never
- * carries the value — the numeric current/max is always rendered as text
- * per colors.md ("never rely on color as the only signal").
- */
 export default function MeterBar({
   current,
   max,

@@ -4,10 +4,7 @@ import { beforeAll, describe } from "vitest";
 import { createS3BlobStore } from "../s3-blob-store.js";
 import { runBlobStoreContract } from "./blob-store-contract.js";
 
-// Opt-in leg: without S3_TEST_ENDPOINT the whole file skips, keeping the local
-// suite hermetic (no network, no credentials). CI runs it against MinIO so the
-// "same contract suite passes against both drivers" AC is machine-enforced and
-// the driver has real coverage for the fallow CRAP gate (#1614).
+// #1614: without S3_TEST_ENDPOINT the whole file skips, keeping the local suite hermetic (no network, no credentials); CI runs it against MinIO.
 const endpoint = process.env.S3_TEST_ENDPOINT;
 const credentials = {
   bucket: process.env.S3_TEST_BUCKET ?? "test-bucket",
@@ -28,8 +25,7 @@ describe.skipIf(!endpoint)("s3 driver against a live endpoint", () => {
       await client.send(new CreateBucketCommand({ Bucket: credentials.bucket }));
     } catch (error) {
       const name = (error as Error).name;
-      // A bucket surviving from an earlier run is fine — the contract suite
-      // namespaces its keys per run.
+      // A bucket surviving from an earlier run is fine — keys are namespaced per run.
       if (name !== "BucketAlreadyOwnedByYou" && name !== "BucketAlreadyExists") {
         throw error;
       }

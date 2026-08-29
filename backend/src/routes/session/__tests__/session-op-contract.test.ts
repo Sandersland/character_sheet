@@ -1,9 +1,4 @@
-/**
- * Latch for the session PATCH schema migrated into @character-sheet/contracts
- * (#1394, epic #1369). The whole-object `.refine()` doesn't touch the
- * input/output shape, so z.input and z.output coincide here — asserted, not
- * assumed (expectTypeOf is erased at runtime; `npm run typecheck` gates it).
- */
+// patchSessionSchema's whole-object .refine() doesn't touch the input/output shape, so z.input and z.output must coincide (#1394); expectTypeOf is erased at runtime, gated by `npm run typecheck`.
 import { patchSessionSchema, type PatchSessionInput } from "@character-sheet/contracts";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { z } from "zod";

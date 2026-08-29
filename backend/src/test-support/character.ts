@@ -15,11 +15,7 @@ const BASE_CHARACTER = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-// Minimal persisted character for tests that only need an owned row of a given
-// edition — e.g. authoring a homebrew spell, whose edition the create endpoint
-// derives from the authoring character (#1819). Cascade-deleted with its owner
-// (Character.owner onDelete: Cascade), so a test that cleans up its users needs
-// no separate character cleanup.
+// Cascade-deleted with its owner (Character.owner onDelete: Cascade), so a test that cleans up its users needs no separate character cleanup.
 export async function createTestCharacter(
   ownerId: string,
   opts: { id?: string; edition?: RulesEdition; name?: string; campaignId?: string } = {},
@@ -27,8 +23,7 @@ export async function createTestCharacter(
   const character = await prisma.character.create({
     data: {
       ...BASE_CHARACTER,
-      // `id: undefined` lets Prisma fall back to the uuid default — pass it only
-      // when a test needs a stable fixture id.
+      // `id: undefined` lets Prisma fall back to the uuid default — pass it only when a test needs a stable fixture id.
       id: opts.id,
       name: opts.name ?? "Test Author Character",
       ownerId,

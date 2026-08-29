@@ -1,17 +1,4 @@
-// #1224 commit 1: Bard's EDITION_2014 rows must be byte-identical
-// transcriptions of what lib/classes/bard.ts's BARD_FEATURES/
-// COLLEGE_OF_LORE_FEATURES/COLLEGE_OF_VALOR_FEATURES said BEFORE this
-// migration — 2014 is a supported edition, not a rewrite target. This
-// snapshot is that pre-change text, pinned by hand from the tree at the
-// commit before #1224 landed, NOT re-derived from anything this migration
-// touches — a hardcoded oracle is the whole point, mirroring
-// cleric-2014-snapshot.test.ts's/ranger-2014-snapshot.test.ts's shape.
-//
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (BARD_FEATURES is authored as a byte-identical copy in the
-// same commit that adds this file). Its job is to catch commit 2 silently
-// editing a 2014 row while authoring 2024 content — this file must stay
-// green, unedited, from commit 1 through commit 3.
+// This snapshot must stay green and unedited through commit 3 — its job is to catch a later commit silently editing a 2014 row while authoring 2024 content.
 import { describe, expect, it } from "vitest";
 
 import { BARD_FEATURES } from "../bard-features.js";
@@ -24,7 +11,6 @@ interface Pinned {
 }
 
 const PRE_CHANGE_2014: Pinned[] = [
-  // ---- Base class ----------------------------------------------------------
   {
     subclassSlug: null,
     name: "Spellcasting",
@@ -87,7 +73,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     level: 20,
     description: "When you roll initiative and have no uses of Bardic Inspiration remaining, you regain one use.",
   },
-  // ---- College of Lore -------------------------------------------------------
   {
     subclassSlug: "bard-college-of-lore",
     name: "Bonus Proficiencies",
@@ -115,7 +100,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "When making an ability check, expend one Bardic Inspiration die to add the number rolled to the check. You can use this feature even if you're the one inspiring yourself.",
   },
-  // ---- College of Valor -------------------------------------------------------
   {
     subclassSlug: "bard-college-of-valor",
     name: "Bonus Proficiencies",
@@ -170,10 +154,7 @@ describe("Bard EDITION_2014 rows are byte-identical to the pre-#1224 tree (2014 
     expect(actualKeys).toEqual(pinnedKeys);
   });
 
-  // Extra pin beyond the Cleric template (#1224 plan): the derivedStat pair
-  // riding College of Valor's Extra Attack row must survive the AuthoredFeature
-  // -> literal-row move losslessly — extra-attack-seeded.test.ts is the
-  // DB-backed proof; this is the in-memory companion.
+  // derivedStat/derivedStatTiers on this row must survive the AuthoredFeature-to-literal-row move losslessly.
   it("College of Valor's Extra Attack keeps its derivedStat/derivedStatTiers under EDITION_2014", () => {
     const row = BARD_FEATURES.find(
       (r) => r.edition === "EDITION_2014" && r.subclassSlug === "bard-college-of-valor" && r.name === "Extra Attack",

@@ -1,19 +1,3 @@
-// #1227 AC #2: every Fighter EDITION_2024 row must be asserted against its
-// SRD 5.2 (or mirror-sourced PHB'24, cited as such) value — never merely
-// against "differs from 2014". feature-edition.test.ts's ledger proves a pair
-// DIFFERS, which is exactly the check this AC rules out; it is not a
-// substitute for this file. Mirrors fighter-2014-snapshot.test.ts's
-// three-assertion shape (count / per-row level+description / set-equality),
-// pinned by hand from fighter-features.ts's authored text, NOT re-derived
-// from that file — a hardcoded oracle is the whole point, so a wrong level or
-// a rewritten description in fighter-features.ts goes red here instead of
-// passing silently through the rest of the suite.
-//
-// Eldritch Knight is deferred to #1531 (fighter-features.ts's
-// ELDRITCH_KNIGHT_RAW rows are UNTAGGED, so expand() seeds identical text for
-// both editions) — its 6 EDITION_2024 rows are asserted equal to their
-// EDITION_2014 twins below, so the residual is pinned rather than merely
-// disclosed.
 import { describe, expect, it } from "vitest";
 
 import { FIGHTER_FEATURES } from "../fighter-features.js";
@@ -25,7 +9,7 @@ interface Pinned {
   description: string;
 }
 
-// ---- Base class — SRD 5.2 pp. 47-48 ---------------------------------------
+// SRD 5.2 pp. 47-48
 const BASE_2024: Pinned[] = [
   {
     subclassSlug: null,
@@ -116,7 +100,7 @@ const BASE_2024: Pinned[] = [
   },
 ];
 
-// ---- Champion — SRD 5.2 p. 49 ----------------------------------------------
+// SRD 5.2 p. 49
 const CHAMPION_2024: Pinned[] = [
   {
     subclassSlug: "fighter-champion",
@@ -158,7 +142,7 @@ const CHAMPION_2024: Pinned[] = [
   },
 ];
 
-// ---- Battle Master — PHB'24 (mirror-sourced; not in SRD 5.2) ---------------
+// PHB'24 (mirror-sourced; not in SRD 5.2)
 const BATTLE_MASTER_2024: Pinned[] = [
   {
     subclassSlug: "fighter-battle-master",
@@ -202,9 +186,7 @@ const BATTLE_MASTER_2024: Pinned[] = [
   },
 ];
 
-// ---- Eldritch Knight — PARKED (#1531): untagged rows, identical to the ----
-// EDITION_2014 twin. Pinned here as an explicit equality, not merely
-// disclosed by a comment, so the residual can't silently drift.
+// Eldritch Knight rows are untagged in fighter-features.ts (#1531), so 2024 equals 2014 here — pinned explicitly, not just disclosed.
 const ELDRITCH_KNIGHT_2024_EQUALS_2014: Pinned[] = [
   {
     subclassSlug: "fighter-eldritch-knight",

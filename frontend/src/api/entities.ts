@@ -9,11 +9,6 @@ import type {
 } from "@/types/character";
 import { jsonBody, request, send } from "@/api/http";
 
-// Campaign entities & @-tagging (#248). Plain REST. Search/list is campaign-scoped;
-// create/edit are any-member; delete is OWNER-only (server-enforced). Backlinks come
-// pre-filtered server-side to the caller's own notes plus other members' CAMPAIGN-
-// shared ones (#838), so no client-side visibility logic is needed.
-
 export async function fetchEntities(
   campaignId: string,
   opts?: { q?: string; type?: EntityType; includeStats?: boolean },
@@ -65,11 +60,9 @@ export async function updateEntity(
   );
 }
 
-// Uploads an entity portrait as a multipart body under the `portrait` field —
-// the same #1615 contract as uploadCharacterPortrait, including the deliberate
-// absence of a Content-Type header (the browser must generate the multipart
-// boundary). Owner-only server-side; returns the wire entity whose portraitUrl
-// carries a fresh ?v= version so a cached <img> naturally refetches.
+// Same contract as uploadCharacterPortrait: no Content-Type header (the
+// browser must generate the multipart boundary), and the returned entity's
+// portraitUrl carries a fresh ?v= version so a cached <img> refetches.
 export async function uploadEntityPortrait(
   campaignId: string,
   entityId: string,
@@ -84,8 +77,7 @@ export async function uploadEntityPortrait(
   );
 }
 
-// Removes the entity's portrait (idempotent server-side) and returns the wire
-// entity, portraitUrl now null.
+// Idempotent; the returned entity has portraitUrl null.
 export async function deleteEntityPortrait(
   campaignId: string,
   entityId: string,
@@ -105,6 +97,9 @@ export async function deleteEntity(campaignId: string, entityId: string): Promis
   );
 }
 
+// Backlinks come pre-filtered server-side to the caller's own notes plus
+// other members' CAMPAIGN-shared ones — no client-side visibility filtering
+// needed.
 export async function fetchEntityBacklinks(
   campaignId: string,
   entityId: string,
@@ -141,10 +136,8 @@ export async function fetchEntityActivity(
   );
 }
 
-// Entity identity merges (#387). Owner-only writes (prepare/execute/unmerge). The
-// list is scrubbed server-side: a non-owner only ever receives EXECUTED merges
-// between revealed identities.
-
+// The list is scrubbed server-side: a non-owner only ever receives EXECUTED
+// merges between revealed identities.
 export async function fetchEntityMerges(campaignId: string): Promise<CampaignEntityMerge[]> {
   return request<CampaignEntityMerge[]>(
     `/campaigns/${campaignId}/entities/merges`,
@@ -183,12 +176,9 @@ export async function unmergeEntityMerge(campaignId: string, mergeId: string): P
   );
 }
 
-// Destructive typo-dedup (#1942): absorbs every `loserEntityIds` duplicate
-// into `survivorEntityId` in one atomic combine and deletes them — all or
-// nothing, so a failure leaves every entity untouched. A single combine is a
-// 1-length loserEntityIds array (CombineConfirmDialog); the inbox's
-// Review-duplicates modal passes a cluster's whole loser list in one call.
-// Owner-only server-side; no undo — the confirm surface calling this is the gate.
+// Atomic and all-or-nothing: absorbs every `loserEntityIds` duplicate into
+// `survivorEntityId` and deletes them, or leaves every entity untouched.
+// Owner-only server-side; no undo.
 export async function combineEntities(
   campaignId: string,
   survivorEntityId: string,

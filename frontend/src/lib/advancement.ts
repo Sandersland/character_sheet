@@ -1,5 +1,3 @@
-// Pretty-print an AdvancementEntry's mechanical effects for the list view.
-
 import { abilityLabel, skillLabel } from "@/lib/abilities";
 import type { AdvancementEntry, FeatImprovement } from "@/types/character";
 
@@ -10,21 +8,18 @@ export const NUMERIC_TARGET_LABELS: Record<string, string> = {
   initiative: "initiative",
 };
 
-// Ability score bumps (from abilityDeltas, same cascade as ASI): "+2 Strength".
 function abilityBumpParts(abilityDeltas: AdvancementEntry["abilityDeltas"]): string[] {
   return Object.entries(abilityDeltas)
     .filter(([, d]) => d !== 0)
     .map(([ab, d]) => `+${d} ${abilityLabel(ab)}`);
 }
 
-// Numeric stat bonuses from improvements: "+1/level max HP".
 function numericBonusParts(improvements: FeatImprovement[]): string[] {
   return improvements
     .filter((imp) => imp.target in NUMERIC_TARGET_LABELS)
     .map((imp) => `+${imp.amount}${imp.perLevel ? "/level" : ""} ${NUMERIC_TARGET_LABELS[imp.target]}`);
 }
 
-// Proficiency labels for a given improvement target, resolved via `labelFor`.
 function profLabels(
   improvements: FeatImprovement[],
   target: FeatImprovement["target"],
@@ -43,7 +38,6 @@ function featDetail(entry: AdvancementEntry): string | undefined {
   const saves = profLabels(improvements, "savingThrowProficiency", abilityLabel);
   if (saves.length) parts.push(`Save prof: ${saves.join(", ")}`);
 
-  // Fall back to description when there are no improvements to summarize.
   return parts.length ? parts.join(" · ") : (entry.featDescription ?? undefined);
 }
 

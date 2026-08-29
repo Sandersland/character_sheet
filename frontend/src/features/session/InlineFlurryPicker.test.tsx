@@ -69,7 +69,6 @@ function monkCharacter(overrides: Partial<Character> = {}): Character {
     improvisedWeapon: { attackBonus: 2, damage: { count: 1, faces: 4, modifier: 0, damageType: "bludgeoning" }, proficient: false },
     resources: { pools: [] },
     advancements: [],
-    // The Shortsword's served row is present and must still never be offered.
     attackRows: [
       attackRow({
         id: "inv-1",
@@ -179,8 +178,6 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
     await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
     await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
 
-    // Strike 2 — the rail re-arms itself (mirrors InlineAttackPicker's Extra
-    // Attack loop) since a strike remains.
     await waitFor(() => expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled());
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
 
@@ -248,8 +245,7 @@ function LiveHarness({ character }: { character: Character }) {
 describe("InlineFlurryPicker — resolveAction commit + strike loop (live turnState, #1845)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    // useTurnState persists to localStorage keyed by sessionId — clear so a
-    // prior test's economy never rehydrates into the next one.
+    // useTurnState persists to localStorage keyed by sessionId — clear or a prior test's economy rehydrates into the next one.
     window.localStorage.clear();
   });
 

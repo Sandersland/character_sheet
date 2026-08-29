@@ -1,16 +1,3 @@
-/**
- * Warrior of the Elements route tests (#1247). A level-17 Warrior of the
- * Elements (Wis 16, prof +6) has focus DC 17 and a d12 Martial Arts die.
- * Elemental Burst spends 2 Focus and rolls 3× the Martial Arts die vs a Dex
- * save; Elemental Strikes require an active attunement and force a Str save.
- *
- * Elemental Attunement's own toggle moved OFF this endpoint (#1686) onto the
- * generic row-driven "toggle" mechanism (POST .../actions/transactions,
- * executeAction "elementalAttunement"/"endElementalAttunement") — its own
- * coverage lives in this file's "Elemental Attunement toggle" describe block
- * below, exercised through that endpoint instead of `url`.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -30,7 +17,7 @@ const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Warrior of Elements Test Monk",
   alignment: "True Neutral",
-  experiencePoints: 225000, // level 17 → proficiency +6, Martial Arts die d12
+  experiencePoints: 225000,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 120, max: 120, temp: 0 },
@@ -46,25 +33,19 @@ function agent() {
   return supertest.agent(app).set("Cookie", COOKIE);
 }
 const url = `/api/characters/${FIXTURE_ID}/abilities/warrior-of-elements/transactions`;
-// Elemental Attunement's own toggle (#1686) — the generic row-driven actions
-// endpoint, not the bespoke `url` above.
+// Elemental Attunement's toggle runs through the generic row-driven actions endpoint, not `url` above.
 function toggleAttunement(actionKey: "elementalAttunement" | "endElementalAttunement") {
   return agent()
     .post(`/api/characters/${FIXTURE_ID}/actions/transactions`)
     .send({ operations: [{ type: "executeAction", actionKey }] });
 }
 
-// #1524: production always sets both classId/subclassId (routes/character/
-// class.ts, level-up.ts), and characterInclude's ClassFeature relations key
-// off them. This fixture's bespoke CLASS_NAME row (isolated by name, this
-// file's own convention) carries no seeded rows on its own, so a subclass
-// string with no matching subclassId now loses that subclass's feature TEXT
-// entirely. Only "Warrior of the Elements" is asserted against `.features`
-// (the rest only exercise pools/gates, unaffected by missing subclassId), so
-// only its rows are seeded — text copied verbatim from the real seeded Monk/
-// Warrior of the Elements EDITION_2024 rows.
+// characterInclude's ClassFeature relations key off classId+subclassId together — a subclass string with no matching subclassId loses that subclass's feature text, so only "Warrior of the Elements" (the one asserted against .features) is seeded here.
 const WARRIOR_OF_ELEMENTS_SUBCLASS_NAME = "Warrior of Elements Route Test Subclass";
 let warriorOfElementsSubclassId: string | undefined;
+
+// Guards the Focus row below against a redundant re-seed on every resolveClassAndSubclass call.
+let focusRowSeeded = false;
 
 async function resolveClassAndSubclass(subclass: string | undefined): Promise<{ classId: string; subclassId: string | undefined }> {
   const cls = await prisma.characterClass.upsert({
@@ -72,19 +53,27 @@ async function resolveClassAndSubclass(subclass: string | undefined): Promise<{ 
     create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
     update: {},
   });
+  if (!focusRowSeeded) {
+    await prisma.classFeature.deleteMany({ where: { classId: cls.id, subclassId: null } });
+    await prisma.classFeature.create({
+      data: {
+        classId: cls.id, subclassId: null, name: "Focus", level: 2, edition: "EDITION_2024",
+        description: "You have a pool of Focus Points equal to your monk level.",
+        resourceKey: "focus", resourceLabel: "Focus Points", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      },
+    });
+    focusRowSeeded = true;
+  }
   if (subclass !== "Warrior of the Elements") return { classId: cls.id, subclassId: undefined };
 
   if (!warriorOfElementsSubclassId) {
-    // find-then-create, never .upsert()'s classId_name compound key: `edition`
-    // is nullable and Prisma rejects a literal null inside a compound-unique
-    // where at runtime (dec-1-2, catalog-edition.ts's upsertEditionRow JSDoc).
+    // find-then-create, not .upsert()'s classId_name compound key — edition is nullable, and Prisma rejects a literal null in a compound-unique where clause.
     const existing = await prisma.subclass.findFirst({ where: { classId: cls.id, name: WARRIOR_OF_ELEMENTS_SUBCLASS_NAME } });
     const sub =
       existing ??
       (await prisma.subclass.create({
-        // A distinct slug (not the real "warrior-of-elements") — Subclass has
-        // a @@unique([slug, edition]) constraint and the real seeded row
-        // shares this fixture's (implicit) null edition.
+        // A distinct slug — Subclass has a @@unique([slug, edition]) constraint and the real seeded row shares this fixture's (implicit) null edition.
         data: { classId: cls.id, name: WARRIOR_OF_ELEMENTS_SUBCLASS_NAME, description: "Test fixture subclass.", slug: "warrior-of-elements-route-test-fixture" },
       }));
     warriorOfElementsSubclassId = sub.id;
@@ -94,7 +83,7 @@ async function resolveClassAndSubclass(subclass: string | undefined): Promise<{ 
         {
           classId: cls.id, subclassId: sub.id, name: "Elemental Attunement", level: 3, edition: "EDITION_2024",
           description: "At the start of your turn, you can expend 1 Focus Point (no action) to imbue yourself with elemental energy for 10 minutes (or until you're Incapacitated). While attuned: your Unarmed Strike reach increases by 10 ft; and once per Unarmed Strike hit you can deal Acid, Cold, Fire, Lightning, or Thunder damage instead of the normal type — when you do, you can force the target to make a Strength saving throw (your focus save DC), moving it up to 10 ft in a direction of your choice on a failure.",
-          // #1686: the toggle half — mirrors monk.ts's real AuthoredFeature entry.
+          // Mirrors the real AuthoredFeature toggle entry.
           activationCost: "free",
           resolverKind: "toggle",
           resourceKey: "elementalAttunement",
@@ -107,8 +96,7 @@ async function resolveClassAndSubclass(subclass: string | undefined): Promise<{ 
         {
           classId: cls.id, subclassId: sub.id, name: "Elemental Burst", level: 6, edition: "EDITION_2024",
           description: "As a Magic action, you can expend 2 Focus Points to create a 20-foot-radius sphere of elemental energy centered on a point within 120 ft. Choose Acid, Cold, Fire, Lightning, or Thunder. Each creature in the sphere makes a Dexterity saving throw (your focus save DC), taking damage equal to three rolls of your Martial Arts die of the chosen type on a failure, or half as much on a success.",
-          // Row-driven action (#1912) — S, identity == pool. The save-DC
-          // damage op stays in warrior-of-elements.ts's own endpoint.
+          // Row-driven action (#1912): cost is a flat pool spend; the save-DC damage op stays bespoke.
           resourceKey: "elementalBurst", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 2,
         },
         { classId: cls.id, subclassId: sub.id, name: "Stride of the Elements", level: 11, edition: "EDITION_2024", description: "While your Elemental Attunement is active, you have a Fly Speed and a Swim Speed each equal to your Speed." },
@@ -131,7 +119,6 @@ async function createMonk(level: number, subclass?: string) {
   });
 }
 
-// Minimal XP thresholds (levelForExperience) for the levels this suite uses.
 function xpForLevel(level: number): number {
   if (level >= 17) return 225000;
   if (level >= 6) return 14000;
@@ -139,10 +126,7 @@ function xpForLevel(level: number): number {
   return 0;
 }
 
-// A single-class monk whose classEntries[0].level COLUMN lags the XP-derived
-// level (a "pending level-up" — the character gained XP but hasn't run the
-// /hp levelUp op yet, mirrors hitDice.total vs progress.level in
-// character-serialize.ts). Distinct from createMonk, which keeps both in sync.
+// A "pending level-up": XP-derived level outruns classEntries[0].level because /hp's levelUp op hasn't run yet. createMonk keeps both in sync; this fixture deliberately doesn't.
 async function createMonkStaleLevelColumn(entryLevelColumn: number, xpLevel: number, subclass?: string) {
   const { classId, subclassId } = await resolveClassAndSubclass(subclass);
   await prisma.character.create({
@@ -192,15 +176,13 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     expect(actionKeys).toContain("elementalBurst");
   });
 
-  // #1686: Elemental Attunement's own toggle is row-driven now — the generic
-  // actions endpoint (toggleAttunement helper), not `url`.
   it("Elemental Attunement toggles a 10-min while-active buff, spending 1 Focus", async () => {
     await createMonk(17, "Warrior of the Elements");
     const res = await toggleAttunement("elementalAttunement");
     expect(res.status).toBe(200);
 
     const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
-    expect(focus.remaining).toBe(16); // 17 total − 1 spent
+    expect(focus.remaining).toBe(16);
 
     const buffs = await activeBuffs();
     const buff = buffs.find((b) => b.key === ELEMENTAL_ATTUNEMENT_BUFF_KEY)!;
@@ -213,12 +195,6 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     expect((await activeBuffs()).some((b) => b.key === ELEMENTAL_ATTUNEMENT_BUFF_KEY)).toBe(false);
   });
 
-  // #1275/#1686 byte-identity oracle: originally captured on the per-feature
-  // URL, then re-pinned here against the generic actions endpoint — a green
-  // run is evidence the buff/spend shape is unchanged. The THIRD
-  // "toggleElementalAttunement" summary event the old bespoke closure logged
-  // is intentionally gone (#1686): the generic toggle handler logs only the
-  // primitive ops (buffApplied, spendResource), same as Rage's own migration.
   it("pins the audit trail of one Elemental Attunement toggle", async () => {
     await createMonk(17, "Warrior of the Elements");
     const res = await toggleAttunement("elementalAttunement");
@@ -252,11 +228,7 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     ]);
   });
 
-  // #1686: the generic toggle engine has no "already active" guard (same as
-  // Rage) — re-activating simply re-applies the buff (dedup-by-key replaces,
-  // never stacks, appendActiveBuffInTx's existing contract) and spends
-  // another Focus. This intentionally REPLACES the retired bespoke
-  // function's 400 rejection.
+  // The generic toggle engine has no "already active" guard — appendActiveBuffInTx dedups by key, never stacks, so re-activating just re-applies the buff and spends Focus again.
   it("activating Elemental Attunement twice re-applies the buff and spends Focus again (no guard, matches Rage)", async () => {
     await createMonk(17, "Warrior of the Elements");
     await toggleAttunement("elementalAttunement");
@@ -264,7 +236,7 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     expect(res.status).toBe(200);
     expect((await activeBuffs()).filter((b) => b.key === ELEMENTAL_ATTUNEMENT_BUFF_KEY)).toHaveLength(1);
     const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
-    expect(focus.remaining).toBe(15); // 17 total − 2 activations × 1 Focus
+    expect(focus.remaining).toBe(15);
   });
 
   it("Elemental Burst spends 2 Focus and resolves a Dex save vs the focus DC (17)", async () => {
@@ -279,7 +251,7 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     expect(result.appliedDamage).toBe(result.outcome === "success" ? 15 : 30);
 
     const focus = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
-    expect(focus.remaining).toBe(15); // 17 total − 2 spent
+    expect(focus.remaining).toBe(15);
   });
 
   it("Elemental Burst is rejected below level 6", async () => {
@@ -291,7 +263,6 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
 
   it("Elemental Strikes require an active attunement, then force a Str save to move the target", async () => {
     await createMonk(17, "Warrior of the Elements");
-    // No attunement yet → rejected.
     const blocked = await agent().post(url).send({ operations: [{ type: "elementalStrike", damageType: "lightning", roll: 8 }] });
     expect(blocked.status).toBe(400);
     expect(blocked.body.error).toMatch(/attunement/i);
@@ -305,32 +276,19 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     expect(["fail", "success"]).toContain(result.outcome);
     expect(result.moved).toBe(result.outcome === "fail");
 
-    // Elemental Strikes cost no Focus (only the attunement's 1 was spent).
+    // Elemental Strikes cost no Focus of their own (only the attunement's 1 was spent).
     const focus = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
     expect(focus.remaining).toBe(16);
   });
 
-  // #1315: assertWarriorOfElements now resolves through deriveEntryScopedActions
-  // (the same shared function shadow-arts.ts's guards use) instead of comparing
-  // XP-derived level against the classEntries[].level COLUMN directly. That
-  // column can lag XP (a pending level-up not yet applied via /hp levelUp,
-  // mirrored by progress.level vs hitDice.total in character-serialize.ts) — the
-  // OLD hand-rolled check trusted the stale column and would reject a
-  // genuinely-eligible L3 character; the new shared-function check resolves
-  // against the XP-derived effective level for single-class characters instead.
+  // deriveEntryScopedActions gates on the XP-derived effective level, not the classEntries[].level column, which can lag after a pending level-up.
   it("gates off the XP-derived level, not a stale classEntries[].level column (single-class pending level-up)", async () => {
     await createMonkStaleLevelColumn(2, 3, "Warrior of the Elements");
     const res = await toggleAttunement("elementalAttunement");
     expect(res.status).toBe(200);
   });
 
-  // #1686: the row-driven toggle's "not granted" failure now surfaces
-  // through the SAME generic gate every other row-driven action uses
-  // (assertKnownActionKeys/eligibleRowActions, routes/character/actions.ts)
-  // — a Warrior of the Open Hand's own rows simply never contain
-  // "elementalAttunement", so it 400s as an unknown action key rather than
-  // the retired bespoke function's "Only a Warrior of the Elements monk..."
-  // message.
+  // assertKnownActionKeys/eligibleRowActions is the same generic gate every row-driven action uses — a Warrior of the Open Hand's rows never contain "elementalAttunement", so it 400s as an unknown action key.
   it("rejects Elemental Attunement from a non-elements monk", async () => {
     await createMonk(17, "Warrior of the Open Hand");
     const res = await toggleAttunement("elementalAttunement");

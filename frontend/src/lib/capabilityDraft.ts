@@ -25,30 +25,24 @@ const NEW_GRANT: ItemCapability = {
   grantValueKind: "damageType",
   grantValue: "fire",
 };
-// Wand of Magic Missiles defaults: 7 charges, regains 1d6+1 daily at dawn (#555).
 const NEW_CHARGES: ItemCapability = {
   kind: "charges",
   maxCharges: 7,
   recharge: { trigger: "dawn", dice: { count: 1, faces: 6 }, bonus: 1 },
 };
 
-/** A fresh capability draft for a newly-picked kind. */
 export function draftForKind(kind: CapabilityKind): ItemCapability {
   const next =
     kind === "castSpell" ? NEW_CAST : kind === "grant" ? NEW_GRANT : kind === "charges" ? NEW_CHARGES : NEW_PASSIVE;
   return { ...next };
 }
 
-/** The key options for a target that names a skill/ability via targetKey. */
 export function keyOptions(target: CapabilityTarget): readonly { key: string; label: string }[] {
   if (targetUsesSkillKey(target)) return SKILL_OPTIONS;
   if (targetUsesAbilityKey(target)) return ABILITY_OPTIONS;
   return [];
 }
 
-// A spell carries a DC (save spells) or an attack bonus (attack spells), never
-// both — utility/buff spells carry neither, so clear the inapplicable field so a
-// stale default 13/5 never rides along on a picked Fly.
 export function applySpell(cap: ItemCapability, spell: CatalogSpell): Partial<ItemCapability> {
   const needsDc = spell.attackType === "save";
   const needsAttack = spell.attackType === "attack";
@@ -65,7 +59,6 @@ export function applySpell(cap: ItemCapability, spell: CatalogSpell): Partial<It
   };
 }
 
-// Reset targetKey when the new target no longer keys off a skill/ability.
 export function applyTarget(cap: ItemCapability, target: CapabilityTarget): Partial<ItemCapability> {
   const opts = keyOptions(target);
   const targetKey =
@@ -77,7 +70,6 @@ export function applyDiceToggle(useDice: boolean): Partial<ItemCapability> {
   return useDice ? { dice: { count: 1, faces: 6 }, value: undefined } : { dice: undefined, value: 1 };
 }
 
-// Reset the value picker to a sensible default when the grant type changes.
 export function applyGrantType(grantType: GrantType): Partial<ItemCapability> {
   const defaults: Record<GrantType, Partial<ItemCapability>> = {
     resistance: { grantValueKind: "damageType", grantValue: "fire", grantOn: undefined, cantBeSurprised: undefined },
@@ -94,8 +86,7 @@ export function applyProfKind(profKind: ProficiencyKind): Partial<ItemCapability
   return { grantValueKind: profKind, grantValue: value };
 }
 
-// Reset the advantage qualifier to match the new axis so it never keeps a stale
-// key: initiative/attack are whole-axis; a check is per-skill, a save per-ability.
+// initiative/attack are whole-axis (no qualifier); check is per-skill, save per-ability — never keeps a stale key.
 export function applyAdvantageOn(grantOn: ItemCapability["grantOn"]): Partial<ItemCapability> {
   const wholeAxis = grantOn === "initiative" || grantOn === "attack";
   const qualifier = wholeAxis

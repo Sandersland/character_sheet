@@ -10,19 +10,11 @@ import * as client from "@/api/client";
 import type { RollResult } from "@/lib/dice";
 import type { Character, ConcentrationCheck } from "@/types/character";
 
-// Mock the API client — HitPointTracker batches HP ops and swaps the returned
-// character via the character cache (useCharacterMutation), then toasts any
-// concentration check (issue #41). logRoll backs the concentration save's
-// session-log emit (issue #460).
 vi.mock("@/api/client", () => ({
   applyHitPointOperations: vi.fn(),
   logRoll: vi.fn().mockResolvedValue(undefined),
 }));
 
-// The concentration-save modal reads useRoll(); every render is wrapped so it
-// resolves (matching the app, where HitPointTracker always sits in a RollProvider).
-// HitPointTracker also reads useCurrentCharacter(), so every render seeds the
-// cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character) {
   return renderWithCharacter(
     <RollProvider>
@@ -32,9 +24,6 @@ function render(character: Character) {
   );
 }
 
-// Mock the 3D DiceRoller (issue #76): the real one mounts a Three.js Canvas that
-// doesn't render in jsdom. The stub fires onResult once on mount with a fixed
-// natural d20 (14), standing in for a completed tumble.
 const SAVE_DIE = 14;
 vi.mock("@/features/dice/DiceRoller", () => {
   function MockDiceRoller({
@@ -87,7 +76,6 @@ function mockResolve(concentrationChecks: ConcentrationCheck[]) {
 
 async function applyDamage() {
   const user = userEvent.setup();
-  // Damage is the default segmented mode; type into its stepper field and apply.
   const damageInput = screen.getByRole("spinbutton", { name: /damage amount/i });
   await user.type(damageInput, "8");
   await user.click(screen.getByRole("button", { name: /apply \d+ damage/i }));
@@ -98,7 +86,6 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-/** A resolved/pending concentration check, with #76 fields defaulted. */
 function check(partial: Partial<ConcentrationCheck>): ConcentrationCheck {
   return {
     status: "resolved",
@@ -232,11 +219,6 @@ describe("HitPointTracker concentration toast (issue #41)", () => {
   });
 });
 
-// #1166: the checkbox is retired — the standing preference now lives only in
-// the Preferences surface (#1167) and is read here via useAutoRollConcentrationPref,
-// seeded through localStorage since these tests render outside a
-// PreferencesProvider (falls back to pure localStorage, same as the hook's own
-// doc comment).
 describe("HitPointTracker interactive concentration save (issue #76, retired #1166)", () => {
   it("renders no auto-roll-concentration checkbox in the HP card", () => {
     mockResolve([]);
@@ -254,7 +236,6 @@ describe("HitPointTracker interactive concentration save (issue #76, retired #11
 
     expect(await screen.findByRole("status")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    // The damage op carries the auto-roll preference (default true).
     const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
     expect(ops[0]).toMatchObject({ type: "damage", autoRollConcentration: true });
   });
@@ -268,7 +249,6 @@ describe("HitPointTracker interactive concentration save (issue #76, retired #11
 
     await applyDamage();
 
-    // A modal opens (no inline banner / UI shift in the HP card).
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("button", { name: /roll save/i })).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
@@ -279,7 +259,6 @@ describe("HitPointTracker interactive concentration save (issue #76, retired #11
   it("rolling in the modal submits a concentrationSave op and shows the result", async () => {
     const user = userEvent.setup();
     localStorage.setItem("cs:pref:autoRollConcentration", "false");
-    // First the damage op returns a pending check; then the save op resolves.
     vi.mocked(client.applyHitPointOperations)
       .mockResolvedValueOnce({
         character: makeCharacter(),
@@ -297,14 +276,10 @@ describe("HitPointTracker interactive concentration save (issue #76, retired #11
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /roll save/i }));
 
-    // The seeded preference actually reaches the wire: the damage op read it
-    // from useAutoRollConcentrationPref, not a hardcoded default (mutation-tested —
-    // hardcoding autoRollConcentration=true in useHitPointApply turns this red).
+    // Mutation-tested: hardcoding autoRollConcentration=true in useHitPointApply turns this red.
     const firstCall = vi.mocked(client.applyHitPointOperations).mock.calls[0];
     expect(firstCall[1][0]).toMatchObject({ type: "damage", autoRollConcentration: false });
 
-    // The mocked DiceRoller fires onResult → a concentrationSave op is submitted
-    // with the natural d20 (not the bonus-inclusive total).
     const secondCall = vi.mocked(client.applyHitPointOperations).mock.calls[1];
     expect(secondCall[1][0]).toEqual({
       type: "concentrationSave",
@@ -312,7 +287,6 @@ describe("HitPointTracker interactive concentration save (issue #76, retired #11
       roll: SAVE_DIE,
       damage: 30,
     });
-    // The result lingers in the modal (14 + 2 = 16 vs DC 15 → holds).
     expect(within(dialog).getByText(/16 vs DC 15/)).toBeInTheDocument();
     expect(within(dialog).getByText(/holds/i)).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: /done/i })).toBeInTheDocument();
@@ -374,7 +348,6 @@ describe("HitPointTracker damage type + resistance (#456)", () => {
 
     await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), "12");
     await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
-    // Uncheck the "apply resistance" toggle to take the full amount.
     await user.click(screen.getByRole("checkbox", { name: /resistant to slashing/i }));
     await user.click(screen.getByRole("button", { name: /apply \d+ damage/i }));
 

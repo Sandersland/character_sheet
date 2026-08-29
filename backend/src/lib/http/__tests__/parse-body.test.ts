@@ -4,8 +4,6 @@ import { z } from "zod";
 
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 
-// A minimal res double capturing status + json, so the helper can be exercised
-// without an Express app.
 function mockRes() {
   const res = {
     statusCode: 0,

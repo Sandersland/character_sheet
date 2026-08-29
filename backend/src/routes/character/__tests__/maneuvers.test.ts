@@ -1,11 +1,3 @@
-/**
- * castManeuver route tests (#418). Level-3 Battle Master (Str 16, Cha 14) so the
- * superiority pool (4×d8), maneuver save DC (13), and Rally temp HP are
- * deterministic bounds. Covers: catalog spend + save DC on the event, Rally
- * self temp HP via the core path, custom (description-only) spend, die refunded
- * when the pool is empty, and the not-known error path.
- */
-
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -28,7 +20,7 @@ const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Maneuvers Test Battle Master",
   alignment: "Lawful Neutral",
-  experiencePoints: 900, // level 3, prof +2
+  experiencePoints: 900,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 28, max: 28, temp: 0 },
@@ -52,10 +44,7 @@ async function learn(op: unknown): Promise<{ id: string; name: string; maneuverI
   return list[list.length - 1];
 }
 
-// #1412: the picker catalog itself. Fixture built through upsertEditionRow (a
-// compound key containing `edition` rejects a literal null on
-// findUnique/upsert) and deleted by NAME, never by an id var that would read to
-// Prisma as "no filter" had beforeAll thrown partway.
+// Deletes by NAME, never an id var — an unset id var would read to Prisma as "no filter" if beforeAll threw partway (#1412).
 describe("GET /api/maneuvers — required ?edition= + silent cross-edition omission", () => {
   const FIXTURE_NAME = "XEd Maneuver 2014";
 
@@ -121,12 +110,7 @@ describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
       create: { name: CLASS_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"], skillChoiceCount: 2, skillChoices: ["athletics"], isSpellcaster: false, subclassLevel: 3 },
       update: { subclassLevel: 3 },
     });
-    // #1546 Part B-ii: Battle Master's superiority-dice pool + announcedSaveDC
-    // are ROW-driven now (fighter.ts's resourceFn/deriveExtras are gone) — a
-    // bespoke Subclass row with no ClassFeature children would silently lose
-    // both, same failure mode fighterResourceRowsData's own header describes
-    // for the base class (#1546 Part B-i, Ruling 2). Shared helper, not a
-    // per-file copy.
+    // battleMasterResourceRowsData is a shared helper — a bespoke Subclass row with no ClassFeature children would silently lose the superiority-dice pool and announcedSaveDC (#1546).
     const bm = await upsertEditionRow(
       prisma.subclass,
       { classId: cls.id, name: BM_SUBCLASS_NAME, edition: null },
@@ -152,9 +136,7 @@ describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
   });
   afterAll(async () => {
-    // Scoped by subclassId/classId, never a bare name match — "battle master"
-    // is also the real seeded catalog's subclass name and every other bespoke
-    // fixture's, so an unscoped deleteMany here would cross-delete them.
+    // Scoped by subclassId/classId, never a bare name match — "battle master" is also the real seeded catalog's subclass name, so an unscoped deleteMany would cross-delete it.
     await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
     await prisma.subclass.deleteMany({ where: { id: bmSubclassId } });
     await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
@@ -176,9 +158,6 @@ describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
     expect(pool.remaining).toBe(3);
   });
 
-  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
-  // the shared ability endpoint, so a green run afterwards is evidence the audit
-  // trail is unchanged.
   it("pins the audit trail of one Trip Attack cast", async () => {
     const entry = await learn({ type: "learnManeuver", maneuverId: tripId });
     const res = await agent().post(maneuversUrl).send({ operations: [{ type: "castManeuver", entryId: entry.id }] });
@@ -220,7 +199,7 @@ describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
     const entry = await learn({ type: "learnManeuver", maneuverId: rallyId });
     const res = await agent().post(maneuversUrl).send({ operations: [{ type: "castManeuver", entryId: entry.id }] });
     const { roll } = res.body.results[0];
-    expect(res.body.character.hitPoints.temp).toBe(roll + 2); // Cha 14 → +2
+    expect(res.body.character.hitPoints.temp).toBe(roll + 2);
     expect(res.body.results[0].saveDc).toBeNull();
     expect(res.body.results[0].summary).toContain("temp HP");
   });
@@ -241,7 +220,6 @@ describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
 
   it("400s (die refunded) when no superiority dice remain", async () => {
     const entry = await learn({ type: "learnManeuver", maneuverId: tripId });
-    // Drain all 4 dice.
     await agent().post(resourcesUrl).send({ operations: [{ type: "spendResource", key: "superiorityDice", amount: 4 }] });
     const res = await agent().post(maneuversUrl).send({ operations: [{ type: "castManeuver", entryId: entry.id }] });
     expect(res.status).toBe(400);
@@ -250,14 +228,7 @@ describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
   });
 });
 
-// #1546 Part B-ii: every OTHER Battle Master fixture in this repo is
-// Str-primary (Str > Dex), so `deriveAnnouncedSaveDC`'s `Math.max(strMod,
-// dexMod)` is untested in the one direction that would catch an operand swap
-// (e.g. Math.max -> Math.min, or the two mods swapped) — a Str-primary
-// character can't distinguish "the DC used the higher mod" from "the DC used
-// Str specifically". Dex 18 (+4) > Str 10 (+0) here makes that distinction
-// observable: DC 8 + prof(2) + max(0, 4) = 14, which only a genuine max()
-// produces — min() would read 10, and a Str/Dex swap would read 10 too.
+// Dex 18 > Str 10 makes deriveAnnouncedSaveDC's Math.max(strMod, dexMod) observable: only a genuine max() produces DC 14, not min() or a Str/Dex swap.
 const DEX_FIXTURE_ID = "test-maneuvers-dex-primary-1";
 const DEX_CLASS_NAME = "Maneuvers Route Test Fighter (Dex-primary)";
 const DEX_BM_SUBCLASS_NAME = "battle master";
@@ -289,7 +260,7 @@ describe("castManeuver — Dex-primary Battle Master (Dex > Str), the max(Str,De
         id: DEX_FIXTURE_ID,
         name: "Maneuvers Test Battle Master (Dex-primary)",
         alignment: "Lawful Neutral",
-        experiencePoints: 900, // level 3, prof +2
+        experiencePoints: 900,
         initiativeBonus: 4,
         speed: 30,
         hitPoints: { current: 24, max: 24, temp: 0 },
@@ -310,9 +281,7 @@ describe("castManeuver — Dex-primary Battle Master (Dex > Str), the max(Str,De
     await prisma.character.deleteMany({ where: { id: DEX_FIXTURE_ID } });
   });
   afterAll(async () => {
-    // Scoped by classId (own bespoke class, never a bare name match) — "battle
-    // master" is also the real seeded catalog's subclass name and every other
-    // bespoke fixture's, so an unscoped deleteMany here would cross-delete them.
+    // Scoped by classId (own bespoke class, never a bare name match) — "battle master" is also the real seeded catalog's subclass name, so an unscoped deleteMany would cross-delete it.
     await prisma.subclass.deleteMany({ where: { name: DEX_BM_SUBCLASS_NAME, classId: dexClassId } });
     await prisma.characterClass.deleteMany({ where: { name: DEX_CLASS_NAME } });
   });

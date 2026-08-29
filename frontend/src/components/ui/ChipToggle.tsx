@@ -7,7 +7,6 @@ interface ChipToggleProps {
   className?: string;
 }
 
-// Pill-shaped boolean toggle (aria-pressed). Pair inside a ChipGroup.
 export default function ChipToggle({ pressed, onChange, children, className = "" }: ChipToggleProps) {
   return (
     <button

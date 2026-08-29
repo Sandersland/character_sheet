@@ -1,19 +1,4 @@
-/**
- * #1546 Part B-i: `resolveLevelUpContext` resolves the featureRows carrier by
- * FK ONLY — no name/slug-keyed ClassFeature lookup anywhere (Ruling 1). This
- * is the DB-backed proof, against the REAL seeded Fighter/Battle Master
- * catalog, that both planner paths receive a non-empty carrier:
- *
- * - The PERSISTED path: an existing class entry with `subclassId` already
- *   set — `targetEntry.classFeatureRows`/`subclassFeatureRows` resolve
- *   through `TARGET_ENTRY_SELECT` (mirroring characterInclude).
- * - The re-plan (`?subclassId=`) path: no subclass committed yet —
- *   `pickedSubclassFeatureRows` resolves through the enhanced
- *   `prisma.subclass.findUnique`, the "one line" fix Ruling 1 describes.
- *
- * Uses the real seeded catalog (no bespoke Subclass row) so this is also a
- * proof against production content, not a hand-built fixture.
- */
+// #1546 Part B-i (Ruling 1): resolveLevelUpContext resolves the featureRows carrier by FK only — no name/slug-keyed ClassFeature lookup. DB-backed proof against the real seeded Fighter/Battle Master catalog that both the PERSISTED and re-plan (`?subclassId=`) paths receive a non-empty carrier.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -94,8 +79,6 @@ describe("resolveLevelUpContext — featureRows carrier, both planner paths (#15
     expect(context.targetEntry.subclassFeatureRows!.length).toBeGreaterThan(0);
     expect(context.targetEntry.subclassFeatureRows!.some((r) => r.name === "Combat Superiority")).toBe(true);
 
-    // The re-plan (picked) channel stays untouched on the persisted path — no
-    // ?subclassId= was submitted.
     expect(context.pickedSubclassFeatureRows).toBeNull();
   });
 
@@ -108,12 +91,8 @@ describe("resolveLevelUpContext — featureRows carrier, both planner paths (#15
     expect(context.pickedSubclassFeatureRows!.length).toBeGreaterThan(0);
     expect(context.pickedSubclassFeatureRows!.some((r) => r.name === "Combat Superiority")).toBe(true);
 
-    // Nothing is persisted for this character yet (subclass: null on the row) —
-    // the PERSISTED half of the carrier must stay empty; only the PICKED
-    // channel carries the not-yet-committed pick's rows.
     expect(context.targetEntry.subclass).toBeNull();
     expect(context.targetEntry.subclassFeatureRows ?? []).toEqual([]);
-    // The class's own rows still resolve regardless (unrelated to the subclass pick).
     expect(context.targetEntry.classFeatureRows!.some((r) => r.name === "Second Wind")).toBe(true);
   });
 });

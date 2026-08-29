@@ -7,10 +7,6 @@ import {
   lookupSession,
 } from "@/lib/auth/session.js";
 
-// Postgres-backed: session create/lookup/destroy hit AuthSession. A per-file
-// owner avoids cross-file races on the shared dev DB. Cookie helpers and the
-// OAuth PKCE primitives moved out — covered by cookies.test.ts and
-// auth-oauth-pkce.test.ts respectively.
 const OWNER_ID = "test-owner-auth-session";
 
 describe("session lifecycle", () => {

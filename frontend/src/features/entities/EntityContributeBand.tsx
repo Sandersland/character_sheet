@@ -1,4 +1,3 @@
-// Invitation band (#842): every article ends with a prompt to add what you know.
 export default function EntityContributeBand({
   name,
   onEdit,

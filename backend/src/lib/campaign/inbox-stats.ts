@@ -1,11 +1,4 @@
-// Pure, DB-free mention-stats folding for GET /api/inbox (#1945 review): the
-// inbox needs only a per-entity mention count and last-mention date, not the
-// full aggregateEntityStats/EntityStatsAggregate shape (chroniclers,
-// first-mentioned, session context) — that's Codex-page display data the
-// inbox never renders. A merged-away identity's refs redirect to its
-// ultimate EXECUTED survivor (buildSurvivorMap) before folding, so
-// pickDefaultSurvivor can't prefer a shallow copy that never itself absorbed
-// the campaign's real activity over the entity that actually did.
+// Merged-away refs redirect to their ultimate EXECUTED survivor (buildSurvivorMap) before folding, so pickDefaultSurvivor can't prefer a shallow copy over the entity that actually absorbed the activity.
 
 import { resolveSurvivorChain, type MergeEdge } from "@/lib/activity/entity-merges.js";
 
@@ -19,9 +12,7 @@ export interface MentionStats {
   lastMentionedAt: Date;
 }
 
-// entityId -> its ultimate EXECUTED survivor id. Present only for an entity
-// that IS merged into something; an unmerged (or only PREPARED-merged)
-// entity has no entry, so callers fall back to the entity's own id.
+// Present only for an entity that IS EXECUTED-merged into something; an unmerged or PREPARED-only entity has no entry, so callers fall back to its own id.
 export function buildSurvivorMap(edges: MergeEdge[], entityIds: string[]): Map<string, string> {
   const survivorOf = new Map<string, string>();
   for (const id of entityIds) {
@@ -31,9 +22,6 @@ export function buildSurvivorMap(edges: MergeEdge[], entityIds: string[]): Map<s
   return survivorOf;
 }
 
-// Folds raw refs into per-entity stats, redirecting a merged-away identity's
-// refs onto survivorOf's target so mentions accumulate at the canonical
-// entity instead of staying stranded on the old identity.
 export function foldMentionStats(
   refs: MentionRef[],
   survivorOf: ReadonlyMap<string, string>,

@@ -22,11 +22,7 @@ import {
 import { snapshotInventoryItemForUndo } from "./inventory-snapshot.js";
 import { buildInventorySnapshot } from "./inventory-snapshot-build.js";
 
-/**
- * Exported so the actions orchestrator (actionsRouter) can include
- * an adjustQuantity op inside a shared $transaction without re-opening one.
- * Two callers: the applyOp switch in applyInventoryOperations and actionsRouter.
- */
+// Exported so actionsRouter can include an adjustQuantity op inside a shared $transaction without re-opening one.
 export async function applyAdjustQuantity(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -52,8 +48,7 @@ export async function applyAdjustQuantity(
     entityId: item.id,
     before: { quantity: item.quantity },
     after: nextQuantity === 0 ? null : { quantity: nextQuantity },
-    // Only snapshot for undo when the row is actually deleted (quantity hits 0);
-    // a partial adjust leaves the row, so `before.quantity` is enough to restore.
+    // Only snapshot for undo when the row is deleted; a partial adjust leaves the row, so `before.quantity` is enough to restore.
     data: {
       itemName: item.name,
       quantityDelta: op.delta,
@@ -65,7 +60,7 @@ export async function applyAdjustQuantity(
 
   // fallow-ignore-next-line code-duplication -- zero-quantity delete-and-clear-buff vs update branch intentionally shared across quantity mutations
   if (nextQuantity === 0) {
-    // Adjusting to zero deletes the row — clear any seeded buff so it can't leak.
+    // Deleting the row must clear any seeded buff so it can't leak.
     await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `used up ${item.name}`);
     await tx.inventoryItem.delete({ where: { id: item.id } });
   } else {
@@ -73,22 +68,12 @@ export async function applyAdjustQuantity(
   }
 }
 
-// Shallow-merges a partial detail override onto the item's current detail
-// block — correct because every detail block is flat (no nested objects of
-// its own) and op.weapon/armor/consumable only ever carries keys the DM
-// actually typed: an absent key is omitted by zod, never
-// present-with-value-undefined, so the spread can't accidentally wipe a field
-// the caller didn't touch. Absent `override` or `current` (item has no such
-// detail, or the op didn't touch it) passes `current` through unchanged.
+// Correct only because every detail block is flat and zod omits an untouched key entirely rather than sending it as present-with-value-undefined, so the spread can't accidentally wipe a field the caller didn't touch.
 function mergedDetail<T extends object>(current: T | null, override: Partial<T> | undefined): T | null {
   return override && current ? { ...current, ...override } : current;
 }
 
-// The weapon/armor/consumable partial overrides ("Club +1": bump just
-// weapon.damageModifier) used to nest a Prisma `update` onto the matching
-// detail table; #1649 deleted those tables, so the merged result is instead
-// re-validated through buildInventorySnapshot and written back to `snapshot`
-// whole.
+// #1649 deleted the per-detail tables, so the merged result is re-validated through buildInventorySnapshot and written back to `snapshot` whole.
 function mergedSnapshotSource(item: InventoryItemWithDetails, op: UpdateOperation) {
   return {
     name: op.name ?? item.name,
@@ -104,9 +89,7 @@ function mergedSnapshotSource(item: InventoryItemWithDetails, op: UpdateOperatio
     weaponDetail: mergedDetail(item.weaponDetail, op.weapon),
     armorDetail: mergedDetail(item.armorDetail, op.armor),
     consumableDetail: mergedDetail(item.consumableDetail, op.consumable),
-    // Untouched by `update` (it never edits capabilities) — round-tripping
-    // through readCapability inside buildInventorySnapshot reproduces the
-    // same union values capabilityColumnsFromSnapshot derived them from.
+    // `update` never edits capabilities — round-tripping through readCapability reproduces the same union values unchanged.
     capabilities: item.capabilities,
   };
 }
@@ -165,8 +148,7 @@ export async function applyRemove(
     sessionId,
   });
 
-  // Deleting the row must clear any active-effect buff it seeded (undo re-applies
-  // it via the paired effects-event revert, symmetric with the recreated row).
+  // Deleting the row must clear any active-effect buff it seeded (undo re-applies it via the paired effects-event revert, symmetric with the recreated row).
   await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `removed ${item.name}`);
   await tx.inventoryItem.delete({ where: { id: item.id } });
 }
@@ -192,8 +174,7 @@ export async function applySell(tx: Prisma.TransactionClient, characterId: strin
     entityId: item.id,
     before: { quantity: item.quantity },
     after: remaining === 0 ? null : { quantity: remaining },
-    // Only snapshot for undo when the FULL stack is sold (row deleted); a
-    // partial sell leaves the row, so `before.quantity` is enough to restore.
+    // Only snapshot for undo when the FULL stack is sold; a partial sell leaves the row, so `before.quantity` is enough to restore.
     data: {
       itemName: item.name,
       quantityDelta: -quantitySold,
@@ -206,7 +187,7 @@ export async function applySell(tx: Prisma.TransactionClient, characterId: strin
 
   // fallow-ignore-next-line code-duplication -- full-sell delete-and-clear-buff vs update branch shares the adjust-quantity pattern by design
   if (quantitySold === item.quantity) {
-    // Full-stack sell deletes the row — clear any seeded buff so it can't leak.
+    // Deleting the row must clear any seeded buff so it can't leak.
     await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `sold ${item.name}`);
     await tx.inventoryItem.delete({ where: { id: item.id } });
   } else {

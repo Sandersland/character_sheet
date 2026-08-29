@@ -8,13 +8,7 @@ import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-
 
 export const shadowArtsRouter = Router({ mergeParams: true });
 
-// Feeds the Warrior of Shadow monk's Shadow Arts picker — mirrors GET /api/maneuvers.
-// Each row carries its embedded focus cost (AbilityCost) and flat EffectSpec.
-//
-// Mounted top-level, so `?edition=` is REQUIRED and a cross-edition row is
-// omitted SILENTLY (#1412) — both for the reasons spelled out at maneuversRouter,
-// including the deliberate asymmetry with crossEditionRejection: a list read has
-// no player intent to contradict, a supplied id does.
+// Mirrors GET /api/maneuvers, including the deliberate asymmetry with crossEditionRejection: a list read has no player intent to contradict, a supplied id does.
 shadowArtsRouter.get("/", async (req, res) => {
   const edition = requireEditionOr400(req, res);
   if (edition === undefined) return;

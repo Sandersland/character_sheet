@@ -19,7 +19,6 @@ const baseEffect = {
   buffModifier: null,
 };
 
-// 2024 rewrite (#1246): Shadow Arts is a single 1-focus Darkness cast.
 const WARRIOR_OF_SHADOW_CATALOG: CatalogShadowArt[] = [
   {
     id: "darkness",
@@ -31,9 +30,7 @@ const WARRIOR_OF_SHADOW_CATALOG: CatalogShadowArt[] = [
   },
 ];
 
-// 2014 Way of Shadow (PHB'14 pp.79-80, #1502/#1738): the four-spell 2-ki
-// menu — Darkness/Darkvision/Pass without Trace/Silence. Only Darkvision
-// doesn't concentrate.
+// PHB'14 pp.79-80: the four-spell 2-ki menu. Only Darkvision doesn't concentrate.
 const WAY_OF_SHADOW_CATALOG: CatalogShadowArt[] = [
   {
     id: "sa-darkness",
@@ -76,9 +73,7 @@ function makeCharacter(
 ): Character {
   const poolKey = options.poolKey ?? "focus";
   const poolLabel = options.poolLabel ?? "Focus";
-  // total must never be < remaining (an impossible pool state) — every fixture
-  // call site here wants a monk with at least 3 total, so this only grows for
-  // a poolRemaining bigger than that (the 2014 ki-menu tests, remaining: 4).
+  // total must never be < remaining (an impossible pool state).
   const poolTotal = Math.max(poolRemaining, 3);
   return {
     id: "char-1",
@@ -95,8 +90,6 @@ function makeCharacter(
   } as unknown as Character;
 }
 
-// ShadowArtsSection reads useCurrentCharacter(), so every render seeds the
-// cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderSection(character: Character, props: Partial<React.ComponentProps<typeof ShadowArtsSection>> = {}) {
   const onCast = vi.fn();
   renderWithCharacter(<ShadowArtsSection busy={false} onCast={onCast} {...props} />, character);
@@ -116,8 +109,7 @@ describe("ShadowArtsSection", () => {
     // Focus remaining surfaced through the served DerivedResource.label.
     expect(screen.getByText(/Focus remaining/)).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
-    // The catalog is edition-scoped server-side (#1412) — a hardcoded edition
-    // would render identically here, so the argument itself is the assertion.
+    // A hardcoded edition would render identically here, so the argument itself is the assertion.
     expect(client.fetchShadowArts).toHaveBeenCalledWith("EDITION_2024");
   });
 
@@ -147,7 +139,6 @@ describe("ShadowArtsSection", () => {
     const darknessRow = screen.getByText("Darkness").closest("li")!;
     expect(within(darknessRow).getByText("concentrating")).toBeInTheDocument();
 
-    // Handoff banner names the current concentration.
     expect(screen.getByText(/Concentrating on/)).toBeInTheDocument();
   });
 
@@ -177,8 +168,6 @@ describe("ShadowArtsSection", () => {
     expect(screen.queryByText(/Couldn't load Shadow Arts/)).not.toBeInTheDocument();
   });
 
-  // #1738: 2014 Way of Shadow gets the real four-spell 2-ki menu — the same
-  // component, driven entirely by the edition-scoped catalog response.
   describe("2014 Way of Shadow (#1738)", () => {
     beforeEach(() => {
       vi.mocked(client.fetchShadowArts).mockResolvedValue(WAY_OF_SHADOW_CATALOG);

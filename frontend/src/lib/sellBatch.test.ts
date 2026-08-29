@@ -5,7 +5,6 @@ import type { CharacterEvent, Currency } from "@/types/character";
 
 let seq = 0;
 
-/** Build a minimal `sold` CharacterEvent carrying `data`. */
 function soldEvent(
   data: unknown,
   overrides: Partial<CharacterEvent> = {}

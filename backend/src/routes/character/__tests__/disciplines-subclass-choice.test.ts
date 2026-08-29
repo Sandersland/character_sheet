@@ -1,9 +1,3 @@
-/**
- * Way of the Four Elements riding the generic subclass-choice machinery
- * (#899/#1503): resources.subclassChoices count progression across levels,
- * and crossEditionRejection (#1345) for a 2014-tagged discipline optionId
- * supplied by a 2024 character.
- */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -39,6 +33,7 @@ const BASE = {
 };
 
 let classId: string;
+let subclassId: string;
 let fangsId: string;
 
 function agent() {
@@ -53,7 +48,7 @@ async function createMonk(experiencePoints: number, edition: "EDITION_2014" | "E
       ownerId: OWNER_ID,
       rulesEdition: edition,
       resources: Prisma.JsonNull,
-      classEntries: { create: [{ name: "monk", subclass, classId, position: 0 }] },
+      classEntries: { create: [{ name: "monk", subclass, subclassId: subclass ? subclassId : null, classId, position: 0 }] },
     },
   });
 }
@@ -73,6 +68,33 @@ describe("resources.subclassChoices — fourElementsDisciplines count progressio
       update: {},
     });
     classId = cls.id;
+
+    const existingSub = await prisma.subclass.findFirst({ where: { classId, slug: "disciplines-subclass-choice-route-test" } });
+    const sub =
+      existingSub ??
+      (await prisma.subclass.create({
+        data: { classId, name: "Way of the Four Elements Route Test", description: "Test fixture subclass.", slug: "disciplines-subclass-choice-route-test" },
+      }));
+    subclassId = sub.id;
+    await prisma.classFeature.deleteMany({ where: { subclassId } });
+    // Both editions, deliberately SYNTHETIC: production's real Disciple of the
+    // Elements row is EDITION_2014-only. Seeding an EDITION_2024 partition here
+    // lets the #1345 test below reach a 2024 character where the choice
+    // resolves, exercising crossEditionRejection's option-level check.
+    await prisma.classFeature.createMany({
+      data: (["EDITION_2014", "EDITION_2024"] as const).map((edition) => ({
+        classId, subclassId, name: "Disciple of the Elements", level: 3, edition,
+        description: "row text",
+        choiceKey: "fourElementsDisciplines", choiceLabel: "Elemental Disciplines", choiceCatalogSource: "discipline",
+        choiceCountTiers: [
+          { minLevel: 3, count: 1 },
+          { minLevel: 6, count: 2 },
+          { minLevel: 11, count: 3 },
+          { minLevel: 17, count: 4 },
+        ],
+      })),
+    });
+
     fangsId = (await prisma.grantedAbility.findFirstOrThrow({ where: { name: "Fangs of the Fire Snake" } })).id;
   });
 
@@ -102,16 +124,7 @@ describe("resources.subclassChoices — fourElementsDisciplines count progressio
     }
   });
 
-  // #1345: the choose-N `count`/`choices` declaration (monk.ts) is
-  // edition-INVARIANT (SubclassChoice.count takes no edition param, per its
-  // own doc comment) — only the seeded OPTION rows are edition-tagged. So the
-  // adversarial case this guards is a character whose subclass string reads
-  // "way of the four elements" (making the choice resolve) while its OWN
-  // rulesEdition is 2024 (a forged request or stale-migration state, never a
-  // state the UI itself can reach) — crossEditionRejection still catches the
-  // mismatched OPTION at that point, independent of the choice-availability
-  // check above it.
-  it("(#1345) rejects a 2014-tagged discipline optionId against a mismatched EDITION_2024 character", async () => {
+  it("(#1345) rejects a 2014-tagged discipline optionId against a synthetic EDITION_2024 partition (production has no real 2024 partition)", async () => {
     await createMonk(XP_L3, "EDITION_2024", "way of the four elements");
     const res = await agent()
       .post(`/api/characters/${FIXTURE_ID}/resources/transactions`)

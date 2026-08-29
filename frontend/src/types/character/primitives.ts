@@ -1,7 +1,3 @@
-/**
- * Core ability / skill / currency scalar types shared across the character wire model.
- */
-
 export type AbilityName =
   | "strength"
   | "dexterity"
@@ -44,9 +40,8 @@ export interface Skill {
   ability: AbilityName;
   proficient: boolean;
   expertise?: boolean;
-  /** Active cast-granted buff total (#438). Absent when no buff targets this skill. */
+  /** Active cast-granted buff total; absent when no buff targets this skill. */
   tempModifier?: number;
-  /** Per-source breakdown of tempModifier, for display. */
   tempModifierSources?: { label: string; value: number }[];
 }
 

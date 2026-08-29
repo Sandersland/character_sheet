@@ -6,14 +6,10 @@ import { createCharacter, gotoSheet, learnSpells, uniqueName } from "./helpers/a
 
 const WIZARD_L5_XP = 6500;
 
-// Remaining slots = count of available (expend) pips for that level.
 function slotRemaining(page: Page, level: number): Promise<number> {
   return page.getByTitle(`Expend a level ${level} slot`).count();
 }
 
-// Casting lives behind the record view's single "Cast a spell" door (#1162):
-// open the door, tap the spell to open its shared detail card, optionally pick
-// an upcast slot, then Cast. The door closes itself afterward.
 async function castViaDoor(page: Page, spellName: string, slotLevel?: number): Promise<void> {
   await page.getByRole("button", { name: "Cast a spell" }).click();
   await page.getByRole("button", { name: new RegExp(`^Open ${spellName}$`) }).click();
@@ -41,17 +37,10 @@ test("spellcasting: leveled cast, upcast, and free cantrip drive the slot pips",
   const l1Before = await slotRemaining(page, 1);
   const l2Before = await slotRemaining(page, 2);
 
-  // ── Cast Magic Missile with a level-1 slot ──────────────────────────────────
   await castViaDoor(page, "Magic Missile", 1);
-
-  // ── Upcast Magic Missile with a level-2 slot ────────────────────────────────
   await castViaDoor(page, "Magic Missile", 2);
-
-  // ── Cantrip consumes no slot (no slot picker offered) ───────────────────────
   await castViaDoor(page, "Fire Bolt");
 
-  // One level-1 slot spent (base cast) + one level-2 slot spent (upcast); the
-  // cantrip drove no pips.
   await expect.poll(() => slotRemaining(page, 1)).toBe(l1Before - 1);
   await expect.poll(() => slotRemaining(page, 2)).toBe(l2Before - 1);
 

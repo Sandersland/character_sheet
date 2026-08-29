@@ -11,13 +11,7 @@ import {
 import { errorMessage } from "@/lib/errorMessage";
 import type { Character, Session, SessionDoorwayState } from "@/types/character";
 
-// The network side of a doorway tap. "resume" needs no call — the character is
-// already joined; join/start hit their existing endpoints before we navigate.
-// A null campaignId means a solo (campaign-less) character: start routes to
-// startSoloSession, while join is campaign-only and fails loud (#1082).
-// start* returns the session's updated character (shape D, #1283) — the caller
-// writes it into the character query cache; join returns nothing to write.
-// Exported for direct unit testing of the join/start dispatch + guard.
+// "resume" makes no network call — the character is already joined.
 export async function dispatchDoorwayAction(
   action: DoorwayAction,
   campaignId: string | null,
@@ -25,12 +19,9 @@ export async function dispatchDoorwayAction(
   characterId: string,
 ): Promise<Character | undefined> {
   if (action === "join") {
-    // Joining is inherently campaign-only (a solo doorway never offers it), so a
-    // null campaignId here is a can't-happen — fail loud rather than reinterpret.
+    // A null campaignId here is a can't-happen (a solo doorway never offers join) — fail loud rather than reinterpret.
     if (campaignId === null) throw new Error("Cannot join a session without a campaign");
-    // A liveNotJoined/earlyJoin doorway always carries a session, so this is a
-    // can't-happen guard — but fail loud rather than skip the join and still
-    // navigate to an empty session page (the signature admits undefined).
+    // A can't-happen guard (a liveNotJoined/earlyJoin doorway always carries a session) — fail loud rather than silently skip the join.
     if (!sessionId) throw new Error("Cannot join a session without a session id");
     await joinSession(campaignId, sessionId, characterId);
     return undefined;
@@ -42,25 +33,18 @@ export async function dispatchDoorwayAction(
 }
 
 export interface UseSessionDoorway {
-  /** True once the doorway read has resolved (successfully) — gate rendering on it. */
   ready: boolean;
   summary: SessionDoorwaySummary;
-  /** A start/join is in flight; the bar disables during it. */
   pending: boolean;
-  /** Inline action error (start/join). A failed READ instead keeps `ready` false. */
+  /** A failed READ keeps `ready` false instead — this error is only for a failed start/join action. */
   error: string | null;
-  /** Dispatch the summary's action (resume/join/start). No-op when action is null. */
   onAction: () => void;
-  // Threaded into RollProvider + the capture dock, mirroring the old hook.
   inActiveSession: boolean;
   activeSessionId: string | undefined;
   activeSession: Session | null;
 }
 
-// The capture dock reads only status/startedAt/title; synthesize a minimal
-// Session from the doorway's live-session state so the ⌘J dock header still works
-// without a second fetch. campaignId flows through as-is — null for a solo
-// session (#1082), which the dock handles like any other active session.
+// Synthesizes a minimal Session (capture dock reads only status/startedAt/title) so the dock avoids a second fetch; campaignId flows through as null for solo (#1082).
 function toCaptureSession(state: SessionDoorwayState): Session | null {
   const s = state.session;
   if (!s || s.status !== "active" || s.startedAt === null) return null;
@@ -76,14 +60,8 @@ const HIDDEN_SUMMARY: SessionDoorwaySummary = {
 };
 
 /**
- * The sheet's session-doorway render state (#942), now a thin adapter over
- * `LiveSessionProvider` (#959) — it no longer fetches, so there is exactly ONE
- * doorway read per sheet. It distills the shared doorway into the bar's summary
- * and dispatches the start/join/resume action as a mutation (#1299), re-resolving
- * the shared doorway/session queries on success so a just-started session lights
- * up the workspace. On success it jumps **in-workspace** to the Combat tab (#963)
- * via `onEnterCombat` — no more `navigate('/characters/:id/session')`; the live
- * tracker lives under Combat now.
+ * Exactly one doorway read per sheet — a thin adapter over LiveSessionProvider, never a second fetch.
+ * Jumps in-workspace via `onEnterCombat` on success — never navigates to /session (#963).
  */
 export function useSessionDoorway(
   id: string | undefined,
@@ -97,33 +75,23 @@ export function useSessionDoorway(
 
   const inActiveSession = status === "liveJoined";
   const activeSessionId = sessionId ?? undefined;
-  // Prefer the full session (participants) when joined; else synthesize the
-  // capture-dock slice from the doorway.
   const activeSession = session ?? (doorway ? toCaptureSession(doorway) : null);
 
   const doorwayMutation = useMutation({
-    // Same scope key as useCharacterMutation: this mutation also writes
-    // characterKeys.detail(id) (via dispatchDoorwayAction's returned
-    // character), so it must serialize with every other character mutation —
-    // without it, a Start/Join response could land between two HP responses
-    // (or after a slower one) and drag the cached character backward.
+    // Shares `character-<id>` scope with useCharacterMutation so a Start/Join response can't land out of order with an HP response and drag the cache backward.
     scope: { id: `character-${id}` },
     mutationFn: async (action: DoorwayAction) => {
-      // `onAction`'s guard below never calls mutate without id + doorway set,
-      // so the non-null assertions here are can't-happen, not a real risk.
+      // onAction's guard below never calls mutate without id + doorway set, so these non-null assertions are can't-happen.
       const character = await dispatchDoorwayAction(action, doorway!.campaignId, activeSessionId, id!);
-      // start* returns the session's updated character (shape D, #1283) — an
-      // exact write, same bias as useCharacterMutation: join returns none.
+      // start* returns the session's updated character as an exact cache write (shape D, #1283), same bias as useCharacterMutation; join returns none.
       if (character) queryClient.setQueryData(characterKeys.detail(id), character);
-      // Re-resolve BEFORE switching so Combat renders the live tracker, not the
-      // static panel off stale not-joined state (#963 addendum).
+      // refresh() must resolve before onEnterCombat, or Combat renders the stale not-joined panel instead of the live tracker (#963).
       await refresh();
     },
   });
 
   const onAction = async () => {
-    // A solo doorway carries campaignId === null (a legit start target), so the
-    // guard checks the character + a dispatchable action, not campaign presence.
+    // A solo doorway has campaignId === null but is still a legit start target, so this guard checks action presence, not campaignId.
     if (!id || !doorway || summary.action === null) return;
     try {
       await doorwayMutation.mutateAsync(summary.action);

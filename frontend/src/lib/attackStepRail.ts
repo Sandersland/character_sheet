@@ -1,11 +1,4 @@
-// Pure step model for the attack sheet's 1-2-3 rail (#811): Roll to hit →
-// Call it → Damage. No JSX — the weapon/attack-roll shape of
-// computeResolutionSteps (resolutionSteps.ts), rendered by ResolutionRail.
-//
-// "Damage" arms as soon as a roll exists (implicit hit — rolling damage IS the
-// hit call), so it never gates on step 2; a miss verdict parks it (a missed
-// attack deals no damage).
-
+// Damage arms as soon as a roll exists (rolling damage IS the hit call) — it never gates on step 2; only a miss verdict parks it (#811).
 import type { TallyVerdict } from "@/lib/attackTallySummary";
 
 export type StepState = "done" | "active" | "pending";

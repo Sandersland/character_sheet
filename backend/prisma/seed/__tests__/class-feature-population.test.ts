@@ -1,17 +1,3 @@
-// DB-backed proof for #1525's per-class per-edition population guard
-// (assertEveryClassEditionPopulated, seed-class-features.ts): a class whose
-// EDITION_2024 partition failed to seed doesn't fall back to 2014 text (see
-// featuresFromRows' plain `.filter(row => row.edition === edition && ...)`,
-// lib/classes/class-feature-rows.ts) — it renders NO features at all. This
-// suite proves the guard actually fires on that state, and that its returned
-// summary is a real DB read rather than a vacuous "all clear".
-//
-// Calls assertEveryClassEditionPopulated DIRECTLY, never through
-// seedClassFeatures: the seeder rewrites every row before reaching the guard
-// at the end of its own body, so routing a broken-state probe through it
-// could only ever pass. Mirrors class-feature-prune.test.ts's `afterEach`
-// re-seed idiom so a failed assertion mid-test can't leave the template DB
-// short for a later file.
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -24,48 +10,31 @@ describe("assertEveryClassEditionPopulated — anti-vacuity floors (#1525)", () 
     await seedClassFeatures(prisma);
   }, RESEED_TIMEOUT_MS);
 
-  // Literals measured directly against this tree's real seeded catalog (12
-  // classes, 532 rows, Warlock's EDITION_2024 the smallest pair at 12, Monk
-  // the largest at 37/37) — never re-derived from CLASS_FEATURES.length or any other
-  // value the guard itself could also get wrong, which is the whole point of
-  // an anti-vacuity check (the #1499 `triplesVisited >= 158` shape).
+  // Floors measured against the real seeded catalog, never re-derived from CLASS_FEATURES.length — an anti-vacuity check can't reuse the value it's checking.
   it("a clean seed reports summary counts at or above today's measured floors", async () => {
     const summary = await assertEveryClassEditionPopulated(prisma);
 
-    // 12 seeded classes x 2 editions. Also pinned to classRowCount so an
-    // emptied CharacterClass table can't shrink both sides of this
-    // assertion together — the literal 24 is what stops that from being
-    // self-satisfying.
+    // Also pinned to classRowCount so an emptied CharacterClass table can't shrink both sides of this assertion together.
     expect(summary.pairsChecked).toBeGreaterThanOrEqual(24);
     expect(summary.pairsChecked).toBe(summary.classRowCount * 2);
 
-    // Today's real minimum is Warlock's EDITION_2024 at 12 — a retab SHRINKS
-    // the smaller partition when 2024 drops features (Warlock's 2014 half is
-    // 20), so this floor tracks the most-retabbed class, not the smallest
-    // class. Two rows of slack below it still catches a half-written
-    // partition, which a bare `>= 1` sails straight past.
+    // Tracks the most-retabbed class's smaller partition (today: Warlock's EDITION_2024 at 12), not the smallest class overall.
     expect(summary.minPairCount).toBeGreaterThanOrEqual(10);
 
-    // 532 today. Grew from 522 when #1231/#1233/#1234 authored Rogue's,
-    // Warlock's and Wizard's real 2024 content; wave 2's remaining six
-    // classes will grow it further. Tune this DOWNWARD only, and record the
-    // reason here when it moves.
+    // Tune this floor DOWNWARD only; record the reason here when it moves.
     expect(summary.rowsCounted).toBeGreaterThanOrEqual(480);
   });
 });
 
 describe("assertEveryClassEditionPopulated — mutation proof (#1525)", () => {
   afterEach(async () => {
-    // Restores whatever a test deleted — belt-and-suspenders alongside each
-    // test's own explicit restore step below.
     await seedClassFeatures(prisma);
   }, RESEED_TIMEOUT_MS);
 
   it("deleting Sorcerer's EDITION_2024 rows at the DB level fails the guard, naming class and edition; reseeding restores it", async () => {
     const sorcerer = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Sorcerer" } });
 
-    // Sanity check this fixture assumption before mutating: if Sorcerer had
-    // zero 2024 rows already, the delete below would prove nothing.
+    // Fails if Sorcerer already had zero 2024 rows — the delete below would prove nothing.
     const before = await prisma.classFeature.count({ where: { classId: sorcerer.id, edition: "EDITION_2024" } });
     expect(before).toBeGreaterThan(0);
 

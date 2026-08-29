@@ -36,7 +36,6 @@ interface DetailSetters {
   connections: (c: EntityConnection[]) => void;
 }
 
-// Load the DM item an ITEM entity fronts; returns the effect cleanup.
 function loadCampaignItem(
   campaignId: string,
   entityId: string,
@@ -51,7 +50,6 @@ function loadCampaignItem(
   };
 }
 
-// Merge a PATCH result into the pane entity, the rail list, and the shared cache.
 function mergeEntityUpdate(
   campaignId: string,
   entityId: string,
@@ -65,7 +63,6 @@ function mergeEntityUpdate(
   primeCampaignEntities(campaignId, entities.map((e) => (e.id === entityId ? updated : e)));
 }
 
-// Kick off all per-entity reads; returns the effect cleanup that cancels them.
 function loadEntityDetail(campaignId: string, entityId: string, set: DetailSetters): () => void {
   let active = true;
   fetchCampaign(campaignId)
@@ -73,9 +70,7 @@ function loadEntityDetail(campaignId: string, entityId: string, set: DetailSette
       if (!active) return;
       set.role(c.role);
       set.characters(c.characters ?? []);
-      // Rides the campaign read this effect already makes — an ITEM entity's
-      // card needs an edition to pick a /reference cache slot (#1437), not a
-      // second request.
+      // Rides the campaign read this effect already makes so an ITEM card's edition lookup doesn't need a second request (#1437).
       set.rulesEdition(c.rulesEdition);
     })
     .catch(() => active && set.role(undefined));
@@ -135,15 +130,12 @@ async function runMutation(
   }
 }
 
-// The slice of the campaign read this page keeps: the viewer's role, the member
-// characters, and the edition an ITEM card resolves rarity labels against
-// (#1437). One sub-hook because all three land from the same fetchCampaign.
+// One sub-hook because role, characters, and rulesEdition all land from the same fetchCampaign call.
 function useCampaignMeta() {
   const [role, setRole] = useState<CampaignRole | undefined>(undefined);
   const [characters, setCharacters] = useState<NonNullable<Campaign["characters"]>>([]);
   const [rulesEdition, setRulesEdition] = useState<RulesEdition | undefined>(undefined);
-  // Stable so the load effect can depend on it without re-running per render —
-  // same reason useEntityForm memoizes `fill`.
+  // Stable so the load effect can depend on it without re-running per render, same reason useEntityForm memoizes `fill`.
   const set = useMemo(
     () => ({ role: setRole, characters: setCharacters, rulesEdition: setRulesEdition }),
     [],
@@ -151,7 +143,6 @@ function useCampaignMeta() {
   return { role, characters, rulesEdition, set };
 }
 
-// The edit-form field state; `fill` seeds it from a freshly loaded entity.
 function useEntityForm() {
   const [type, setType] = useState<EntityType>("NPC");
   const [name, setName] = useState("");
@@ -177,8 +168,6 @@ function useEntityForm() {
   };
 }
 
-// Mutation surface (save/delete/reveal-hide + busy/error), split from the data
-// loading. `apply` merges a PATCH result into pane/rail/shared-cache state.
 function useEntityMutations(ctx: {
   campaignId?: string;
   entityId?: string;
@@ -222,8 +211,7 @@ function useEntityMutations(ctx: {
     });
   }
 
-  // Portrait writes (#1617) ride the same apply path as PATCH so the pane,
-  // rail, and shared entity cache pick up the fresh ?v= URL together.
+  // Portrait writes ride the same apply path as PATCH so pane, rail, and shared cache pick up the fresh ?v= URL together (#1617).
   function handleUploadPortrait(file: File) {
     const { campaignId, entityId } = ctx;
     if (!campaignId || !entityId) return;
@@ -251,9 +239,7 @@ function useEntityMutations(ctx: {
   };
 }
 
-// Loads an entity (with derived stats), its role/item/backlinks/connections, and
-// owns the edit-form + mutation state for EntityDetailPage. `entity === undefined`
-// means still loading. `?edit=1` (#841 deep link) lands directly in edit state.
+// entity === undefined means still loading; null means not found.
 export function useEntityDetail(campaignId?: string, entityId?: string) {
   const { entities, byId } = useCampaignEntities(campaignId);
   const [searchParams] = useSearchParams();
@@ -274,12 +260,7 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
 
   useEffect(() => {
     if (!campaignId || !entityId) return;
-    // Pane navigation keeps the page mounted (#842): reset per-entity state.
-    // `item` resets here too (#1943 fix) — without it, navigating an ITEM
-    // entity away to a non-ITEM one left its stale CampaignItem sitting in
-    // state forever (the item-loading effect below never re-fires for a
-    // non-ITEM entity to correct it), which could render a false
-    // item-link-transfer warning in the combine dialog.
+    // item must reset here too: its loading effect never re-fires for a non-ITEM entity, and a stale item would trigger a false item-link-transfer warning in combine.
     setEntity(undefined);
     setItem(null);
     setBacklinks([]);
@@ -295,8 +276,7 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
     });
   }, [campaignId, entityId, fill, meta.set]);
 
-  // ITEM entities front a DM-authored CampaignItem — load its card data. The
-  // by-entity read 404s for a non-owner while the entity is hidden (setItem null).
+  // The by-entity read 404s for a non-owner while the entity is hidden, hence the catch setting item to null.
   useEffect(() => {
     if (!campaignId || !entityId || entity?.type !== "ITEM") return;
     return loadCampaignItem(campaignId, entityId, setItem);

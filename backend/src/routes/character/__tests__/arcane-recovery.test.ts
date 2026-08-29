@@ -1,10 +1,3 @@
-/**
- * Wizard Arcane Recovery op tests (#904).
- * A level-8 wizard (cap = ceil(8/2) = 4 slot-levels) recovers expended slots
- * on a short rest, once per long rest. Fixture pre-expends several slots via the
- * spellcasting JSON so the op has slots to restore without casting first.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -17,7 +10,7 @@ import { authCookie } from "@/test-support/auth.js";
 const OWNER_ID = "owner-arcane-recovery";
 let COOKIE: string;
 
-const XP_LVL_8 = 34000; // level 8 → L1:4, L2:3, L3:3, L4:2 slots; cap = 4 slot-levels
+const XP_LVL_8 = 34000;
 
 const WIZARD_ID = "arcane-recovery-wizard";
 const FIGHTER_ID = "arcane-recovery-fighter";
@@ -36,7 +29,6 @@ const BASE = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-// Pre-expended slots: 2×L1, 3×L2, 1×L3.
 const EXPENDED_SPELLCASTING = {
   slotsUsed: { "1": 2, "2": 3, "3": 1 },
   arcanumUsed: {},
@@ -59,12 +51,7 @@ beforeEach(async () => {
     update: {},
   });
   wizardClassId = wiz.id;
-  // #1234 commit 3: Arcane Recovery's pool moved off wizard.ts's resourceFn
-  // onto its ClassFeature row (wizard-features.ts) — this bespoke test class
-  // (a fixed id distinct from the real seeded Wizard) needs its OWN row now,
-  // or resolveArcaneRecoveryContext's poolsFromRows read finds nothing and
-  // every op below 400s with "Arcane Recovery is not available for this
-  // character" (the exact regression this migration's plan flagged to check).
+  // resolveArcaneRecoveryContext reads pools from ClassFeature rows, not a shared resourceFn — this fixture class needs its own Arcane Recovery row (#1234).
   await prisma.classFeature.deleteMany({ where: { classId: wizardClassId, name: "Arcane Recovery" } });
   await prisma.classFeature.createMany({
     data: (["EDITION_2014", "EDITION_2024"] as const).map((edition) => ({
@@ -137,10 +124,8 @@ describe("POST spellcasting/transactions — arcaneRecovery (#904)", () => {
       .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 1, count: 2 }, { level: 2, count: 1 }] }] });
 
     expect(res.status).toBe(200);
-    // 2×L1 (2 levels) + 1×L2 (2 levels) = 4 slot-levels = cap.
-    expect(slot(res.body, 1)!.used).toBe(0); // 2 → 0
-    expect(slot(res.body, 2)!.used).toBe(2); // 3 → 2
-    // The once-per-long-rest use is now spent.
+    expect(slot(res.body, 1)!.used).toBe(0);
+    expect(slot(res.body, 2)!.used).toBe(2);
     expect(pool(res.body, "arcaneRecovery")!.used).toBe(1);
     expect(pool(res.body, "arcaneRecovery")!.remaining).toBe(0);
   });
@@ -154,13 +139,11 @@ describe("POST spellcasting/transactions — arcaneRecovery (#904)", () => {
       .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 1, count: 1 }] }] });
     expect(second.status).toBe(400);
 
-    // Long rest refreshes the use (and clears all expended slots).
     const rest = await supertest(app).post(`/api/characters/${WIZARD_ID}/hp`).set("Cookie", COOKIE)
       .send({ operations: [{ type: "longRest" }] });
     expect(rest.status).toBe(200);
     expect(pool(rest.body, "arcaneRecovery")!.used).toBe(0);
 
-    // Expend a slot again, then Arcane Recovery works once more.
     await supertest(app).post(url(WIZARD_ID)).set("Cookie", COOKIE).send({ operations: [{ type: "expendSlot", level: 2 }] });
     const third = await supertest(app).post(url(WIZARD_ID)).set("Cookie", COOKIE)
       .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 2, count: 1 }] }] });
@@ -169,11 +152,9 @@ describe("POST spellcasting/transactions — arcaneRecovery (#904)", () => {
   });
 
   it("rejects recovering more than ceil(wizardLevel/2) total slot-levels", async () => {
-    // 3×L2 = 6 slot-levels > cap 4.
     const res = await supertest(app).post(url(WIZARD_ID)).set("Cookie", COOKIE)
       .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 2, count: 3 }] }] });
     expect(res.status).toBe(400);
-    // Rejected op did not consume the use.
     const check = await supertest(app).get(`/api/characters/${WIZARD_ID}`).set("Cookie", COOKIE);
     expect(pool(check.body, "arcaneRecovery")!.used).toBe(0);
   });
@@ -185,27 +166,21 @@ describe("POST spellcasting/transactions — arcaneRecovery (#904)", () => {
   });
 
   it("rejects recovering more slots than are expended at a level", async () => {
-    // Only 1×L3 expended in the fixture.
     const res = await supertest(app).post(url(WIZARD_ID)).set("Cookie", COOKIE)
       .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 3, count: 2 }] }] });
     expect(res.status).toBe(400);
   });
 
   it("aggregates duplicate-level entries so they cannot over-recover past expended", async () => {
-    // 2×L1 expended; two entries summing to 3 must be rejected as one over-count,
-    // not pass twice against the full expended count (#904 review).
     const res = await supertest(app).post(url(WIZARD_ID)).set("Cookie", COOKIE)
       .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 1, count: 2 }, { level: 1, count: 1 }] }] });
     expect(res.status).toBe(400);
-    // Rejected: slots untouched (still 2 expended) and the use not consumed.
     const check = await supertest(app).get(`/api/characters/${WIZARD_ID}`).set("Cookie", COOKIE);
     expect(slot(check.body, 1)!.used).toBe(2);
     expect(pool(check.body, "arcaneRecovery")!.used).toBe(0);
   });
 
   it("applies valid duplicate-level entries once (aggregated, no double-decrement)", async () => {
-    // Two L1 entries summing to 2 (≤ 2 expended, 2 slot-levels ≤ cap 4): succeeds
-    // and restores exactly 2 L1 slots (used 2→0), not more.
     const res = await supertest(app).post(url(WIZARD_ID)).set("Cookie", COOKIE)
       .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 1, count: 1 }, { level: 1, count: 1 }] }] });
     expect(res.status).toBe(200);
@@ -223,7 +198,7 @@ describe("POST spellcasting/transactions — arcaneRecovery (#904)", () => {
     const rec = await supertest(app).post(url(WIZARD_ID)).set("Cookie", COOKIE)
       .send({ operations: [{ type: "arcaneRecovery", slots: [{ level: 2, count: 2 }] }] });
     expect(rec.status).toBe(200);
-    expect(slot(rec.body, 2)!.used).toBe(1); // 3 → 1
+    expect(slot(rec.body, 2)!.used).toBe(1);
     expect(pool(rec.body, "arcaneRecovery")!.used).toBe(1);
 
     const activity = await supertest(app).get(`/api/characters/${WIZARD_ID}/activity`).set("Cookie", COOKIE);
@@ -233,7 +208,7 @@ describe("POST spellcasting/transactions — arcaneRecovery (#904)", () => {
 
     const undo = await supertest(app).post(`/api/characters/${WIZARD_ID}/events/${ev.batchId}/revert`).set("Cookie", COOKIE);
     expect(undo.status).toBe(200);
-    expect(slot(undo.body, 2)!.used).toBe(3); // restored
-    expect(pool(undo.body, "arcaneRecovery")!.used).toBe(0); // use refunded
+    expect(slot(undo.body, 2)!.used).toBe(3);
+    expect(pool(undo.body, "arcaneRecovery")!.used).toBe(0);
   });
 });

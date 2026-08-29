@@ -1,14 +1,4 @@
-// DB-backed migration-correctness suite for #1519/#1533: StartingEquipmentPackage
-// (+Group/Option/Item/OpenPick) is a seeded home for the twelve classes'
-// starting-equipment packages, still served ONLY from STARTING_EQUIPMENT (no
-// reader yet — #1534). Modelled on class-feature-migration.test.ts:
-// seed-starting-equipment.ts exports seedStartingEquipment(prisma) precisely
-// so this file can call it in-process (seed.ts's OWN families can't be
-// re-run this way — main() self-invokes at module load and exports nothing).
-//
-// The template DB vitest.global-setup.ts clones from already ran
-// `prisma db seed` once, so every row asserted against below is the REAL
-// seeded catalog, not a fixture.
+// vitest.global-setup.ts clones a template DB that already ran `prisma db seed` — every row asserted against below is the real seeded catalog, not a fixture.
 import { describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -34,11 +24,7 @@ describe("StartingEquipmentPackage migration — row count (#1533, #1565)", () =
     }
   });
 
-  // #1565/#1570: exactly eight background packages exist (Acolyte both
-  // editions; Charlatan/Criminal/Noble/Sage/Soldier 2024 only; Folk Hero 2014
-  // only) — never the fourteen a full 7-background x 2-edition grid would
-  // suggest, since no background but Acolyte exists in both editions' seeded
-  // content (see starting-equipment.ts's background-section header).
+  // 8, not the 14 a full 7-background x 2-edition grid would suggest — only Acolyte exists in both editions.
   it("exactly 8 background packages exist, each with >= 1 group", async () => {
     const packages = await prisma.startingEquipmentPackage.findMany({
       where: { backgroundId: { not: null } },
@@ -52,11 +38,7 @@ describe("StartingEquipmentPackage migration — row count (#1533, #1565)", () =
   });
 });
 
-// #1570: Charlatan and Noble are PHB'24 backgrounds — NOT SRD, but the repo
-// already transcribes their 2024 mechanics (abilityChoices + originFeatName in
-// BACKGROUNDS are 2024-only concepts), so the equipment finishes a row that was
-// already half-authored from the same source. Values verified against the
-// PHB'24 stat blocks themselves, not a reference site.
+// Values verified against the PHB'24 stat blocks directly, not a reference site.
 describe("Charlatan/Noble 2024 background packages (#1570)", () => {
   async function optionsFor(backgroundName: string) {
     const pkg = await prisma.startingEquipmentPackage.findFirst({
@@ -102,16 +84,14 @@ describe("Charlatan/Noble 2024 background packages (#1570)", () => {
     const [a, b] = pkg!.groups[0].options;
     expect(a.items.map((i) => i.catalogName)).toEqual(["Fine Clothes", "Perfume Vial"]);
     expect(a.gold).toBe(29);
-    // "same as above" binds to the gaming-set proficiency the background itself
-    // grants — the identical mechanism Soldier's package uses (#1564/#1565).
+    // "same as above" binds to the gaming-set proficiency the background itself grants — same mechanism as Soldier's package.
     expect(a.openPicks).toHaveLength(1);
     expect(a.openPicks[0].toolCategory).toBe("gamingSet");
     expect(a.openPicks[0].boundToToolChoice).toBe(true);
     expect(b.gold).toBe(50);
   });
 
-  // SRD 5.2 lists Forgery Kit (15 GP, 5 lb) in its tools table, so the Item row
-  // is citable even though the background that needs it is not.
+  // SRD 5.2 lists Forgery Kit (15 GP, 5 lb) in its tools table — citable even though the background isn't.
   it("seeds the Forgery Kit item the Charlatan package references", async () => {
     const item = await prisma.item.findFirst({ where: { name: "Forgery Kit" } });
     expect(item).not.toBeNull();
@@ -151,15 +131,11 @@ describe("StartingEquipmentPackage migration — seedStartingEquipment is idempo
 describe("assertEveryClassEditionHasPackage — guard (#1533 [R5])", () => {
   it("returns a non-vacuous summary against the real seeded table", async () => {
     const summary = await assertEveryClassEditionHasPackage(prisma);
-    // 12 classes x 2 editions = 24 pairs; rowsCounted sums each pair's group
-    // count, so it must be >= pairsChecked (every pair has >= 1 group).
+    // rowsCounted >= pairsChecked since every pair has >= 1 group (12 classes x 2 editions = 24 pairs).
     expect(summary.pairsChecked).toBeGreaterThanOrEqual(24);
     expect(summary.rowsCounted).toBeGreaterThanOrEqual(summary.pairsChecked);
   });
 
-  // Mutation proof (#1533's AC): delete one class's 2024 package rows,
-  // confirm the guard throws naming BOTH the class and the edition, then
-  // restore by reseeding (seedStartingEquipment recreates the deleted row).
   it("deleting one class's 2024 package rows makes the guard throw naming that class and edition", async () => {
     const monk2024 = await prisma.startingEquipmentPackage.findFirstOrThrow({
       where: { class: { name: "Monk" }, edition: "EDITION_2024" },
@@ -168,7 +144,6 @@ describe("assertEveryClassEditionHasPackage — guard (#1533 [R5])", () => {
 
     await expect(assertEveryClassEditionHasPackage(prisma)).rejects.toThrow(/Monk \/ EDITION_2024/);
 
-    // Restore — reseeding recreates every (classId, edition) pair.
     await seedStartingEquipment(prisma);
     await expect(assertEveryClassEditionHasPackage(prisma)).resolves.toBeDefined();
   });

@@ -34,12 +34,7 @@ const character = {
   abilityScores: { strength: 16, dexterity: 14, constitution: 15, intelligence: 10, wisdom: 12, charisma: 8 },
 } as unknown as Character;
 
-// The HP row's numbers ride on the plan's own hitPoints step (#1380): the
-// ADVANCING class's d10 at Con 15 (+2), which is what the backend planner
-// resolves and serves. #1497: effectiveMaxAverage is ALSO served and depends
-// on the character's own pre-level max, so it's built per-test via
-// hpMetaFor(rawMax) rather than one shared constant (mirrors
-// levelUpLedger.test.ts's own hpMetaFor).
+// #1497: effectiveMaxAverage depends on the character's own pre-level max, so hpMetaFor is built per-test rather than a shared constant (mirrors levelUpLedger.test.ts's hpMetaFor).
 function hpMetaFor(rawMax: number) {
   return { die: "d10", faces: 10, conMod: 2, fixedAverage: 6, averageGain: 8, minRoll: 3, maxRoll: 12, effectiveMaxAverage: rawMax + 8, effectiveMaxByRoll: [] };
 }
@@ -79,9 +74,6 @@ describe("ReviewStep", () => {
     } as unknown as Character;
     const wizardPlan: LevelUpPlanResponse = { ...plan, steps: [{ kind: "hitPoints", meta: hpMetaFor(30) }] };
     renderReview({ hp: { method: "average" } }, { character: wizard, plan: wizardPlan });
-    // Con 15 → +2; d10 average (Fighter, the advancing class) = 8; max 30 → 38.
-    // No first-paint flash of the stale d6 answer any more: the die arrives with
-    // the plan rather than resolving asynchronously from the reference catalog.
     expect(screen.getByText("38")).toBeInTheDocument();
   });
 
@@ -90,7 +82,6 @@ describe("ReviewStep", () => {
     expect(screen.getByText("Level")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
     expect(screen.getByText("8")).toBeInTheDocument();
-    // Con 15 (+2), d10 average = 8; max 52 → 60.
     expect(screen.getByText("52")).toBeInTheDocument();
     expect(screen.getByText("60")).toBeInTheDocument();
   });
@@ -141,12 +132,7 @@ describe("ReviewStep", () => {
     expect(await screen.findByText("Archery")).toBeInTheDocument();
   });
 
-  // Two assertions, two jobs, neither redundant (#1411). `toHaveBeenCalledWith`
-  // is the red-first proof that the edition is threaded at all;
-  // `toHaveBeenCalledTimes(1)` after an explicit rerender is the standing guard
-  // that the fetcher keeps a stable identity — an inline arrow would re-fire
-  // useCatalogNames's [fetcher] effect forever, and it would still pass a
-  // calledWith-only test.
+  // #1411: CalledWith proves edition threading; CalledTimes(1) after rerender guards fetcher identity — an inline arrow would re-fire useCatalogNames's effect forever and still pass a calledWith-only test.
   it("fetches the feat catalog once across a re-render, for the character's edition", async () => {
     vi.mocked(fetchFeats).mockResolvedValue([
       { id: "archery", name: "Archery", description: "" },
@@ -170,11 +156,7 @@ describe("ReviewStep", () => {
     expect(fetchFeats).toHaveBeenCalledWith("EDITION_2014");
   });
 
-  // The maneuver twin of the feat case above (#1412), and needed for the same
-  // two reasons: fetchManeuvers now takes an argument, so its fetcher can no
-  // longer be a bare module ref and is one inline arrow away from an infinite
-  // refetch. Without it the Review ledger silently degrades to raw ids — a 400
-  // that useCatalogNames swallows into {}.
+  // #1412: fetchManeuvers takes an argument, so its fetcher can't be a bare module ref and is one inline arrow from an infinite refetch; without this, a 400 silently degrades the ledger to raw ids via useCatalogNames swallowing it into {}.
   it("fetches the maneuver catalog once across a re-render, for the character's edition", async () => {
     const draft: LevelUpDraft = {
       hp: { method: "average" },
@@ -268,16 +250,12 @@ describe("ReviewStep", () => {
     const truth = screen.getByText("Zone of Truth");
     expect(restoration).toBeInTheDocument();
     expect(truth).toBeInTheDocument();
-    // Distinct rows, not a run-together name string.
     expect(restoration.closest("li")).not.toBe(truth.closest("li"));
     expect(screen.getByText("Level 2 · Abjuration")).toBeInTheDocument();
     expect(screen.getByText("Level 2 · Enchantment")).toBeInTheDocument();
-    // School-ink class present on the spell names (school-tinted, not run-together plain text).
     expect(restoration.className).toContain("text-school-abjuration");
     expect(truth.className).toContain("text-school-enchantment");
-    // #1509 D5: no served casterModel on this fixture's plan.target → the
-    // "prepared" default (SRD 5.2 Always-Prepared Spells; also the 2014
-    // prepared-model classes' analogue).
+    // #1509: no served casterModel on this fixture's plan.target defaults to "prepared" (SRD 5.2 Always-Prepared Spells).
     expect(screen.getByText("Always prepared — doesn't count against your spells known.")).toBeInTheDocument();
   });
 

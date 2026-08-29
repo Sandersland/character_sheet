@@ -53,7 +53,6 @@ describe("useRovingRadioGroup", () => {
       result.current.itemRef(1)(fakeButton());
       result.current.itemRef(2)(fakeButton());
       result.current.keyDownFor(1)(fakeEvent("ArrowLeft"));
-      // index 0 is disabled, so wrapping from 1 going left must skip it and land on 2.
       expect(onSelect).toHaveBeenCalledWith(2);
     });
 

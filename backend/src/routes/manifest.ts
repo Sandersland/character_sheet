@@ -40,14 +40,10 @@ import { spellsRouter } from "@/routes/catalog/spells.js";
 import { spellcastingRouter } from "@/routes/character/spellcasting.js";
 
 /**
- * One entry per router `createApp` mounts: every `"public"` entry, then the
- * `requireAuth` gate — an unauthenticated request 401s there and never
- * reaches an authed router — then every `"authed"` entry. `scope` is
- * required so a new entry can't default to public silently. Array order is
- * registration order and load-bearing (Express matches in mount order over
- * non-disjoint paths) — preserve it, don't sort. `mount` is an array for a
- * router owning more than one path at one scope (none exist today);
- * character-scoped routers read `:id` via `Router({ mergeParams: true })`.
+ * Array order is registration order and load-bearing — Express matches in mount
+ * order over non-disjoint paths, so don't sort. `requireAuth` gates between the
+ * "public" and "authed" entries; `scope` is required so a new entry can't
+ * default to public silently.
  */
 export interface RouteMount {
   router: Router;
@@ -62,30 +58,21 @@ export const routeManifest: RouteMount[] = [
   { router: charactersRouter, mount: "/api", scope: "authed" },
   { router: preferencesRouter, mount: "/api", scope: "authed" },
 
-  // Catalog / reference routers own top-level collection paths.
   { router: referenceRouter, mount: "/api", scope: "authed" },
   { router: itemsRouter, mount: "/api", scope: "authed" },
   { router: spellsRouter, mount: "/api", scope: "authed" },
-  // Owns /spells/custom — mounted after spellsRouter (registration order is
-  // load-bearing per this file's own docstring) so the fixed "custom" segment
-  // never shadows spellsRouter's own paths, though today they're disjoint.
+  // Owns /spells/custom; mounted after spellsRouter so "custom" can't shadow its paths.
   { router: customSpellsRouter, mount: "/api", scope: "authed" },
   { router: featsRouter, mount: "/api", scope: "authed" },
   { router: grantsRouter, mount: "/api", scope: "authed" },
   { router: forkRouter, mount: "/api", scope: "authed" },
-  // Edition-independent by construction (#1436): the only catalog route that
-  // takes no `?edition=`, because it is what the client reads to CHOOSE one.
+  // The only catalog route with no `?edition=`, since it's what the client reads to choose one.
   { router: editionsRouter, mount: "/api", scope: "authed" },
 
-  // Character-scoped routers own their sub-path under /characters/:id and read
-  // :id via mergeParams (see each Router({ mergeParams: true })).
   { router: hitPointsRouter, mount: "/api/characters/:id/hp", scope: "authed" },
   { router: inventoryRouter, mount: "/api/characters/:id/inventory", scope: "authed" },
   { router: experienceRouter, mount: "/api/characters/:id/experience", scope: "authed" },
   { router: spellcastingRouter, mount: "/api/characters/:id/spellcasting", scope: "authed" },
-  // Unified combat action resolution (#1829, epic #1827) — one undoable
-  // resolveAction event per weapon swing / spell cast. Not yet called by the
-  // frontend (adapter slices #1832/#1833 migrate useAttackRolls/useSpellPicker).
   { router: resolveActionRouter, mount: "/api/characters/:id/resolve-action", scope: "authed" },
   { router: resourcesRouter, mount: "/api/characters/:id/resources", scope: "authed" },
   { router: conditionsRouter, mount: "/api/characters/:id/conditions", scope: "authed" },
@@ -95,14 +82,13 @@ export const routeManifest: RouteMount[] = [
   { router: levelUpRouter, mount: "/api/characters/:id/level-up", scope: "authed" },
   { router: portraitRouter, mount: "/api/characters/:id/portrait", scope: "authed" },
   { router: actionsRouter, mount: "/api/characters/:id/actions", scope: "authed" },
-  // One endpoint for every automated class/subclass ability; the feature is
-  // chosen by URL key out of ABILITY_REGISTRY rather than by its own mount (#1275).
+  // One endpoint for every automated class/subclass ability; the feature is chosen by URL key
+  // out of ABILITY_REGISTRY rather than by its own mount.
   { router: abilitiesRouter, mount: "/api/characters/:id/abilities", scope: "authed" },
-  // activity owns two sub-paths (/activity, /events/:batchId/revert), so it
-  // mounts on the character root rather than a single leaf.
+  // activity owns two sub-paths (/activity, /events/:batchId/revert), so it mounts on the character root.
   { router: activityRouter, mount: "/api/characters/:id", scope: "authed" },
 
-  // Catalog pickers for abilities whose transactions live on abilitiesRouter (#1275).
+  // Catalog pickers for abilities whose transactions live on abilitiesRouter.
   { router: maneuversRouter, mount: "/api/maneuvers", scope: "authed" },
   { router: shadowArtsRouter, mount: "/api/shadow-arts", scope: "authed" },
   { router: disciplinesRouter, mount: "/api/disciplines", scope: "authed" },

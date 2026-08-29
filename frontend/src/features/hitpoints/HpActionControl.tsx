@@ -14,13 +14,11 @@ import Segmented from "@/components/ui/Segmented";
 
 export type { HpMode };
 
-/** Optional metadata for a damage apply — the type and whether to auto-halve (#456). */
 export interface DamageMeta {
   damageType?: string;
   applyResistance?: boolean;
 }
 
-// Per-mode field aria-label + Apply button tone/label.
 const HP_MODES: Record<
   HpMode,
   { label: string; fieldLabel: string; buttonClass: string; applyLabel: (n: number) => string }
@@ -94,7 +92,6 @@ function AmountChips({
 const STEP_BTN_CLS =
   "flex h-11 w-11 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50";
 
-// Display-size amount readout: one large tabular input flanked by −/+ stepper.
 function AmountStepper({
   pending,
   amount,
@@ -156,7 +153,6 @@ export default function HpActionControl({
   pending: boolean;
   hitPoints: HpSnapshot;
   onApply: (mode: HpMode, value: number, damage?: DamageMeta) => Promise<boolean>;
-  /** Damage types the character currently resists (drives the auto-halve preview) (#456). */
   resistedTypes?: string[];
 }) {
   const [mode, setMode] = useState<HpMode>("damage");
@@ -182,7 +178,6 @@ export default function HpActionControl({
     if (ok) setAmount("");
   }
 
-  // Chips/stepper build the amount; clamped 0–999.
   function bumpAmount(delta: number) {
     setAmount(String(accumulateAmount(numericAmount, delta)));
   }
@@ -196,7 +191,7 @@ export default function HpActionControl({
         label="Hit point action"
       />
 
-      {/* Editable amount readout flanked by the −/+ stepper */}
+      
       <AmountStepper
         pending={pending}
         amount={amount}
@@ -217,7 +212,7 @@ export default function HpActionControl({
         onClear={() => setAmount("")}
       />
 
-      {/* Damage-type picker (damage mode only, optional) (#456) */}
+      
       {mode === "damage" && (
         <select
           value={damageType}
@@ -235,7 +230,7 @@ export default function HpActionControl({
         </select>
       )}
 
-      {/* Resistance auto-halve preview + decline override (#456) */}
+      
       {isResisted && (
         <label className="flex items-center gap-2 text-xs text-parchment-600">
           <input
@@ -253,7 +248,7 @@ export default function HpActionControl({
         </label>
       )}
 
-      {/* Full-width primary action echoing the pending amount */}
+      
       <button
         type="button"
         disabled={applyDisabled}

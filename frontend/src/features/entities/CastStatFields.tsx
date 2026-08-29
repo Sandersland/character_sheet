@@ -15,8 +15,6 @@ interface CastStatFieldsProps {
   onValue: (value: number) => void;
 }
 
-// The mode picker + numeric value for a castSpell's Save DC or Attack bonus.
-// "Wielder's own" hides the value and needs a spellcaster-attunable item (#528).
 export default function CastStatFields({ index, kind, mode, value, fallbackValue, spellcasterAttunable, onMode, onValue }: CastStatFieldsProps) {
   const modeLabel = kind === "dc" ? "Save DC" : "Attack bonus";
   const valueLabel = kind === "dc" ? "DC value" : "Attack value";

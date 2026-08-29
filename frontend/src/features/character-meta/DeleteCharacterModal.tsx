@@ -13,12 +13,6 @@ interface DeleteCharacterModalProps {
   onClose: () => void;
 }
 
-/**
- * Confirmation dialog before permanently deleting a character. Reuses the
- * Modal primitive (which was designed for confirm dialogs) and navigates to
- * "/" after a successful delete — replacing history so the now-dead sheet URL
- * can't be reached by pressing Back.
- */
 export default function DeleteCharacterModal({
   characterId,
   characterName,
@@ -33,11 +27,7 @@ export default function DeleteCharacterModal({
     setError(null);
     try {
       await deleteCharacter(characterId);
-      // Write the list cache exactly rather than invalidating (#1660): the
-      // navigation lands inside createQueryClient's 30s staleTime, so the list
-      // page would otherwise serve the cached array with the ghost row and
-      // never refetch. The detail entry is removed outright — nothing should
-      // read a deleted character back.
+      // Cache is written directly, not invalidated (#1660): navigating inside the 30s staleTime would otherwise serve the stale list with the deleted row.
       const queryClient = getQueryClient();
       queryClient.setQueryData<CharacterSummary[]>(characterKeys.list(), (prev) =>
         prev?.filter((character) => character.id !== characterId),

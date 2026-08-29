@@ -1,8 +1,4 @@
-// Rider contract (#1316): sneakAttack/stunningStrike/openHandTechnique/
-// quiveringPalm/maneuvers are emitted ONLY when the character has them —
-// absent keys off-class/subclass/level, never `null`. Headline case: a
-// Battle Master Fighter's payload carries none of the monk/rogue keys.
-
+// Rider contract (#1316): sneakAttack/stunningStrike/openHandTechnique/quiveringPalm/maneuvers are emitted only when the character has them — absent, never null.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -50,14 +46,7 @@ let battleMasterSubclassId: string;
 
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
-  // #1546 Part B-ii: Battle Master's maneuverChoiceCount/announcedSaveDC are
-  // ROW-driven now (fighter.ts's deriveExtras is gone) — resolving them needs
-  // the REAL FK relations (CharacterClassEntry.classId/subclassId), which this
-  // fixture previously omitted entirely (harmless while Battle Master's
-  // content was code, keyed only by the `subclass` NAME string). Points at the
-  // real seeded catalog (read-only, never mutated — mirrors
-  // maneuvers-multiclass.test.ts's identical pattern) rather than a bespoke
-  // Subclass row, since this suite has no other reason to own its own class.
+  // maneuverChoiceCount/announcedSaveDC are ROW-driven and need the real FK relations (classId/subclassId) to the seeded Fighter/Battle Master catalog, not a bespoke Subclass row.
   fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
   battleMasterSubclassId = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighterClassId, name: "Battle Master" } })).id;
 });
@@ -77,7 +66,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         ...BASE,
         id: "riders-battle-master-l7",
         name: "Battle Master Snapshot",
-        experiencePoints: 23000, // level 7, proficiency +3
+        experiencePoints: 23000,
         hitDice: { total: 7, die: "d10", spent: 7 },
         abilityScores: { strength: 16, dexterity: 10, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
         classEntries: { create: [{ name: "fighter", position: 0, level: 7, subclass: "battle master", classId: fighterClassId, subclassId: battleMasterSubclassId }] },
@@ -85,18 +74,14 @@ describe("serializeCharacter rider contract (#1316)", () => {
     });
     const payload = await serialize("riders-battle-master-l7");
 
-    // The reproduction case: no null placeholders, no keys at all.
     expect(payload).not.toHaveProperty("sneakAttack");
     expect(payload).not.toHaveProperty("stunningStrike");
     expect(payload).not.toHaveProperty("openHandTechnique");
     expect(payload).not.toHaveProperty("quiveringPalm");
 
-    // announcedSaveDC folds into the same rider contract, at the top level,
-    // named for the feature like every other rider (`maneuvers`, not
-    // `announcedSaveDC`) — Str 16 (+3) > Dex 10 (0), prof +3 → DC 14.
+    // announcedSaveDC folds into the top-level maneuvers rider, named for the feature like every other rider.
     expect(payload).toHaveProperty("maneuvers", { saveDC: 14 });
-    // maneuverChoiceCount/toolProfChoiceCount stay put in resources (#1316) —
-    // only the save DC moved out.
+    // maneuverChoiceCount/toolProfChoiceCount stay put in resources (#1316) — only the save DC moved out.
     expect((payload.resources as { maneuverChoiceCount?: number }).maneuverChoiceCount).toBe(5);
     expect(payload.resources).not.toHaveProperty("announcedSaveDC");
   });
@@ -107,7 +92,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         ...BASE,
         id: "riders-rogue-l3",
         name: "Rogue Snapshot",
-        experiencePoints: 900, // level 3, proficiency +2
+        experiencePoints: 900,
         hitDice: { total: 3, die: "d8", spent: 3 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 10, charisma: 10 },
         classEntries: { create: [{ name: "rogue", position: 0, level: 3 }] },
@@ -128,7 +113,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         ...BASE,
         id: "riders-monk-l4",
         name: "Monk L4 Snapshot",
-        experiencePoints: 2700, // level 4
+        experiencePoints: 2700,
         hitDice: { total: 4, die: "d8", spent: 4 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
         classEntries: { create: [{ name: "monk", position: 0, level: 4 }] },
@@ -144,7 +129,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         ...BASE,
         id: "riders-monk-l5",
         name: "Monk L5 Snapshot",
-        experiencePoints: 6500, // level 5, proficiency +3
+        experiencePoints: 6500,
         hitDice: { total: 5, die: "d8", spent: 5 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
         classEntries: { create: [{ name: "monk", position: 0, level: 5 }] },
@@ -152,9 +137,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
     });
     const payload = await serialize("riders-monk-l5");
 
-    // Wis 16 (+3), prof +3 → DC 14.
     expect(payload.stunningStrike).toEqual({ saveDC: 14 });
-    // Not Open Hand — no Open Hand riders even though monk level is high enough.
     expect(payload).not.toHaveProperty("openHandTechnique");
     expect(payload).not.toHaveProperty("quiveringPalm");
     expect(payload).not.toHaveProperty("sneakAttack");
@@ -166,7 +149,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         ...BASE,
         id: "riders-open-hand-l2",
         name: "Open Hand L2 Snapshot",
-        experiencePoints: 300, // level 2
+        experiencePoints: 300,
         hitDice: { total: 2, die: "d8", spent: 2 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
         classEntries: { create: [{ name: "monk", position: 0, level: 2, subclass: "Warrior of the Open Hand" }] },
@@ -182,7 +165,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         ...BASE,
         id: "riders-open-hand-l3",
         name: "Open Hand L3 Snapshot",
-        experiencePoints: 900, // level 3, proficiency +2
+        experiencePoints: 900,
         hitDice: { total: 3, die: "d8", spent: 3 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
         classEntries: { create: [{ name: "monk", position: 0, level: 3, subclass: "Warrior of the Open Hand" }] },
@@ -190,9 +173,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
     });
     const payload = await serialize("riders-open-hand-l3");
 
-    // Wis 16 (+3), prof +2 → DC 13.
     expect(payload.openHandTechnique).toEqual({ saveDC: 13 });
-    // Monk level 3 < 5 — Stunning Strike's own gate, unaffected by subclass.
     expect(payload).not.toHaveProperty("stunningStrike");
     expect(payload).not.toHaveProperty("quiveringPalm");
   });
@@ -203,7 +184,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         ...BASE,
         id: "riders-open-hand-l16",
         name: "Open Hand L16 Snapshot",
-        experiencePoints: 195000, // level 16
+        experiencePoints: 195000,
         hitDice: { total: 16, die: "d8", spent: 16 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
         classEntries: { create: [{ name: "monk", position: 0, level: 16, subclass: "Warrior of the Open Hand" }] },
@@ -219,7 +200,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         ...BASE,
         id: "riders-open-hand-l17",
         name: "Open Hand L17 Snapshot",
-        experiencePoints: 225000, // level 17, proficiency +6
+        experiencePoints: 225000,
         hitDice: { total: 17, die: "d8", spent: 17 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
         classEntries: { create: [{ name: "monk", position: 0, level: 17, subclass: "Warrior of the Open Hand" }] },
@@ -232,7 +213,6 @@ describe("serializeCharacter rider contract (#1316)", () => {
     });
     const payload = await serialize("riders-open-hand-l17");
 
-    // Wis 16 (+3), prof +6 → DC 17; vibrations are set → active true.
     expect(payload.quiveringPalm).toEqual({ saveDC: 17, active: true });
   });
 
@@ -242,7 +222,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         ...BASE,
         id: "riders-shadow-l17",
         name: "Shadow L17 Snapshot",
-        experiencePoints: 225000, // level 17
+        experiencePoints: 225000,
         hitDice: { total: 17, die: "d8", spent: 17 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
         classEntries: { create: [{ name: "monk", position: 0, level: 17, subclass: "Warrior of Shadow" }] },
@@ -251,20 +231,17 @@ describe("serializeCharacter rider contract (#1316)", () => {
     const payload = await serialize("riders-shadow-l17");
     expect(payload).not.toHaveProperty("openHandTechnique");
     expect(payload).not.toHaveProperty("quiveringPalm");
-    // Base monk feature still gates purely on monk level, regardless of subclass.
     expect(payload.stunningStrike).toEqual({ saveDC: 17 });
   });
 
-  // #1277: openHandMonkEntry used to substring-match ("open hand"), so a
-  // homebrew name merely CONTAINING "Open Hand" incorrectly surfaced both
-  // riders — the same failure class #1339 fixed at the DERIVED_ACTIONS gate.
+  // Regression guard: a homebrew name merely CONTAINING "Open Hand" must not surface either rider (#1277).
   it('a level-17 monk named "Way of the Open Handbook" has neither Open Hand rider', async () => {
     await prisma.character.create({
       data: {
         ...BASE,
         id: "riders-open-handbook-l17",
         name: "Open Handbook L17 Snapshot",
-        experiencePoints: 225000, // level 17
+        experiencePoints: 225000,
         hitDice: { total: 17, die: "d8", spent: 17 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
         classEntries: { create: [{ name: "monk", position: 0, level: 17, subclass: "Way of the Open Handbook" }] },
@@ -296,9 +273,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
     expect(payload).not.toHaveProperty("maneuvers");
   });
 
-  // #1501: Way of the Open Hand (2014) is a SEPARATE subclass from Warrior of
-  // the Open Hand (2024), not a fork sharing the same slug — openHandMonkEntry
-  // must recognize both slugs, since both grant the same two riders.
+  // Way of the Open Hand (2014) is a SEPARATE subclass from Warrior of the Open Hand (2024) — openHandMonkEntry must recognize both slugs (#1501).
   it("a 2014 Way of the Open Hand monk carries both Open Hand riders, same as its 2024 counterpart", async () => {
     await prisma.character.create({
       data: {
@@ -306,7 +281,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         id: "riders-way-open-hand-l17",
         name: "Way of the Open Hand L17 Snapshot",
         rulesEdition: "EDITION_2014",
-        experiencePoints: 225000, // level 17, proficiency +6
+        experiencePoints: 225000,
         hitDice: { total: 17, die: "d8", spent: 17 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
         classEntries: { create: [{ name: "monk", position: 0, level: 17, subclass: "Way of the Open Hand" }] },
@@ -314,8 +289,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
     });
     const payload = await serialize("riders-way-open-hand-l17");
 
-    // Wis 16 (+3), prof +6 → DC 17 — the ki/focus save DC formula is
-    // edition-invariant (monkSaveDC).
+    // The ki/focus save DC formula is edition-invariant (monkSaveDC).
     expect(payload.openHandTechnique).toEqual({ saveDC: 17 });
     expect(payload.quiveringPalm).toEqual({ saveDC: 17, active: false });
   });
@@ -326,7 +300,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
         ...BASE,
         id: "riders-rogue3-monk5",
         name: "Rogue3Monk5 Snapshot",
-        experiencePoints: 34000, // level 8 (rogue 3 + monk 5), proficiency +3
+        experiencePoints: 34000,
         hitDice: { total: 8, die: "d8", spent: 8 },
         abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
         classEntries: {
@@ -339,10 +313,7 @@ describe("serializeCharacter rider contract (#1316)", () => {
     });
     const payload = await serialize("riders-rogue3-monk5");
 
-    // Sneak Attack gates on the rogue entry's own level (3), not the total
-    // character level (8) — same for Stunning Strike against the monk entry.
     expect(payload.sneakAttack).toEqual({ dice: { count: 2, faces: 6 } });
-    // Wis 16 (+3), prof +3 (character level 8) → DC 14.
     expect(payload.stunningStrike).toEqual({ saveDC: 14 });
     expect(payload).not.toHaveProperty("openHandTechnique");
     expect(payload).not.toHaveProperty("quiveringPalm");

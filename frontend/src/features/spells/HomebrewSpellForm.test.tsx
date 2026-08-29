@@ -201,8 +201,6 @@ describe("HomebrewSpellForm", () => {
   });
 });
 
-// #1788, epic #1782 5/5: HomebrewTab's manage list reuses this same form in
-// edit mode — prefilled from the served row, submitting via PATCH.
 describe("HomebrewSpellForm editing an existing homebrew spell", () => {
   beforeEach(() => {
     vi.mocked(client.fetchReference).mockResolvedValue(REFERENCE);

@@ -7,9 +7,6 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Session } from "@/types/character";
 import type { TurnStateView } from "@/features/session/useTurnState";
 
-// The turn engine is out of scope (#1086): stub the hub so we assert only that
-// LiveTurnBody renders it and forwards the log opener. HP / conditions / rest are
-// no longer nested here — they're sibling CombatColumn slots.
 vi.mock("@/features/session/TurnHub", () => ({
   default: ({ onOpenLog }: { onOpenLog?: () => void }) => (
     <div data-testid="turn-hub">

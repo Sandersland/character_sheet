@@ -18,30 +18,16 @@ import type {
 } from "@/types/character";
 
 interface StartingEquipmentEditorProps {
-  /** The selected class's starting-equipment definition (null → skip rendering). */
   startingEquipment: ClassStartingEquipment | null;
-  /** Full item catalog, used to populate open-pick weapon dropdowns. */
   catalog: Item[];
-  /** Current draft value. */
   value: EquipmentDraft;
   onChange: (draft: EquipmentDraft) => void;
-  /** The character's own chosen tool proficiencies (creation toolChoices step,
-   *  #1564 PR #1567 fix — catalog item names). A boundToToolChoice pick
-   *  (Monk's "Artisan's Tools or Musical Instrument chosen for the tool
-   *  proficiency above") filters to exactly these, never the whole catalog —
-   *  matching the server's boundToolChoiceError so the picker never offers a
-   *  choice the write path would reject (#1336). */
+  // Catalog item names; a boundToToolChoice pick must filter to exactly these to match the server's boundToolChoiceError (#1336).
   selectedToolChoices: string[];
-  /** #1565: "class" (default) or "background". Two jobs — it labels the
-   *  package-mode button on the rare path where both modes exist (a background
-   *  never has a gold-roll alternative, so its own toggle row never renders at
-   *  all), and it namespaces this instance's native radio groups so the two
-   *  editors mounted on the creation step stay independent. See OptionChoice's
-   *  radioGroupName for what went wrong when they did not. */
+  // Labels the package-mode button and namespaces this instance's radio groups — see OptionChoice's radioGroupName (#1565).
   kind?: "class" | "background";
 }
 
-/** Describes the fixed-item contents of a bundle (no open pick placeholders). */
 function bundleFixedSummary(bundle: EquipmentBundle): string {
   return (bundle.items ?? [])
     .map((item) => {
@@ -59,9 +45,7 @@ interface OpenPickSelectProps {
   selectedToolChoices: string[];
 }
 
-// The pre-#1564 weapon-only behaviour, unchanged — split out of matchesPick
-// purely to keep its own cyclomatic complexity low (mirrors the backend's
-// own openPickFilterError -> weaponFilterError split, character-create.ts).
+// Mirrors the backend's openPickFilterError -> weaponFilterError split.
 function matchesWeaponFilter(item: Item, pick: OpenPick): boolean {
   return (
     item.category === "weapon" &&
@@ -71,17 +55,7 @@ function matchesWeaponFilter(item: Item, pick: OpenPick): boolean {
   );
 }
 
-// Mirrors the backend's openPickFilterError dispatch order exactly (#1564): a
-// toolCategory filter (if present) gates first; a boundToToolChoice pick
-// (Monk's "Artisan's Tools or Musical Instrument chosen for the tool
-// proficiency above" — spans two tool categories, so it carries no single
-// filter.toolCategory) then requires membership in the character's OWN chosen
-// tool proficiencies instead of falling through to the weapon pool. That
-// fallback offered every weapon in the catalog, which the server's
-// boundToolChoiceError rejects outright — #1336's lesson that a picker
-// offering what the write path refuses is a dead end. A plain toolCategory
-// pick (no binding) accepts anything in that category; anything else keeps
-// the pre-#1564 weapon-only behaviour unchanged.
+// Must mirror the backend's openPickFilterError dispatch order exactly (#1564, #1336).
 function matchesPick(item: Item, pick: OpenPick, selectedToolChoices: string[]): boolean {
   if (pick.filter.toolCategory && item.toolCategory !== pick.filter.toolCategory) return false;
   if (pick.boundToToolChoice) return selectedToolChoices.includes(item.name);
@@ -89,8 +63,6 @@ function matchesPick(item: Item, pick: OpenPick, selectedToolChoices: string[]):
   return matchesWeaponFilter(item, pick);
 }
 
-/** A single open-pick dropdown, filtered to the pick's weapon-class/range/
- *  toolCategory/boundToToolChoice constraint (#1564). */
 function OpenPickSelect({ pick, catalog, currentPick, onPick, selectedToolChoices }: OpenPickSelectProps) {
   const matchingItems = catalog.filter((item) => matchesPick(item, pick, selectedToolChoices));
   const unfilled = !currentPick;
@@ -133,7 +105,6 @@ interface OpenPickListProps {
   selectedToolChoices: string[];
 }
 
-/** Renders a bundle's open-pick dropdowns (may be none). */
 function OpenPickList({ bundle, catalog, currentPicks, onPick, selectedToolChoices }: OpenPickListProps) {
   if (!bundle.openPicks?.length) return null;
   return (
@@ -154,12 +125,7 @@ function OpenPickList({ bundle, catalog, currentPicks, onPick, selectedToolChoic
 
 interface OptionChoiceProps {
   option: EquipmentBundle;
-  /** Native radio-group name — must be unique across every editor instance on
-   *  the page, not just across groups within one. Since #1565 the creation step
-   *  mounts TWO editors (class and background); a bare `group-${idx}` made both
-   *  cards' first groups one native radio group, so choosing a background
-   *  option visually cleared the class option (the draft kept both, since the
-   *  radios are React-controlled, so only the rendering lied). */
+  // Must be unique across every editor instance on the page, not just within one (#1565).
   radioGroupName: string;
   isChosen: boolean;
   catalog: Item[];
@@ -169,8 +135,6 @@ interface OptionChoiceProps {
   selectedToolChoices: string[];
 }
 
-// Split out of OptionChoice purely to keep its own cyclomatic complexity low
-// — visible only once this option is chosen AND it actually has open picks.
 function ChosenOpenPicks({
   isChosen,
   option,
@@ -200,14 +164,11 @@ function ChosenOpenPicks({
   );
 }
 
-// Same split reasoning as ChosenOpenPicks above.
 function ChosenFixedSummary({ isChosen, option }: { isChosen: boolean; option: EquipmentBundle }) {
   if (!isChosen || !option.items?.length) return null;
   return <p className="ml-5 text-xs text-parchment-600">{bundleFixedSummary(option)}</p>;
 }
 
-/** One selectable radio option within a player-choice group — split out of
- *  EquipmentGroupCard purely to keep its own cyclomatic complexity low. */
 function OptionChoice({
   option,
   radioGroupName,
@@ -252,8 +213,7 @@ function OptionChoice({
 interface EquipmentGroupCardProps {
   group: EquipmentChoiceGroup;
   groupIdx: number;
-  /** Namespaces this card's radio group per editor instance — see OptionChoice's
-   *  radioGroupName. */
+  // Namespaces this card's radio group per editor instance — see OptionChoice's radioGroupName.
   radioGroupPrefix: string;
   sel: PackageSelection | undefined;
   catalog: Item[];
@@ -262,9 +222,6 @@ interface EquipmentGroupCardProps {
   selectedToolChoices: string[];
 }
 
-/** One choice group's card — auto-granted display or the player's option
- *  radio list, plus any open picks. Split out of StartingEquipmentEditor
- *  purely to keep its own cyclomatic complexity low. */
 function EquipmentGroupCard({
   group,
   groupIdx,
@@ -284,13 +241,11 @@ function EquipmentGroupCard({
       <p className="text-sm font-medium text-parchment-800">{group.label}</p>
 
       {isAutoGrant ? (
-        // Auto-granted — display only, no choice needed
         <div className="rounded-control border border-parchment-200 bg-parchment-100 px-3 py-2 text-sm text-parchment-700">
           {bundleFixedSummary(group.options[0])}
           <span className="ml-2 text-xs text-parchment-600">(auto-granted)</span>
         </div>
       ) : (
-        // Player picks one option
         <div className="flex flex-col gap-2">
           {group.options.map((option, optionIdx) => (
             <OptionChoice
@@ -308,7 +263,6 @@ function EquipmentGroupCard({
         </div>
       )}
 
-      {/* Open picks on an auto-granted bundle (rare but possible) */}
       {isAutoGrant && chosenBundle && (
         <OpenPickList
           bundle={chosenBundle}
@@ -329,10 +283,7 @@ interface GoldModeSectionProps {
   onSetGold: (g: number) => void;
 }
 
-/** The "roll for starting gold" mode's content — split out of
- *  StartingEquipmentEditor purely to keep its own cyclomatic complexity low.
- *  Never rendered when `gold` is null (PHB'24 has no roll-for-gold rule at
- *  all, #1564 commit 3) — the caller narrows before mounting this. */
+// Never rendered when gold is null (PHB'24 has no roll-for-gold rule) — the caller narrows before mounting this.
 function GoldModeSection({ gold, value, startingEquipment, onSetGold }: GoldModeSectionProps) {
   return (
     <div className="flex flex-col gap-3">
@@ -373,12 +324,7 @@ function GoldModeSection({ gold, value, startingEquipment, onSetGold }: GoldMode
   );
 }
 
-// Pure draft-transition helpers, hoisted out of StartingEquipmentEditor
-// purely to keep its own cyclomatic complexity low (each closure below was
-// otherwise a branch fallow's analyzer folds into the enclosing component).
-// Each returns the next EquipmentDraft, or null when the transition doesn't
-// apply (wrong mode) — the component's own wrappers just guard-and-call
-// onChange, never re-implementing the branch.
+// Returns the next EquipmentDraft, or null when the mode doesn't apply — callers guard-and-call onChange, never reimplement the branch.
 function draftForMode(startingEquipment: ClassStartingEquipment, mode: "package" | "gold"): EquipmentDraft {
   return mode === "package"
     ? { mode: "package", selections: emptyPackageState(startingEquipment) }
@@ -418,19 +364,13 @@ function draftWithOpenPick(
 interface ModeToggleProps {
   isPackage: boolean;
   isGold: boolean;
-  // NULL when this edition has no roll-for-gold rule at all (PHB'24, #1564)
-  // — the toggle to that mode is simply not offered.
+  // Null when this edition has no roll-for-gold rule at all (PHB'24, #1564) — the toggle to that mode is simply not offered.
   gold: StartingGold | null;
   onSelectPackage: () => void;
   onSelectGold: () => void;
-  /** #1565: this editor's own package-mode button label — a background reuse
-   *  of this component never has a gold alternative (so this button always
-   *  renders alone), but it must still say "Background", not "Class". */
   packageModeLabel: string;
 }
 
-// Split out of StartingEquipmentEditor purely to keep its own cyclomatic
-// complexity low.
 function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold, packageModeLabel }: ModeToggleProps) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -445,10 +385,7 @@ function ModeToggle({ isPackage, isGold, gold, onSelectPackage, onSelectGold, pa
       >
         {packageModeLabel}
       </button>
-      {/* A TYPE narrowing, not a runtime branch: the caller no longer renders
-          this component at all when `gold` is null (#1565), but the prop is
-          still nullable and goldLabel below needs a StartingGold. Deleting it
-          costs a non-null assertion, which is strictly worse. */}
+      {/* Type narrowing, not a runtime branch — deleting this costs a non-null assertion instead, which is worse. */}
       {gold && (
         <button
           type="button"
@@ -479,9 +416,7 @@ export default function StartingEquipmentEditor({
   const isPackage = value.mode === "package";
   const isGold = value.mode === "gold";
   const packageModeLabel = kind === "background" ? "Background equipment package" : "Class equipment package";
-  // NULL when this edition has no roll-for-gold rule at all (PHB'24, #1564
-  // commit 3) — narrowed once here so every render below can pass a non-null
-  // StartingGold to goldMin/goldMax/goldLabel/rollGold without re-checking.
+  // Narrowed once here so every render below can pass a non-null StartingGold without re-checking.
   const gold = startingEquipment.gold;
 
   function setOptionIndex(groupIdx: number, optionIdx: number) {
@@ -496,12 +431,7 @@ export default function StartingEquipmentEditor({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Package mode is always available, so the toggle row is only
-          meaningful when a SECOND mode (gold) also exists — a 2014 class
-          package. A 2024 class package and every background package have
-          `gold: null` and therefore exactly one mode, and a one-option toggle
-          group is not a choice, so the row is hidden rather than rendering a
-          lone button that does nothing when pressed (#1565). */}
+      {/* Toggle row only renders when a second mode (gold) exists — one option is not a choice (#1565). */}
       {gold && (
         <ModeToggle
           isPackage={isPackage}

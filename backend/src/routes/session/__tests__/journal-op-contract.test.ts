@@ -1,16 +1,4 @@
-/**
- * Latch for the journal request schemas migrated into
- * @character-sheet/contracts (#1394, epic #1369) — the hardest input≠output
- * case in the #1370 backlog (see #1394's own body). Two independent
- * divergences prove this package's z.input policy (index.ts, #1395) is doing
- * real work here, not just documented for uniformity:
- *
- *  1. `dateSchema` `.transform()`s a YYYY-MM-DD string to a `Date`. The
- *     client-facing type MUST be the pre-transform string (z.input) — a
- *     client never constructs a `Date` to send over JSON.
- *  2. `createJournalSchema.kind` has `.default("ENTRY")`, so z.input makes it
- *     optional — the same shape preferences-ops.ts documents.
- */
+// Latch for the journal schemas' z.input policy (#1394, #1395): dateSchema's client-facing type must stay the pre-transform string, and createJournalSchema.kind's z.input must stay optional under its .default("ENTRY").
 import {
   createJournalSchema,
   dateSchema,

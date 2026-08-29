@@ -45,17 +45,12 @@ function renderStrengthBox(rollModifiers: RollModifier[]) {
   );
 }
 
-// #984: the per-row "why" TEXT chip is gone — the reason lives once in the
-// ConditionRollBanner above the rails. An affected roll affordance shows only a
-// subtle, non-text amber dot, and the roll STILL auto-applies the resolved mode.
 describe("state-driven roll mode + affected-row indicator (#486/#984)", () => {
   beforeEach(() => mockLogRoll.mockClear());
 
   it("marks affected affordances with a dot (no text) and still rolls with advantage while raging", async () => {
     const user = userEvent.setup();
     renderStrengthBox(rage);
-    // Rage grants advantage on both Strength checks and saves → both affordances
-    // get the dot; neither renders the old "advantage — Rage" stamp.
     expect(screen.getAllByTestId("roll-mode-indicator")).toHaveLength(2);
     expect(screen.queryByText(/advantage — Rage/i)).toBeNull();
     expect(screen.queryByTestId("roll-mode-chip")).toBeNull();
@@ -78,7 +73,6 @@ describe("state-driven roll mode + affected-row indicator (#486/#984)", () => {
   it("still cancels advantage + disadvantage from different sources to normal (RAW)", async () => {
     const user = userEvent.setup();
     renderStrengthBox([...rage, ...poisonedCheck]);
-    // Both sources apply to a Strength check, so it stays marked, but resolves normal.
     expect(screen.getAllByTestId("roll-mode-indicator").length).toBeGreaterThan(0);
 
     await user.click(screen.getByTitle(/Roll Strength check/));
@@ -88,15 +82,12 @@ describe("state-driven roll mode + affected-row indicator (#486/#984)", () => {
 
   it("keeps an ability/category-scoped grant off a non-matching affordance", () => {
     renderStrengthBox(poisonedCheck);
-    // Poisoned disadvantage is check-only: the Strength CHECK affordance is
-    // marked; the Strength SAVE affordance is not.
     expect(screen.getAllByTestId("roll-mode-indicator")).toHaveLength(1);
   });
 
   it("folds an exhaustion flat penalty into the rolled check and still rolls normal (#1136)", async () => {
     const user = userEvent.setup();
     renderStrengthBox(exhaustion2);
-    // Both the check and save affordances are marked (the flat penalty hits every d20 Test).
     expect(screen.getAllByTestId("roll-mode-indicator").length).toBeGreaterThan(0);
 
     await user.click(screen.getByTitle(/Roll Strength check/));

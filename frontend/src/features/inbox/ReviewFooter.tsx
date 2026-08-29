@@ -3,15 +3,11 @@ interface ReviewFooterProps {
   onCombine: () => void;
   disregarding: boolean;
   combining: boolean;
-  /** Hard-disables Combine when the consequence preview failed to load. */
   combineDisabled?: boolean;
   loserCount: number;
 }
 
-// The Review-duplicates modal's confirm footer (#1946) — this feature's only
-// confirm surface, so there is no second "are you sure" dialog behind it.
-// Combine is atomic (#1942): loserCount is always the full cluster minus the
-// survivor — it never shrinks after a failed attempt, since nothing landed.
+// Combine is atomic (#1942): loserCount is always the full cluster minus the survivor, and never shrinks after a failed attempt since nothing landed.
 export default function ReviewFooter({
   onDisregard,
   onCombine,

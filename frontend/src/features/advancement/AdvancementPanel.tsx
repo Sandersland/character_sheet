@@ -1,5 +1,3 @@
-// Inline expand-in-place picker for taking an Ability Score Improvement or a Feat (ASI + Feat tabs), not a Modal per frontend.md rules.
-
 import { useReducer, useState } from "react";
 
 import AsiFlow from "@/features/advancement/AsiFlow";
@@ -15,12 +13,10 @@ interface Props {
   currentScores: Record<string, number>;
   slotsRemaining: number;
   busy: boolean;
-  /** Character level — sent as `asiLevel` so the server gates which feats the
-   *  picker offers (General 4+, Epic Boon 19+); the client never re-applies it (#1438). */
+  // Sent as `asiLevel` so the server gates which feats are offered; the client never re-applies that gate (#1438).
   characterLevel: number;
-  /** The character's rules edition — decides which edition's feat rows the picker offers (#1411). */
   rulesEdition: RulesEdition;
-  /** Ordered list of skill names from the character (avoids duplicating SRD skill list). */
+  // Avoids duplicating the SRD skill list client-side.
   skillNames: string[];
   onSubmit: (op: AdvancementOperation) => void;
 }
@@ -45,7 +41,6 @@ export default function AdvancementPanel({
 
   const custom = useCustomFeatDraft();
 
-  // Reset feat panel when switching mode.
   function handleTabChange(next: "asi" | "feat") {
     setTab(next);
     dispatchView({ type: "reset" });
@@ -100,7 +95,7 @@ export default function AdvancementPanel({
 
   return (
     <div className="mt-3 rounded-card border border-gold-200 bg-gold-50 p-4">
-      {/* Panel header */}
+      
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gold-900">
           Choose an Advancement
@@ -115,7 +110,7 @@ export default function AdvancementPanel({
         </button>
       </div>
 
-      {/* Tab bar */}
+      
       <div className="mb-4 flex gap-2">
         {(["asi", "feat"] as const).map((t) => (
           <button

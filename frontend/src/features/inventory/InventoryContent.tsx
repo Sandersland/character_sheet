@@ -13,14 +13,12 @@ interface InventoryContentProps {
   selectMode: boolean;
   selectedIds: Set<string>;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
-  // Bundled (#1854) — see WeaponBondProps' own comment.
   bond: WeaponBondProps;
   onEdit: (id: string) => void;
   onCancelEdit: () => void;
   onToggleSelect: (id: string) => void;
 }
 
-// The non-empty pack view: the Worn paper-doll or the Bag's sectioned rows.
 export default function InventoryContent({
   view,
   pending,

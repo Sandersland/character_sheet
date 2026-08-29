@@ -4,11 +4,10 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-// #994 — mechanical guard for the garnet brand-surface token pair. Reads the
-// checked-in CSS (not a duplicated color table) so the test can only pass by
-// the actual tokens clearing the bars, never by a copy drifting from them.
-// Self-contained on purpose: this contrast math has no production consumer,
-// so it lives here rather than in a lib/ module fallow would flag as dead.
+// Reads the checked-in CSS directly (not a duplicated color table) so this can
+// only pass by the real tokens clearing the bars. Lives here, not lib/,
+// because this contrast math has no production consumer and fallow would
+// flag a lib/ version as dead code (#994).
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const CSS_PATH = join(TEST_DIR, "..", "index.css");
@@ -58,14 +57,9 @@ const THEMES = { light, dark } as const;
 
 describe("garnet brand-surface tokens (#994)", () => {
   it("light values are byte-identical to the ramp they were copied from", () => {
-    // Anti-vacuity: if extractBlock ever silently returns {} (a parsing miss —
-    // wrong selector match, an off-by-one on the block boundary), every
-    // comparison below degenerates to undefined === undefined and passes for
-    // the wrong reason. Prove the parse actually found real tokens first.
+    // Anti-vacuity: an empty extractBlock() would make every comparison below
+    // pass vacuously (undefined === undefined).
     expect(Object.keys(light).length).toBeGreaterThan(0);
-    // A stronger proof of "light mode unchanged" than any screenshot: if this
-    // assertion holds, every migrated fill resolves to the exact hex it did
-    // before the migration, in light mode, full stop.
     expect(light["garnet-surface"]).toBe(light["garnet-700"]);
     expect(light["garnet-surface-hover"]).toBe(light["garnet-800"]);
     expect(light["garnet-surface-deep"]).toBe(light["garnet-900"]);
@@ -74,14 +68,11 @@ describe("garnet brand-surface tokens (#994)", () => {
   });
 
   it("--color-garnet-on-surface is absent from the dark block", () => {
-    // Theme-invariance enforced structurally: on-surface must NOT be
-    // redeclared under [data-theme="dark"], so it falls through to the same
-    // #faf9f7 as light — that's the actual fix for the salmon-label bug.
+    // on-surface must NOT be redeclared under [data-theme="dark"], so it
+    // falls through to the same value as light.
     const darkOnly = extractBlock(css, '[data-theme="dark"]');
-    // Anti-vacuity: this is the ONE assertion in the file whose entire job is
-    // structural enforcement (on-surface is genuinely absent, not merely equal
-    // across themes) — a silent parse failure returning {} would make the
-    // absence check below pass trivially instead of proving anything.
+    // Anti-vacuity: a silent parse failure returning {} would make the
+    // absence check below pass trivially.
     expect(Object.keys(darkOnly).length).toBeGreaterThan(0);
     expect(darkOnly["garnet-on-surface"]).toBeUndefined();
   });
@@ -100,17 +91,13 @@ describe("garnet brand-surface tokens (#994)", () => {
 
     it(`${name}: surface clears 3:1 (SC 1.4.11) against the page and the card`, () => {
       // parchment-100 is the page background, parchment-50 is the Card surface
-      // brand fills sit on — the two backgrounds a resting fill must read as a
-      // shape against. parchment-200 (meter tracks) is deliberately excluded:
-      // MeterBar has its own dedicated --color-garnet-meter token — see #1403.
+      // fills sit on. parchment-200 (meter tracks) is excluded — MeterBar's
+      // own garnet-meter token is tuned against it separately (#1403).
       expect(ratio(tokens["garnet-surface"], tokens["parchment-100"])).toBeGreaterThanOrEqual(3);
       expect(ratio(tokens["garnet-surface"], tokens["parchment-50"])).toBeGreaterThanOrEqual(3);
     });
 
     it(`${name}: hover darkens relative to resting (never lightens)`, () => {
-      // Encodes "hover darkens in both themes" — the invariant that stops
-      // someone lightening the dark hover value and silently breaking the
-      // on-surface/-hover contrast bar above.
       expect(relativeLuminance(tokens["garnet-surface-hover"])).toBeLessThan(
         relativeLuminance(tokens["garnet-surface"]),
       );
@@ -118,7 +105,7 @@ describe("garnet brand-surface tokens (#994)", () => {
   }
 
   it("mutation: dark surface -> today's salmon fails the text bar", () => {
-    const mutated: Record<string, string> = { ...dark, "garnet-surface": dark["garnet-700"] }; // #f5868c
+    const mutated: Record<string, string> = { ...dark, "garnet-surface": dark["garnet-700"] };
     expect(ratio(mutated["garnet-on-surface"], mutated["garnet-surface"])).toBeLessThan(4.5);
   });
 
@@ -141,15 +128,15 @@ describe("garnet-meter token (#1403)", () => {
 
   for (const [name, tokens] of Object.entries(THEMES)) {
     it(`${name}: meter fill clears 3:1 (SC 1.4.11) against its own track (parchment-200)`, () => {
-      // The meter's contrast reference is its OWN track, never the page —
+      // The meter's contrast reference is its own track, never the page —
       // garnet-surface (2.65:1 dark) fails this bar; garnet-meter is tuned
-      // against it directly. See index.css's @theme comment for the ratios.
+      // against it directly.
       expect(ratio(tokens["garnet-meter"], tokens["parchment-200"])).toBeGreaterThanOrEqual(3);
     });
   }
 
   it("mutation: garnet-surface's dark value fails the meter's track bar", () => {
-    const mutated: Record<string, string> = { ...dark, "garnet-meter": dark["garnet-surface"] }; // #da2233, 2.65:1
+    const mutated: Record<string, string> = { ...dark, "garnet-meter": dark["garnet-surface"] };
     expect(ratio(mutated["garnet-meter"], mutated["parchment-200"])).toBeLessThan(3);
   });
 });
@@ -161,17 +148,17 @@ describe("garnet-soft-surface tokens (#1404, family B)", () => {
   });
 
   it("light resting value stays distinct from garnet-surface (family A vs B two-intensity distinction)", () => {
-    // The whole point of NOT collapsing onto garnet-surface: family A rests at
-    // garnet-700, family B at garnet-600 — two different brand-intensity levels
-    // in light mode. If this ever passes with them equal, the token collapsed.
+    // Family A rests at garnet-700, family B at garnet-600 — two distinct
+    // brand-intensity levels; if this ever passes with them equal, the token
+    // collapsed.
     expect(light["garnet-soft-surface"]).not.toBe(light["garnet-surface"]);
   });
 
   it("dark deliberately converges with garnet-surface/-hover (documented in index.css)", () => {
-    // The legal band simultaneously clearing AA 4.5:1 (text) and SC 3:1 (page/
-    // card) is only ~11% of relative luminance wide (see the #994 @theme
-    // comment) — a second value squeezed into it would be visually
-    // indistinguishable, so soft-surface's dark value converges on purpose.
+    // The legal band clearing both AA 4.5:1 (text) and SC 3:1 (page/card) is
+    // only ~11% of relative luminance wide — a second value squeezed into it
+    // would be visually indistinguishable, so soft-surface's dark value
+    // converges on purpose (#994).
     expect(dark["garnet-soft-surface"]).toBe(dark["garnet-surface"]);
     expect(dark["garnet-soft-surface-hover"]).toBe(dark["garnet-surface-hover"]);
   });

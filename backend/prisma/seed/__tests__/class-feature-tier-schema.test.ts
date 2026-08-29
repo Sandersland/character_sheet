@@ -1,19 +1,7 @@
-// Pure unit test (NO database) for #1522's settled tier-array ordering rule:
-// resourceTotals/resourceDieTiers/derivedStatTiers are authored ASCENDING by
-// minLevel, last-match-wins. Settled because the two shapes being merged
-// disagreed — EXTRA_ATTACK_TIERS is descending/first-match while #1522's own
-// resourceTotals example is ascending — so all three ClassFeature tier
-// columns share ONE zod-enforced invariant rather than inheriting the
-// ambiguity. Nothing in this migration populates these columns yet (#1528+
-// is the first consumer); this only proves the validator itself rejects a
-// descending array.
-//
-// Driven through classFeatureSeedSchema.safeParse, not the three tier
-// schemas directly: those are intentionally un-exported (class-features.ts)
-// since classFeatureSeedSchema is the surface that actually ships, and
-// testing through it exercises the SAME `.refine` predicate as the
-// production validation path (prisma/seed/validate.ts) rather than a second,
-// bypassable entry point.
+// Pure unit test (no database) for classFeatureSeedSchema's tier-array
+// invariants. Driven through classFeatureSeedSchema.safeParse — the surface
+// assertSeedContentValid actually runs — never the intentionally un-exported
+// per-column tier schemas.
 import { describe, expect, it } from "vitest";
 
 import { classFeatureSeedSchema } from "../class-features.js";
@@ -96,13 +84,157 @@ describe("ClassFeature tier-array schemas reject a descending minLevel order (#1
     });
     expect(result.success).toBe(true);
   });
+
+  it("resourceRechargeTiers accepts strictly ascending minLevel", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [
+        { minLevel: 1, recharge: "longRest" },
+        { minLevel: 5, recharge: "short-or-long" },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("resourceRechargeTiers rejects descending order", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [
+        { minLevel: 5, recharge: "short-or-long" },
+        { minLevel: 1, recharge: "longRest" },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("resourceRechargeTiers rejects an unrecognized recharge value", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [{ minLevel: 1, recharge: "everyTurn" }],
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
-// #1685/#416 C3: total may be a formula instead of a flat number. Driven
-// through classFeatureSeedSchema.safeParse for the same reason as the suite
-// above — the one surface that actually ships (prisma/seed/validate.ts's
-// assertSeedContentValid runs it at seed time, so a malformed formula fails
-// the seed, never a character's read path).
+describe("resourceDetailTiers accepts interleaved-but-per-label-ascending order and rejects a per-label descending pair (#1685)", () => {
+  it("accepts two labels interleaved in the array, each strictly ascending on its own", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [
+        { minLevel: 2, label: "Max CR", value: "1/4" },
+        { minLevel: 2, label: "Duration", value: "1 hour(s)" },
+        { minLevel: 4, label: "Max CR", value: "1/2 (no flying speed)" },
+        { minLevel: 6, label: "Duration", value: "3 hour(s)" },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a descending pair WITHIN the same label, even though the array's raw order looks fine for a different label", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [
+        { minLevel: 4, label: "Max CR", value: "1/2" },
+        { minLevel: 2, label: "Max CR", value: "1/4" },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a repeated minLevel within the same label (not strictly increasing)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [
+        { minLevel: 2, label: "Max CR", value: "1/4" },
+        { minLevel: 2, label: "Max CR", value: "1/2" },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty array — authoring garbage, same as resourceRechargeTiers", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty label", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [{ minLevel: 1, label: "", value: "1/4" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty value", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [{ minLevel: 1, label: "Max CR", value: "" }],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// Without the scalar fallback, poolFromRow silently resolves "none" at any
+// level where the pool exists but no recharge tier is reached yet.
+describe("resourceRechargeTiers' first tier must be reached by resourceTotals' first tier when there is no resourceRecharge fallback", () => {
+  it("rejects a gap: the pool opens at level 1 but the first recharge tier isn't reached until level 5", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: 2 }],
+      resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts the same gap when a resourceRecharge scalar covers the levels below the first tier", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRecharge: "longRest",
+      resourceTotals: [{ minLevel: 1, total: 2 }],
+      resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  // An empty array is truthy, so `!row.resourceRechargeTiers` doesn't
+  // short-circuit the refine — reading `[0].minLevel` could throw instead.
+  it("resourceRechargeTiers: [] is a clean validation FAILURE, not a thrown error", () => {
+    expect(() =>
+      classFeatureSeedSchema.safeParse({
+        ...baseRow,
+        resourceRechargeTiers: [],
+      }),
+    ).not.toThrow();
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // Same empty-array hazard on the refine's other side: the `resourceTotals[0]`
+  // read must not throw. Acceptance is correct — an empty resourceTotals opens
+  // no pool, so missing recharge coverage never matters.
+  it("resourceTotals: [] alongside recharge tiers and no scalar does not throw, and is accepted (no pool ever opens to need recharge coverage)", () => {
+    expect(() =>
+      classFeatureSeedSchema.safeParse({
+        ...baseRow,
+        resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+        resourceTotals: [],
+      }),
+    ).not.toThrow();
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+      resourceTotals: [],
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
 describe("resourceTotals' `total` accepts the #1685 formula vocabulary and rejects malformed formulas", () => {
   it('accepts "proficiencyBonus"', () => {
     const result = classFeatureSeedSchema.safeParse({
@@ -126,6 +258,22 @@ describe("resourceTotals' `total` accepts the #1685 formula vocabulary and rejec
       resourceTotals: [{ minLevel: 1, total: { abilityMod: "wisdom" } }],
     });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts { abilityMod, plus }", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", plus: 1 } }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a negative plus — nothing downstream guards a negative pool total", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", plus: -1 } }],
+    });
+    expect(result.success).toBe(false);
   });
 
   it("accepts { levelTimes }", () => {
@@ -161,11 +309,6 @@ describe("resourceTotals' `total` accepts the #1685 formula vocabulary and rejec
   });
 });
 
-// #1686: effectBuffs is a NEW nullable/optional list on ClassFeature — a
-// "toggle" resolverKind row's while-active buff descriptors. Driven through
-// classFeatureSeedSchema.safeParse for the same reason as every suite above:
-// prisma/seed/validate.ts's assertSeedContentValid is the one surface that
-// actually ships.
 describe("effectBuffs (#1686) — the toggle-resolver buff-list vocabulary", () => {
   it("accepts a minimal buff (flat number modifier, a known target)", () => {
     const result = classFeatureSeedSchema.safeParse({
@@ -317,10 +460,6 @@ describe("effectBuffs (#1686) — the toggle-resolver buff-list vocabulary", () 
   });
 });
 
-// #1688: activationRequires' closed vocabulary — an armor/shield literal or a
-// `requiresActiveBuff` object. Driven through classFeatureSeedSchema.safeParse
-// for the same reason as effectBuffs above: the production validation path
-// (prisma/seed/validate.ts) is what this pins, not an un-exported schema.
 describe("activationRequires (#1688) — the declarative activation-constraint vocabulary", () => {
   it("accepts every armor/shield literal", () => {
     const result = classFeatureSeedSchema.safeParse({
@@ -372,6 +511,131 @@ describe("activationRequires (#1688) — the declarative activation-constraint v
 
   it("null/absent activationRequires is valid (the common case)", () => {
     expect(classFeatureSeedSchema.safeParse({ ...baseRow, activationRequires: null }).success).toBe(true);
+    expect(classFeatureSeedSchema.safeParse({ ...baseRow }).success).toBe(true);
+  });
+});
+
+describe("resourceOnInitiative (#1522) — the row-driven InitiativeRegen vocabulary", () => {
+  const withPool = {
+    resourceKey: "focus",
+    resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+  };
+
+  it("accepts a minimal entry (id + amount only) on a row that declares its own pool", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [{ id: "uncannyMetabolism", amount: "all" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts the full monk shape: minLevel, oncePerLongRest, threshold, and bonusHeal with a martialArtsDie/flatBonus formula", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [
+        {
+          id: "uncannyMetabolism",
+          amount: "all",
+          oncePerLongRest: true,
+          bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: "martialArtsDie", flatBonus: { levelTimes: 1 } },
+        },
+        { id: "perfectFocus", minLevel: 15, amount: 4, threshold: 3 },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects duplicate ids within one row's array — the id disambiguates once-per-long-rest markers", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [
+        { id: "dup", amount: "all" },
+        { id: "dup", amount: 2 },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a zero amount", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [{ id: "bad", amount: 0 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a negative amount", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [{ id: "bad", amount: -1 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a missing id", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [{ amount: "all" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects dieFaces: 0 on bonusHeal", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [{ id: "heal", amount: "all", bonusHeal: { sourceName: "Test", dieFaces: 0 } }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a malformed flatBonus formula on bonusHeal", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [
+        { id: "heal", amount: "all", bonusHeal: { sourceName: "Test", dieFaces: 6, flatBonus: { levelTimes: 0 } } },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a descriptor with no pool: resourceOnInitiative present but resourceKey/resourceTotals absent", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceOnInitiative: [{ id: "orphan", amount: "all" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a descriptor whose row declares resourceKey but an empty resourceTotals", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceKey: "focus",
+      resourceTotals: [],
+      resourceOnInitiative: [{ id: "orphan", amount: "all" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty array — authoring garbage, same as resourceRechargeTiers/resourceDetailTiers", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceKey: "focus",
+      resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      resourceOnInitiative: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("null/absent resourceOnInitiative is valid (the common case — no seed row uses it yet)", () => {
+    expect(classFeatureSeedSchema.safeParse({ ...baseRow, resourceOnInitiative: null }).success).toBe(true);
     expect(classFeatureSeedSchema.safeParse({ ...baseRow }).success).toBe(true);
   });
 });

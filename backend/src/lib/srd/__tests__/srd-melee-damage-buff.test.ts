@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { deriveWeaponDamage } from "@/lib/srd/srd.js";
 
-const scores = { strength: 16, dexterity: 12 }; // STR +3, DEX +1
+const scores = { strength: 16, dexterity: 12 };
 
 const melee = {
   name: "Greataxe",
@@ -28,13 +28,13 @@ describe("deriveWeaponDamage — meleeDamage buff", () => {
   it("adds the melee-damage bonus to a melee weapon's damage modifier", () => {
     const base = deriveWeaponDamage(melee, false, scores);
     const raged = deriveWeaponDamage(melee, false, scores, 2);
-    expect(base.damageModifier).toBe(3); // STR mod only
-    expect(raged.damageModifier).toBe(5); // STR + 2 buff
+    expect(base.damageModifier).toBe(3);
+    expect(raged.damageModifier).toBe(5);
   });
 
   it("leaves a ranged weapon's damage untouched", () => {
     const raged = deriveWeaponDamage(ranged, false, scores, 2);
-    expect(raged.damageModifier).toBe(1); // DEX mod only, no buff
+    expect(raged.damageModifier).toBe(1);
   });
 
   it("defaults to no bonus when the buff sum is omitted", () => {
@@ -50,7 +50,6 @@ describe("deriveWeaponDamage — meleeDamage buff", () => {
 describe("deriveWeaponDamage — abilityModifier component (#732)", () => {
   it("exposes the governing ability modifier, excluding the melee buff", () => {
     const raged = deriveWeaponDamage(melee, false, scores, 2);
-    // damageModifier folds the buff in, abilityModifier stays the raw STR mod.
     expect(raged.damageModifier).toBe(5);
     expect(raged.abilityModifier).toBe(3);
   });
@@ -61,6 +60,6 @@ describe("deriveWeaponDamage — abilityModifier component (#732)", () => {
 
   it("uses the better of STR/DEX for a finesse weapon", () => {
     const finesse = { ...melee, finesse: true, twoHanded: false };
-    expect(deriveWeaponDamage(finesse, true, scores).abilityModifier).toBe(3); // STR 16 > DEX 12
+    expect(deriveWeaponDamage(finesse, true, scores).abilityModifier).toBe(3);
   });
 });

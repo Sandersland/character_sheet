@@ -56,9 +56,7 @@ describe("CampaignOverrideRow", () => {
       expect(client.forkCatalogEntry).toHaveBeenCalledWith("entry-1", { scope: "CAMPAIGN", campaignId: "camp-a" }),
     );
     expect(onForked).toHaveBeenCalledTimes(1);
-    // The button's aria-label is fixed ("Override for …") across every state — its
-    // TEXT flips to "Overridden ✓" and it disables, but the accessible name doesn't
-    // change, so the done check queries by the stable label and asserts on content.
+    // The button's accessible name stays fixed across states; only its text content changes.
     const button = await screen.findByRole("button", { name: "Override for The Sunless Citadel" });
     expect(button).toBeDisabled();
     expect(button).toHaveTextContent("Overridden ✓");

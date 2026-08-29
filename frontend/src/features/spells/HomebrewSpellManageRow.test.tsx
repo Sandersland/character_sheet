@@ -6,8 +6,6 @@ import HomebrewSpellManageRow from "@/features/spells/HomebrewSpellManageRow";
 import * as client from "@/api/client";
 import type { CatalogSpell } from "@/types/character";
 
-// ShareSpellSheet talks to the campaign/grant endpoints; stubbed here so this
-// suite only exercises HomebrewSpellManageRow's own rendering + wiring.
 vi.mock("@/api/client", () => ({
   fetchCampaigns: vi.fn(),
   shareCatalogEntry: vi.fn(),
@@ -69,10 +67,6 @@ describe("HomebrewSpellManageRow", () => {
     expect(screen.queryByRole("button", { name: "Share Ember Bolt" })).not.toBeInTheDocument();
   });
 
-  // #1808, epic #1795 8/8: a DM's CAMPAIGN-scope fork is now manageable here
-  // (Edit/Delete), but NOT shareable — POST …/grants 400s any non-USER-scope
-  // entry (grants.ts's own "Only USER-scope catalog entries can be granted"),
-  // so offering Share on one would be a dead-end button.
   it("offers Edit/Delete but omits Share for a DM's editable CAMPAIGN-scope fork", () => {
     const campaignFork: CatalogSpell = {
       ...OWN_SPELL,
@@ -86,12 +80,6 @@ describe("HomebrewSpellManageRow", () => {
     expect(screen.queryByRole("button", { name: "Share Ember Bolt" })).not.toBeInTheDocument();
   });
 
-  // The leak an Opus review of the combined #1808+#1811 state caught: once
-  // #1811's campaign-aware picker serves a CAMPAIGN row to every campaign
-  // member (not just its DM), this row can reach a NON-DM member's manage
-  // list too (ownedHomebrewSpells' own gate is the first line of defense —
-  // this is the same check again at the row, belt-and-suspenders). Its
-  // PATCH/DELETE would 403 for that member, so Edit/Delete must not render.
   it("hides Edit/Delete for a non-DM member's non-editable CAMPAIGN-scope row", () => {
     const notMyFork: CatalogSpell = {
       ...OWN_SPELL,

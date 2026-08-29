@@ -14,7 +14,6 @@ interface InventoryHeaderActionsProps {
   onToggleAdd: () => void;
 }
 
-// The Card title accessory: the select-mode sell bar, or the default Sell/Add buttons.
 export default function InventoryHeaderActions({
   selectMode,
   configuringSell,

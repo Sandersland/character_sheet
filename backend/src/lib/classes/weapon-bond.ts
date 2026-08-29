@@ -1,23 +1,7 @@
-/**
- * Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854): "Perform a 1-hour
- * ritual to bond with up to two weapons. Bonded weapons can't be disarmed
- * and you can summon one to your hand as a bonus action."
- *
- * Two sub-mechanics, decided B (stateful, #1854 Decision comment):
- *   - Bonded-weapon SELECTION (<=2, FK to InventoryItem) — this module's
- *     bond/unbond transaction ops, dispatched via ABILITY_REGISTRY under
- *     "weapon-bond" (POST …/abilities/weapon-bond/transactions). Never PATCH.
- *   - "Summon bonded weapon" bonus action — a plain DERIVED_ACTIONS row
- *     (actions.ts), gated the same way every other subclass action is, with
- *     `enabled` driven by a synthetic "weaponBond" resource pool
- *     (character-serialize.ts) built from this module's `weaponBondEligible`
- *     and a count of `weaponBonded` inventory rows.
- *   - "Can't be disarmed" stays reminder text — self-or-announce (#416);
- *     there is no disarm mechanic to guard against.
- *
- * 2024 Eldritch Knight text is unverified and PARKED (#1531, fighter-features.ts) —
- * this feature stays 2014-only until that lands (#1854 Decision).
- */
+// Eldritch Knight Weapon Bond, PHB'14 p.75: bond up to two weapons; bonded weapons can't be disarmed, summon to hand as a bonus action.
+// Bonded-weapon selection is this module's bond/unbond ops (ABILITY_REGISTRY "weapon-bond"), never PATCH. The "Summon bonded weapon" bonus action is a plain DERIVED_ACTIONS row, enabled via a synthetic "weaponBond" resource pool built from weaponBondEligible + a count of weaponBonded inventory rows.
+// "Can't be disarmed" stays reminder text — there is no disarm mechanic to guard against.
+// 2024 Eldritch Knight text is unverified and PARKED (#1531) — this feature stays 2014-only until that lands.
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
@@ -34,9 +18,7 @@ export class InvalidWeaponBondOperationError extends Error {
   status = 400;
 }
 
-// Cap breach -> explicit 409, mirroring AttunementLimitError (inventory-currency.ts).
-// Not exported: domainErrors registers only the base InvalidWeaponBondOperationError
-// (instanceof matches this subclass too), same as AttunementLimitError's own callers.
+// Cap breach -> explicit 409, mirroring AttunementLimitError. Not exported: domainErrors registers only the base InvalidWeaponBondOperationError (instanceof matches this subclass too).
 class WeaponBondLimitError extends InvalidWeaponBondOperationError {
   status = 409;
 }
@@ -44,19 +26,13 @@ class WeaponBondLimitError extends InvalidWeaponBondOperationError {
 export const WEAPON_BOND_LEVEL = 3;
 export const WEAPON_BOND_LIMIT = 2;
 
-/**
- * Whether Weapon Bond exists at all for this edition. `switch` +
- * `assertNever`-typed default (#1527 pattern-setter — subclassGateLevel),
- * never `if (edition === …) … else …`.
- */
+// Total-mapping per #1527 (mirrors subclassGateLevel) — never `=== EDITION_…`.
 export function weaponBondAvailable(edition: RulesEdition): boolean {
   switch (edition) {
     case "EDITION_2014":
       return true;
     case "EDITION_2024":
-      // Eldritch Knight's PHB'24 text is unverified/PARKED (#1531) — no real
-      // 2024 Weapon Bond shape is authored yet, so this stays 2014-only
-      // (#1854 Decision) until #1531 lands it.
+      // PHB'24 text is unverified/PARKED (#1531) — stays 2014-only until that lands.
       return false;
     default: {
       const exhaustive: never = edition;
@@ -65,35 +41,21 @@ export function weaponBondAvailable(edition: RulesEdition): boolean {
   }
 }
 
-/** Whether a character entry at `entryLevel` who IS an Eldritch Knight has Weapon Bond. */
 export function hasWeaponBond(entryLevel: number, isEldritchKnight: boolean, edition: RulesEdition): boolean {
   return isEldritchKnight && entryLevel >= WEAPON_BOND_LEVEL && weaponBondAvailable(edition);
 }
 
 type EldritchKnightEntry = SubclassIdentityInput & { name: string; level: number };
 
-/**
- * The character's own Eldritch Knight (fighter subclass) class entry, or
- * undefined off-subclass. Resolved via resolveSubclassSlug (#1277: FK
- * preferred, exact name as fallback) — never a substring/name-literal match
- * (CLAUDE.md).
- */
+// Resolved via resolveSubclassSlug (FK preferred, exact name as fallback) — never a substring/name-literal match.
 export function eldritchKnightEntry<E extends EldritchKnightEntry>(classEntries: E[]): E | undefined {
   return classEntries.find(
     (e) => e.name.toLowerCase() === "fighter" && resolveSubclassSlug("fighter", e) === "fighter-eldritch-knight",
   );
 }
 
-/**
- * The ONE shared rule the bond/unbond transaction ops, reconcileWeaponBond
- * (level-reconciliation.ts), and the clamp-on-read in character-serialize.ts
- * all call (CLAUDE.md: a reconciler and its clamp-on-read must resolve to the
- * same function) — never two inline copies of "is this character's Weapon
- * Bond active". Uses effectiveEntryLevel, the same per-entry scoping
- * deriveEntryScopedActions (actions.ts) uses for every other subclass
- * action, so the mutation gate can never disagree with which character sees
- * the Summon Bonded Weapon action.
- */
+// The ONE shared rule the bond/unbond ops, reconcileWeaponBond, and the clamp-on-read all call (CLAUDE.md: a reconciler and its clamp-on-read must resolve to the same function) — never two inline copies.
+// Uses effectiveEntryLevel, the same per-entry scoping deriveEntryScopedActions uses for every other subclass action, so the mutation gate can never disagree with which character sees the Summon Bonded Weapon action.
 export function weaponBondEligible<E extends EldritchKnightEntry>(
   classEntries: E[],
   totalLevel: number,
@@ -152,22 +114,11 @@ async function bondWeapon(
     throw new InvalidWeaponBondOperationError(`${item.name} is not a weapon — Weapon Bond only bonds weapons`);
   }
 
-  // Serializes concurrent bondWeapon calls for the SAME character before
-  // BOTH the already-bonded check and the cap recount below: under Postgres'
-  // default READ COMMITTED, two concurrent requests can each read this row's
-  // pre-write state while the other's UPDATE is still uncommitted — one
-  // TOCTOU window lets a 3rd weapon bond past the cap, and a NARROWER one
-  // (both requests targeting the SAME item) lets both see `weaponBonded:
-  // false`, both write `true`, and both log a `weaponBonded` audit event —
-  // two events for one real transition, corrupting LIFO undo (undoing one
-  // leaves the other's stale event to fire an unexpected re-bond). Locking
-  // the Character row makes every read after this line authoritative: a
-  // blocked `FOR UPDATE` re-evaluates against the latest COMMITTED state
-  // once the first request's transaction finishes.
+  // Serializes concurrent bondWeapon calls for the SAME character before the already-bonded check and the cap recount below: under READ COMMITTED, two concurrent requests could each read pre-write state while the other's UPDATE is uncommitted — letting a 3rd weapon bond past the cap, or (both targeting the same item) both see weaponBonded: false, both write true, and both log a weaponBonded event for one real transition, corrupting LIFO undo.
+  // Locking the Character row makes every read after this line authoritative: a blocked FOR UPDATE re-evaluates against the latest COMMITTED state once the first request's transaction finishes.
   await tx.$queryRaw`SELECT id FROM "Character" WHERE id = ${characterId} FOR UPDATE`;
 
-  // Re-read under the lock, not the pre-lock `item` above — the authoritative
-  // check for whether this bond is actually a false→true transition.
+  // Re-read under the lock, not the pre-lock `item` above — the authoritative check for whether this bond is actually a false→true transition.
   const locked = await tx.inventoryItem.findUniqueOrThrow({
     where: { id: item.id },
     select: { weaponBonded: true },
@@ -176,7 +127,6 @@ async function bondWeapon(
     throw new InvalidWeaponBondOperationError(`${item.name} is already bonded`);
   }
 
-  // Derived 2-weapon cap: count currently-bonded rows, reject a 3rd with a 409.
   const bondedCount = await tx.inventoryItem.count({ where: { characterId, weaponBonded: true } });
   if (bondedCount >= WEAPON_BOND_LIMIT) {
     throw new WeaponBondLimitError(`Cannot bond more than ${WEAPON_BOND_LIMIT} weapons — unbond one first`);
@@ -213,14 +163,10 @@ async function unbondWeapon(
     throw new InvalidWeaponBondOperationError(`Inventory item not found on this character: ${op.inventoryItemId}`);
   }
 
-  // Same TOCTOU shape as bondWeapon's own lock (see that function's comment):
-  // two concurrent unbondWeapon calls on the SAME item could otherwise both
-  // read `weaponBonded: true` unlocked, both write `false`, and both log a
-  // `weaponUnbonded` event for one real transition.
+  // Same TOCTOU shape as bondWeapon's own lock: two concurrent unbondWeapon calls on the SAME item could otherwise both read weaponBonded: true unlocked, both write false, and both log a weaponUnbonded event for one real transition.
   await tx.$queryRaw`SELECT id FROM "Character" WHERE id = ${characterId} FOR UPDATE`;
 
-  // Re-read under the lock — the authoritative check for whether this unbond
-  // is actually a true→false transition.
+  // Re-read under the lock — the authoritative check for whether this unbond is actually a true→false transition.
   const locked = await tx.inventoryItem.findUniqueOrThrow({
     where: { id: item.id },
     select: { weaponBonded: true },
@@ -245,13 +191,7 @@ async function unbondWeapon(
   });
 }
 
-/**
- * Applies a batch of bond/unbond operations atomically. Mirrors
- * applyInventoryOperations' shape (one batchId, per-op character re-read) —
- * kept as its own module rather than folded into lib/inventory/inventory.ts
- * because bonding is class/level/edition-gated (needs the character's
- * classEntries), unlike attune/unattune which gate only on the item itself.
- */
+// Mirrors applyInventoryOperations' shape (one batchId, per-op character re-read) — kept as its own module rather than folded into the inventory domain because bonding is class/level/edition-gated, unlike attune/unattune which gate only on the item itself.
 export async function applyWeaponBondOperations(
   characterId: string,
   operations: WeaponBondOperation[],

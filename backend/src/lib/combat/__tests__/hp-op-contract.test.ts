@@ -1,23 +1,5 @@
-/**
- * Latch for the HP op schemas migrated into @character-sheet/contracts (#1390),
- * which retired the backend's own hand-written op interfaces — the third
- * declaration of these shapes.
- *
- * Three things this guards, and the runtime half is the one that matters most:
- *
- *  1. z.infer aliases z.output, but the frontend must construct z.input — they
- *     diverge on `.transform()`/`.default()`/`.catch()`/`z.coerce.*`/`.pipe()`.
- *     Asserted, not assumed. `expectTypeOf` is erased at runtime (there is no
- *     vitest `typecheck` block), so this half is gated by `npm run typecheck`.
- *  2. Union completeness for HitPointOperation — the drift shape that motivated
- *     resource-wire-contract.test.ts (the frontend's ResourceOperation copy was
- *     missing a member the server validated). Spelling out all nine members
- *     means widening the union without listing it here fails the build.
- *  3. Range/sign drift, via safeParse. Every bound below is ALSO re-checked in
- *     lib/combat against live state, and both paths answer 400 — so the route
- *     tests, which assert only `res.status`, stay green if `.positive()`,
- *     `.int()` or `.max(20)` disappears from a schema. These assertions do not.
- */
+// expectTypeOf is erased at runtime, so these type assertions are gated by `npm run typecheck`, not vitest.
+// Route tests assert only res.status, so these safeParse bound checks are what catches schema drift from lib/combat's runtime checks.
 import {
   concentrationSaveOpSchema,
   damageOpSchema,
@@ -62,8 +44,7 @@ describe("hit-point op wire contract", () => {
   });
 
   it("carries every HP op the dispatcher accepts", () => {
-    // longRest and stabilize are payload-free and deliberately have no exported
-    // type (nothing consumes one), so they are named by z.infer here.
+    // longRest and stabilize are payload-free with no exported type, so they are named by z.infer here.
     expectTypeOf<HitPointOperation>().toEqualTypeOf<
       | DamageOperation
       | HealOperation

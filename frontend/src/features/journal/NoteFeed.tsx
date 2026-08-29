@@ -1,11 +1,3 @@
-// The NOTE feed rows shared by both quick-capture surfaces (#865, #866). Two
-// layouts, both newest at the BOTTOM, grouped under day dividers with a serif
-// ink body to match the ruled writing register:
-//   - MobileFeed: the full-height mobile capture (#866) — "Tonight ·" divider.
-//   - DockFeed: the desktop margin dock (#865).
-// Both reuse NoteRow/NoteEditor + a single edit/delete state machine so inline
-// edit and confirm-in-place delete behave identically across surfaces.
-
 import { useState } from "react";
 
 import { Lock, Unlock } from "@/components/ui/icons";
@@ -19,7 +11,6 @@ type NotePatch = { body: string; visibility?: EntryVisibility };
 const editInputCls =
   "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-base md:text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 
-// The visibility opt-out checkbox, shared by the composer and the inline editor.
 export function PrivateToggle({
   checked,
   onChange,
@@ -42,10 +33,7 @@ export function PrivateToggle({
   );
 }
 
-// The visibility opt-out as a compact icon toggle — the mobile composer's lock
-// button (#866), sitting beside the field in place of the checkbox+label row.
-// A closed lock reads "private"; an open lock reads "shared" (the campaign
-// default). ≥44px hit target; state announced via aria-pressed.
+// ≥44px hit target; state announced via aria-pressed.
 export function PrivateLockButton({
   checked,
   onChange,
@@ -71,8 +59,6 @@ export function PrivateLockButton({
   );
 }
 
-// One edit/confirm-delete selection, shared by both feeds. Starting one action
-// cancels the other so a row is never editing and delete-confirming at once.
 function useFeedRowState() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
@@ -97,9 +83,7 @@ interface RowCallbacks {
   onDelete: (entryId: string) => Promise<boolean>;
 }
 
-// Inline editor for one feed note; keyed by note id so it mounts fresh per edit.
-// In a campaign the patch always carries an explicit visibility (mirrors
-// JournalEntryPanel); campaign-less edits omit it (the server keeps PRIVATE).
+// Campaign-less edits omit visibility — the server keeps PRIVATE (mirrors JournalEntryPanel).
 function NoteEditor({
   note,
   rows,
@@ -158,7 +142,6 @@ function NoteEditor({
   );
 }
 
-// Edit/Delete controls + the two-click delete confirm, shared by both row layouts.
 function RowActions({
   busy,
   confirmingDelete,
@@ -229,10 +212,7 @@ interface NoteRowProps {
   onEditStart: () => void;
 }
 
-// One display row of the feed: full-width body over a muted meta line (time,
-// lock, edit/delete). At md+ the actions reveal on hover/focus only — a
-// pending delete-confirm stays visible so it can't vanish under a moving
-// pointer. Mobile has no hover, so actions stay always-visible there.
+// Delete-confirm bypasses the opacity-0 hover reveal so it can't vanish under a moving pointer.
 function NoteRow({ note, entities, campaignId, busy, bodyClassName, confirmingDelete, ...actions }: NoteRowProps) {
   return (
     <div className="group -mx-2 flex flex-col gap-0.5 rounded-lg px-2 py-2 transition-colors md:hover:bg-parchment-100/70 md:focus-within:bg-parchment-100/70">
@@ -274,7 +254,6 @@ interface FeedProps extends RowCallbacks {
   busy: boolean;
 }
 
-// Render one note as an editor row or a display row, wired to the shared state.
 function renderRow(
   note: JournalEntry,
   props: FeedProps,
@@ -315,8 +294,7 @@ function renderRow(
   );
 }
 
-// Local-calendar day key/label for the dock's day dividers. loggedAt is a real
-// timestamp (unlike the UTC-midnight `date`), so group by the LOCAL day.
+// loggedAt is a real timestamp (unlike the UTC-midnight `date`) — group by the LOCAL day.
 function dayKey(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -350,7 +328,6 @@ function DayDivider({ label }: { label: string }) {
 
 type DayGroup = { key: string; label: string; notes: JournalEntry[] };
 
-// Group ascending notes under their day, so each divider precedes that day's rows.
 function groupByDay(notes: JournalEntry[]): DayGroup[] {
   const groups: DayGroup[] = [];
   for (const note of notes) {
@@ -362,9 +339,6 @@ function groupByDay(notes: JournalEntry[]): DayGroup[] {
   return groups;
 }
 
-// Mobile capture divider label: the current day reads "Tonight · {Mon D}" (notes
-// are jotted during an evening session); earlier days fall back to the shared
-// Today/Yesterday/absolute labels.
 function mobileDayLabel(iso: string): string {
   const base = dayLabel(iso);
   if (base !== "Today") return base;
@@ -373,11 +347,7 @@ function mobileDayLabel(iso: string): string {
   return `Tonight · ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
 }
 
-// The newest-at-bottom body shared by both surfaces (#865, #866): props.notes
-// arrives newest-first, so reverse to oldest-first (newest lands last), group
-// under day dividers, and render each row via the shared machinery. The caller
-// supplies the divider labeller (dock = plain day; mobile = "Tonight ·") and the
-// serif body class for its register.
+// props.notes arrives newest-first; reversed here to render oldest-first (newest lands last).
 function GroupedNoteFeed({
   props,
   bodyClassName,
@@ -403,7 +373,6 @@ function GroupedNoteFeed({
   );
 }
 
-// Mobile capture surface (#866): serif ink body, "Tonight ·" divider.
 export function MobileFeed(props: FeedProps) {
   if (props.notes.length === 0) {
     return (
@@ -421,7 +390,6 @@ export function MobileFeed(props: FeedProps) {
   );
 }
 
-// Desktop margin dock (#865): serif body, plain day dividers.
 export function DockFeed(props: FeedProps) {
   if (props.notes.length === 0) {
     return (

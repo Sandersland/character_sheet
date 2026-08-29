@@ -1,10 +1,3 @@
-/**
- * ResourcePoolRow — displays a single resource pool (e.g. Superiority Dice)
- * with spend and restore controls. Dice are rolled client-side via dice.ts;
- * the result is shown as an inline banner, mirroring SpellsSection's cast
- * result pattern.
- */
-
 import { useState } from "react";
 
 import { rollSpec } from "@/lib/dice";
@@ -53,7 +46,6 @@ export default function ResourcePoolRow({ pool, busy, onOperations }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Label row */}
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-semibold text-parchment-800">
           {pool.label}
@@ -68,7 +60,17 @@ export default function ResourcePoolRow({ pool, busy, onOperations }: Props) {
         </span>
       </div>
 
-      {/* Meter */}
+      {pool.details && pool.details.length > 0 && (
+        <div className="text-xs text-parchment-600">
+          {pool.details.map((detail, i) => (
+            <span key={detail.label}>
+              {i > 0 && " · "}
+              {detail.label} <span className="font-semibold text-parchment-700">{detail.value}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       <MeterBar
         current={pool.remaining}
         max={pool.total}
@@ -76,7 +78,6 @@ export default function ResourcePoolRow({ pool, busy, onOperations }: Props) {
         label={`${pool.label}: ${pool.remaining} of ${pool.total} remaining`}
       />
 
-      {/* Controls */}
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -101,7 +102,6 @@ export default function ResourcePoolRow({ pool, busy, onOperations }: Props) {
         </span>
       </div>
 
-      {/* Inline roll result banner */}
       {rollResult !== null && (
         <div className="flex items-center justify-between rounded-control bg-gold-50 px-3 py-2 text-gold-800">
           <p className="text-sm">

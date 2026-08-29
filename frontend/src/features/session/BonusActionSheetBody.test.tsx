@@ -1,19 +1,3 @@
-/**
- * #1431/#1505: what the Bonus Action sheet's class cards say about the
- * universal actions their class feature re-costs.
- *
- * The options are built through the real `classActionOption` against the real
- * served-row fixtures, so this covers the whole seam — backend `regrants` keys →
- * edition-resolved names → card subtitle — rather than a hand-made view model.
- *
- * Resolved regrant names win the subtitle over a row's own curated reminder
- * (#1505) — a name list is more scannable, and the reminder prose stays
- * available via the on-use toast/drill-in. The monk block is the scope latch:
- * those four rows carry `regrants` that are 2024-shaped on an edition-blind
- * catalog (see DERIVED_ACTIONS), so a 2014 monk is never SERVED them at all —
- * naming a served row's regrant never lies to the wrong edition.
- */
-
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
@@ -65,9 +49,6 @@ describe("BonusActionSheetBody — regranted action names (#1431)", () => {
   });
 
   it("names the object-use action under each edition's own name on the Fast Hands pair, even though the row also carries its own reminder", () => {
-    // Fast Hands carries rule text of its own (it spends Cunning Action's Bonus
-    // Action rather than a second one) — the resolved regrant name still wins
-    // the subtitle (#1505); the reminder prose surfaces on-use instead.
     const fastHands = action({
       key: "fastHands",
       name: "Fast Hands",
@@ -85,9 +66,6 @@ describe("BonusActionSheetBody — regranted action names (#1431)", () => {
     expect(card("Cunning Action")).not.toHaveTextContent("·");
   });
 
-  // Reminder deliberately omitted so the card falls through to the resolved
-  // names — this pins the CARD's edition seam, not what a Thief sees (the real
-  // row always carries rule text and the test above covers that).
   it("a reminder-less regranting row renders each edition's own name", () => {
     renderSheet([action({ key: "fastHands", name: "Fast Hands", regrants: ["useObject"] })], SERVED_ACTIONS_2014);
     expect(card("Fast Hands")).toHaveTextContent("Use an Object");
@@ -95,11 +73,7 @@ describe("BonusActionSheetBody — regranted action names (#1431)", () => {
 });
 
 describe("BonusActionSheetBody — the monk cards name their regrants (#1431/#1505)", () => {
-  // A 2024 monk L2 is served all four rows (the free/1-Focus pair for each of
-  // Patient Defense/Step of the Wind); each now shows its resolved regrant
-  // names instead of the curated reminder prose that used to win (#1505 —
-  // ActionSheetBody's regrantNames-first precedence). Byte-identical to the
-  // real DERIVED_ACTIONS rows' `regrants` arrays and reminders.
+  // Kept byte-identical to DERIVED_ACTIONS' regrants/reminders — update both together.
   const MONK_L2: [AvailableAction, string][] = [
     [
       action({ key: "patientDefense", name: "Patient Defense", regrants: ["disengage"], reminder: "Disengage (free bonus action)." }),

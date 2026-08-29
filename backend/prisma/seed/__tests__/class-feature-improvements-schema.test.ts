@@ -1,11 +1,3 @@
-// Pure unit test (NO database) for #1691's `improvements` column on
-// classFeatureSeedSchema — reuses featImprovementSchema (lib/srd/feats.ts),
-// the SAME zod a taken feat's `improvements` snapshot validates against
-// (route-level, routes/character/advancement.ts), rather than a second
-// declaration. Driven through classFeatureSeedSchema.safeParse, mirroring
-// class-feature-tier-schema.test.ts's own convention: that is the surface
-// assertSeedContentValid (prisma/seed/validate.ts) actually runs at seed
-// time, so testing through it exercises the production validation path.
 import { describe, expect, it } from "vitest";
 
 import { classFeatureSeedSchema } from "../class-features.js";

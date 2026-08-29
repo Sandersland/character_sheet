@@ -37,13 +37,7 @@ describe("scopeBadgeLabel", () => {
     expect(scopeBadgeLabel(spell)).toBe("Shared homebrew");
   });
 
-  // #1815 review findings 2/10: the server used to leak the GRANTER's id as
-  // `ownerId` on a granted (not owned) row, and the old implementation read
-  // `ownerId` to decide "mine" — so a granted row would have wrongly shown
-  // "My homebrew". Backend now nulls `ownerId` for a row the viewer doesn't
-  // own (routes/catalog/spells.ts), but this function must be correct
-  // EVEN IF a leaked ownerId ever reached it again — it reads only
-  // `catalog.editable`, never `ownerId`.
+  // Must read only catalog.editable, never ownerId — a granted row's ownerId may leak the granter's id (#1815).
   it("still labels a granted row 'Shared homebrew' even if ownerId carries the granter's id", () => {
     const spell = {
       ...BASE,
@@ -82,11 +76,7 @@ describe("isForkable", () => {
     expect(isForkable(spell)).toBe(false);
   });
 
-  // #1815 review findings 2/10: forkability must key off `catalog.editable`
-  // alone — a granted row is forkable regardless of what `ownerId` says
-  // (previously `ownerId === undefined` was the rule, which a leaked
-  // granter id would defeat, hiding the Fork button on exactly the row this
-  // epic's primary use case forks).
+  // Forkability must key off catalog.editable alone, never ownerId — a granted row's ownerId may carry the granter's id (#1815).
   it("is true for a granted (not owned) row even if ownerId carries the granter's id", () => {
     const spell = {
       ...BASE,

@@ -1,14 +1,3 @@
-// PR #1567 review, fix 3: schema.prisma's comment on StartingEquipmentPackage
-// says the three gold-dice columns are "jointly null, never partially" —
-// mapGold's two non-null assertions (backend lib/inventory/starting-equipment
-// -package.ts) rest entirely on that convention, with nothing enforcing it at
-// the DB. A CHECK constraint makes a partial-null row impossible to write in
-// the first place, rather than trusting every future write path to honour a
-// comment. No Prisma-level test covers this elsewhere — StartingEquipmentPackage
-// rows are otherwise only ever written through packageCreateData/
-// goldColumnsCreateInput (seed-starting-equipment.ts), which already keeps the
-// three jointly null or jointly set; this proves the DB itself refuses the
-// shape those functions would never produce.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -34,13 +23,7 @@ describe("StartingEquipmentPackage gold-dice columns are jointly null or jointly
     fixtureClassId = cls.id;
   });
 
-  // Every test shares one (classId, edition) pair — @@unique([classId, edition])
-  // would otherwise reject the SECOND test's insert for the wrong reason (a
-  // uniqueness violation, not the gold-dice CHECK this file exists to prove).
-  // A successful create must be cleaned up regardless of whether the test's
-  // own assertion passed or failed (a rejected-partial-null test that
-  // unexpectedly succeeds — the exact red state this file's TDD pass hit —
-  // would otherwise leave a stray row poisoning every later test in the file).
+  // Every test shares one (classId, edition) pair; @@unique([classId, edition]) would otherwise reject the second insert.
   afterEach(async () => {
     await prisma.startingEquipmentPackage.deleteMany({ where: { classId: fixtureClassId } });
   });

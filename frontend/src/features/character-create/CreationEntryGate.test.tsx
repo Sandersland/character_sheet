@@ -12,9 +12,8 @@ import type { Campaign } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchCampaigns: vi.fn(),
-  // Never actually called in the seeded cases (seedEditions makes the
-  // staleTime: Infinity entry permanently fresh) — stubbed so the cold-cache and
-  // fetch-failed cases can drive it explicitly.
+  // Not called in the seeded cases — seedEditions gives that entry
+  // staleTime: Infinity, so it's permanently fresh.
   fetchEditions: vi.fn(),
 }));
 
@@ -36,8 +35,6 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
   };
 }
 
-// #1343: a distinct id/name per campaign, so a spec can address "Campaign 17"
-// specifically to prove the scrolled-past cards are still real radios.
 function makeCampaigns(n: number): Campaign[] {
   return Array.from({ length: n }, (_, i) =>
     makeCampaign({ id: `camp-${i + 1}`, name: `Campaign ${i + 1}` }),
@@ -47,8 +44,6 @@ function makeCampaigns(n: number): Campaign[] {
 beforeEach(() => {
   vi.clearAllMocks();
   seedEditions();
-  // A realistic default so a refetch triggered by "Try again" resolves rather
-  // than returning undefined; the load-state specs below override it.
   mockFetchEditions.mockResolvedValue({ defaultEdition: "EDITION_2024", editions: SERVED_EDITIONS });
 });
 
@@ -62,15 +57,12 @@ describe("CreationEntryGate (#1286)", () => {
     expect(await screen.findByRole("radio", { name: "2024 rules" })).toHaveAttribute("aria-checked", "true");
     expect(screen.queryByRole("radiogroup", { name: /campaign/i })).not.toBeInTheDocument();
 
-    // Irreversibility stated at the moment of choosing.
     expect(screen.getByText(/locked in at creation/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /continue/i }));
     expect(onResolved).toHaveBeenCalledWith({ campaignId: null, campaignName: null, rulesEdition: "EDITION_2024" });
   });
 
-  // #1372 restores this to a positive assertion: 2014 is selectable for a solo
-  // character now that its content has shipped (reverses #1371's gate).
   it("lets a solo player switch to 2014 before continuing", async () => {
     mockFetchCampaigns.mockResolvedValue([]);
     const onResolved = vi.fn();
@@ -88,7 +80,6 @@ describe("CreationEntryGate (#1286)", () => {
 
     expect(await screen.findByRole("radio", { name: /solo/i })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("radio", { name: /the sunless citadel/i })).toBeInTheDocument();
-    // Solo is selected by default, so the edition picker (not an inherited display) shows.
     expect(screen.getByRole("radio", { name: "2024 rules" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /continue/i }));
@@ -96,8 +87,8 @@ describe("CreationEntryGate (#1286)", () => {
   });
 
   it("picking a campaign displays its inherited edition instead of asking", async () => {
-    // Both fields set explicitly — deriving the label from the key in a fixture
-    // would re-implement the mapping #1436 moved server-side.
+    // Both fields set explicitly — deriving the label from the key would
+    // re-implement the mapping #1436 moved server-side.
     mockFetchCampaigns.mockResolvedValue([
       makeCampaign({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }),
     ]);
@@ -106,7 +97,6 @@ describe("CreationEntryGate (#1286)", () => {
 
     await userEvent.click(await screen.findByRole("radio", { name: /the sunless citadel/i }));
 
-    // No edition picker once a campaign is chosen — it's inherited, not asked.
     expect(screen.queryByRole("radio", { name: "2024 rules" })).not.toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: "2014 rules" })).not.toBeInTheDocument();
     expect(screen.getByText(/2014 rules/)).toBeInTheDocument();
@@ -147,8 +137,6 @@ describe("CreationEntryGate (#1286)", () => {
     expect(campaign).toHaveAttribute("aria-checked", "true");
   });
 
-  // #1286: the choice is irreversible, so a transient fetch failure must never
-  // silently steer the player into "no campaigns" and a picked-for-them edition.
   describe("campaign list fails to load", () => {
     it("shows an error state and blocks Continue rather than defaulting to Solo", async () => {
       mockFetchCampaigns.mockRejectedValue(new Error("network down"));
@@ -173,9 +161,6 @@ describe("CreationEntryGate (#1286)", () => {
     });
   });
 
-  // #1436: /api/editions is the second precondition of this screen, and its
-  // failure mode is the same one — a fallback edition on an irreversible field IS
-  // the guess the copy above promises not to make.
   describe("rules editions fail to load", () => {
     it("takes the same 'we won't guess' branch, with no picker and no Continue", async () => {
       getQueryClient().removeQueries({ queryKey: catalogKeys.editions() });
@@ -207,8 +192,6 @@ describe("CreationEntryGate (#1286)", () => {
     });
   });
 
-  // #1436: cold cache and the scrambled-order fixture — the two states the
-  // positional default made unrepresentable.
   describe("rules editions load states", () => {
     it("cold cache: shows only the spinner — no picker, no flash of a wrong default", async () => {
       getQueryClient().removeQueries({ queryKey: catalogKeys.editions() });
@@ -216,7 +199,6 @@ describe("CreationEntryGate (#1286)", () => {
       mockFetchCampaigns.mockResolvedValue([makeCampaign()]);
       render(<CreationEntryGate onResolved={vi.fn()} />);
 
-      // The campaign list resolves first; the screen must still be the spinner.
       await waitFor(() => expect(mockFetchCampaigns).toHaveBeenCalled());
       expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /continue/i })).not.toBeInTheDocument();
@@ -224,9 +206,8 @@ describe("CreationEntryGate (#1286)", () => {
       expect(screen.getByRole("status")).toBeInTheDocument();
     });
 
-    // Rows 2014-FIRST while the served default is 2024: order and default
-    // deliberately disagree, so no positional implementation can pass both
-    // assertions. This is the test the same-name/opposite-order arrays lacked.
+    // Order and default deliberately disagree, so no positional implementation
+    // can pass both assertions.
     it("checks the SERVED default, not the first row, when the two disagree", async () => {
       const [row2024, row2014] = SERVED_EDITIONS;
       seedEditions({ editions: [row2014, row2024], defaultEdition: "EDITION_2024" });
@@ -248,11 +229,6 @@ describe("CreationEntryGate (#1286)", () => {
     });
   });
 
-  // #1343: an unbounded campaign list pushed EditionSection and Continue below
-  // the fold for a DM with many campaigns — one screenshot showed 18 cards with
-  // no visible way forward. jsdom can only assert the class strings that drive
-  // the cap; it can't verify anything about layout (no stylesheet, zero-size
-  // bounding rects) — the browser check is the real gate for this issue.
   describe("campaign list overflow (#1343)", () => {
     it("caps and scrolls the campaign list past three campaigns", async () => {
       mockFetchCampaigns.mockResolvedValue(makeCampaigns(20));
@@ -270,8 +246,8 @@ describe("CreationEntryGate (#1286)", () => {
       render(<CreationEntryGate onResolved={vi.fn()} />);
 
       const group = await screen.findByRole("radiogroup", { name: /which campaign/i });
-      // Byte-identical to the pre-#1343 markup — not just "no scroll classes" —
-      // so a stray p-0.5/padding class applied unconditionally also fails this.
+      // Byte-identical to the pre-#1343 markup, not just "no scroll classes",
+      // so a stray unconditional padding class also fails this.
       expect(group.className).toBe("grid gap-3 sm:grid-cols-2");
     });
 
@@ -280,8 +256,8 @@ describe("CreationEntryGate (#1286)", () => {
       render(<CreationEntryGate onResolved={vi.fn()} />);
 
       const group = await screen.findByRole("radiogroup", { name: /which campaign/i });
-      // Solo + 20 campaigns — scoped to the campaign group, since EditionPicker's
-      // own two radios (2024/2014) are also on the page once Solo is selected.
+      // Scoped to the campaign group: EditionPicker's own two radios are also
+      // on the page once Solo is selected.
       expect(within(group).getAllByRole("radio")).toHaveLength(21);
 
       await userEvent.click(screen.getByRole("radio", { name: "Campaign 17" }));
@@ -303,7 +279,7 @@ describe("CreationEntryGate (#1286)", () => {
       const solo = await screen.findByRole("radio", { name: /solo/i });
       const spy = vi.spyOn(Element.prototype, "scrollIntoView");
       solo.focus();
-      // Anti-vacuity: nothing scrolls on mount/focus alone — only the keypress does.
+      // Anti-vacuity: nothing scrolls on mount/focus alone.
       expect(spy).not.toHaveBeenCalled();
 
       await userEvent.keyboard("{ArrowRight}");

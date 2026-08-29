@@ -32,8 +32,7 @@ const mockDoorway = vi.mocked(fetchSessionDoorway);
 const mockStartSolo = vi.mocked(startSoloSession);
 const mockStartCampaign = vi.mocked(startCampaignSession);
 
-// A campaign-less doorway: #1080 emits campaignId:null + canStart:true so the
-// solo character can start its own session.
+// campaignId: null + canStart: true is how a solo doorway is served (#1080).
 function soloDoorway(): SessionDoorwayState {
   return { campaignId: null, role: "PLAYER", canStart: true, kind: "none", session: null };
 }
@@ -63,7 +62,7 @@ describe("useSessionDoorway solo start (#1082)", () => {
     await waitFor(() => expect(mockStartSolo).toHaveBeenCalledWith("c1"));
     expect(mockStartCampaign).not.toHaveBeenCalled();
     expect(onEnterCombat).toHaveBeenCalledTimes(1);
-    // #1299: the returned character is an exact cache write, not a refetch.
+    // Exact cache write, not a refetch (#1299).
     expect(getQueryClient().getQueryData(characterKeys.detail("c1"))).toBe(startedCharacter);
   });
 });

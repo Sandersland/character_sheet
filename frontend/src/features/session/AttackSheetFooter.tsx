@@ -1,14 +1,8 @@
-// Attack-sheet footer: Cancel (pre-roll, refunds the action) before any attack
-// is rolled, Done afterwards. The "N attacks · no target AC tracked" kicker lives
-// in the sheet header (TurnResolutionSheets), not here (#778).
-
 interface AttackSheetFooterProps {
   preRoll: boolean;
-  /** Attacks still unspent — the sheet closes to a live Resume, so "Close" (#802). */
   attacksRemain: boolean;
   onCancel: () => void;
   onClose: () => void;
-  /** Pre-roll cancel copy — off-hand refunds the BONUS action, not the action (#813). */
   refundLabel?: string;
 }
 

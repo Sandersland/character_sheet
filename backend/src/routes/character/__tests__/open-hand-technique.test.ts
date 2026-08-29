@@ -1,10 +1,3 @@
-/**
- * Open Hand Technique route tests (#1245). A level-3 Warrior of the Open Hand
- * (Wis 16, prof +2) has focus DC 13; Addle never rolls; Push/Topple roll a
- * flat d20 vs the DC and apply on a fail, resist on a success. Non-subclass /
- * below-level monks (and non-monks) have no Open Hand Technique.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -24,7 +17,7 @@ const FIXTURE_BASE = {
   id: FIXTURE_ID,
   name: "Open Hand Technique Test Monk",
   alignment: "Lawful Neutral",
-  experiencePoints: 900, // level 3 → proficiency +2
+  experiencePoints: 900,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 24, max: 24, temp: 0 },
@@ -46,6 +39,16 @@ async function createMonk(level: number, subclass?: string, rulesEdition: "EDITI
     where: { name: CLASS_NAME },
     create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
     update: {},
+  });
+  await prisma.classFeature.deleteMany({ where: { classId: cls.id, subclassId: null } });
+  const [poolName, poolKey, poolLabel] = rulesEdition === "EDITION_2014" ? (["Ki", "ki", "Ki Points"] as const) : (["Focus", "focus", "Focus Points"] as const);
+  await prisma.classFeature.create({
+    data: {
+      classId: cls.id, subclassId: null, name: poolName, level: 2, edition: rulesEdition,
+      description: `You have a pool of ${poolLabel} equal to your monk level.`,
+      resourceKey: poolKey, resourceLabel: poolLabel, resourceRecharge: "short-or-long",
+      resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+    },
   });
   await prisma.character.create({
     data: {
@@ -83,9 +86,6 @@ describe("POST /api/characters/:id/abilities/open-hand-technique/transactions", 
     expect(result.summary).toMatch(/no save/i);
   });
 
-  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
-  // the shared ability endpoint, so a green run afterwards is evidence the audit
-  // trail is unchanged.
   it("pins the audit trail of one Addle rider (the roll-free branch)", async () => {
     const res = await agent()
       .post(url)
@@ -96,10 +96,7 @@ describe("POST /api/characters/:id/abilities/open-hand-technique/transactions", 
       {
         category: "resources",
         type: "imposeOpenHandRider",
-        // #1501: corrected to SRD 5.2's actual wording — "can't make
-        // Opportunity Attacks" (not "take reactions"), ending at the start of
-        // the TARGET's ("its") next turn. See open-hand-technique.ts's
-        // addleClause for the verified source text.
+        // SRD 5.2: target "can't make Opportunity Attacks" until the start of its next turn.
         summary:
           "Open Hand Technique — Addle (no save): the target can't make Opportunity Attacks until the start of its next turn.",
         before: null,
@@ -178,11 +175,6 @@ describe("Open Hand Technique for an under-level or off-subclass monk", () => {
     expect(res.body.error).toMatch(/open hand/i);
   });
 
-  // #1277: isWarriorOfTheOpenHand used to substring-match ("open hand"), so a
-  // homebrew name merely CONTAINING "Open Hand" inherited real Warrior of the
-  // Open Hand mechanics — the same failure class #1339 fixed at the
-  // DERIVED_ACTIONS gate (actions.test.ts's "Warrior of the Open Handbook"
-  // fixture, not reachable through this route until this gate is fixed too).
   it("rejects a homebrew name containing \"Open Hand\" that isn't the real subclass", async () => {
     await createMonk(5, "Warrior of the Open Handbook");
     const res = await agent()
@@ -193,10 +185,6 @@ describe("Open Hand Technique for an under-level or off-subclass monk", () => {
   });
 });
 
-// #1501: the 2014 counterpart — Way of the Open Hand, a SEPARATE subclass
-// (not a fork of Warrior of the Open Hand). Addle's duration text is the
-// only clause that differs at this route: "end of your next turn" (the
-// monk's own), not 2024's "start of its next turn" (the target's).
 describe("Open Hand Technique for a 2014 Way of the Open Hand monk (#1501)", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
@@ -231,9 +219,6 @@ describe("Open Hand Technique for a 2014 Way of the Open Hand monk (#1501)", () 
   });
 });
 
-// #1277: resolveSubclassSlug prefers the catalog FK over the freeform display
-// name. FK-fixture twin of the same test in hand-of-harm.test.ts, which
-// asserts the opposite outcome for the SAME character shape.
 describe("Open Hand Technique prefers the subclass catalog FK over a misleading display name (#1277)", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
@@ -270,17 +255,11 @@ describe("Open Hand Technique prefers the subclass catalog FK over a misleading 
   });
 });
 
-// #1337: hasOpenHandTechnique is the single source of the L3 gate — both the
-// serialized rider and this route's cast guard read it. Proven with a
-// Fighter/Warrior-of-the-Open-Hand multiclass whose TOTAL character level is
-// held CONSTANT across the two fixtures — only the monk entry's own level
-// moves across the gate, so the assertion cannot pass on `character.level`.
+// hasOpenHandTechnique is the single source of the L3 gate; the fixtures below hold TOTAL character level constant and move only the monk entry's own level, so the assertion cannot pass on character.level.
 describe("Open Hand Technique multiclass entry-scoping (#1337)", () => {
   const MULTICLASS_ID = "test-open-hand-technique-multiclass-1";
   const multiclassUrl = `/api/characters/${MULTICLASS_ID}/abilities/open-hand-technique/transactions`;
-  // Arbitrary total held constant across both fixtures below (must exceed
-  // OPEN_HAND_TECHNIQUE_LEVEL so the "below the gate" fixture's fighter level
-  // stays positive).
+  // Must exceed OPEN_HAND_TECHNIQUE_LEVEL so the "below the gate" fixture's fighter level stays positive.
   const TOTAL_LEVEL = 17;
 
   afterEach(async () => {

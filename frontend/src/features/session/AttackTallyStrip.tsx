@@ -1,10 +1,3 @@
-// "This action" tally strip inside the attack sheet (#802, display-only since
-// #811): one row per rolled attack — form name, to-hit total with nat-20/nat-1
-// badges, the single damage slot, and the verdict. Resolved rows are FINAL here
-// (correctable only via the Turn-summary banner's quiet Change row); an
-// unresolved row keeps the tappable "hit or miss?" affordance, expanding
-// Hit / Miss / Crit! in place — the same rule the banner follows.
-
 import { useState } from "react";
 
 import { isCritRow, isMissRow, isUnresolvedRow } from "@/lib/attackTallySummary";
@@ -58,8 +51,6 @@ function NatBadge({ kind }: { kind: "nat20" | "nat1" }) {
   );
 }
 
-// The verdict cell: unresolved rows get the tappable question (→ expand),
-// resolved rows a static, final chip.
 function VerdictCell({
   row,
   expanded,
@@ -128,12 +119,10 @@ export default function AttackTallyStrip({
 }: {
   rows: AttackTallyRow[];
   onSetVerdict: (index: number, verdict: TallyVerdict | undefined) => void;
-  /** Show only rows from this slot; verdict writes still carry the GLOBAL index (#813). */
   source?: TallyRowSource;
   heading?: string;
 }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-  // Keep each row's global index so onSetVerdict targets the right tally entry.
   const shown = rows
     .map((row, index) => ({ row, index }))
     .filter(({ row }) => source === undefined || row.source === source);

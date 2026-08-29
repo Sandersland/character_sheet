@@ -1,6 +1,3 @@
-// Unit tests for the shared transactions-endpoint factory. Prisma, access, and
-// serialize are mocked so every branch (parse-400, domain-error-400, rethrow,
-// path override, respond transform) is exercised without a database.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { Router } from "express";
@@ -26,7 +23,6 @@ const access = vi.mocked(assertCharacterAccess);
 class DomainErrorA extends Error {}
 class DomainErrorB extends Error {}
 
-// Capture the handler the factory registers on router.post(path, handler).
 function register<S extends z.ZodTypeAny, R>(
   config: Omit<Parameters<typeof makeTransactionsEndpoint<S, R>>[0], "router">,
 ) {
@@ -174,9 +170,7 @@ describe("makeTransactionsEndpoint", () => {
   });
 });
 
-// runTransaction is the same body without the router closure — the shared ability
-// endpoint calls it per request after resolving a handler out of ABILITY_REGISTRY
-// (#1275). The suite above proves makeTransactionsEndpoint still delegates here.
+// Same body without the router closure (#1275); full behavior is already covered by the suite above.
 describe("runTransaction", () => {
   const call = (
     handler: Parameters<typeof runTransaction>[0],

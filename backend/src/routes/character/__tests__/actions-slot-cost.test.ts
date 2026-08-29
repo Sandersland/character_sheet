@@ -1,24 +1,3 @@
-/**
- * Slot-shaped ability cost (#1687) — row-driven cast-core route tests.
- *
- * A ClassFeature row can now declare `costKind: "slot"` (reusing `costBase`
- * as the minimum slot level, same as `AbilityCost`'s `{kind:"slot",minLevel}`
- * arm) — the row-driven dispatcher (`applyRowDrivenActionInTx`,
- * routes/character/actions.ts) must load real slot/arcanum state and thread
- * it into `payAbilityCostInTx`, persist the spend, and log an undoable
- * spellcasting-category event (mirrors applySpellcastingOpInTx's own
- * load → pay → persist → log sequence for a spell cast). These tests pin:
- *   - casting at a chosen slot level expends exactly that level's slot
- *   - the spend is logged (undoable) and the heal effect logs its own event
- *   - LIFO revert restores BOTH the slot and the HP together
- *   - exhausting the slot 400s with the existing "No level-N spell slots
- *     remaining" message (paySlotCost, unchanged)
- *
- * Real Postgres in beforeEach; supertest against the shared `app`. A bespoke
- * "Actions Slot Cost Test Wizard" CharacterClass + ClassFeature row per
- * testing.md, so afterAll cleanup never touches seeded catalog rows.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -33,9 +12,6 @@ let COOKIE: string;
 const WIZARD_ID = "test-actions-slot-cost-wizard";
 const WIZARD_CATALOG_NAME = "Actions Slot Cost Test Wizard";
 
-// Level-5 Wizard (6500 XP): full-caster slot table gives L1:4, L2:3, L3:2 —
-// enough L3 slots to prove both the spend (cast once) and the exhaustion
-// 400 (cast until the 2 are gone) from the SAME fixture.
 const WIZARD_BASE = {
   id: WIZARD_ID,
   name: "Actions Slot Cost Test Wizard",
@@ -124,7 +100,7 @@ describe("POST /:id/actions/transactions — slot-shaped ability cost (#1687)", 
         edition: "EDITION_2014",
         resourceKey: SLOT_ABILITY_KEY,
         activationCost: "reaction",
-        // costKind "slot": costBase reused as the minimum slot level (F3, #1687).
+        // costKind "slot" reuses costBase as the minimum slot level (#1687).
         costKind: "slot",
         costBase: 1,
         effectKind: "heal",
@@ -178,13 +154,13 @@ describe("POST /:id/actions/transactions — slot-shaped ability cost (#1687)", 
       .set("Cookie", COOKIE)
       .post(`/api/characters/${WIZARD_ID}/events/${batchId}/revert`);
     expect(revert.status).toBe(200);
-    expect(revert.body.hitPoints.current).toBe(20); // heal undone
-    expect(slot(revert.body, 3)).toMatchObject({ used: 0 }); // slot spend undone
+    expect(revert.body.hitPoints.current).toBe(20);
+    expect(slot(revert.body, 3)).toMatchObject({ used: 0 });
   });
 
   it("no level-3 slots remaining → 400 with the existing no-slot message", async () => {
     await execute(3);
-    await execute(3); // both L3 slots now spent (total 2)
+    await execute(3);
     const res = await execute(3);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/No level-3 spell slots remaining/);

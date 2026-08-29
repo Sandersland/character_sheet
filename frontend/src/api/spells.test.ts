@@ -3,8 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { applySpellcastingTransactions, createCustomSpell, deleteCustomSpell, updateCustomSpell } from "@/api/spells";
 import type { HomebrewSpellInput, SpellcastingOperation } from "@/types/character";
 
-// New coverage (#1270) — applySpellcastingTransactions had no direct test in
-// client.test.ts (only exercised transitively through other suites).
 describe("applySpellcastingTransactions", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -39,9 +37,6 @@ describe("applySpellcastingTransactions", () => {
   });
 });
 
-// #1787, epic #1782 4/5: user-owned homebrew spell CRUD (POST/PATCH/DELETE
-// /api/spells/custom). Plain REST, same shape as createCampaignItem/
-// updateCampaignItem/deleteCampaignItem in api/campaign.ts.
 const HOMEBREW_INPUT: HomebrewSpellInput = {
   name: "Test Bolt",
   level: 1,
@@ -67,8 +62,8 @@ describe("createCustomSpell", () => {
 
     const result = await createCustomSpell(HOMEBREW_INPUT, "char-1");
 
-    // #1819: the authoring character rides in the query so the server derives
-    // the new spell's edition from it.
+    // characterId rides in the query so the server derives the new spell's
+    // edition from it.
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/spells/custom?characterId=char-1"),
       expect.objectContaining({ method: "POST", body: JSON.stringify(HOMEBREW_INPUT) })

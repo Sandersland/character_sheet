@@ -9,8 +9,7 @@ export interface PreferenceOption<T extends string> {
   icon: LucideIcon;
 }
 
-// Single source for label/icon/order — both AccountMenu's quick shortcuts and
-// the full PreferencesSheet (#1167) render from these so the two can't drift.
+// Single source for label/icon/order — both AccountMenu's quick shortcuts and PreferencesSheet render from these so the two can't drift.
 export const THEME_OPTIONS: PreferenceOption<ThemePreference>[] = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },

@@ -1,9 +1,3 @@
-// Open Hand Technique on the Flurry-of-Blows sheet (#1245): a Flurry hit
-// rider, mirrors StunningStrikeSection's shape but with 3 mutually exclusive
-// choices instead of one button. Addle never rolls (no save — always applies);
-// Push/Topple roll a flat d20 vs the focus DC server-side (no NPC combatant,
-// same simplification as Stunning Strike — see open-hand-technique.ts).
-
 import { useState } from "react";
 
 import { imposeOpenHandRiderTransaction } from "@/api/client";
@@ -19,7 +13,6 @@ const RIDER_LABELS: Record<OpenHandRider, string> = {
   topple: "Topple",
 };
 
-// Why the rider buttons are disabled, in priority order — surfaced as their tooltip.
 function riderBlockedReason(currentRow: AttackTallyRow | null, used: boolean): string | undefined {
   if (currentRow === null) return "Roll a hit first";
   if (used) return "Already used this turn";
@@ -28,7 +21,6 @@ function riderBlockedReason(currentRow: AttackTallyRow | null, used: boolean): s
 
 interface OpenHandTechniqueSectionProps {
   turnState: TurnState & TurnStateActions;
-  /** The bound Flurry hit row this rider rides on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
 }
 
@@ -48,11 +40,9 @@ export default function OpenHandTechniqueSection({
   });
   const canImpose = !used && !mutation.isPending && currentRow !== null;
 
-  // Only a L3+ Warrior of the Open Hand has Open Hand Technique.
   if (!openHandTechnique) return null;
 
-  // No try/catch (unchanged from pre-#1283): this component has never
-  // surfaced an error — a rejection propagates same as before.
+  // No try/catch: this handler has never surfaced errors — a rejected mutation propagates uncaught.
   async function handleImpose(rider: OpenHandRider) {
     if (!canImpose) return;
     const { results } = await mutation.mutateAsync(rider);

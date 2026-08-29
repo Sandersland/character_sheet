@@ -1,24 +1,8 @@
-// #1593: the LITERAL_ROW_CLASSES fixture mirrors the literal seed files, and
-// until this suite existed NOTHING enforced that the two agree.
-//
-// The drift this catches shipped once already: #1232 corrected two fabricated
-// EDITION_2024 Draconic descriptions in sorcerer-features.ts and left
-// test-feature-rows.fixture.ts carrying the old text. The full backend suite,
-// fallow, e2e and a clean claude-review all passed on that state, because the
-// three suites that could have noticed each look elsewhere by design —
-// class-feature-parity.test.ts `continue`d on LITERAL_ROW_CLASSES (it has
-// since been retired outright, #1675 — it went vacuous the moment Monk, its
-// last un-skipped class, joined that same set), the per-class content tests
-// (sorcerer-2024-content.test.ts and friends) read the DB rather than the
-// fixture, and class-features-snapshot.test.ts strips `.features` before
-// snapshotting.
-//
+// #1593: asserts LITERAL_ROW_CLASSES' fixture mirrors the literal seed files.
 // Lives on the PRISMA side because it has to import both halves and only this
-// direction compiles: backend/tsconfig.json's `rootDir: "src"` makes a src file
-// importing anything under prisma/ a TS6059 error, which is the same constraint
-// that forces the two LITERAL_ROW_CLASSES sets to be maintained separately in
-// the first place. Importing the fixture is side-effect free — it is a plain
-// module with no describe/it of its own, deliberately (see its own header).
+// direction compiles — a src file importing anything under prisma/ is a
+// TS6059 error, the same constraint that forces the two LITERAL_ROW_CLASSES
+// sets to be maintained separately in the first place.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -30,10 +14,9 @@ import { SUBCLASS_IDENTITY } from "@/lib/classes/subclass-slug.js";
 import { CLASS_FEATURES, LITERAL_ROW_CLASSES } from "../class-features.js";
 
 // The fixture keys subclass rows by lowercase NAME ("life domain") while
-// CLASS_FEATURES carries subclassSlug ("cleric-life-domain"). SUBCLASS_IDENTITY
-// is the join. Matching on a substring or endsWith of the slug instead is the
-// trap here — it silently mismatches, and `nameKey` is precisely what the
-// fixture is keyed on.
+// CLASS_FEATURES carries subclassSlug ("cleric-life-domain"); SUBCLASS_IDENTITY
+// is the join. Matching on a substring or endsWith of the slug instead
+// silently mismatches — `nameKey` is precisely what the fixture is keyed on.
 const SLUG_BY_NAME_KEY = new Map(
   Object.entries(SUBCLASS_IDENTITY).map(([slug, identity]) => [identity.nameKey, slug]),
 );
@@ -41,6 +24,38 @@ const SLUG_BY_NAME_KEY = new Map(
 interface SeedRow {
   level: number;
   description: string;
+  choiceColumns: string;
+  poolColumns: string;
+}
+
+function choiceColumnsOf(row: { choiceKey?: string | null; choiceCatalogSource?: string | null; choiceCountTiers?: unknown }): string {
+  return JSON.stringify({
+    choiceKey: row.choiceKey ?? null,
+    choiceCatalogSource: row.choiceCatalogSource ?? null,
+    choiceCountTiers: row.choiceCountTiers ?? null,
+  });
+}
+
+// Guards a row's pool identity/shape — resourceKey/resourceLabel/
+// resourceRecharge/resourceTotals/resourceOnInitiative — the same way
+// choiceColumnsOf guards the choose-N columns. Without this, a seed-only edit
+// to a pool's totals/onInitiative (e.g. a flatBonus mutation) drifts silently
+// from the fixture: the description/level checks above never look at these
+// fields, and nothing else in this suite reads them either.
+function poolColumnsOf(row: {
+  resourceKey?: string | null;
+  resourceLabel?: string | null;
+  resourceRecharge?: string | null;
+  resourceTotals?: unknown;
+  resourceOnInitiative?: unknown;
+}): string {
+  return JSON.stringify({
+    resourceKey: row.resourceKey ?? null,
+    resourceLabel: row.resourceLabel ?? null,
+    resourceRecharge: row.resourceRecharge ?? null,
+    resourceTotals: row.resourceTotals ?? null,
+    resourceOnInitiative: row.resourceOnInitiative ?? null,
+  });
 }
 
 // (lowercased className, subclassSlug or "null", name, edition) -> row. Keyed
@@ -50,7 +65,7 @@ interface SeedRow {
 const SEED_BY_KEY = new Map<string, SeedRow>(
   CLASS_FEATURES.map((row) => [
     `${row.className.toLowerCase()}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`,
-    { level: row.level, description: row.description },
+    { level: row.level, description: row.description, choiceColumns: choiceColumnsOf(row), poolColumns: poolColumnsOf(row) },
   ]),
 );
 
@@ -59,6 +74,8 @@ interface FixtureRow {
   label: string;
   level: number;
   description: string;
+  choiceColumns: string;
+  poolColumns: string;
 }
 
 function collectFixtureRows(): FixtureRow[] {
@@ -71,6 +88,8 @@ function collectFixtureRows(): FixtureRow[] {
         label: `LITERAL_CLASS_ROWS[${classKey}] "${row.name}" (${row.edition})`,
         level: row.level,
         description: row.description,
+        choiceColumns: choiceColumnsOf(row),
+        poolColumns: poolColumnsOf(row),
       });
     }
   }
@@ -87,6 +106,8 @@ function collectFixtureRows(): FixtureRow[] {
         label: `LITERAL_SUBCLASS_ROWS["${nameKey}"] "${row.name}" (${row.edition})`,
         level: row.level,
         description: row.description,
+        choiceColumns: choiceColumnsOf(row),
+        poolColumns: poolColumnsOf(row),
       });
     }
   }
@@ -95,34 +116,11 @@ function collectFixtureRows(): FixtureRow[] {
 }
 
 describe("literal-row fixture parity (#1593)", () => {
-  // Anti-vacuity: if the fixture maps were empty (or the join produced nothing)
-  // every assertion below would pass by iterating nothing. Eleven classes are
-  // literal as of wave C (#1224/#1226/#1229), and the fixture mirrors nine of
-  // them — Rogue and Bard are deliberately absent entirely, since neither
-  // declares a resourceKey/derivedStat the fixture must carry and no surviving
-  // test asserts a null-vs-object distinction against either (see the
-  // fixture's own header).
-  //
-  // RE-MEASURED on the merged wave-C tree, never carried over from a branch.
-  // #1226 measured 241 rows / 8 classes / 13 subclasses and #1229 measured
-  // 230 / 8 / 11, each correct for its own branch ALONE — taking the incoming
-  // side would have LOWERED the row floor 238 -> 220 and the subclass floor
-  // 13 -> 11, the exact silent weakening this comment exists to warn about.
-  // Paladin's base-class rows join LITERAL_CLASS_ROWS; its three Oaths are
-  // deliberately absent from LITERAL_SUBCLASS_ROWS, the same exemption shape as
-  // Barbarian's two subclasses (see PALADIN_BASE_ROWS' own comment in
-  // test-feature-rows.fixture.ts). The floors sit just under the real merged
-  // count, not an order of magnitude under — a loose floor passes a bad merge
-  // that drops most of the fixture, which would defeat every assertion below
-  // while staying green. Tune these UPWARD as classes go literal; only ever
-  // tune one DOWNWARD with the reason recorded here (the
-  // class-feature-population.test.ts idiom).
-  //
-  // Tuned DOWN 265 -> 255 by #1595: THE_ARCHFEY_ROWS/THE_GREAT_OLD_ONE_ROWS
-  // stopped fabricating an EDITION_2024 partition the real seed never had, so
-  // the fixture went 268 -> 258 rows. A NARROWING toward the seed, not a loss —
-  // no mirrored seed row went away, and the class/subclass floors are unmoved
-  // because both maps keep every key.
+  // Anti-vacuity: an empty fixture map, or a join producing nothing, would
+  // still pass every assertion below by iterating nothing. Floors sit just
+  // under the real merged count, re-measured on the merged tree (never
+  // carried over from a branch) — tune UPWARD as classes go literal, and only
+  // ever DOWNWARD with the reason recorded here.
   it("the fixture actually mirrors something — non-vacuity floor", () => {
     const rows = collectFixtureRows();
     expect(rows.length).toBeGreaterThanOrEqual(255);
@@ -131,10 +129,11 @@ describe("literal-row fixture parity (#1593)", () => {
     expect(SEED_BY_KEY.size).toBe(CLASS_FEATURES.length);
   });
 
-  // The drift #1232 shipped. Reports EVERY mismatch at once rather than
-  // failing on the first — a wave that touches several classes wants the whole
-  // list, not one row per re-run.
-  it("every fixture row's description and level match its seed row exactly", () => {
+  // Reports EVERY mismatch at once rather than failing on the first — a wave
+  // that touches several classes wants the whole list, not one row per
+  // re-run. Pool columns joined the check alongside choice columns since
+  // nothing else in this repo compares the two sides' pool shape.
+  it("every fixture row's description, level, choice columns, and pool columns match its seed row exactly", () => {
     const mismatches: string[] = [];
 
     for (const row of collectFixtureRows()) {
@@ -148,6 +147,12 @@ describe("literal-row fixture parity (#1593)", () => {
       }
       if (seed.level !== row.level) {
         mismatches.push(`${row.label}: level ${row.level} in fixture, ${seed.level} in seed`);
+      }
+      if (seed.choiceColumns !== row.choiceColumns) {
+        mismatches.push(`${row.label}: choice columns drifted\n    fixture: ${row.choiceColumns}\n    seed:    ${seed.choiceColumns}`);
+      }
+      if (seed.poolColumns !== row.poolColumns) {
+        mismatches.push(`${row.label}: pool columns drifted\n    fixture: ${row.poolColumns}\n    seed:    ${seed.poolColumns}`);
       }
     }
 

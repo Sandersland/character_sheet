@@ -15,7 +15,6 @@ export default function HitPointTracker() {
   const { character } = useCurrentCharacter();
   const { hitPoints, hitDice } = character;
 
-  // Shared HP-apply engine, death-save controls (#736), and rest actions.
   const hp = useHitPointApply(character);
   const deathSaveCtl = useDeathSaves(character);
   const rest = useRestActions(character, hp.submit);

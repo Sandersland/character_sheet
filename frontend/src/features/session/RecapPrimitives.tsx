@@ -23,7 +23,6 @@ export function StatTile({
   );
 }
 
-// A wrapped row of "×{qty} {name}" item badges (acquired or sold).
 export function ItemBadgeList({ items }: { items: SessionSummaryItem[] }) {
   return (
     <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-parchment-900">
@@ -37,7 +36,6 @@ export function ItemBadgeList({ items }: { items: SessionSummaryItem[] }) {
   );
 }
 
-// Spell slots spent, one badge per level ("L1 ×2"), ascending by level.
 export function SlotsSpentRow({ slotsSpent }: { slotsSpent: Record<string, number> }) {
   const levels = sortSlotsSpent(slotsSpent);
   if (levels.length === 0) return null;
@@ -54,7 +52,6 @@ export function SlotsSpentRow({ slotsSpent }: { slotsSpent: Record<string, numbe
   );
 }
 
-// Feats + Ability Score Improvements taken, as labelled rows.
 export function AdvancementsList({ advancements }: { advancements: SessionSummaryAdvancement[] }) {
   if (advancements.length === 0) return null;
   return (
@@ -69,7 +66,7 @@ export function AdvancementsList({ advancements }: { advancements: SessionSummar
   );
 }
 
-// A small labelled recap group. Callers gate visibility themselves.
+// Callers gate visibility themselves — RecapGroup does not hide itself when empty.
 export function RecapGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">

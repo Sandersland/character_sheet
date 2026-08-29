@@ -1,9 +1,3 @@
-// The chronicle "spine" (#864): the desktop left pane and the mobile chapters
-// list. Chapters are the campaign's sessions (title, or "Session N"); with arcs
-// they nest under collapsible PART headers (frame A′), and without arcs they render
-// as a flat list (frame A). A client-side title filter sits at the top; the
-// pure grouping/filtering lives in chronicle.ts.
-
 import { ChevronDown, ChevronRight } from "@/components/ui/icons";
 import {
   filterSpine,
@@ -87,9 +81,6 @@ export default function ChronicleSpine({
   );
 }
 
-// A collapsible part: header (roman numeral + name + session range) plus, when
-// expanded, its chapter rows. Clicking a collapsed header navigates to the part's
-// newest chapter (which expands it).
 function PartGroup({
   part,
   expanded,
@@ -137,8 +128,6 @@ function PartGroup({
   );
 }
 
-// One chapter row: gold session number, serif title + note count, short date, and
-// a gold diamond marking the current selection.
 function ChapterRow({
   chapter,
   selected,

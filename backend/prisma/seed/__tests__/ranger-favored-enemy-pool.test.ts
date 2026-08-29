@@ -1,13 +1,3 @@
-// #1230 commit 3: Favored Enemy's uses-per-Long-Rest pool moved off the
-// issue's (unsupported, 2014-Tasha's-carryover) "proficiency bonus" premise
-// onto a flat level-tiered resourceTotals on the EDITION_2024 row — read here
-// through the SAME poolsFromRows a real character's derivation calls
-// (registry.ts's deriveBaseLayer). Modelled on warlock-resource-pools.test.ts.
-// Tireless/Nature's Veil (#1230 C1) were the resourceFn-only case this file
-// used to prove the NEGATIVE for; #1685 migrated both onto their rows as
-// `{ abilityMod: "wisdom", min: 1 }` formula tiers, so poolsFromRows resolves
-// them directly now too — see the describe block below. The end-to-end proof
-// through deriveResources stays in ranger-wisdom-pools.test.ts.
 import { describe, expect, it } from "vitest";
 
 import { poolsFromRows } from "@/lib/classes/class-feature-rows.js";
@@ -17,8 +7,6 @@ import { RANGER_FEATURES } from "../ranger-features.js";
 
 const BASE_ROWS = RANGER_FEATURES.filter((r) => r.subclassSlug === null);
 
-// abilityScores defaults to `{}`; the wisdom-modifier tests below (Tireless/
-// Nature's Veil, #1685) pass their own.
 function poolAt(key: string, level: number, edition: "EDITION_2014" | "EDITION_2024", abilityScores: Record<string, number> = {}) {
   return poolsFromRows(BASE_ROWS, level, abilityScores, 0, edition).find((p) => p.key === key);
 }
@@ -53,12 +41,7 @@ describe("Favored Enemy (#1230): 2/3/4/5/6 at L1/5/9/13/17, Long Rest recharge, 
     expect(poolAt("favoredEnemy", 20, "EDITION_2014")).toBeUndefined();
   });
 
-  // Derived-totals cross-check (issue AC: "don't hard-code a table that could
-  // drift"): the Favored Enemy tier value happens to equal
-  // proficiencyBonusForLevel(level) at every level in SRD 5.2 — a numeric
-  // COINCIDENCE, not a rule (see ranger-features.ts's own comment on this
-  // row). A future PB table change must not silently retabulate Favored
-  // Enemy — this assertion is what would go red if the two ever diverge.
+  // Favored Enemy's tier value equals proficiencyBonusForLevel(level) by coincidence, not by rule — see ranger-features.ts's own comment on this row.
   it("coincidentally equals proficiencyBonusForLevel(level) at every level 1-20 (not a rule — see the row's own comment)", () => {
     for (let level = 1; level <= 20; level++) {
       expect(poolAt("favoredEnemy", level, "EDITION_2024")?.total, `level ${level}`).toBe(proficiencyBonusForLevel(level));
@@ -75,9 +58,9 @@ describe("Tireless / Nature's Veil (#1230, migrated onto their rows by #1685): {
         continue;
       }
       const low = poolAt("tireless", 10, edition, { wisdom: 8 });
-      expect(low?.total).toBe(1); // Wis 8 -> -1 mod, floored to 1
+      expect(low?.total).toBe(1);
       expect(low?.recharge).toBe("longRest");
-      expect(poolAt("tireless", 10, edition, { wisdom: 18 })?.total).toBe(4); // Wis 18 -> +4 mod
+      expect(poolAt("tireless", 10, edition, { wisdom: 18 })?.total).toBe(4);
     }
   });
 
@@ -89,9 +72,9 @@ describe("Tireless / Nature's Veil (#1230, migrated onto their rows by #1685): {
         continue;
       }
       const low = poolAt("naturesVeil", 14, edition, { wisdom: 8 });
-      expect(low?.total).toBe(1); // Wis 8 -> -1 mod, floored to 1
+      expect(low?.total).toBe(1);
       expect(low?.recharge).toBe("longRest");
-      expect(poolAt("naturesVeil", 14, edition, { wisdom: 18 })?.total).toBe(4); // Wis 18 -> +4 mod
+      expect(poolAt("naturesVeil", 14, edition, { wisdom: 18 })?.total).toBe(4);
     }
   });
 });

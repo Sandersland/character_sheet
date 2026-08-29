@@ -19,7 +19,6 @@ function mentionsLabel(entity: CampaignEntity, backlinks: EntityBacklink[]): str
   return `${count} across ${sessions} ${sessions === 1 ? "session" : "sessions"}`;
 }
 
-// Sheets are owner-only views today: link only the viewer's own character (#842).
 function ownedSheetPath(
   entity: CampaignEntity,
   characters: { id: string; ownerId: string }[],
@@ -82,8 +81,6 @@ function OwnerQuietLinks({
   );
 }
 
-// The article's derived-facts panel (#842): portrait tile, fact rows, and the
-// owner's quiet Hide/Delete links. No fact here is persisted — all computed.
 export default function EntityInfobox({
   entity,
   role,

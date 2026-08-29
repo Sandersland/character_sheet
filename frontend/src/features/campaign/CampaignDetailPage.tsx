@@ -9,9 +9,6 @@ import { fetchCampaign } from "@/api/client";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { Campaign } from "@/types/character";
 
-// The campaign hub: routed tabs — Overview (invite/add-character/roster) at
-// /campaigns/:id, Codex (entity registry) at /campaigns/:id/codex, and an
-// owner-only Manage tab (#379) at /campaigns/:id/manage.
 export default function CampaignDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -33,8 +30,6 @@ export default function CampaignDetailPage() {
     };
   }, [id]);
 
-  // Guard the owner-only Manage route: a player deep-linking to /manage is
-  // redirected back to Overview once we know their role.
   useEffect(() => {
     if (onManage && campaign && campaign.role !== "OWNER") {
       navigate(`/campaigns/${id}`, { replace: true });
@@ -74,14 +69,13 @@ export default function CampaignDetailPage() {
                 {campaign.role === "OWNER" ? "Owner" : "Player"}
               </Badge>
             )}
-            {/* Campaign header + sheet header only (#1286) — not the character-list card.
-                Label served with the campaign row (#1436), never resolved client-side. */}
+            {/* Label served with the campaign row, never resolved client-side (#1436). */}
             <Badge tone="neutral">{campaign.rulesEditionLabel}</Badge>
           </h1>
         </div>
       </div>
 
-      {/* The codex tab is full-width (#840); the tab strip stays centered via its own wrapper. */}
+      {/* Codex tab is full-width; nested wrapper keeps the tab strip centered (#840). */}
       <main className={`mx-auto flex flex-col gap-6 px-6 py-8${onCodex ? "" : " max-w-4xl"}`}>
         <div className="mx-auto w-full max-w-4xl">
           <CampaignTabs

@@ -1,21 +1,5 @@
-// Fork a catalog spell into an overriding copy (#1800/#1801, epic #1795
-// 5/6+6/6): "Make my version" (any viewer, USER scope) always offered;
-// "Override for campaign" (that campaign's DM only) delegated to
-// CampaignOverrideSection, which owns the per-campaign list/loading
-// branching so this component's own complexity stays small. Calls POST
-// …/fork via api/client — never fetch() directly.
-//
-// Unlike a grant, a fork is NOT idempotent — every successful POST creates a
-// brand-new CatalogEntry (forkContent's own deep copy, #1800's file banner).
-// "Make my version" is therefore a one-shot WITHIN THIS SHEET INSTANCE: once
-// it succeeds it flips to a disabled "done" state instead of staying
-// clickable, so this open sheet can't be clicked twice for a second,
-// throwaway fork. That's a courtesy, not a guarantee — onForked's refetch
-// unmounts this sheet and re-renders the row, so re-opening Fork on the same
-// (now-shadowed) origin and forking again is still possible, and would mint
-// a second USER entry. Deduping a lineage down to one visible winner either
-// way is the backend resolver's job (pickLineageWinner, lib/catalog/
-// entitlement.ts), not something this UI enforces.
+// A fork is not idempotent; a lineage is deduped to one winner by the backend's
+// pickLineageWinner, not by this UI.
 import { useState } from "react";
 
 import { forkCatalogEntry } from "@/api/client";
@@ -26,8 +10,6 @@ import type { CatalogSpell } from "@/types/character";
 
 interface ForkSpellSheetProps {
   spell: CatalogSpell;
-  /** A fork succeeded — caller refetches the catalog so the new entry (and, for
-   *  a USER fork, its "My homebrew" badge) shows up without a manual reload. */
   onForked: () => void;
   onClose: () => void;
 }
@@ -65,9 +47,7 @@ export default function ForkSpellSheet({ spell, onForked, onClose }: ForkSpellSh
     <BottomSheet title={`Fork "${spell.name}"`} subtitle="Make your own editable copy" onClose={onClose}>
       <div className="flex flex-col gap-4">
         <div>
-          {/* `!entryId` mirrors handleMakeMyVersion's own early return — without it
-              a spell served with no catalog metadata would show a fully-enabled
-              button whose click is silently a no-op. */}
+          {/* disabled mirrors handleMakeMyVersion's early return, so a spell with no catalog metadata can't show an enabled no-op button. */}
           <button
             type="button"
             disabled={!entryId || userForkState !== "idle"}

@@ -1,24 +1,10 @@
-/**
- * AbilityRowShell — the shared <li> anatomy of the class-ability rows
- * (ManeuverRow / ShadowArtRow, #688): an expandable
- * name-toggle with inline chips, a right-aligned action cluster, an optional
- * warning line, and the expandable body. Owns the expanded state; the rows
- * keep their own cast/forget semantics.
- */
-
 import { useState, type ReactNode } from "react";
 
 interface AbilityRowShellProps {
   name: string;
-  /** Inline chips rendered after the name (focus cost, concentration, buff). */
   chips?: ReactNode;
-  /** Right-aligned action cluster (focus select, Cast, Swap, Forget). Absent
-   *  for a row with no sheet-level action (#1516: ManeuverRow — a maneuver
-   *  replacement is learn-time only, offered inside the level-up ceremony). */
   actions?: ReactNode;
-  /** Optional line between the header and the expandable body. */
   warning?: ReactNode;
-  /** Expandable body (description + roll/save previews). */
   children: ReactNode;
 }
 
@@ -48,7 +34,6 @@ export default function AbilityRowShell({ name, chips, actions, warning, childre
   );
 }
 
-/** The gold Cast affordance every castable row shares (disabled ⇒ explains why via title). */
 export function CastAbilityButton({
   disabled,
   onClick,

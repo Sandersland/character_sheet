@@ -5,29 +5,21 @@ import { useDialogChrome } from "@/hooks/useDialogChrome";
 
 interface DrawerProps {
   title: string;
-  /** Optional muted line under the title (e.g. the session name, mirrors BottomSheet). */
   subtitle?: string;
   onClose: () => void;
   children: ReactNode;
 }
 
-/**
- * A right-edge slide-in panel (#1086) for md+ surfaces — the desktop home for the
- * session log, which never occupies page layout. Shares Modal/BottomSheet's
- * focus-trap / Escape / scroll-lock via `useDialogChrome`. Below md, callers pick
- * BottomSheet instead (via `useIsBelowMd`), so this stays desktop-only by contract.
- */
 export default function Drawer({ title, subtitle, onClose, children }: DrawerProps) {
   const panelRef = useDialogChrome(onClose);
   const titleId = useId();
-  // Enter transition: mount off-screen right, then slide in on the next frame.
+  // Mounts off-screen right, then slides in on the next frame.
   const [entered, setEntered] = useState(false);
   useEffect(() => setEntered(true), []);
 
   return createPortal(
     <div
-      // Presentational scrim: mouse-down-to-close is a pointer convenience only —
-      // Escape (via useDialogChrome) is the keyboard-accessible close path.
+      // Mouse-down-to-close is a pointer convenience only; Escape covers keyboard users.
       role="presentation"
       className="fixed inset-0 z-50 flex justify-end bg-backdrop backdrop-blur-sm"
       onMouseDown={(e) => {

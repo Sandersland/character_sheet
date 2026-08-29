@@ -179,10 +179,7 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
       weapon: { damageModifier: 1, damageDiceFaces: 4 },
     });
 
-    // The divergence path (#1649 AC): the update patched `snapshot` JSON, not
-    // a per-item detail row — reload from a FRESH GET (not just the mutation's
-    // own echo) to prove the bumped field survives and its sibling
-    // (damageDiceFaces) wasn't clobbered by the JSON patch.
+    // The update patched `snapshot` JSON, not a per-item detail row — reload from a fresh GET to prove the bumped field survives without clobbering its sibling.
     const reloaded = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE.id}`);
     expect(reloaded.status).toBe(200);
     expect(reloaded.body.inventory[0]).toMatchObject({

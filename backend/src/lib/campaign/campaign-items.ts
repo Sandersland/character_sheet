@@ -24,9 +24,7 @@ import { ITEM_RARITY_KEYS } from "@/lib/srd/srd.js";
 
 import type { CampaignItemHolder } from "./campaign-item-award.js";
 
-// The 8 worn EquipSlot values gear may declare; MAIN_HAND/OFF_HAND/BODY are derived from detail data, never authored.
-// A genuine subset of EQUIP_SLOTS, not a mirror of it — which is why this one
-// stays local while the full tuples come from contracts.
+// WORN_SLOTS is a deliberate subset of EQUIP_SLOTS (MAIN_HAND/OFF_HAND/BODY are derived, never authored) — not a mirror, which is why it stays local instead of coming from contracts.
 const WORN_SLOTS = ["HEAD", "NECK", "CLOAK", "HANDS", "WRISTS", "BELT", "FEET", "RING"] as const;
 
 const currencySchema = z
@@ -76,9 +74,7 @@ const consumableInputSchema = z
   })
   .strict();
 
-// A DM-authored passiveBonus/activatedEffect capability (#545/#546/#543). passiveBonus
-// is an always-on modifier (dice nested, consumed at #526C); activatedEffect is a
-// toggled self-buff with a recharge (#543), reusing target/op/value for its inline buff.
+// activatedEffect reuses passiveBonus's target/op/value fields for its own buff instead of separate columns.
 const passiveBonusInputSchema = z
   .object({
     kind: z.enum(["passiveBonus", "activatedEffect"]),
@@ -96,7 +92,6 @@ const passiveBonusInputSchema = z
       })
       .strict()
       .optional(),
-    // activatedEffect payload (#543).
     activation: z.enum(["action", "bonus", "reaction", "commandWord"]).optional(),
     activatedDuration: z.enum(["whileActive", "untilRest"]).optional(),
     resourceKind: z.enum(["perRest", "perDay", "atWill"]).optional(),
@@ -110,13 +105,11 @@ const passiveBonusInputSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["activation"],
-        // Name the field in the message too: the route 400s with error.flatten(),
-        // which collapses the nested path (capabilities.N.activation) away.
+        // Name the field in the message too: the route 400s with error.flatten(), which drops the nested path.
         message: "activation is required when kind is activatedEffect",
       });
     }
-    // applyActivate seeds an ADDITIVE buff (modifier: value) and does not honor setTo,
-    // so reject a non-add op at the authoring boundary rather than silently misapplying.
+    // applyActivate only supports an additive buff (ignores setTo), so reject a non-add op here rather than silently misapplying it.
     if (val.kind === "activatedEffect" && val.op !== undefined && val.op !== "add") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -126,9 +119,6 @@ const passiveBonusInputSchema = z
     }
   });
 
-// A DM-authored castSpell capability (#528): the item casts a catalog spell from
-// its own resource. wielder DC/attack is only meaningful for a spellcaster-
-// intended item, so it's rejected unless the item requires spellcaster attunement.
 const castSpellInputSchema = z
   .object({
     kind: z.literal("castSpell"),
@@ -138,7 +128,6 @@ const castSpellInputSchema = z
     castLevel: z.number().int().min(0).max(9),
     resource: z.enum(CAST_RESOURCES),
     uses: z.number().int().positive().optional(),
-    // Pool charges per cast (#555), meaningful only when resource is "charges".
     chargeCost: z.number().int().positive().optional(),
     concentration: z.boolean().optional(),
     dcMode: z.enum(CAST_STAT_MODES),
@@ -149,9 +138,6 @@ const castSpellInputSchema = z
   })
   .strict();
 
-// A DM-authored charges pool (#555): the item's shared charge reservoir that
-// castSpell/activatedEffect capabilities with a `charges` resource spend from.
-// At most one per item (enforced on the capabilities array below).
 const chargesInputSchema = z
   .object({
     kind: z.literal("charges"),
@@ -167,9 +153,6 @@ const chargesInputSchema = z
   })
   .strict();
 
-// A DM-authored grant capability (#529): resistance/immunity/conditionImmunity/
-// advantage/proficiency conferred while the item is active. grantValue is the
-// damage-type/condition/skill/ability/name; grantOn is advantage-only.
 const grantInputSchema = z
   .object({
     kind: z.literal("grant"),
@@ -189,9 +172,7 @@ const capabilityInputSchema = z.discriminatedUnion("kind", [
   chargesInputSchema,
 ]);
 
-// Item-level charges-pool rules (#555): at most ONE pool per item (the spend path
-// resolves "the item's pool" implicitly), and a charges-costed castSpell needs a
-// pool to spend from. Runs on the capabilities array so create + update share it.
+// At most one charges pool per item: the spend path elsewhere resolves "the item's pool" implicitly, assuming there's only one.
 function refineChargesPool(caps: z.infer<typeof capabilityInputSchema>[], ctx: z.RefinementCtx) {
   const pools = caps.filter((c) => c.kind === "charges");
   if (pools.length > 1) {
@@ -200,9 +181,7 @@ function refineChargesPool(caps: z.infer<typeof capabilityInputSchema>[], ctx: z
       message: "an item can have at most one charges pool",
     });
   }
-  // NOTE: only castSpell is checked — the activatedEffect schema doesn't accept
-  // resourceKind "charges" yet (see the enum above). When activatedEffect
-  // charges-authoring lands, extend this poolless check to cover it too.
+  // Only castSpell is checked here — activatedEffect's schema doesn't accept resourceKind "charges" yet; extend this when it does.
   if (pools.length === 0 && caps.some((c) => c.kind === "castSpell" && c.resource === "charges")) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -230,13 +209,11 @@ const baseFields = {
   capabilities: z.array(capabilityInputSchema).superRefine(refineChargesPool).optional(),
 };
 
-// Nullish default as a call, not a `??` operator — keeps each per-kind column
-// builder's field defaulting out of its branch count.
+// A function call instead of inline `??` keeps each per-kind column builder's branch count down.
 function orElse<T>(value: T | null | undefined, fallback: T): T {
   return value ?? fallback;
 }
 
-// The three flat dice columns a passiveBonus/activatedEffect input maps to.
 function diceColumns(dice?: { count: number; faces: number; damageType?: string }) {
   return {
     valueDiceCount: orElse(dice?.count, null),
@@ -245,7 +222,6 @@ function diceColumns(dice?: { count: number; faces: number; damageType?: string 
   };
 }
 
-// Per-kind builders mapping a capability input onto the flat side-table columns.
 function castSpellColumns(cap: z.infer<typeof castSpellInputSchema>) {
   return {
     kind: cap.kind,
@@ -289,7 +265,6 @@ function grantColumns(cap: z.infer<typeof grantInputSchema>) {
   };
 }
 
-// passiveBonus + activatedEffect share the flat target/op/value + activation columns.
 function passiveColumns(cap: z.infer<typeof passiveBonusInputSchema>) {
   return {
     kind: cap.kind,
@@ -309,7 +284,6 @@ function passiveColumns(cap: z.infer<typeof passiveBonusInputSchema>) {
   };
 }
 
-// Map a capability input onto the flat side-table columns.
 export function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
   switch (cap.kind) {
     case "castSpell":
@@ -324,8 +298,7 @@ export function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
   }
 }
 
-// Reject a wielder-mode castSpell on an item not intended for a spellcaster —
-// wielder DC/attack resolves to the holder's spell stats, meaningless otherwise (#528).
+// wielder DC/attack resolves to the holder's own spell stats, which is meaningless unless the item requires spellcaster attunement.
 export function assertWielderModeAllowed(data: {
   attunementPrereqKind?: string | null;
   capabilities?: z.infer<typeof capabilityInputSchema>[];
@@ -339,8 +312,7 @@ export function assertWielderModeAllowed(data: {
   return null;
 }
 
-// A worn slot only makes sense on gear (weapons/armor derive their slot from detail data).
-// Name the field: the route 400s with error.flatten(), which needs a field key.
+// weapons/armor derive their own slot from detail data, so an authored slot only makes sense on gear.
 function refineSlotCategory(val: { category?: string; slot?: string | null }, ctx: z.RefinementCtx) {
   if (val.slot != null && val.category !== undefined && val.category !== "gear") {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["slot"], message: "slot is only valid on a gear item" });
@@ -354,7 +326,6 @@ export const awardSchema = z
   .object({
     characterId: z.string().min(1),
     quantity: z.number().int().positive().optional(),
-    // Thread the loot event onto a live session (#382); validated in the lib.
     sessionId: z.string().min(1).optional(),
   })
   .strict();
@@ -370,7 +341,7 @@ export const itemInclude = {
 
 type ItemWithDetails = Prisma.ItemGetPayload<{ include: typeof itemInclude }>;
 
-// The scalar columns, null → undefined so unset fields vanish from the wire.
+// null → undefined so unset scalar fields vanish from the wire instead of serializing as null.
 function serializeItemBase(row: ItemWithDetails) {
   return {
     id: row.id,
@@ -389,7 +360,7 @@ function serializeItemBase(row: ItemWithDetails) {
   };
 }
 
-// The per-category detail blocks — at most one is present, keyed by category.
+// At most one detail block is present, keyed by category.
 function serializeItemDetails(row: ItemWithDetails) {
   return {
     weapon: row.weaponDetail ? serializeWeaponDetail(row.weaponDetail) : undefined,
@@ -398,12 +369,7 @@ function serializeItemDetails(row: ItemWithDetails) {
   };
 }
 
-// Serialize for the wire. dmNotes is included ONLY when includeDmNotes is true —
-// the single guard behind "dmNotes never reaches a player-facing payload". Since
-// #1646 the column lives on Item alongside seeded catalog rows, so nothing about
-// the TABLE makes it private any more — this flag is the whole protection.
-// holders (derived from live InventoryItem rows) is player-safe: just who holds
-// how many, so it appears on both the owner list and the revealed Codex card.
+// includeDmNotes is the ONLY guard against dmNotes reaching a player payload — the table itself no longer makes it private.
 export function serializeCampaignItem(
   row: ItemWithDetails,
   includeDmNotes: boolean,
@@ -422,7 +388,6 @@ export function serializeCampaignItem(
   };
 }
 
-// Build the nested detail-create block matching the item's category.
 export function detailCreate(data: z.infer<typeof createItemSchema>) {
   if (data.category === "weapon" && data.weapon) {
     return { weaponDetail: { create: data.weapon } };
@@ -436,13 +401,10 @@ export function detailCreate(data: z.infer<typeof createItemSchema>) {
   return {};
 }
 
-// The base columns a create persists, with the same defaults create always used.
-// orElse (not ??) for the same reason as the capability column builders above.
 export function createItemColumns(campaignId: string, data: z.infer<typeof createItemSchema>) {
   return {
     campaignId,
-    // The scope triple is written together because Item_scope_key_agreement_check
-    // rejects any row where they disagree (#1645).
+    // scope/scopeKey are written together: Item_scope_key_agreement_check rejects a row where they disagree.
     scope: "CAMPAIGN" as const,
     scopeKey: `campaign:${campaignId}`,
     name: data.name,
@@ -460,8 +422,7 @@ export function createItemColumns(campaignId: string, data: z.infer<typeof creat
   };
 }
 
-// Pick only the keys a PATCH actually sent — an undefined key must stay ABSENT
-// from the Prisma update input so the column is left untouched.
+// A key must stay ABSENT (not present as undefined) from the Prisma update input, or the column gets touched.
 export function pickDefined<T extends object, K extends keyof T>(data: T, keys: K[]): Partial<Pick<T, K>> {
   const out: Partial<Pick<T, K>> = {};
   for (const key of keys) {
@@ -470,15 +431,13 @@ export function pickDefined<T extends object, K extends keyof T>(data: T, keys: 
   return out;
 }
 
-// Clear a stale slot when the item leaves gear; else persist an explicit slot send.
 export function slotUpdate(data: z.infer<typeof updateItemSchema>) {
   if (data.category !== undefined && data.category !== "gear") return { slot: null };
   if (data.slot !== undefined) return { slot: data.slot };
   return {};
 }
 
-// The per-category detail upserts a PATCH may carry (create-or-update — a
-// detail block may be patched onto an item created without one).
+// upsert, not update: a detail block may be patched onto an item that was created without one.
 export function detailUpsert(data: z.infer<typeof updateItemSchema>) {
   return {
     ...(data.weapon !== undefined ? { weaponDetail: { upsert: { create: data.weapon, update: data.weapon } } } : {}),

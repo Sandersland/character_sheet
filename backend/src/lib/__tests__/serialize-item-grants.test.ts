@@ -82,7 +82,6 @@ describe("serialize derives item grants (#529)", () => {
     expect(view.grantedAdvantages).toEqual([
       { on: "initiative", cantBeSurprised: true, source: "Ring of Fire Resistance" },
     ]);
-    // Item skill proficiency flips the derived proficient flag (affects modifier).
     expect(view.skills.find((s) => s.name === "perception")?.proficient).toBe(true);
   });
 
@@ -110,7 +109,6 @@ describe("serialize derives item grants (#529)", () => {
       }),
     });
     const view = await serialize(characterId);
-    // Rogue lacks Greataxes, so the item grant surfaces with source "item".
     expect(view.weaponProficiencies.some((w) => w.name === "Greataxes" && w.source === "item")).toBe(true);
     expect(view.grantedProficiencies).toContainEqual({ profType: "weapon", value: "Greataxes", source: "Greataxe of Training" });
   });

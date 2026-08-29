@@ -8,13 +8,9 @@ interface ItemDetailControlsProps {
   pending: boolean;
   atCap: boolean;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
-  // Bundled (#1854) — see WeaponBondProps' own comment.
   bond: WeaponBondProps;
 }
 
-// The reused per-item action pills inside the detail sheet (#1029): equip,
-// use, attune, bond (InventoryRowControls — the row's own pill cluster) plus
-// activate, which the row renders outside its pill cluster instead.
 export default function ItemDetailControls({ item, pending, atCap, onSubmit, bond }: ItemDetailControlsProps) {
   const hasControls =
     item.equippable ||

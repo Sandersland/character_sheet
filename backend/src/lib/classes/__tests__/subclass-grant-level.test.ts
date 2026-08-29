@@ -1,9 +1,6 @@
-// 2024 rules: every class chooses its subclass at level 3 (#1128) — no subclass
-// feature or pool derives below level 3 under EDITION_2024, regardless of the
-// class-definition grantLevel table's (2014-scoped, #1291) content: isSubclassActive
-// resolves through subclassActiveAt, which hardcodes 3 for 2024. The cross-source
-// invariant that grantLevel matches the seed catalog's 2014 value lives with the
-// seed structural checks (seed-data.test.ts), which can import the seed catalog.
+// PHB'24: every class chooses its subclass at level 3 — isSubclassActive
+// resolves through subclassActiveAt, which hardcodes 3 for EDITION_2024
+// regardless of the seeded subclassLevel (2014-scoped).
 import { describe, it, expect } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -20,15 +17,10 @@ function subclassFeatures(className: string, subclass: string, level: number, ed
   return (info?.features ?? []).filter((f) => f.source === "subclass");
 }
 
-// Ten of the twelve non-3 `grantLevel` subclasses (#1546 Part A's verified
-// list) whose 2014 gate moved to 3 under 2024 — everything else the list names,
-// not a representative sample, since Part A's registration change touches every
-// class's subclass lookup and this is the surface it must leave unchanged.
-// The Archfey and The Great Old One are the two exclusions (#1595): #1233
-// authored them zero EDITION_2024 rows (no licensed source could verify their
-// PHB'24 reworks), so there is no 2024 gate for them to have moved to and
-// assertEverySubclassEditionPopulated stops a 2024 character picking either.
-// Their 2014 gate of 1 is asserted by GATE_1 below.
+// The Archfey and The Great Old One are excluded: they have zero
+// EDITION_2024 rows (no licensed source to verify their PHB'24 rework), so
+// there's no 2024 gate for them to have moved to. Their 2014 gate of 1 is
+// asserted by GATE_1 below.
 const MOVED: Array<[string, string]> = [
   ["cleric", "life domain"],
   ["cleric", "trickery domain"],
@@ -51,16 +43,9 @@ describe("subclass grant level is 3 for all classes (#1128)", () => {
     expect(subclassFeatures(className, subclass, 3).length).toBeGreaterThan(0);
   });
 
-  // The only place in the repo asserting the gate suppresses `.resources` pools
-  // and not just `.features`. Wild Magic carries it since #1595 retired the
-  // Archfey pool case (that patron has no EDITION_2024 rows to gate at all);
-  // it is the same "gate moved" shape — Wild Magic opens at level 1 under 2014
-  // (PHB'14 p. 99) and at 3 under 2024, where the `Tides of Chaos` row itself
-  // sits (PHB'24 p. 149). Written as an edition CONTRAST on one pool key rather
-  // than the 2024 half alone: no real PHB'24 subclass row exists below level 3,
-  // so the 2024 half cannot on its own separate the subclass gate from the
-  // row's own level gate, and asserting it that way would read as a stronger
-  // claim than the data supports.
+  // The only check in this suite that the gate suppresses `.resources` pools,
+  // not just `.features`. Wild Magic opens at level 1 under 2014 (PHB'14
+  // p.99) and level 3 under 2024, where the Tides of Chaos row sits (PHB'24 p.149).
   it("Wild Magic's tidesOfChaos pool tracks the subclass gate, which differs by edition", () => {
     const at = (level: number, edition: RulesEdition) =>
       deriveResources("sorcerer", "wild magic", level, ABILITIES, proficiencyBonusForLevel(level), testFeatureRowsFor("sorcerer", "wild magic"), edition)
@@ -72,12 +57,9 @@ describe("subclass grant level is 3 for all classes (#1128)", () => {
     expect(at(3, "EDITION_2024")).toBe(true);
   });
 
-  // The lowest domain/patron spell tier now grants at level 3, so no cleric or
-  // warlock subclass feature description may still label it "(L1)" (#1128).
-  // Intrinsically a 2024-only rule, so The Archfey/The Great Old One are out
-  // (#1595): with zero EDITION_2024 rows the filter inspects nothing and the
-  // case passes vacuously, while their 2014 text legitimately writes SPELL
-  // levels as "(1st)"/"(2nd)".
+  // The lowest domain/patron spell tier grants at level 3 in 2024, so no
+  // feature description may still label it "(L1)". The Archfey/The Great Old
+  // One are excluded — zero EDITION_2024 rows to inspect.
   const L1_LABEL_SUBCLASSES: Array<[string, string]> = [
     ["cleric", "life domain"],
     ["cleric", "trickery domain"],
@@ -90,19 +72,9 @@ describe("subclass grant level is 3 for all classes (#1128)", () => {
   });
 });
 
-// #1291: under EDITION_2014, isSubclassActive resolves grantLevel through the
-// SAME subclassActiveAt gate buildClassesView uses — Cleric/Sorcerer/Warlock
-// open at 1, Druid/Wizard at 2 (PHB'14), the opposite of the 2024 table above.
-// Pins deriveResources agreeing with buildClassesView's per-class gate (the
-// live bug: they used to disagree the moment #1308 seeded real 2014 values).
-// #1546 Part A: the full twelve non-3 `grantLevel` subclasses (the arbiter's
-// verified list — everything else gates at 3, including all three Fighter
-// subclasses via their identity-only SUBCLASS_IDENTITY entry, #1546). Part A's
-// registration change is behaviour-preserving by construction (the TS overlay
-// always wins for a class still on the migration path), so these twelve stay
-// exactly as gated as before — this is the exhaustive version of the
-// GATE_1/GATE_2 spot-checks below, closing the gap between "5 representative
-// subclasses" and "all twelve the issue names".
+// PHB'14: Cleric/Sorcerer/Warlock open at 1, Druid/Wizard at 2 — the opposite
+// of the 2024 table above. Pins deriveResources agreeing with
+// buildClassesView's per-class gate.
 describe("subclass grant level is edition-aware for 2014 (#1291) — full twelve", () => {
   const GATE_1: Array<[string, string]> = [
     ["cleric", "life domain"],

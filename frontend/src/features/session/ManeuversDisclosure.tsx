@@ -1,9 +1,3 @@
-// Battle Master maneuvers behind a single 44px disclosure row (#811): the
-// Precision/damage ManeuverPrompt halves and the attackOption rows (Commander's
-// Strike) collapse when unused so the step card keeps its vertical room.
-// Collapsed row reads "Battle Master maneuvers · d8 × 4"; expanding mounts the
-// same components the two old cards hosted (#809 hosting rules unchanged).
-
 import { useState } from "react";
 
 import AttackOptionSection from "@/features/session/AttackOptionSection";
@@ -14,7 +8,6 @@ import type { TurnState, TurnStateActions } from "@/features/session/useTurnStat
 
 interface ManeuversDisclosureProps {
   turnState: TurnState & TurnStateActions;
-  /** The bound (last-rolled) form's view — the prompts read its roll state. */
   view: AttackEntryView | null;
   attacksExhausted: boolean;
   die: UseManeuverDieReturn;

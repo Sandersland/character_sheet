@@ -29,14 +29,12 @@ describe("useCampaignMerges", () => {
     fetchEntityMerges.mockReset();
   });
 
-  // Pin (green-first): no campaignId.
   it("no campaignId -> [], fetchEntityMerges never called", () => {
     const { result } = renderHook(() => useCampaignMerges(null));
     expect(result.current.merges).toEqual([]);
     expect(fetchEntityMerges).not.toHaveBeenCalled();
   });
 
-  // Pin (green-first): success -> list.
   it("success -> the fetched list", async () => {
     const list = [merge({ id: "m1" })];
     fetchEntityMerges.mockResolvedValue(list);
@@ -44,7 +42,8 @@ describe("useCampaignMerges", () => {
     await waitFor(() => expect(result.current.merges).toEqual(list));
   });
 
-  // Pin (green-first): the fanout the reveal banner / Manage tab depend on.
+  // primeCampaignMerges must reach an already-mounted consumer (reveal
+  // banner, Manage tab).
   it("a primeCampaignMerges call is seen by an already-mounted consumer", async () => {
     fetchEntityMerges.mockResolvedValue([]);
     const { result } = renderHook(() => useCampaignMerges("camp-1"));
@@ -56,8 +55,8 @@ describe("useCampaignMerges", () => {
     await waitFor(() => expect(result.current.merges).toEqual(created));
   });
 
-  // RED: same identity-churn class as useCampaignEntities — pins the module-level
-  // NONE constant.
+  // Pins the module-level NONE constant (same identity-churn class as
+  // useCampaignEntities).
   it("merges keeps the same identity across re-renders when nothing changed", () => {
     const { result, rerender } = renderHook(() => useCampaignMerges(null));
     const before = result.current.merges;
@@ -65,7 +64,7 @@ describe("useCampaignMerges", () => {
     expect(result.current.merges).toBe(before);
   });
 
-  // Pin (green-first): two consumers mounting together share one request.
+  // Two consumers mounting together share one request (TanStack Query dedupe).
   it("two consumers mounting together issue one fetchEntityMerges call", async () => {
     fetchEntityMerges.mockResolvedValue([]);
     const first = renderHook(() => useCampaignMerges("camp-1"));

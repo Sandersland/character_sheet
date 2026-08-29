@@ -93,8 +93,6 @@ describe("SpellPicker", () => {
     expect(screen.getByText(/No spells match/)).toBeInTheDocument();
   });
 
-  // #1826: a search that filters a NON-empty eligible pool to zero must keep
-  // reading as an ordinary search miss — never the misconfiguration copy below.
   it("keeps the ordinary search-miss copy distinct from the empty-eligible-pool copy", async () => {
     render(<SpellPicker groups={groups({})} />);
     await userEvent.type(screen.getByRole("searchbox"), "zzz");
@@ -102,9 +100,6 @@ describe("SpellPicker", () => {
     expect(screen.queryByText(/configuration problem/i)).not.toBeInTheDocument();
   });
 
-  // #1826: an EMPTY eligible pool (every group's `options` is empty — a
-  // resolver bug, not a search) must render visibly different copy than a
-  // search miss, with no search text typed at all.
   it("shows a distinct misconfiguration message when every group's eligible pool is empty", () => {
     render(
       <SpellPicker

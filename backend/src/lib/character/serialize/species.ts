@@ -1,16 +1,7 @@
-// Species-granted trait view + improvements layer (#1682) — mirrors #1691's
-// ClassFeature improvements layer (buildResourcesView's classFeatureImprovements
-// + applyFeatLayer's merge, serialize/classes.ts) but sourced from
-// CharacterRace's species/variant selection (#1679) instead of a class
-// entry's feature rows. Reuses the SAME deriveImprovementBonuses/
-// deriveImprovementProficiencies evaluator (lib/srd/feats.ts) through
-// applyFeatLayer's existing merge point — no second helper (class-feature-
-// rows.ts's improvementsFromRows JSDoc anticipates exactly this reuse).
 import type { FeatImprovement } from "@/lib/classes/resources-state.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import { buildSpeciesGrantedSpellSource, type GrantedSpellSource } from "@/lib/spellcasting/granted-spells.js";
 
-/** The species-granted sheet section's own row shape (#1682) — cited text only. */
 export interface SpeciesTraitView {
   name: string;
   description: string;
@@ -23,28 +14,7 @@ interface SpeciesTraitRow {
   improvements: FeatImprovement[] | null;
 }
 
-/**
- * Active trait rows for the character's OWN species/variant selection: every
- * species-level row (variantId: null) plus the picked variant's own rows.
- * `species.traits` is the Species -> SpeciesTrait back-relation, which
- * returns EVERY trait FK'd to this speciesId regardless of variantId (plain
- * Prisma relation semantics) — the `variantId === null` filter below is what
- * narrows it to "this species' OWN traits", not "every trait any of its
- * variants have too". `variant.traits` needs no such filter: SpeciesVariant's
- * own back-relation is already scoped to that one variantId.
- *
- * Legacy `race`-name-only characters (speciesId/variantId both null, #1679's
- * additive migration — the species picker itself ships in #1680) resolve to
- * [] here: no species picked yet, not a bug. `characterInclude` loads
- * `raceSelection.species`/`.variant` unconditionally; Prisma resolves both to
- * null when the FK is null, so this never queries.
- *
- * `improvements` is cast once here (`as unknown as SpeciesTraitRow[]`),
- * mirroring featureRowsOf's identical cast of Prisma's opaque Json column to
- * the FeatImprovement[] shape validated at seed time
- * (speciesTraitSeedSchema, prisma/seed/species-traits-data.ts) — not
- * re-validated on every read.
- */
+// species.traits is Species's unfiltered back-relation (every trait FK'd to this speciesId, any variantId) — the variantId === null filter below narrows to this species' OWN traits. variant.traits needs no such filter (already scoped to one variantId). Legacy race-name-only characters (speciesId/variantId both null) resolve to [] here — no species picked yet, not a bug.
 function activeTraitRows(row: CharacterWithRelations): SpeciesTraitRow[] {
   const species = row.raceSelection?.species;
   if (!species) return [];
@@ -53,20 +23,7 @@ function activeTraitRows(row: CharacterWithRelations): SpeciesTraitRow[] {
   return [...speciesLevel, ...variantLevel];
 }
 
-/**
- * The species-granted sheet section (#1682) — a name + cited-text row per
- * active trait, and the flat FeatImprovement[] applyFeatLayer merges into its
- * combined-improvements list (serialize/classes.ts) ALONGSIDE
- * clampedAdvancements and classFeatureImprovements, through the ONE
- * deriveImprovementBonuses/deriveImprovementProficiencies evaluator. Dwarven
- * Toughness's maxHp-per-level bonus and Mountain Dwarf/Dwarf/Elf weapon-and-
- * armor training all resolve through that shared merge — this function only
- * collects the rows, never sums or dedupes them itself.
- *
- * `traits` carries text only (no rule arithmetic) — the frontend renders it
- * verbatim (CLAUDE.md: rules logic is backend-owned, the frontend never
- * originates a rule).
- */
+// This function only collects trait rows — applyFeatLayer sums/dedupes their improvements through the shared deriveImprovementBonuses/deriveImprovementProficiencies evaluator. traits carries description text only, rendered verbatim by the frontend — no rule arithmetic here.
 export function buildSpeciesTraitsView(row: CharacterWithRelations): {
   traits: SpeciesTraitView[];
   improvements: FeatImprovement[];
@@ -78,16 +35,7 @@ export function buildSpeciesTraitsView(row: CharacterWithRelations): {
   };
 }
 
-/**
- * The species/lineage GrantedSpellSource for THIS character (#1683) — the
- * `characterInclude`-shaped adapter feeding buildSpeciesGrantedSpellSource
- * (granted-spells.ts), which stays the one shared function subclass grants
- * also resolve through (sourceKind "species"). `raceSelection.species` is the
- * back-relation, unfiltered by variant (same activeTraitRows gotcha); the
- * function itself narrows to species-level + the picked variant.
- * `raceSelection.castingAbility` is the #1683 creation-time snapshot — read
- * straight off the row (a scalar column, needs no include).
- */
+// Feeds buildSpeciesGrantedSpellSource — the SAME shared function subclass grants also resolve through.
 export function buildSpeciesGrantedSpellSourceFor(row: CharacterWithRelations): GrantedSpellSource | null {
   const { species, variant, castingAbility } = row.raceSelection ?? {};
   if (!species) return null;

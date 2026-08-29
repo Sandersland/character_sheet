@@ -3,14 +3,7 @@ import { describe, it, expect } from "vitest";
 import { deriveAttacksPerAction } from "@/lib/srd/srd.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 
-// Pure unit test — no database — for #1530's row-driven deriveAttacksPerAction.
-// EXTRA_ATTACK_TIERS (a TS Record keyed by class name) is retired; these rows
-// mirror what the seed actually authors (fighter-features.ts, barbarian.ts,
-// monk.ts, paladin.ts, ranger.ts, bard.ts's COLLEGE_OF_VALOR_FEATURES) closely
-// enough to pin the SHAPE (ascending tiers, one row carrying all of Fighter's
-// three), but are synthetic fixtures, not a read of the real seed — see
-// extra-attack-seeded.test.ts (lib/classes/__tests__/) for the DB-backed
-// proof that the actual seeded rows carry these values.
+// Synthetic fixtures pin the row SHAPE (#1530), not a read of the real seed.
 function attacksRow(
   level: number,
   tiers: { minLevel: number; value: number }[],
@@ -32,9 +25,7 @@ const FIGHTER_TIERS = [
   { minLevel: 20, value: 4 },
 ];
 
-// Both editions' rows, byte-identical tiers — mirrors fighter-features.ts:
-// the rule is edition-invariant even though 2024 decomposes the L11/L20
-// tiers into their own (text-only, no derivedStat) named features.
+// Byte-identical tiers both editions — edition-invariant even though 2024 decomposes L11/L20 into separate named features.
 function fighterRows(): ClassFeatureRow[] {
   return [attacksRow(5, FIGHTER_TIERS, "EDITION_2014"), attacksRow(5, FIGHTER_TIERS, "EDITION_2024")];
 }
@@ -102,9 +93,7 @@ describe("deriveAttacksPerAction — multiclass takes the max (never summed)", (
     expect(attacks([entry(20), entry(20)])).toBe(1);
   });
 
-  // Below the row's OWN grant level, that entry contributes nothing — mirrors
-  // a multiclass character whose levels in one class haven't reached the
-  // feature yet, per entry (never total character level).
+  // Below the row's OWN grant level, that entry contributes nothing — per entry, never total character level.
   it("Fighter 4 / class-with-L5-tier 5 multiclass → 2", () => {
     expect(attacks([entry(4, fighterRows()), entry(5, singleTierRows(5))])).toBe(2);
   });
@@ -122,31 +111,18 @@ describe("deriveAttacksPerAction — College of Valor bard (subclass row, no nam
     expect(attacks([entry(20, [], [])])).toBe(1);
   });
 
-  // #1277/#1339: attacksForClass's Valor check used to substring-match on
-  // "valor" (or fall back to an exact-name lookup), so a homebrew subclass
-  // could inherit Extra Attack it never earned. A row is keyed by subclassId
-  // (the FK, resolved at SEED time), so a homebrew entry — whatever its name
-  // — simply never has this row in its subclassRows carrier. Unrepresentable
-  // rather than guarded: there is no substring or exact-name check left to
-  // get wrong at this call site.
+  // Rows are keyed by subclassId (FK, resolved at seed time) — a homebrew subclass never gets this row regardless of its name (#1277/#1339).
   it('a homebrew subclass whose name merely CONTAINS "Valor" has no matching row → 1 attack', () => {
     expect(attacks([entry(10, [], [])])).toBe(1);
   });
 
-  // [arbiter]: a homebrew subclass named EXACTLY "College of Valor" but with
-  // subclassId: null also gets 1 — a behaviour change from the pre-#1530
-  // resolveSubclassSlug exact-name fallback, and the intended #1277/#1524
-  // semantics (an FK-null entry's subclassRef.features is empty, so it
-  // already shows no subclass features at all elsewhere on the sheet).
+  // FK-null entry's subclassRef.features is empty, so no subclass features anywhere (#1277/#1524).
   it('a homebrew subclass named EXACTLY "College of Valor" with no FK also gets 1 attack', () => {
     expect(attacks([entry(10, [], [])])).toBe(1);
   });
 });
 
-// Mutation proof (#1530 AC): corrupting an authored tier value must be
-// visible here as a wrong RESULT, not merely a passing test — demonstrates
-// the assertions above are actually sensitive to the tier value, not just to
-// row presence.
+// Mutation proof: a corrupted tier value must change the result, not just pass (#1530).
 describe("deriveAttacksPerAction — mutation sensitivity", () => {
   it("a corrupted tier value changes the derived result", () => {
     const corrupted = [attacksRow(5, [{ minLevel: 5, value: 99 }], "EDITION_2024")];

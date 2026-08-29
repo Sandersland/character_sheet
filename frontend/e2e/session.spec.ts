@@ -4,7 +4,6 @@ import { login } from "./helpers/auth";
 import { enterLiveCombat, startCombatAndTurn } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
-// #962: the legacy /session route redirects to the sheet's Combat tab (bookmarks).
 test("session: /characters/:id/session redirects to the Combat tab", async ({ page }) => {
   await login(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
@@ -14,12 +13,6 @@ test("session: /characters/:id/session redirects to the Combat tab", async ({ pa
   await expect(page).toHaveURL(/[?&]tab=combat/);
 });
 
-// Uses the Session Fighter roster persona (seeded with its own campaign so a
-// live session can be started/resumed here). The session button resolves to
-// Start/Resume/Join depending on leftover state — any of them lands on /session.
-// #963: the doorway lands on the Combat tab in-workspace (?tab=combat), where
-// the live turn tracker runs. The session log is an on-demand overlay now (#1086,
-// see the dedicated test below), not a persistent rail.
 test("session: start combat and take an action from the Combat tab", async ({ page }) => {
   await login(page);
 
@@ -30,7 +23,6 @@ test("session: start combat and take an action from the Combat tab", async ({ pa
 
   await startCombatAndTurn(page);
 
-  // Action economy shows the action available, then consumed after Dodge.
   await expect(page.getByRole("button", { name: "Use Action" })).toBeVisible();
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Dodge" }).click();
@@ -39,10 +31,6 @@ test("session: start combat and take an action from the Combat tab", async ({ pa
   expect(errors).toEqual([]);
 });
 
-// #1086: the #964 three-column live view is gone — no abilities/skills rail, no
-// persistent session-log rail. The log is a one-line row that opens an on-demand
-// overlay (a right-side Drawer on desktop). A roll made from the turn tracker
-// must land in that log without any tab switch.
 test("session: desktop live Combat has no rails; a roll lands in the on-demand log overlay", async ({ page }) => {
   await login(page);
 
@@ -51,42 +39,32 @@ test("session: desktop live Combat has no rails; a roll lands in the on-demand l
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  // The old rails are gone (#1086).
   await expect(
     page.getByRole("complementary", { name: /Ability checks, saves, and skills/i }),
   ).toHaveCount(0);
   await expect(page.getByRole("complementary", { name: /Session log/i })).toHaveCount(0);
 
-  // The persistent banner shows the live state; the Combat tab carries the pip.
   await expect(page.getByRole("tab", { name: /Combat \(session live\)/i })).toBeVisible();
 
-  // Start combat + roll an attack from the turn tracker.
   await startCombatAndTurn(page);
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Attack", exact: true }).click();
   const attackSheet = page.getByRole("dialog");
   await attackSheet.getByRole("button", { name: /Roll to hit/ }).first().click();
-  // The rail (#1831) requires the swing fully resolved before "Done" appears —
-  // an implicit hit needs its damage rolled; a die-locked miss needs nothing
-  // more (DamageStepContent hides the Roll-damage button on a called miss).
+  // DamageStepContent hides Roll-damage on a die-locked miss, so only an
+  // implicit hit needs this click.
   const damage = attackSheet.getByRole("button", { name: /Roll (crit )?damage/ });
   if (await damage.count()) await damage.click();
   const done = attackSheet.getByRole("button", { name: /^Done$/ });
-  // Two-step dismiss (#1832 review): the rail's own "Done" commits the swing
-  // but doesn't close the sheet — Session Fighter has one attack per action,
-  // so once it's spent AttackSheetFooter's button relabels from "Close" to
-  // "Done" (same onClose handler, just a conditional label) and a second tap
-  // on the re-resolved locator hits that footer button, which actually closes
-  // the dialog. BottomSheet renders `role="dialog"` on both breakpoints (its
-  // own header comment: desktop just gets the centered-dialog treatment), so
-  // this holds here exactly as it does on mobile.
+  // ResolutionRail's "Done" commits the swing without closing the sheet;
+  // AttackSheetFooter then relabels its own close button to "Done" too (same
+  // handler, same accessible name) — this second click is that one.
+  // BottomSheet renders role="dialog" on both breakpoints, so this holds here
+  // exactly as it does on mobile.
   await done.click();
   await done.click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // Open the on-demand log overlay (a right Drawer) — the attack roll landed in it
-  // without any tab switch. Matched on the chat-feed sentence — one consolidated
-  // resolveAction row per swing (#1830) — rather than a bare type label.
   await page.getByRole("button", { name: /open session log/i }).click();
   const logDrawer = page.getByRole("dialog", { name: "Session Log" });
   await expect(logDrawer.getByText(/hit for |missed|critical hit/).first()).toBeVisible();
@@ -94,8 +72,6 @@ test("session: desktop live Combat has no rails; a roll lands in the on-demand l
   expect(errors).toEqual([]);
 });
 
-// #765: opening the item picker and closing it without using anything must not
-// spend the Action — the slot commits only on use.
 test("session: opening Use-an-item then closing leaves the action available", async ({ page }) => {
   await login(page);
 
@@ -113,17 +89,12 @@ test("session: opening Use-an-item then closing leaves the action available", as
   await expect(sheet.getByText(/Nothing is spent until you use an item/)).toBeVisible();
   await sheet.getByRole("button", { name: "Close" }).click();
 
-  // Action untouched — no commit, no undo affordance.
   await expect(page.getByRole("button", { name: "Use Action" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Undo/ })).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });
 
-// #958: the global docked NORMAL/ADV/DIS footer is retired — roll mode rides
-// the roll surface now (long-press menu on skills/saves; a visible control on
-// the attack sheet). This asserts the footer is gone and the turn flow still
-// works without it.
 test("session: the global roll-mode footer is retired (mobile)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
@@ -133,11 +104,9 @@ test("session: the global roll-mode footer is retired (mobile)", async ({ page }
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
-  // No docked footer and no global "Roll mode" group anywhere.
   await expect(page.getByTestId("roll-mode-bar")).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Roll mode" })).toHaveCount(0);
 
-  // The turn flow is unaffected by the footer's removal.
   await startCombatAndTurn(page);
   await page.getByRole("button", { name: /Use Action/ }).click();
   await expect(page.getByRole("button", { name: "Dodge" })).toBeVisible();
@@ -145,10 +114,6 @@ test("session: the global roll-mode footer is retired (mobile)", async ({ page }
   expect(errors).toEqual([]);
 });
 
-// #956: rolling to hit inside the attack sheet surfaces the result SEAL on top
-// of the sheet — it is NEVER suppressed behind the scrim (inverting the old
-// #801 behavior: the seal owns a z tier above dialogs so an in-sheet roll is
-// always visible).
 test("session: the result seal shows over the open attack sheet (mobile)", async ({
   page,
 }) => {
@@ -169,19 +134,12 @@ test("session: the result seal shows over the open attack sheet (mobile)", async
 
   await sheet.getByRole("button", { name: "Roll to hit" }).click();
 
-  // The result seal appears on top of the open sheet — not suppressed (#956);
-  // the attack card still shows its own inline result too.
   await expect(seal).toBeVisible();
   await expect(sheet.getByText("=").first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });
 
-// #815: the mid-turn weapon change lives inside the Action sheet ("Change
-// weapons" card), no longer a slot-root row. The Session Fighter is Unarmed
-// (empty hands, empty bag), so this asserts the card opens the per-hand picker
-// cleanly; the gating/free-draw permutations are covered by the
-// InlineLoadoutPicker + loadoutPicker unit suites.
 test("session: Change weapons in the Action sheet opens the per-hand picker on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
@@ -193,15 +151,12 @@ test("session: Change weapons in the Action sheet opens the per-hand picker on m
 
   await startCombatAndTurn(page);
 
-  // There is no slot-root loadout row anymore.
   await expect(page.getByText(/Equipped ·/)).toHaveCount(0);
 
-  // Open the Action sheet, then the "Change weapons" card.
   await page.getByRole("button", { name: "Use Action" }).click();
   const actionSheet = page.getByRole("dialog");
   await actionSheet.getByRole("button", { name: "Change weapons" }).click();
 
-  // The picker is the per-hand card layout, not a flat candidate list.
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByText(/Now wielding/)).toBeVisible();
   await expect(sheet.getByText(/Main hand/)).toBeVisible();

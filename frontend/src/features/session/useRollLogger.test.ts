@@ -1,5 +1,3 @@
-// #1359: the dropped d20 face of an advantage/disadvantage roll must reach the
-// logged event as `droppedFaces`, alongside the existing kept-only `faces`.
 import { describe, it, expect, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 

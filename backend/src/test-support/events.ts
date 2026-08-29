@@ -9,16 +9,8 @@ export interface PinnedEvent {
   data: unknown;
 }
 
-/**
- * Test-only oracle for "the audit trail one transaction wrote", used to pin the
- * ability endpoints' events before and after the #1275 URL move — a pin captured
- * on the old URL that still passes on the new one is the byte-identity evidence.
- *
- * Events written inside one batch share a createdAt, so rows are sorted by their
- * serialized payload rather than by time: unstable ordering would make the pin
- * flaky without telling us anything about behaviour. Pass `types` only when the
- * test's own setup wrote unrelated events (e.g. learnManeuver before a cast).
- */
+// Events written inside one batch share a createdAt, so rows are sorted by their serialized payload rather than by time — unstable ordering would make the pin flaky.
+// Pass `types` only when the test's own setup wrote unrelated events (e.g. learnManeuver before a cast).
 export async function readPinnedEvents(characterId: string, types?: string[]): Promise<PinnedEvent[]> {
   const rows = await prisma.characterEvent.findMany({ where: { characterId } });
   return rows

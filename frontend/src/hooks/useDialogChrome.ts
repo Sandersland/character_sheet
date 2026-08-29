@@ -12,7 +12,6 @@ function emitDialogChange() {
   dialogListeners.forEach((listener) => listener());
 }
 
-/** True while any Modal/BottomSheet is mounted; subscribes to the shared count. */
 export function useAnyDialogOpen(): boolean {
   return useSyncExternalStore(
     (listener) => {
@@ -24,14 +23,6 @@ export function useAnyDialogOpen(): boolean {
   );
 }
 
-/**
- * Shared overlay behavior for the app's dialog surfaces — `Modal` (centered)
- * and `BottomSheet` (slide-up). On mount: focus the panel, lock body scroll.
- * While open: trap Tab within the panel and close on Escape. On unmount:
- * restore the previous scroll + focus. Returns a ref to attach to the panel
- * element. Extracted (#729) so the two surfaces share one implementation
- * instead of duplicating the focus-management block.
- */
 export function useDialogChrome(onClose: () => void) {
   const panelRef = useRef<HTMLDivElement>(null);
   // Keep the latest onClose in a ref so the effect below runs on mount/unmount

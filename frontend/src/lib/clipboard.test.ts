@@ -2,10 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { selectAndCopy, writeToClipboard } from "@/lib/clipboard";
 
-// jsdom defines neither navigator.clipboard nor document.execCommand, so the
-// insecure-context path is the DEFAULT here and the available-API cases are the
-// ones that need a stub. Never gate on window.isSecureContext: jsdom leaves it
-// undefined, so a check there passes for the wrong reason.
+// jsdom leaves window.isSecureContext undefined, so gating on it there passes for the wrong reason — never do that.
 function stubClipboard(value: unknown) {
   Object.defineProperty(window.navigator, "clipboard", { configurable: true, value });
 }

@@ -4,8 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { parseClassFilterOr400 } from "@/lib/http/parse-class-param.js";
 import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
 
-// A minimal res double capturing status + json, so the helpers can be exercised
-// without an Express app (verbatim from parse-body.test.ts's mockRes).
 function mockRes() {
   const res = {
     statusCode: 0,
@@ -33,8 +31,7 @@ describe("parseMaxSpellLevelOr400", () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  // The whole reason this is not a copy of parseAsiLevelOr400: cantrips are
-  // level 0, so 0 is in band and its `< 1` floor would have rejected them.
+  // 0 (cantrips) is in band; parseAsiLevelOr400's `< 1` floor would reject it.
   it("accepts 0 (cantrips) and the 9 ceiling", () => {
     expect(parseMaxSpellLevelOr400(reqWith({ maxLevel: "0" }), mockRes())).toEqual({ ok: true, maxLevel: 0 });
     expect(parseMaxSpellLevelOr400(reqWith({ maxLevel: "9" }), mockRes())).toEqual({ ok: true, maxLevel: 9 });
@@ -53,8 +50,7 @@ describe("parseMaxSpellLevelOr400", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  // `Number("")` is 0 and 0 is legal here, so a blank param must not be read as
-  // "cantrips only" — the one case parseAsiLevelOr400 gets for free.
+  // Number("") is 0, and 0 is legal here — a blank param must not be read as "cantrips only".
   it("400s a blank, non-integer, or repeated param instead of reading it as 0", () => {
     for (const maxLevel of ["", "   ", "abc", "1.5", ["1", "2"]]) {
       const res = mockRes();
@@ -71,8 +67,7 @@ describe("parseClassFilterOr400", () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  // SpellClass.className is stored lowercase, so the caller's casing must
-  // never reach the query — the client passes a display-cased name ("Warlock").
+  // SpellClass.className is stored lowercase; the client passes a display-cased name ("Warlock").
   it("lowercases and trims the class name", () => {
     expect(parseClassFilterOr400(reqWith({ class: "  Warlock " }), mockRes())).toEqual({
       ok: true,

@@ -39,10 +39,6 @@ function makeTurnState(bonusAttack: { total: number; used: number } | null) {
   } as unknown as TurnState & TurnStateActions;
 }
 
-// The off-hand row the server would serve for the dagger below. `damageModifier`
-// is the number the server already resolved (#1434) — this sheet does no
-// subtraction of its own, so a test about the Two-Weapon Fighting style states the
-// modifier the style would have preserved rather than taking the feat.
 function offHandDaggerRow(damageModifier: number): AttackRow {
   return attackRow({
     id: "off",
@@ -56,8 +52,6 @@ function offHandDaggerRow(damageModifier: number): AttackRow {
   });
 }
 
-// Two equipped light weapons: a main-hand Shortsword and an OFF_HAND dagger whose
-// damage snapshot carries STR +3 folded into damageModifier (abilityModifier: 3).
 function twoWeaponCharacter(
   overrides: Partial<Character> = {},
   offHand: AttackRow | null = offHandDaggerRow(0),
@@ -135,18 +129,11 @@ function renderPicker(
 describe("InlineOffHandPicker (#813 redesign, rewired onto the shared resolver #1845)", () => {
   it("renders the off-hand form with the '(off-hand)' tag and the ability mod dropped (no style)", () => {
     renderPicker(twoWeaponCharacter(), makeTurnState({ total: 1, used: 0 }));
-    // Named once in the stats summary and once in the rail's own "Roll to
-    // hit" step header (ResolutionRail's own `view.source`, #1831) — both are
-    // real, expected renders of the same swing.
     expect(screen.getAllByText("Dagger (off-hand)").length).toBeGreaterThan(0);
-    // STR +3 dropped → 1d6 piercing (no modifier shown).
     expect(screen.getByText(/1d6 piercing/)).toBeInTheDocument();
     expect(screen.queryByText(/1d6 \+ 3/)).not.toBeInTheDocument();
   });
 
-  // With the Two-Weapon Fighting style the SERVER keeps the ability mod on the
-  // off-hand row (deriveOffHandDamage); this sheet just has to label what it is
-  // served, so the fixture serves the un-reduced modifier rather than the feat.
   it("labels the full ability mod when the served off-hand row kept it (TWF style)", () => {
     const character = twoWeaponCharacter({}, offHandDaggerRow(3));
     renderPicker(character, makeTurnState({ total: 1, used: 0 }));
@@ -156,7 +143,6 @@ describe("InlineOffHandPicker (#813 redesign, rewired onto the shared resolver #
   it("uses the same rail shell as the main sheet (Roll to hit → Damage, one swing)", () => {
     renderPicker(twoWeaponCharacter(), makeTurnState({ total: 1, used: 0 }));
     expect(screen.getByRole("button", { name: /Roll to hit/ })).toBeInTheDocument();
-    // No "Attacking with" selector — a bonus swing always resolves one form.
     expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
   });
 
@@ -204,13 +190,6 @@ describe("InlineOffHandPicker (#813 redesign, rewired onto the shared resolver #
     expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
   });
 
-  // A single swing: once committed, ResolutionRail's own "Done" is gone
-  // (view.completed) and the footer's OWN "Done" is the only one left,
-  // Roll to hit disabled behind it — mirrors the pre-#1845 "bonusAttack
-  // cleared" terminal state, now reached via the real commit path rather
-  // than a synthetic already-null mount (turnState.bonusAttack going null
-  // server-side doesn't retroactively affect an already-mounted sheet; this
-  // hook's own local completedSwings counter is what the terminal UI reads).
   it("shows Done and disables Roll to hit once the swing has been committed", async () => {
     seedMid();
     const turnState = makeTurnState({ total: 1, used: 0 });
@@ -254,8 +233,6 @@ describe("InlineOffHandPicker (#813 redesign, rewired onto the shared resolver #
   });
 
   it("variant=unarmed ignores equipped weapons entirely, even with no off-hand weapon", () => {
-    // No served off-hand row, so variant=twf would hit the "No off-hand weapon
-    // equipped" branch — the unarmed row is always served, so this swing is not.
     const solo = twoWeaponCharacter({
       inventory: [
         {

@@ -109,7 +109,6 @@ describe("JournalPage", () => {
 
     expect(await screen.findByText("Part II — The Sunken Crypt")).toBeInTheDocument();
     expect(screen.getByText("Part I — Opening Moves")).toBeInTheDocument();
-    // Newest session is the default selection → its heading + prose show.
     expect(screen.getByRole("heading", { name: "The Vault Below" })).toBeInTheDocument();
     expect(screen.getByText("We found the vault.")).toBeInTheDocument();
   });
@@ -168,8 +167,8 @@ describe("JournalPage", () => {
       expect(client.updateSessionTitle).toHaveBeenCalledWith("camp-1", "s1", "New Name"),
     );
     expect(await screen.findByRole("heading", { name: "New Name" })).toBeInTheDocument();
-    // #1299 review: the rename is a query-cache write now, not a local splice —
-    // confirm the chronicle query itself carries the new title.
+    // The rename is a query-cache write, not local state — confirm the
+    // chronicle query itself carries the new title.
     const cached = getQueryClient().getQueryData<{ sessions: ChronicleSession[] }>(
       sessionKeys.chronicle("camp-1", "char-1"),
     );

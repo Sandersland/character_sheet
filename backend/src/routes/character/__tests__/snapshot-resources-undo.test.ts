@@ -1,15 +1,4 @@
-/**
- * Undo-correctness regression for the canonical snapshotResources() helper (#818).
- *
- * Before #818 the maneuvers/tool-prof reconcile snapshots were hand-built 4-key
- * objects that omitted advancements. Because the resources undo branch restores
- * before.resources WHOLESALE, undoing a maneuvers-reconcile event silently wiped
- * a Fighter's advancements (incl. the #1137 Fighting Style feat).
- *
- * This pins the fix: a Battle Master with an ASI AND a Fighting Style feat
- * advancement, leveled 7→6 (maneuvers trimmed 5→3, advancements kept), then
- * undone — both survive the round-trip.
- */
+
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -52,7 +41,6 @@ function fiveManeuvers() {
   ];
 }
 
-// One ASI (L4) + one Fighting Style feat (#1137) — both kept at level 6.
 function twoAdvancements() {
   return [
     { id: "adv-str", level: 4, kind: "asi" as const, abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 },
@@ -67,10 +55,7 @@ let bmSubclassId: string;
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   COOKIE = await authCookie(OWNER_ID);
-  // extraAsiLevels/fightingStyleFeatLevel (#1529): the ASI/fs-slot caps
-  // resolve via these columns through the class FK relation now, matching
-  // Fighter's real values so twoAdvancements()'s ASI + fs feat both survive
-  // the slot-cap clamp exactly as the old className-keyed lookup did.
+  // extraAsiLevels/fightingStyleFeatLevel (#1529) must match Fighter's real values, or the slot-cap clamp trims twoAdvancements()'s ASI + fs feat.
   const fighter = await prisma.characterClass.upsert({
     where: { name: FIGHTER_CATALOG_NAME },
     create: {
@@ -84,13 +69,12 @@ beforeAll(async () => {
   const bm = await upsertEditionRow(
     prisma.subclass,
     { classId: fighter.id, name: BM_SUBCLASS_NAME, edition: null },
-    // Distinct from the real seeded "fighter-battle-master" (#1277) — this
-    // test's Fighter class is its own throwaway row.
+    // Distinct from the real seeded "fighter-battle-master" (#1277) — this test's Fighter class is its own throwaway row.
     { classId: fighter.id, name: BM_SUBCLASS_NAME, description: "Maneuvers + Student of War.", slug: "fighter-battle-master-snapshot-undo-test" },
     {},
   );
   bmSubclassId = bm.id;
-  // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy.
+
   await prisma.classFeature.deleteMany({ where: { subclassId: bmSubclassId } });
   await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, bmSubclassId) });
 });
@@ -104,9 +88,8 @@ afterEach(async () => {
   await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
 });
 
-// The class entry links classId to the real Fighter row above (#1529) so the
-// Fighting Style feat slot + advancementSlotsForLevel recognize the Fighter
-// schedule — resolution is by FK now, not by the entry's `name`.
+// The class entry links classId to the real Fighter row above (#1529) so the Fighting Style feat slot + advancementSlotsForLevel recognize the Fighter schedule — resolution is by FK now, not the entry's `name`.
+
 async function createBattleMaster() {
   return prisma.character.create({
     data: {
@@ -136,7 +119,6 @@ describe("snapshotResources undo-correctness (#818)", () => {
     await createBattleMaster();
     const hasFs = (advs: Array<{ slot?: string }>) => advs.some((a) => a.slot === "fightingStyle");
 
-    // Level 7 → 6: maneuvers trimmed 5→3; both advancements retained.
     const down = await supertest(app).post(`/api/characters/${FIXTURE_ID}/experience`).set("Cookie", COOKIE)
       .send({ operations: [{ type: "set", value: XP_LVL_6 }] });
     expect(down.status).toBe(200);
@@ -144,14 +126,11 @@ describe("snapshotResources undo-correctness (#818)", () => {
     expect(down.body.advancements).toHaveLength(2);
     expect(hasFs(down.body.advancements)).toBe(true);
 
-    // Find the maneuvers-reconcile event's batch.
     const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`).set("Cookie", COOKIE);
     const ev = (activity.body as Array<{ type: string; reverted: boolean; batchId?: string }>)
       .find((e) => e.type === "maneuversReconciled" && !e.reverted)!;
     expect(ev).toBeDefined();
 
-    // Undo restores before.resources wholesale — pre-#818 this wiped advancements
-    // (incl. the fs feat) because they weren't in the snapshot.
     const undo = await supertest(app).post(`/api/characters/${FIXTURE_ID}/events/${ev.batchId}/revert`).set("Cookie", COOKIE);
     expect(undo.status).toBe(200);
     expect(undo.body.resources.maneuversKnown).toHaveLength(5);

@@ -1,19 +1,3 @@
-/**
- * CombatUtilityStrip — the quiet vitals strip that sits BELOW the turn tracker on
- * the live Combat tab (#982). It collapses what used to be a full-height "No
- * active conditions" card into conditions + exhaustion + rest.
- *
- * Desktop keeps the one-line summary (DesktopUtilityLine); HP no longer rides here
- * (#1086) — desktop live play's canonical HP affordance is CombatLivePanel's
- * compact HP card, and mobile keeps HP in its header. Mobile (#1028) breaks
- * it into full-bleed utility rows (MobileUtilityRows): a Conditions header + Add,
- * wrapping chips beside a big-hit exhaustion stepper, then a Rest row with the
- * hit-dice count inline. Both share the state/handlers here so the transaction
- * calls stay single-sourced; conditions add/remove run through the shared
- * ConditionsSheetBody, and exhaustion steps fire the same `setExhaustion` op the
- * sheet uses (#989). Rest reuses the session RestButton.
- */
-
 import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 
@@ -29,14 +13,12 @@ import type { ConditionsState } from "@/types/character";
 
 const STEP =
   "flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 bg-parchment-50 text-parchment-700 transition-colors hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40";
-// Mobile stepper: 44pt hit target wrapping a 32pt visual disc (#1028).
+// a11y: 44pt hit target wrapping a 32pt visual disc.
 const STEP_MOBILE =
   "flex h-11 w-11 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40";
 const STEP_DISC =
   "flex h-8 w-8 items-center justify-center rounded-full border border-parchment-300 bg-parchment-50 text-parchment-700";
 
-// Shared props both breakpoint layouts consume — state + handlers live in the
-// orchestrator so the client calls stay single-sourced.
 interface UtilityViewProps {
   active: ConditionsState["active"];
   exhaustion: number;
@@ -49,21 +31,18 @@ interface UtilityViewProps {
 
 export default function CombatUtilityStrip() {
   const { character } = useCurrentCharacter();
-  // null = closed; "manage" opens the sheet as-is; "add" opens it with the
-  // condition picker already expanded (the "+ Add" affordance).
+  // "add" opens the sheet with the condition picker already expanded; "manage" opens it as-is.
   const [sheet, setSheet] = useState<null | "manage" | "add">(null);
   const isBelowMd = useIsBelowMd();
   const { active, exhaustion } = character.conditions;
 
-  // Dynamic accessible name so the active conditions are announced, not hidden
-  // behind a static "Manage conditions" (#989 review). Labels only — never keys.
+  // a11y: the accessible name must announce active conditions, not hide them behind a static "Manage conditions".
   const conditionsLabel =
     active.length > 0
       ? `Manage conditions: ${active.map((c) => conditionLabel(c.key)).join(", ")}`
       : "Manage conditions";
 
-  // Inline exhaustion step — the same setExhaustion transaction op the conditions
-  // sheet fires, so exhaustion stays single-sourced through the client.
+  // Must fire the same setExhaustion op ConditionsSheetBody uses, or exhaustion drifts out of sync between the two.
   const exhaustionMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (level: number) => applyConditionTransactions(character.id, [{ type: "setExhaustion", level }]),
@@ -78,7 +57,7 @@ export default function CombatUtilityStrip() {
     try {
       await exhaustionMutation.mutateAsync(clamped);
     } catch {
-      // best-effort, no UI surface here — mirrors pre-#1283 behaviour.
+      // best-effort, no UI surface here
     }
   }
 
@@ -97,8 +76,7 @@ export default function CombatUtilityStrip() {
       {isBelowMd ? <MobileUtilityRows {...viewProps} /> : <DesktopUtilityLine {...viewProps} />}
       {sheet && (
         <BottomSheet title="Conditions" onClose={() => setSheet(null)}>
-          {/* key={sheet} remounts on a mode switch so `defaultAddOpen` (read only
-              at mount by AddConditionPanel) always reflects the current mode. */}
+          {/* key={sheet} forces a remount so AddConditionPanel's mount-only defaultAddOpen reflects the current mode. */}
           <ConditionsSheetBody key={sheet} defaultAddOpen={sheet === "add"} />
         </BottomSheet>
       )}
@@ -106,8 +84,6 @@ export default function CombatUtilityStrip() {
   );
 }
 
-// Mobile (#1028): full-bleed utility rows — Conditions header + Add, wrapping
-// chips beside a big-hit exhaustion stepper, then a Rest row with hit dice.
 function MobileUtilityRows({
   active,
   exhaustion,
@@ -194,7 +170,6 @@ function MobileUtilityRows({
   );
 }
 
-// Desktop (#982): the one-line summary — conditions + Add + exhaustion + Rest.
 function DesktopUtilityLine({
   active,
   exhaustion,
@@ -206,8 +181,7 @@ function DesktopUtilityLine({
 }: UtilityViewProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2 shadow-card">
-      {/* Conditions summary — opens the full add/remove/exhaustion sheet. Uses
-          spans (not a <ul>) so it stays valid phrasing content inside a button. */}
+      {/* Uses spans, not a <ul>, so this stays valid phrasing content inside a <button>. */}
       <button
         type="button"
         aria-label={conditionsLabel}
@@ -233,7 +207,6 @@ function DesktopUtilityLine({
         )}
       </button>
 
-      {/* Direct "+ Add" — opens the picker expanded inside the overlay. */}
       <button
         type="button"
         aria-label="Add condition"
@@ -243,8 +216,6 @@ function DesktopUtilityLine({
         + Add
       </button>
 
-      {/* Exhaustion — inline ± steppers (no sheet, so no "manage conditions"
-          name collision). Fires the same setExhaustion op as the sheet (#989). */}
       <div className="flex shrink-0 items-center gap-1.5">
         <span className="font-sans text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
           Exhaustion
@@ -275,7 +246,6 @@ function DesktopUtilityLine({
         </button>
       </div>
 
-      {/* Rest — reuses the session rest control + its short/long-rest handlers. */}
       <div className="ml-auto shrink-0">
         <RestButton />
       </div>

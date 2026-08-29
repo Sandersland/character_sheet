@@ -1,15 +1,4 @@
-/**
- * Slot-level picker (#1163): the level already reads off the section header,
- * so this renders nothing in the single-slot case — only when more than one
- * legal slot exists does the player need to choose one. Generalized past
- * spell-casting (#1676, Bladesinger's Song of Defense) to `baseLevel: number`
- * instead of a full `Spell` — the only spell-specific bit was `spell.level`,
- * used purely as the "is this an upcast?" comparison baseline, which a
- * non-spell ability (Song of Defense's own minLevel) needs identically.
- */
-
 interface SlotLevelSelectorProps {
-  /** The level a choice above this one renders the "↑" marker for. */
   baseLevel: number;
   availableSlots: number[];
   spellSlot: number | undefined;

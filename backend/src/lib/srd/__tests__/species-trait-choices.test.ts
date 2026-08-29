@@ -1,7 +1,3 @@
-// #1756: chooseCantrip's two shapes — High Elf's class-LIST + fixed casting
-// ability, and Astral Fire's explicit named SPELLS list + player-chosen
-// ability. The schema enforces exactly one of `list`/`spells` and treats a
-// missing castingAbility as "player chooses" (chooseCantripNeedsPlayerAbility).
 import { describe, expect, it } from "vitest";
 
 import {

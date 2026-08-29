@@ -1,6 +1,4 @@
-// applySpellRenames (#1132): in-place catalog renames that preserve row ids, so
-// SubclassGrantedSpell FKs and InventoryCapability.spellId provenance survive the
-// 2024 proper-noun drops. Requires DATABASE_URL.
+// applySpellRenames preserves row ids so SubclassGrantedSpell FKs and InventoryCapability.spellId survive renames (#1132).
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -9,9 +7,7 @@ import { applySpellRenames } from "../rename-spells.js";
 
 const CLEANUP = ["Rename Alpha", "Rename Beta", "Rename Gamma"];
 
-// edition: "EDITION_2024" — applySpellRenames is scoped to that edition
-// (#1710); an edition-null row here wouldn't be found by the function under
-// test. catalogEntryId (#1796) is resolved first — required, no default.
+// applySpellRenames only touches EDITION_2024 rows (#1710).
 async function makeSpell(name: string) {
   const catalogEntryId = await makeCatalogEntry({ name, edition: "EDITION_2024" });
   return prisma.spell.create({
@@ -24,9 +20,7 @@ async function makeSpell(name: string) {
 }
 
 afterEach(async () => {
-  // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
-  // #1796) — the reverse cascade doesn't exist, so a plain
-  // `spell.deleteMany` alone would orphan the entry.
+  // CatalogEntry deletion cascades to Spell, but not the reverse (#1796).
   await prisma.catalogEntry.deleteMany({ where: { name: { in: CLEANUP }, kind: "SPELL" } });
 });
 
@@ -51,14 +45,11 @@ describe("applySpellRenames (#1132)", () => {
     const alpha = await makeSpell("Rename Alpha");
     const beta = await makeSpell("Rename Beta");
     await applySpellRenames(prisma, [{ from: "Rename Alpha", to: "Rename Beta" }]);
-    // Both rows survive untouched — collision is logged and skipped.
     expect((await prisma.spell.findUnique({ where: { id: alpha.id } }))?.name).toBe("Rename Alpha");
     expect((await prisma.spell.findUnique({ where: { id: beta.id } }))?.name).toBe("Rename Beta");
   });
 
-  // #1796: the linked CatalogEntry carries its own `name` (part of its
-  // business key) — a rename that touched only Spell.name would leave the
-  // entry silently stale.
+  // CatalogEntry carries its own `name`; renaming Spell.name alone would leave it stale (#1796).
   it("also renames the linked CatalogEntry's name", async () => {
     const row = await makeSpell("Rename Alpha");
     await applySpellRenames(prisma, [{ from: "Rename Alpha", to: "Rename Beta" }]);

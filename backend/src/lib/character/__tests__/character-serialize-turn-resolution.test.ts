@@ -1,15 +1,4 @@
-// TurnResolution descriptor (epic #1827 Slice 1, #1828): every downstream
-// slice's resolver composes a TurnResolution from ALREADY-SERVED character
-// fields — never a client-side rule re-derivation (CLAUDE.md: rules logic is
-// backend-owned). This suite proves the served payload carries every field a
-// weapon and each of the four spell shapes (attack roll / saving throw /
-// auto-hit / no-roll) need, by building a real `TurnResolution` value from
-// the serialized payload using only field reads — no arithmetic, no rule
-// lookups. The `*Resolution` helpers below are TEST-ONLY proof of shape; the
-// production adapter (weaponToResolution/spellToResolution) lands in a later
-// slice (#1832/#1833) and may differ (picking which of several castable slot
-// levels, etc.) — this only pins that the INPUTS exist.
-
+// TEST-ONLY: these *Resolution helpers prove the served payload carries every field a TurnResolution needs, using only field reads — no arithmetic, no rule lookups. The production adapter (weaponToResolution/spellToResolution, #1832/#1833) may differ; this only pins that the inputs exist.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -28,7 +17,7 @@ const CHAR_IDS = ["turn-resolution-fighter", "turn-resolution-wizard"];
 const BASE = {
   ownerId: OWNER_ID,
   alignment: "Neutral",
-  experiencePoints: 0, // level 1, proficiency +2
+  experiencePoints: 0,
   initiativeBonus: 0,
   speed: 30,
   savingThrowProficiencies: [] as string[],
@@ -76,9 +65,7 @@ async function serialize(characterId: string) {
 
 type Payload = Awaited<ReturnType<typeof serialize>>;
 
-// Local, test-scoped view of the served spellcasting/spell shape — same
-// convention catalog-entitlement-serialize.test.ts uses to narrow
-// buildSpellcastingView's deliberately-loose `object` return type.
+// Narrows buildSpellcastingView's deliberately-loose object return type — same convention catalog-entitlement-serialize.test.ts uses.
 interface ServedSpell {
   id: string;
   name: string;
@@ -107,8 +94,6 @@ function spellNamed(payload: Payload, name: string): ServedSpell {
   if (!spell) throw new Error(`fixture spell "${name}" not found on served payload`);
   return spell;
 }
-
-// ── Weapon fixture ──────────────────────────────────────────────────────────
 
 const LONGSWORD: WeaponDetailInput = {
   damageDiceCount: 1,
@@ -145,11 +130,6 @@ async function createFighterWithWeapon() {
   return id;
 }
 
-/**
- * TEST-ONLY proof: a weapon's TurnResolution, built from nothing but served
- * fields (AttackRow + Character.critRange/attacksPerAction) — no dice math,
- * no rule lookup.
- */
 function weaponResolution(payload: Payload): TurnResolution {
   const row = payload.attackRows.find((r) => r.kind === "weapon" && !r.offHand)!;
   return {
@@ -169,13 +149,11 @@ describe("TurnResolution — weapon, entirely from served AttackRow/critRange/at
     expect(resolution).toEqual<TurnResolution>({
       source: "Longsword",
       cost: { kind: "action", attacks: 1 },
-      toHit: { bonus: 5, critRange: 20 }, // STR +3, prof +2
+      toHit: { bonus: 5, critRange: 20 },
       effect: { spec: { count: 1, faces: 8, modifier: 3 }, kind: "damage", damageType: "slashing" },
     });
   });
 });
-
-// ── Spell fixtures — one per shape (attack roll / save / auto-hit / no-roll / heal) ──
 
 const FIXTURE_SPELLCASTING = {
   slotsUsed: {},
@@ -314,14 +292,7 @@ async function createWizardWithSpells() {
   return id;
 }
 
-/**
- * TEST-ONLY proof: a spell's TurnResolution at its base slot level, built
- * from nothing but served fields (spellcasting ability/DC/attack bonus, the
- * spell's own attackType/saveAbility/damageType, and its served effectRolls
- * lookup for the level) — no dice math, no rule lookup. Mirrors
- * frontend/src/lib/spellCast.ts's computeCastSpec, itself a served-data
- * lookup rather than a re-derivation (#1381).
- */
+// Mirrors the frontend's computeCastSpec (#1381).
 function spellResolution(payload: Payload, spellName: string, costKind: "action" | "bonusAction" | "reaction"): TurnResolution {
   const casting = spellcastingOf(payload);
   const spell = spellNamed(payload, spellName);
@@ -342,7 +313,7 @@ describe("TurnResolution — spell shapes, entirely from served spellcasting/eff
     const payload = await serialize(await createWizardWithSpells());
     const resolution = spellResolution(payload, "Fixture Fire Bolt", "action");
 
-    expect(resolution.toHit).toEqual({ bonus: 5, critRange: 20 }); // INT +3, prof +2
+    expect(resolution.toHit).toEqual({ bonus: 5, critRange: 20 });
     expect(resolution.save).toBeUndefined();
     expect(resolution.effect).toEqual({ spec: { count: 1, faces: 10, modifier: 0 }, kind: "damage", damageType: "fire" });
     expect(resolution.cost).toEqual({ kind: "action" });
@@ -353,7 +324,7 @@ describe("TurnResolution — spell shapes, entirely from served spellcasting/eff
     const resolution = spellResolution(payload, "Fixture Sacred Flame", "action");
 
     expect(resolution.toHit).toBeUndefined();
-    expect(resolution.save).toEqual({ dc: 13, ability: "dexterity" }); // 8 + prof 2 + INT 3
+    expect(resolution.save).toEqual({ dc: 13, ability: "dexterity" });
     expect(resolution.effect).toEqual({ spec: { count: 1, faces: 8, modifier: 0 }, kind: "damage", damageType: "radiant" });
   });
 
@@ -383,7 +354,7 @@ describe("TurnResolution — spell shapes, entirely from served spellcasting/eff
 
     expect(resolution.toHit).toBeUndefined();
     expect(resolution.save).toBeUndefined();
-    // Heal ability modifier is baked into the served roll's modifier (#1381) — INT +3.
+    // Heal ability modifier is baked into the served roll's modifier (#1381).
     expect(resolution.effect).toEqual({ spec: { count: 1, faces: 8, modifier: 3 }, kind: "heal", damageType: undefined });
   });
 

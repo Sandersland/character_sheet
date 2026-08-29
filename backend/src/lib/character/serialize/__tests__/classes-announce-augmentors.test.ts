@@ -1,14 +1,4 @@
-// Route/wire-level proof for the announce-augmentor migration (#1910): exercises
-// the REAL buildAvailableActionsView (serialize/classes.ts) — the function
-// GET /api/characters/:id's availableActions[] is built from — with hand-built
-// classEntries (no DB round trip needed; featureRowsOf, the real production
-// extractor, reads `.class.features`/`.subclassRef.features` off whatever
-// shape it's given). Pins the exact AC scenarios from #1910: a 2024 monk at
-// L3/L12/L13 (Deflect Attacks clause + specs), a 2014 monk L3+ (Deflect
-// Missiles specs), and a 2014 vs 2024 Eldritch Knight L15 (Arcane Charge
-// reminder present only in 2014) — byte-identical to deriveDeflectSpec's own
-// resolved values, proving the served wire value and the pure rule function
-// never drift.
+// Proves the served wire values are byte-identical to deriveDeflectSpec's own resolved values — the served value and the pure rule function must never drift.
 import { describe, expect, it } from "vitest";
 
 import { buildAvailableActionsView } from "../classes.js";
@@ -21,10 +11,7 @@ import type { CharacterWithRelations } from "@/lib/character/character-include.j
 const SCORES = { strength: 10, dexterity: 16, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 };
 const DEX_MOD = abilityModifier(SCORES.dexterity);
 
-// Deflect Attacks/Missiles moved off DERIVED_ACTIONS onto ClassFeature rows
-// (#1912) — `class: { features: [] }` no longer surfaces them at all, so
-// this fixture needs MONK_BASE_ROWS' real content (test-feature-rows
-// .fixture.ts, kept in parity with the seed by literal-fixture-parity.test.ts).
+// Deflect rows live on ClassFeature (#1912) — class: { features: [] } no longer surfaces them, so this fixture needs MONK_BASE_ROWS' real content, kept in parity with the seed by a dedicated fixture-parity test.
 function monkEntries(level: number): CharacterWithRelations["classEntries"] {
   return [
     { name: "monk", subclass: undefined, level, class: { features: MONK_BASE_ROWS }, subclassRef: undefined },

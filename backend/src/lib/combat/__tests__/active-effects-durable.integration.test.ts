@@ -1,10 +1,3 @@
-/**
- * Durable-buff (#455) integration test — the axis beyond #438 concentration:
- * a while-active "meleeDamage" buff raises melee weapon damage via the serializer,
- * concentration-clear leaves durable buffs alone, and until-rest buffs clear on
- * the matching rest. Requires DATABASE_URL (docker compose up db).
- */
-
 import { randomUUID } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -91,7 +84,7 @@ describe("durable buffs (#455)", () => {
   });
 
   it("a while-active meleeDamage +2 buff raises melee weapon damage by 2; clearing reverts", async () => {
-    expect(await greatswordDamageMod()).toBe(3); // STR mod only
+    expect(await greatswordDamageMod()).toBe(3);
     await applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active" });
     expect(await greatswordDamageMod()).toBe(5);
     await prisma.$transaction((tx) => clearBuffByKeyInTx(tx, FIXTURE_ID, "rage", randomUUID(), null, "endRage"));
@@ -103,7 +96,7 @@ describe("durable buffs (#455)", () => {
     await applyBuff({ key: "bless", target: "athletics", modifier: 1, source: "Bless", duration: "concentration", sourceEntryId: "e1" });
     await prisma.$transaction((tx) => clearBuffsForSourceInTx(tx, FIXTURE_ID, "e1", randomUUID(), null, "damage"));
     const buffs = await readBuffs();
-    expect(buffs.map((b) => b.key)).toEqual(["rage"]); // concentration Bless dropped, durable Rage kept
+    expect(buffs.map((b) => b.key)).toEqual(["rage"]);
   });
 
   it("until-rest (long) clears on a long rest; a concentration buff is unaffected", async () => {
@@ -117,7 +110,7 @@ describe("durable buffs (#455)", () => {
     await applyBuff({ key: "shortBuff", target: "meleeDamage", modifier: 1, source: "Second Wind Buff", duration: "until-rest", restType: "short" });
     await applyBuff({ key: "longBuff", target: "meleeDamage", modifier: 2, source: "Rage", duration: "until-rest", restType: "long" });
     await applyHitPointOperations(FIXTURE_ID, [{ type: "shortRest", rolls: [] }]);
-    expect((await readBuffs()).map((b) => b.key)).toEqual(["longBuff"]); // short cleared, long survives a short rest
+    expect((await readBuffs()).map((b) => b.key)).toEqual(["longBuff"]);
   });
 
   it("a while-active Rage buff clears on a long rest (#457)", async () => {
@@ -159,20 +152,20 @@ describe("durable buffs (#455)", () => {
     it("halves matching (b/p/s) damage while a resistance is active and records it in history", async () => {
       await applyRage();
       await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 12, damageType: "slashing" }]);
-      expect(await currentHp()).toBe(14); // 20 - 6
+      expect(await currentHp()).toBe(14);
       expect(await lastDamageSummary()).toContain("resisted from 12");
     });
 
     it("does not halve a non-matching damage type (fire)", async () => {
       await applyRage();
       await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 12, damageType: "fire" }]);
-      expect(await currentHp()).toBe(8); // 20 - 12, full
+      expect(await currentHp()).toBe(8);
     });
 
     it("takes full damage when the player declines resistance (manual override)", async () => {
       await applyRage();
       await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 12, damageType: "slashing", applyResistance: false }]);
-      expect(await currentHp()).toBe(8); // 20 - 12, override declined the halve
+      expect(await currentHp()).toBe(8);
     });
 
     it("applies full typeless damage with no resistance (no regression)", async () => {
@@ -191,12 +184,10 @@ describe("durable buffs (#455)", () => {
     await expect(
       applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "until-rest" }),
     ).rejects.toThrow(/restType/);
-    expect(await readBuffs()).toEqual([]); // rejected before any write
+    expect(await readBuffs()).toEqual([]);
   });
 
   it("clearBuffByKeyInTx leaves a concentration buff of the same key untouched (durable-only contract)", async () => {
-    // Seed a concentration buff directly — append dedups by key, so bypass it to
-    // simulate a future relaxed-dedup state where a key could carry either duration.
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: {
@@ -206,6 +197,6 @@ describe("durable buffs (#455)", () => {
       },
     });
     await prisma.$transaction((tx) => clearBuffByKeyInTx(tx, FIXTURE_ID, "rage", randomUUID(), null, "endRage"));
-    expect((await readBuffs()).map((b) => b.key)).toEqual(["rage"]); // durable-only clear must not drop a concentration buff
+    expect((await readBuffs()).map((b) => b.key)).toEqual(["rage"]);
   });
 });

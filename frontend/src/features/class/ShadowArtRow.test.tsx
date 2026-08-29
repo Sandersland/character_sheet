@@ -1,10 +1,3 @@
-/**
- * Direct ShadowArtRow pins (#688) — previously covered only transitively via
- * ShadowArtsSection.test.tsx. Pins the pool-cast gating (focus or ki, #1738),
- * the name-prefix strip, the concentration badges + replacement warning, the
- * buff chip, and the expandable description, ahead of the shared-row-shell
- * extraction.
- */
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -29,9 +22,7 @@ const DARKNESS: CatalogShadowArt = {
   },
 };
 
-// Synthetic fixture exercising ShadowArtRow's generic buff-chip path (shared
-// with Channel Divinity via catalogEffectSpec) — no current Shadow Art carries
-// a buff (the 2014 four-spell menu are all utilities; the 2024 menu is Darkness only).
+// Synthetic fixture exercising the buff-chip path — no current Shadow Art carries a buff.
 const BUFF_ART_FIXTURE: CatalogShadowArt = {
   id: "sa-test-buff",
   name: "Shadow Arts: Test Buff",
@@ -91,9 +82,7 @@ describe("ShadowArtRow (#688)", () => {
     expect(onCast).not.toHaveBeenCalled();
   });
 
-  // #1738: the 2014 Way of Shadow menu costs ki, not focus — poolLabel is
-  // caller-supplied (resolved from the character's own resource pool by
-  // art.cost.key), never a hardcoded "focus" literal inside this row.
+  // poolLabel is caller-supplied, never a hardcoded "focus" literal inside this row.
   it("renders the caller-supplied pool label (ki for a 2014 Way of Shadow row)", () => {
     renderRow({
       art: { ...DARKNESS, cost: { kind: "pool", key: "ki", base: 2 } },

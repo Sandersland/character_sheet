@@ -90,8 +90,6 @@ describe("SpellRow", () => {
     expect(screen.getByRole("button", { name: /Prepare Fireball/i })).toBeDisabled();
   });
 
-  // #1511 D3/D4: a known caster's leveled row renders the same static-dot
-  // shape as a cantrip/granted spell, with the served locked-rune label.
   describe("known caster (#1511)", () => {
     const knownBudget = { count: 8, limit: 8, atLimit: true, casterModel: "known" as const, alwaysAvailableLabel: "Known" };
 
@@ -245,9 +243,7 @@ describe("SpellRow", () => {
     });
 
     it("shows 'at will' and never a uses count for an at-will item spell", () => {
-      // Wire reality: JSON.stringify(Infinity) === null, so an at-will item's
-      // numeric use counts arrive as 0/null, NOT Infinity. Gate must key off
-      // `resource`, not `usesTotal === Infinity` (which never matches on the wire).
+      // Wire: Infinity serializes to null, so gate off `resource`, not `usesTotal === Infinity`.
       const atWill: Spell = {
         ...itemSpell,
         item: { ...itemSpell.item!, resource: "atWill", usesRemaining: 0, usesTotal: 0 },

@@ -5,10 +5,6 @@ import { NotFoundError } from "@/lib/auth/errors.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 
-// forkContent (#1800, epic #1795 5/6): the deep-copy mechanics underneath the
-// fork route (routes/catalog/__tests__/fork.test.ts covers auth/HTTP). This
-// file exercises the SPELL kind-dispatch directly against real Postgres.
-
 const FORKER = "owner-fork-lib-forker";
 const CAMPAIGN_OWNER = "owner-fork-lib-campaign-owner";
 

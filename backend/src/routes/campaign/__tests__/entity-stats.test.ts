@@ -284,7 +284,7 @@ describe("entity list stats + matchedIn + backlinks session context (#839)", () 
     await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges/${prepared.body.id}/execute`)
       .set("Cookie", cookieOwner);
-    // Executing revealed the survivor; re-hide the merged identity's row stays HIDDEN.
+    // Executing reveals the survivor; the merged identity's own visibility is untouched — it stays HIDDEN.
 
     await seedEntry({
       characterId: CHAR_OWNER,

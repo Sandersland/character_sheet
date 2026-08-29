@@ -1,11 +1,4 @@
-/**
- * Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854) route tests. A
- * level-3 2014 Eldritch Knight can bond up to 2 owned weapons via the shared
- * ability endpoint (never PATCH), each write is audited + undoable, a 3rd
- * bond is rejected (409, cap enforced), and the "Summon Bonded Weapon"
- * bonus-action AvailableAction is served only once eligible and enabled only
- * once >=1 weapon is bonded. A non-EK / sub-L3 / 2024 EK gets none of it.
- */
+// Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854).
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -44,10 +37,8 @@ function agent() {
 const url = `/api/characters/${FIXTURE_ID}/abilities/weapon-bond/transactions`;
 const inventoryUrl = `/api/characters/${FIXTURE_ID}/inventory/transactions`;
 
-// XP thresholds for levels 1-3 (standard 5e table, both editions) — single-class
-// characters resolve their entry level through the XP-DERIVED total
-// (effectiveEntryLevel), so the fixture's experiencePoints must actually match
-// `level`, not just the per-class column.
+// Single-class characters resolve entry level through effectiveEntryLevel's XP-derived total, so experiencePoints must actually match `level`, not just the per-class column.
+
 const XP_FOR_LEVEL: Record<number, number> = { 1: 0, 2: 300, 3: 900 };
 
 async function createEldritchKnight(level: number, edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2014") {
@@ -133,12 +124,8 @@ describe("POST /api/characters/:id/abilities/weapon-bond/transactions", () => {
     expect(bondedCount).toBe(WEAPON_BOND_LIMIT);
   });
 
-  // TOCTOU regression (claude-review on #1887): two concurrent bondWeapon
-  // requests each read the pre-write bonded count, so without a lock inside
-  // the transaction both can pass `< WEAPON_BOND_LIMIT` and both commit,
-  // landing a 3rd bonded weapon past the cap. Fires two real concurrent HTTP
-  // requests (separate connections/transactions, like two browser tabs)
-  // rather than sequential awaits, which would never exercise the race.
+  // TOCTOU regression (#1887): without a lock, two concurrent bondWeapon requests could both read count < WEAPON_BOND_LIMIT and both commit. Real concurrent HTTP requests, not sequential awaits, or the race is never exercised.
+
   it("bonding two weapons concurrently at 1-away-from-cap never exceeds the 2-weapon cap", async () => {
     const already = await makeWeapon("Longsword");
     await agent().post(url).send({ operations: [{ type: "bondWeapon", inventoryItemId: already }] });
@@ -158,16 +145,8 @@ describe("POST /api/characters/:id/abilities/weapon-bond/transactions", () => {
     expect(bondedCount).toBe(WEAPON_BOND_LIMIT);
   });
 
-  // Duplicate-event regression (claude-review round 2 on #1887): the
-  // already-bonded guard used to run off the pre-lock `item` read, so two
-  // concurrent bondWeapon calls on the SAME item could both see
-  // `weaponBonded: false`, both write `true`, and both log a `weaponBonded`
-  // event for one real transition — corrupting LIFO undo (undoing the
-  // second-logged event left the first's stale event to fire an unexpected
-  // re-bond on the next undo). The guard now re-reads under the Character
-  // row's FOR UPDATE lock, so exactly one request sees the true
-  // false→true transition and the other is rejected off the now-committed
-  // state, same as two genuinely sequential calls would be.
+  // Duplicate-event regression (#1887 round 2): the already-bonded guard used to run off a pre-lock read, so two concurrent calls on the same item could both see false, both write true, and both log an event, corrupting LIFO undo. The guard now re-reads under the Character row's FOR UPDATE lock, so exactly one request sees the false→true transition.
+
   it("bonding the same weapon concurrently logs exactly one weaponBonded event, and undo cleanly reverts it", async () => {
     const swordId = await makeWeapon("Longsword");
 
@@ -193,8 +172,6 @@ describe("POST /api/characters/:id/abilities/weapon-bond/transactions", () => {
     expect(reverted.weaponBonded).toBe(false);
   });
 
-  // Same duplicate-event shape as bondWeapon's own concurrency test above,
-  // for unbondWeapon's symmetric lock.
   it("unbonding the same weapon concurrently logs exactly one weaponUnbonded event, and undo cleanly reverts it", async () => {
     const swordId = await makeWeapon("Longsword");
     await agent().post(url).send({ operations: [{ type: "bondWeapon", inventoryItemId: swordId }] });
@@ -268,7 +245,6 @@ describe("POST /api/characters/:id/abilities/weapon-bond/transactions", () => {
     const bondedCount = await prisma.inventoryItem.count({ where: { characterId: FIXTURE_ID, weaponBonded: true } });
     expect(bondedCount).toBe(1);
 
-    // A 2nd weapon can now be bonded again (the removed slot freed up the cap).
     const c = await makeWeapon("Shortsword");
     const bondAgain = await agent().post(url).send({ operations: [{ type: "bondWeapon", inventoryItemId: c }] });
     expect(bondAgain.status).toBe(200);

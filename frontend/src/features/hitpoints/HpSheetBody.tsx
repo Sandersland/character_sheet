@@ -5,11 +5,6 @@ import ConcentrationNoteBanner from "@/features/hitpoints/ConcentrationNoteBanne
 import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
 import { useHitPointApply } from "@/features/hitpoints/useHitPointApply";
 
-/**
- * The interactive body of the session HP sheet (#768): the shared HpActionControl
- * plus concentration surfacing, both wired through useHitPointApply so damage,
- * heal, temp HP, and concentration checks behave identically to the Rest tab.
- */
 export default function HpSheetBody() {
   const { character } = useCurrentCharacter();
   const hp = useHitPointApply(character);

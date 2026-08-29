@@ -16,9 +16,6 @@ interface CapabilityEditorProps {
   edition: RulesEdition;
 }
 
-// DM authoring for an item's capabilities (#546). Each row is one capability of a
-// chosen kind (passiveBonus/castSpell/grant/charges); per-kind fields live in the
-// sibling *Fields subcomponents, draft normalization in capabilityDraft.
 export default function CapabilityEditor({ capabilities, onChange, spellcasterAttunable = false, edition }: CapabilityEditorProps) {
   const [spells, setSpells] = useState<CatalogSpell[]>([]);
   const needSpells = capabilities.some((c) => c.kind === "castSpell");

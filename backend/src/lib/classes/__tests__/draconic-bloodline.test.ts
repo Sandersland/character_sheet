@@ -34,13 +34,19 @@ describe("draconicResilienceMaxHpTerm (#1123)", () => {
     ).toBe(5);
   });
 
-  // Null-FK guard: `class` is null (classId SetNull / free-text class). The
-  // gate must fall back to sorcerer.ts's grantLevel 1 (PHB'14 p.99), not
-  // subclassGateLevel's generic `?? 3` — which would wrongly zero the bonus
-  // for a 2014 L1/L2 Draconic sorcerer.
-  it("2014 L1 with a null class FK still gets +1 (grantLevel fallback, not the generic gate 3)", () => {
-    expect(draconicResilienceMaxHpTerm([entry({ level: 1, class: null })], 1, "EDITION_2014")).toBe(1);
-    expect(draconicResilienceMaxHpTerm([entry({ level: 2, class: null })], 2, "EDITION_2014")).toBe(2);
+  // A null class FK (classId SetNull / free-text class) loses the seeded
+  // subclassLevel — the sole PHB'14 p.99 gate-1 source — so the character
+  // gates at subclassGateLevel's plain 3, the same answer isSubclassActive
+  // gives, keeping the HP term and the feature gate consistent.
+  it("2014 with a null class FK degrades to the plain gate 3, matching the feature gate", () => {
+    expect(draconicResilienceMaxHpTerm([entry({ level: 1, class: null })], 1, "EDITION_2014")).toBe(0);
+    expect(draconicResilienceMaxHpTerm([entry({ level: 2, class: null })], 2, "EDITION_2014")).toBe(0);
+    expect(draconicResilienceMaxHpTerm([entry({ level: 3, class: null })], 3, "EDITION_2014")).toBe(3);
+  });
+
+  it("2014 with the seeded gate carried resolves PHB'14 p.99's gate 1 (+1 per sorcerer level from L1)", () => {
+    expect(draconicResilienceMaxHpTerm([entry({ level: 1 })], 1, "EDITION_2014")).toBe(1);
+    expect(draconicResilienceMaxHpTerm([entry({ level: 2 })], 2, "EDITION_2014")).toBe(2);
   });
 
   it("2024 ignores the null class FK too — the gate is always 3", () => {

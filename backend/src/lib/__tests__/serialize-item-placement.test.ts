@@ -7,12 +7,6 @@ import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { inventoryItemFixtureData, type InventoryItemFixtureInput } from "@/test-support/inventory-snapshot-fixture.js";
 
-// The served placement/proficiency flags (#1433). The snapshot suite cannot
-// cover these: its fixtures' CharacterClass rows are suite-local with empty
-// armorProficiencies/weaponProficiencies columns (#1529) and it carries no
-// two-handed weapon, so `proficient: true` and `offHandLocked: true` are both
-// unreachable there.
-
 const OWNER_ID = "owner-serialize-placement";
 
 const BASE_CHAR = {
@@ -40,19 +34,7 @@ const LONGSWORD_WEAPON = {
 
 let characterIds: string[] = [];
 
-// #1529: armor/weapon proficiency grants resolve via the class FK relation
-// now, not a name lookup — every fixture below must link classId to the REAL
-// seeded catalog row for its className, or the class half of "proficient"
-// silently becomes the homebrew fallback (nothing granted).
-//
-// #1682: RACE_PROFICIENCY_GRANTS (a name-keyed Record) retired — a race grant
-// now resolves via CharacterRace.speciesId/variantId (#1679), the SAME
-// FK-relation fix #1529 already made for the class half above. `raceName`
-// below therefore ALSO resolves the matching seeded SpeciesVariant/Species row
-// (EDITION_2014 — every raceName this file uses is a 2014 subrace name) and
-// links speciesId/variantId, mirroring how classId is resolved from
-// className just above; `rulesEdition` is set to match so the species FK and
-// the character's own edition never disagree.
+// Fixtures must link classId/speciesId to the REAL seeded catalog row for className/raceName, not a name lookup, or the proficiency grant silently falls through to the homebrew fallback. rulesEdition is set to match raceName's edition so the species FK and the character's own edition never disagree.
 async function resolveSpeciesSelectionForRaceName(raceName: string): Promise<{ speciesId: string; variantId: string | null }> {
   const variant = await prisma.speciesVariant.findFirst({
     where: { name: raceName, species: { edition: "EDITION_2014" } },
@@ -160,9 +142,6 @@ describe("serialized allowedSlots + equippable (#1433)", () => {
     expect(rowNamed(view, "Potion").allowedSlots).toEqual([]);
   });
 
-  // The assertion that fails if the two flags are collapsed into one: worn gear
-  // is placeable but NOT equippable, which is what keeps the inventory row's
-  // equip toggle off a circlet while the loadout HEAD picker still offers it.
   it("keeps equippable a category rule, not allowedSlots.length > 0", () => {
     const circlet = rowNamed(view, "Circlet");
     expect(circlet.equippable).toBe(false);
@@ -200,7 +179,6 @@ describe("serialized offHandLocked (#1433)", () => {
     expect((await serialize(id)).offHandLocked).toBe(false);
   });
 
-  // Slot-scoped, not inventory-scoped — a greatsword in the bag locks nothing.
   it("is false while the two-handed weapon is unequipped", async () => {
     const id = await createCharacter({
       className: "Fighter",
@@ -283,11 +261,7 @@ describe("serialized proficient (#1433)", () => {
     expect(rowNamed(await serialize(fighterId), "Chain Shirt").proficient).toBe(true);
   });
 
-  // The flag must read the ITEM-MERGED weapon grants — the same array the wire
-  // `weaponProficiencies` field renders — not InventoryItemContext.weaponGrants,
-  // which omits item grants so deriveWeaponAttackComponents keeps its (deliberate)
-  // un-merged list. Reading the un-merged list would re-warn on a weapon the
-  // sheet simultaneously lists as proficient.
+  // The proficient flag must read the same item-merged grants as the wire weaponProficiencies field, not InventoryItemContext.weaponGrants (which deriveWeaponAttackComponents deliberately keeps un-merged).
   it("is true when an active item grants the weapon category", async () => {
     const id = await createCharacter({
       className: "Wizard",
@@ -306,8 +280,7 @@ describe("serialized proficient (#1433)", () => {
     const view = await serialize(id);
     expect(view.weaponProficiencies).toContainEqual({ name: "Martial Weapons", source: "item" });
     expect(rowNamed(view, "Longsword").proficient).toBe(true);
-    // The attack-bonus path deliberately keeps the un-merged list, so the item
-    // grant does NOT add the proficiency bonus — the asymmetry is pre-existing.
+    // deriveWeaponAttackComponents keeps the un-merged grants, so this item-granted proficiency deliberately does NOT add to attackBonusComponents.proficiencyBonus.
     expect(rowNamed(view, "Longsword").weapon?.attackBonusComponents.proficiencyBonus).toBe(0);
   });
 

@@ -1,10 +1,3 @@
-/**
- * Solo (character-scoped) session lifecycle tests (#1080). A solo session is a
- * first-class Session row with campaignId null, owned by exactly one character.
- * Mirrors sessions.test.ts: real Postgres in beforeEach, supertest against
- * the shared `app`, plus direct lib calls to startSoloSession.
- */
-
 import { randomUUID } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -126,7 +119,6 @@ describe("POST /api/characters/:id/sessions — solo start", () => {
     expect(res.body.session.participants).toHaveLength(1);
     expect(res.body.session.participants[0].characterId).toBe(CHAR_SOLO);
     expect(res.body.session.participants[0].leftAt).toBeNull();
-    // Serialized character shape: derived fields present, id echoed.
     expect(res.body.character.id).toBe(CHAR_SOLO);
     expect(res.body.character.level).toBeGreaterThan(0);
     expect(res.body.character.proficiencyBonus).toBeGreaterThan(0);
@@ -274,8 +266,6 @@ describe("solo session combat + rolls", () => {
     expect(round.status).toBe(201);
     expect(round.body).toMatchObject({ round: 2, combatActive: true });
 
-    // Standalone roll via the resolve-action logRoll op (#1861), not the retired
-    // /roll route — sessionId is derived from the character's active session.
     const roll = await agent()
       .post(`/api/characters/${CHAR_SOLO}/resolve-action/transactions`)
       .send({ operations: [{ type: "logRoll", kind: "attack", source: "Longsword", total: 17 }] });

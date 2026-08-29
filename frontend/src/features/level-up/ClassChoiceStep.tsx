@@ -1,10 +1,5 @@
-// The class-choice step at ceremony start (#1170, BG3-style): pick which class
-// entry advances, or start a new one via multiclassing. New-class options are
-// collapsed behind a "New class →" drill-in (#1209) so the common case (advance
-// an existing class) isn't buried among every not-yet-owned reference class;
-// ineligible new-class rows stay listed (disabled) inside the drill-in with
-// their unmet prerequisite. Renders as its own CeremonyCard — this runs before
-// a plan exists, so it can't use LevelUpStepContext.
+// Runs before a plan exists, so it can't use LevelUpStepContext (unlike the
+// other ceremony steps).
 
 import { useCallback, useMemo, useState, type KeyboardEvent, type RefCallback } from "react";
 
@@ -87,9 +82,6 @@ export default function ClassChoiceStep({
   const [selected, setSelected] = useState<LevelUpTarget | null>(
     () => options.find((o) => o.eligible && sameLevelUpTarget(initialTarget, o.target))?.target ?? null,
   );
-  // A ?classId= deep link into a not-yet-owned class should land the player
-  // straight inside the drill-in, even if that option turns out ineligible
-  // (they still need to see *why*, not bounce back to the top view).
   const [view, setView] = useState<"top" | "new">(() => (initialTarget?.kind === "new" ? "new" : "top"));
 
   const visibleOptions = view === "top" ? existingOptions : newOptions;
@@ -99,8 +91,8 @@ export default function ClassChoiceStep({
     [visibleOptions],
   );
   const isOptionDisabled = useCallback((index: number) => !visibleOptions[index].eligible, [visibleOptions]);
-  // #1324: cards can be disabled (ineligible prerequisites); arrow
-  // navigation and the tabIndex fallback must both skip them.
+  // Cards can be disabled (ineligible prerequisites); arrow navigation and
+  // the tabIndex fallback must both skip them.
   const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(
     visibleOptions.length,
     checkedIndex,
@@ -122,8 +114,8 @@ export default function ClassChoiceStep({
           <button
             type="button"
             onClick={() => setView("top")}
-            // Accessible name disambiguates from the "New class →" open button,
-            // which shares the visible "Add a new class" wording (#1209 review).
+            // Accessible name disambiguates from the "New class →" open
+            // button, which shares the visible "Add a new class" wording.
             aria-label="Back to class selection"
             className="mb-3 text-sm font-semibold text-garnet-700 hover:text-garnet-800"
           >
@@ -160,17 +152,14 @@ export default function ClassChoiceStep({
       </div>
 
       {/* onBack/onConfirm/confirmLabel/confirmClassName are inert here — isFirst
-          && !isLast always renders the Cancel/Continue pair, never Back/Confirm.
-          CeremonyFooterProps requires them for the ceremonies that do reach isLast. */}
+          && !isLast always renders the Cancel/Continue pair, never Back/Confirm —
+          but CeremonyFooterProps requires them for the ceremonies that reach isLast. */}
       <CeremonyFooter
         isFirst
         isLast={false}
         onCancel={onCancel}
         onBack={() => {}}
         onContinue={() => selected && onContinue(selected)}
-        // Gate on the selection's kind matching the visible view so Continue is
-        // enabled only when the checked radio is actually on screen — a top-level
-        // pick stays live if you peek into the drill-in and back out (#1209 review).
         canContinue={selected != null && (view === "top" ? selected.kind === "existing" : selected.kind === "new")}
         onConfirm={() => {}}
         confirmLabel=""

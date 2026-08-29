@@ -9,11 +9,10 @@ import { revertBatch } from "@/lib/activity/activity.js";
 const OWNER_ID = "owner-font-of-magic";
 const SORCERER_CATALOG_NAME = "Font of Magic Sorcerer";
 
-// Level 5 sorcerer: 5 sorcery points; slots 4×L1, 3×L2, 2×L3.
 const BASE_CHAR = {
   name: "Font of Magic Fixture",
   alignment: "Chaotic Neutral",
-  experiencePoints: 6500, // level 5
+  experiencePoints: 6500,
   initiativeBonus: 2,
   speed: 30,
   hitPoints: { current: 28, max: 28, temp: 0 },
@@ -31,7 +30,7 @@ function slotsUsed(row: { spellcasting: Prisma.JsonValue }): Record<string, numb
 
 function spRemaining(row: { resources: Prisma.JsonValue }): number {
   const used = (row.resources as { used?: Record<string, number> } | null)?.used?.sorceryPoints ?? 0;
-  return 5 - used; // level-5 pool total is 5
+  return 5 - used;
 }
 
 describe("convertSorceryPoints (#903 Font of Magic)", () => {
@@ -53,6 +52,16 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
       update: {},
     });
     sorcererClassId = cls.id;
+    // Pools are row-driven (no resourceFn left), so the fixture class must carry the seeded Font of Magic row.
+    await prisma.classFeature.deleteMany({ where: { classId: sorcererClassId } });
+    await prisma.classFeature.create({
+      data: {
+        classId: sorcererClassId, subclassId: null, name: "Font of Magic", level: 2, edition: "EDITION_2024",
+        description: "You have a pool of Sorcery Points equal to your Sorcerer level.",
+        resourceKey: "sorceryPoints", resourceLabel: "Sorcery Points", resourceRecharge: "longRest",
+        resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      },
+    });
   });
 
   beforeEach(async () => {
@@ -64,6 +73,7 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
   });
 
   afterAll(async () => {
+    await prisma.classFeature.deleteMany({ where: { class: { name: SORCERER_CATALOG_NAME } } });
     await prisma.characterClass.deleteMany({ where: { name: SORCERER_CATALOG_NAME } });
   });
 
@@ -104,7 +114,6 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
   });
 
   it("expends a spell slot to gain sorcery points equal to its level", async () => {
-    // Start with all 5 SP spent so there is headroom to gain them back.
     const id = await fixture({ resources: { used: { sorceryPoints: 5 } } });
     const batch = `b-${id}`;
 
@@ -113,7 +122,6 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
     );
 
     const row = await prisma.character.findUniqueOrThrow({ where: { id } });
-    // Expend one L3 slot (used 0→1), gain 3 SP (5 spent → 2 spent → 3 remaining).
     expect(slotsUsed(row)["3"]).toBe(1);
     expect(spRemaining(row)).toBe(3);
 
@@ -137,7 +145,6 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
     expect(result.ok).toBe(true);
 
     const row = await prisma.character.findUniqueOrThrow({ where: { id } });
-    // Created slot is gone (no negative used) and the 2 SP are refunded.
     expect(slotsUsed(row)["1"] ?? 0).toBe(0);
     expect(spRemaining(row)).toBe(5);
   });
@@ -153,7 +160,6 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
     expect(result.ok).toBe(true);
 
     const row = await prisma.character.findUniqueOrThrow({ where: { id } });
-    // Expended slot is restored and the gained SP are given back (5 spent again → 0 remaining).
     expect(slotsUsed(row)["2"] ?? 0).toBe(0);
     expect(spRemaining(row)).toBe(0);
   });
@@ -168,7 +174,7 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
   });
 
   it("rejects creating a slot when not enough sorcery points remain", async () => {
-    const id = await fixture({ resources: { used: { sorceryPoints: 5 } } }); // 0 remaining
+    const id = await fixture({ resources: { used: { sorceryPoints: 5 } } });
     await expect(
       prisma.$transaction((tx) =>
         applySpellcastingOpInTx(tx, id, { type: "convertSorceryPoints", direction: "toSlot", slotLevel: 1 }, `b-${id}`, null, OWNER_ID),
@@ -180,7 +186,6 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
   });
 
   it("rejects converting a slot with none remaining at that level", async () => {
-    // Both L3 slots already expended.
     const id = await fixture({ resources: { used: { sorceryPoints: 5 } }, spellcasting: { slotsUsed: { "3": 2 } } });
     await expect(
       prisma.$transaction((tx) =>
@@ -190,7 +195,6 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
   });
 
   it("rejects a slot→SP gain that would exceed the sorcery-point maximum", async () => {
-    // Only 1 SP spent → 1 headroom, but a L3 slot would grant 3.
     const id = await fixture({ resources: { used: { sorceryPoints: 1 } } });
     await expect(
       prisma.$transaction((tx) =>
@@ -200,14 +204,14 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
   });
 
   it("rejects conversion for a class without the sorcery-point pool", async () => {
-    // Reuse the sorcerer slots but mark the class entry a wizard — no SP pool.
+    // Carrying no ClassFeature rows is what "no SP pool" means — pointing at the sorcerer fixture class would inherit its Font of Magic row.
     const character = await prisma.character.create({
       data: {
         ...BASE_CHAR,
         ownerId: OWNER_ID,
         spellcasting: Prisma.JsonNull,
         resources: Prisma.JsonNull,
-        classEntries: { create: { name: "wizard", classId: sorcererClassId, level: 5, position: 0 } },
+        classEntries: { create: { name: "wizard", level: 5, position: 0 } },
       },
     });
     created.push(character.id);

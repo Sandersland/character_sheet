@@ -1,7 +1,4 @@
-// ── Equipment packs ───────────────────────────────────────────────────────────
-// Each pack matches a catalog Item by name (e.g. "Scholar's Pack") and lists
-// the individual items it expands into at character creation. Seeded from the
-// 5e Basic Rules; custom packs can be added without a code deploy.
+// Seeded from the 5e Basic Rules.
 export interface PackContentSeed {
   itemName: string;
   quantity?: number;

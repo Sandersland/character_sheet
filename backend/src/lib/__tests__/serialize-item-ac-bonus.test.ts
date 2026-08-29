@@ -63,7 +63,6 @@ describe("serialize applies active-item AC passiveBonus into armorClassBreakdown
 
   it("omits the AC bonus while the item is inactive (not equipped/attuned)", async () => {
     const view = await serialize(characterId);
-    // Unarmored Dex 10 → AC 10, no Ring line.
     expect(view.armorClass).toBe(10);
     expect(view.armorClassBreakdown.some((p) => p.label === "Ring of Protection")).toBe(false);
   });
@@ -89,7 +88,6 @@ describe("serialize applies active-item AC passiveBonus into armorClassBreakdown
 
   it("stacks with armor + Dex + shield (single-source sum preserved)", async () => {
     await prisma.inventoryItem.update({ where: { id: ringId }, data: { attuned: true } });
-    // Chain Shirt (medium, base 13, Dex cap +2) + shield, Dex 10.
     await prisma.inventoryItem.create({
       data: inventoryItemFixtureData({
         characterId,
@@ -109,7 +107,6 @@ describe("serialize applies active-item AC passiveBonus into armorClassBreakdown
       }),
     });
     const view = await serialize(characterId);
-    // 13 armor + 0 Dex + 2 shield + 1 ring = 16, and the sum equals the breakdown total.
     expect(view.armorClass).toBe(16);
     expect(view.armorClass).toBe(view.armorClassBreakdown.reduce((t, p) => t + p.value, 0));
     expect(view.armorClassBreakdown).toContainEqual({ label: "Ring of Protection", value: 1 });
@@ -126,7 +123,6 @@ describe("serialize applies active-item AC passiveBonus into armorClassBreakdown
       }),
     });
     const view = await serialize(characterId);
-    // Bonus not applied (still unarmored AC 10); condition shown as reminder.
     expect(view.armorClass).toBe(10);
     expect(view.armorClassBreakdown).toContainEqual({
       label: "Bracers of Defense",

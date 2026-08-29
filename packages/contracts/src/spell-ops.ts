@@ -1,27 +1,6 @@
-/**
- * User-owned homebrew spell CRUD request schema (#1785, epic #1782 2/5) for
- * `backend/src/routes/catalog/custom-spells.ts`. Plain-REST like
- * campaign-ops.ts's schemas, not a transaction-op union: a homebrew spell is
- * shared catalog content across all of a user's characters, not one
- * character's mutable state.
- *
- * `ownerId`/`edition` are server-forced (POST always writes the caller's id
- * + "EDITION_2014") and deliberately absent from this schema — `.strict()`
- * means a client attempting to set either 400s rather than being silently
- * ignored.
- *
- * ONE schema serves both POST and PATCH: PATCH is a full-field replace, not
- * a partial merge (see custom-spells.ts's file banner for why) — the same
- * shape covers the create and edit routes.
- *
- * Cross-field coherence (effectKind ⇒ dice fields required, attackType
- * "save" ⇒ saveAbility required, "attack" ⇒ no save fields, level 0-9, and
- * class-name validity against the CharacterClass catalog) is a 5e-rule
- * concern, not a shape concern, so it is NOT expressed here — see
- * `backend/src/lib/spellcasting/custom-spell-validation.ts`, which the route
- * calls after this schema's `.parse()` (CLAUDE.md: rules logic is
- * backend-owned, in `lib/`).
- */
+/** `ownerId`/`edition` are server-forced and absent here — `.strict()` 400s a client that tries to set either, rather than silently ignoring it. */
+/** One schema serves both POST and PATCH: PATCH is a full-field replace, not a partial merge. */
+/** Cross-field coherence (dice fields, save requirements, class-name validity) is not expressed here — see `validateCustomSpellCoherence`, which the route calls after this schema's `.parse()`. */
 import { z } from "zod";
 
 export const SPELL_SCHOOLS = [
@@ -65,11 +44,8 @@ export const customSpellSchema = z
     concentration: z.boolean().optional(),
     ritual: z.boolean().optional(),
     components: customSpellComponentsSchema.optional(),
-    // Lowercase class names (SpellClass.className convention, #1711) — may be
-    // empty (a spell with no class access yet).
+    // Lowercase class names (SpellClass.className convention); may be empty.
     classes: z.array(z.string().min(1)),
-    // Utility spells carry none of the fields below; validateCustomSpellCoherence
-    // enforces which combinations are legal, not this schema.
     effectKind: z.enum(["damage", "heal"]).optional(),
     effectDiceCount: z.number().int().positive().optional(),
     effectDiceFaces: z.number().int().positive().optional(),

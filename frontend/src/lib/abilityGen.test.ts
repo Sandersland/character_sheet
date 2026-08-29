@@ -25,8 +25,6 @@ describe("roll4d6DropLowest", () => {
   });
 
   it("drops the lowest of the four dice", () => {
-    // Math.random -> rollD6 via 1 + floor(random * 6). Sequence below
-    // produces dice [2, 5, 6, 1]; dropping the 1 leaves 2 + 5 + 6 = 13.
     const sequence = [
       (2 - 1) / 6,
       (5 - 1) / 6,

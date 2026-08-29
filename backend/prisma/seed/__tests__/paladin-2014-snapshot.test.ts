@@ -1,19 +1,3 @@
-// #1229 commit 1: Paladin's EDITION_2014 rows must be byte-identical
-// transcriptions of what lib/classes/paladin.ts's PALADIN_FEATURES/
-// OATH_OF_DEVOTION_FEATURES/OATH_OF_THE_ANCIENTS_FEATURES/
-// OATH_OF_VENGEANCE_FEATURES said BEFORE this migration — 2014 is a
-// supported edition, not a rewrite target. This snapshot is that pre-change
-// text, pinned by hand from the tree at the commit before #1229 landed, NOT
-// re-derived from anything this migration touches — a hardcoded oracle is
-// the whole point, mirroring cleric-2014-snapshot.test.ts's/
-// barbarian-2014-snapshot.test.ts's shape.
-//
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (PALADIN_FEATURES is authored as a byte-identical copy in the
-// same commit that adds this file). Its job is to catch commit 2/3 silently
-// editing a 2014 row while authoring 2024 content or moving the Channel
-// Divinity pool onto a row — this file must stay green, unedited, from
-// commit 1 through commit 3.
 import { describe, expect, it } from "vitest";
 
 import { PALADIN_FEATURES } from "../paladin-features.js";
@@ -26,7 +10,6 @@ interface Pinned {
 }
 
 const PRE_CHANGE_2014: Pinned[] = [
-  // ---- Base class ------------------------------------------------------------
   {
     subclassSlug: null,
     name: "Divine Sense",
@@ -108,7 +91,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "As an action, end one spell on yourself or one willing creature within reach. Uses = Charisma modifier per long rest (minimum 1).",
   },
-  // ---- Oath of Devotion --------------------------------------------------------
   {
     subclassSlug: "paladin-oath-of-devotion",
     name: "Oath Spells",
@@ -149,7 +131,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "As an action, emit an aura of sunlight for 1 minute (60-ft radius, bright light). At the start of each turn, enemies in the aura take 10 radiant damage. You have advantage on saves against spells cast by fiends and undead during this time. Once used, regain on a long rest.",
   },
-  // ---- Oath of the Ancients ----------------------------------------------------
   {
     subclassSlug: "paladin-oath-of-the-ancients",
     name: "Oath Spells",
@@ -191,7 +172,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "As an action, take on an aspect of nature for 1 minute: regain 10 HP at the start of each turn; cast spells as a bonus action; enemies within 10 ft have disadvantage on saves against your paladin spells and Channel Divinity. Once used, regain on a long rest.",
   },
-  // ---- Oath of Vengeance ---------------------------------------------------------
   {
     subclassSlug: "paladin-oath-of-vengeance",
     name: "Oath Spells",

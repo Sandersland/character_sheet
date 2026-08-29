@@ -10,8 +10,6 @@ function makeCharacter(partial: Partial<Character>): Character {
 const caster = makeCharacter({ spellcasting: { ability: "intelligence" } as never });
 const nonCaster = makeCharacter({ spellcasting: undefined });
 
-// #1169: Class Features got its own tab (was dwarfing Overview on multiclass
-// characters). Unlike Magic, it's not caster-gated — every character has a class.
 describe("getSheetTabs Class tab (#1169)", () => {
   it("includes a Class tab, labeled 'Class', for casters and non-casters alike", () => {
     for (const character of [caster, nonCaster]) {

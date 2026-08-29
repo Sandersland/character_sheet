@@ -1,15 +1,4 @@
-/**
- * The one RulesEdition order array and the creation default (#1436).
- *
- * Every value below is asserted against a LITERAL, never against another value
- * in this module — in particular never `RULES_EDITION_DISPLAY_ORDER[0] ===
- * DEFAULT_RULES_EDITION`. Display order is a product choice; the default mirrors
- * `Character.rulesEdition`'s Prisma `@default`. Coupling the two would let
- * either drift silently behind the other, recreate backend-side the positional
- * coupling #1436 deleted from the client, and pre-break #1372 the moment a
- * product decision shows 2014 first. `reference.ts` states the same rule for the
- * same reason on `subclassGateLevel`.
- */
+// Every value below is asserted against a literal, never against another value in this module — RULES_EDITION_DISPLAY_ORDER (a product choice) and DEFAULT_RULES_EDITION (mirrors Character.rulesEdition's Prisma default) must be free to drift independently.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -33,8 +22,6 @@ describe("RULES_EDITION_DISPLAY_ORDER", () => {
     expect(RULES_EDITION_DISPLAY_ORDER).toEqual(["EDITION_2024", "EDITION_2014"]);
   });
 
-  // #1527: display order is now a PERMUTATION of ALL_RULES_EDITIONS, not the
-  // validity set itself — no missing member, no duplicate, no stranger.
   it("is a permutation of ALL_RULES_EDITIONS", () => {
     expect([...RULES_EDITION_DISPLAY_ORDER].sort()).toEqual([...ALL_RULES_EDITIONS].sort());
     expect(new Set(RULES_EDITION_DISPLAY_ORDER).size).toBe(RULES_EDITION_DISPLAY_ORDER.length);
@@ -49,12 +36,7 @@ describe("isRulesEdition", () => {
     expect(isRulesEdition(undefined)).toBe(false);
   });
 
-  // Mutation proof (#1527's own acceptance criterion): reordering or
-  // shortening RULES_EDITION_DISPLAY_ORDER must not change what counts as a
-  // valid edition — isRulesEdition reads ALL_RULES_EDITIONS, a SEPARATE
-  // array, never this one. Mutates the exported array in place (TS `readonly`
-  // is compile-time only) and restores it in `finally` so no other test
-  // observes the mutation.
+  // isRulesEdition reads ALL_RULES_EDITIONS, a separate array from RULES_EDITION_DISPLAY_ORDER; TS `readonly` is compile-time only, so this mutates the exported array in place and restores it in `finally`.
   it("stays correct independent of RULES_EDITION_DISPLAY_ORDER's order or length", () => {
     const mutableOrder = RULES_EDITION_DISPLAY_ORDER as RulesEdition[];
     const original = [...mutableOrder];
@@ -64,8 +46,8 @@ describe("isRulesEdition", () => {
       expect(isRulesEdition("EDITION_2024")).toBe(true);
 
       mutableOrder.length = 0;
-      mutableOrder.push("EDITION_2014"); // shortened — 2024 dropped from display order
-      expect(isRulesEdition("EDITION_2024")).toBe(true); // still a valid edition
+      mutableOrder.push("EDITION_2014");
+      expect(isRulesEdition("EDITION_2024")).toBe(true);
       expect(isRulesEdition("EDITION_2014")).toBe(true);
     } finally {
       mutableOrder.length = 0;

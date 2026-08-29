@@ -1,21 +1,5 @@
-/**
- * The frozen half of an InventoryItem, as one JSON document (#1647, epic
- * #1644). Today the same definition data is spread across InventoryItem
- * columns plus three detail tables plus InventoryCapability, and every new
- * field costs two columns and five snapshot call sites. #1648 adds the
- * `snapshot` column this validates; #1649 makes it the only reader.
- *
- * The membership rule is FROZEN DEFINITION DATA ONLY. Runtime state stays in
- * columns because ~15 call sites update it with atomic `updateMany`, and
- * blobbing it would turn each into a read-modify-write: `quantity`,
- * `equippedSlot`, `attuned`, `notes`, `position`, `activatedUsesSpent`,
- * `usesRemaining`, and a capability's `used` are all deliberately absent. A
- * reviewer should be able to confirm that by reading this file alone.
- *
- * Every object is STRICT. zod strips unknown keys by default, so a non-strict
- * schema would accept a blob carrying `quantity` and silently discard it,
- * turning the rule above into a comment nobody enforces.
- */
+/** Frozen definition data only — runtime state (`quantity`, `equippedSlot`, `attuned`, `notes`, `position`, `activatedUsesSpent`, `usesRemaining`, a capability's `used`) stays in columns, updated via atomic `updateMany`, never here. */
+/** Every object here is `.strictObject` on purpose — non-strict would silently accept and discard a blob carrying runtime fields, defeating the frozen-data rule above. */
 import { z } from "zod";
 
 import { snapshotCapabilitySchema } from "./inventory-snapshot-capability.js";
@@ -29,7 +13,6 @@ import {
   WEAPON_RANGES,
 } from "./item-vocabulary.js";
 
-/** Coin purse, the same {cp,sp,gp,pp} shape the cost column has always held. */
 export const snapshotCostSchema = z.strictObject({
   cp: z.number().int().nonnegative(),
   sp: z.number().int().nonnegative(),
@@ -66,9 +49,7 @@ export const snapshotArmorSchema = z.strictObject({
   strengthRequirement: z.number().int().positive().nullish(),
 });
 
-// `maxUses` is the authored ceiling and is frozen; `usesRemaining` is the
-// runtime counter and stays a column. Including both is the single most likely
-// mistake in #1648 — the strict object is what catches it.
+// `maxUses` is the frozen ceiling; `usesRemaining` is the runtime counter and stays a column, not here.
 export const snapshotConsumableSchema = z.strictObject({
   effectDiceCount: z.number().int().positive().nullish(),
   effectDiceFaces: z.number().int().positive().nullish(),
@@ -78,8 +59,7 @@ export const snapshotConsumableSchema = z.strictObject({
 });
 
 export const inventorySnapshotSchema = z.strictObject({
-  // Bumped only when a blob shape changes incompatibly, so old rows migrate in
-  // code rather than by a data migration.
+  // Bump only when the blob shape changes incompatibly — old rows migrate in code, not via a data migration.
   version: z.literal(1),
 
   name: z.string().min(1),
@@ -90,9 +70,7 @@ export const inventorySnapshotSchema = z.strictObject({
   slot: z.enum(EQUIP_SLOTS).nullish(),
 
   rarity: z.enum(ITEM_RARITY_KEYS).nullish(),
-  // .optional() and NOT .nullish() like its neighbours: the column is
-  // Boolean @default(false) and never null, so null would be a lie. Omission is
-  // the only valid absence.
+  // `.optional()` not `.nullish()` — the column is `Boolean @default(false)`, never null, so null would misrepresent it.
   requiresAttunement: z.boolean().optional(),
   // null kind = attunable by anyone, distinct from requiresAttunement false.
   attunementPrereqKind: z.enum(ATTUNEMENT_PREREQ_KINDS).nullish(),
@@ -104,9 +82,7 @@ export const inventorySnapshotSchema = z.strictObject({
 
   capabilities: z
     .array(snapshotCapabilitySchema)
-    // A z.array cannot express a cross-element rule, so uniqueness is enforced
-    // where the array is declared: a duplicate key would make an
-    // InventoryCapabilityUse row ambiguous about which capability it counts.
+    // Enforced here because z.array can't express cross-element uniqueness; a duplicate key would make an InventoryCapabilityUse row ambiguous about which capability it counts.
     .refine((caps) => new Set(caps.map((c) => c.key)).size === caps.length, {
       message: "capability keys must be unique within an item",
     }),

@@ -1,11 +1,3 @@
-/**
- * Hand of Ultimate Mercy route tests (#1248). A level-17+ Warrior of Mercy
- * monk can spend 5 Focus + 1 use of the handOfUltimateMercy pool (1/long
- * rest) to narrate reviving a creature with the client-rolled 4d10 + Wis mod
- * hit points. Off-subclass, under-level, insufficient-resource, and
- * already-used-this-rest cases are all rejected.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -44,18 +36,50 @@ function agent() {
 }
 const url = `/api/characters/${FIXTURE_ID}/abilities/hand-of-ultimate-mercy/transactions`;
 
+// useHandOfUltimateMercy's gate (resolveSubclassSlug) reads only the
+// display-name string, so this bespoke class/subclass need their own seeded rows.
 async function createMonk(experiencePoints: number, level: number, subclass?: string, resources?: Prisma.InputJsonValue) {
   const cls = await prisma.characterClass.upsert({
     where: { name: CLASS_NAME },
     create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
     update: {},
   });
+  await prisma.classFeature.deleteMany({ where: { classId: cls.id, subclassId: null } });
+  await prisma.classFeature.create({
+    data: {
+      classId: cls.id, subclassId: null, name: "Focus", level: 2, edition: "EDITION_2024",
+      description: "You have a pool of Focus Points equal to your monk level.",
+      resourceKey: "focus", resourceLabel: "Focus Points", resourceRecharge: "short-or-long",
+      resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+    },
+  });
+  let subclassId: string | undefined;
+  if (subclass === "Warrior of Mercy") {
+    // find-then-create, not .upsert(): `edition` is nullable and Prisma's
+    // compound-unique input rejects an explicit null.
+    const existing = await prisma.subclass.findFirst({ where: { classId: cls.id, slug: "hand-of-ultimate-mercy-route-test-mercy" } });
+    const sub =
+      existing ??
+      (await prisma.subclass.create({
+        data: { classId: cls.id, name: "Warrior of Mercy Route Test", description: "Test fixture subclass.", slug: "hand-of-ultimate-mercy-route-test-mercy" },
+      }));
+    subclassId = sub.id;
+    await prisma.classFeature.deleteMany({ where: { subclassId } });
+    await prisma.classFeature.create({
+      data: {
+        classId: cls.id, subclassId, name: "Hand of Ultimate Mercy", level: 17, edition: "EDITION_2024",
+        description: "row text",
+        resourceKey: "handOfUltimateMercy", resourceRecharge: "longRest",
+        resourceTotals: [{ minLevel: 17, total: 1 }],
+      },
+    });
+  }
   await prisma.character.create({
     data: {
       ...fixtureBase(experiencePoints),
       ownerId: OWNER_ID,
       resources: resources ?? Prisma.JsonNull,
-      classEntries: { create: [{ name: "monk", classId: cls.id, position: 0, level, subclass }] },
+      classEntries: { create: [{ name: "monk", classId: cls.id, subclassId, position: 0, level, subclass }] },
     },
   });
 }
@@ -91,9 +115,6 @@ describe("POST /api/characters/:id/abilities/hand-of-ultimate-mercy/transactions
     expect(ultimateMercyPool.total).toBe(1);
   });
 
-  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
-  // the shared ability endpoint, so a green run afterwards is evidence the audit
-  // trail is unchanged.
   it("pins the audit trail of one Hand of Ultimate Mercy use", async () => {
     const res = await agent()
       .post(url)
@@ -189,8 +210,6 @@ describe("Hand of Ultimate Mercy for an under-level or off-subclass monk", () =>
     expect(res.body.error).toMatch(/warrior of mercy/i);
   });
 
-  // #1277: isWarriorOfMercy used to substring-match ("mercy"), so a homebrew
-  // name merely CONTAINING "Mercy" inherited real Warrior of Mercy mechanics.
   it("rejects a homebrew name containing \"Mercy\" that isn't the real subclass", async () => {
     await createMonk(225000, 17, "Way of Mercy Reborn");
     const res = await agent()

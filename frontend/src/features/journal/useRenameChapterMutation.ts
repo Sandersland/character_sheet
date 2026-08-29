@@ -12,16 +12,7 @@ interface RenameChapterVars {
 
 type ChronicleCache = { arcs: unknown; sessions: ChronicleSession[] } | undefined;
 
-/**
- * JournalPage's chapter-rename write (#1299), split out so JournalPageBody's
- * own function stays under fallow's cognitive-complexity gate.
- *
- * Exact write, not invalidate: updateSessionTitle returns a full `Session`
- * (participants included), a different shape than the cached
- * `ChronicleSession[]` (which also carries derived sessionNumber/noteCount) —
- * so the response can't be dropped in directly. The title is already known
- * from the caller's own input, the same value the old setSessions splice used.
- */
+// Exact write, not invalidate: updateSessionTitle's response is a full Session, a different shape than the cached ChronicleSession[], so it can't be dropped in directly.
 export function useRenameChapterMutation(characterId: string) {
   const queryClient = useQueryClient();
 

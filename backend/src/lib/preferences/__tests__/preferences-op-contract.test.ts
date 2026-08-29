@@ -1,11 +1,4 @@
-/**
- * Latch for the Preferences schema migrated into @character-sheet/contracts
- * (#1395, epic #1369) — the reference case that settles this package's
- * z.input vs z.output policy (index.ts). `preferencesSchema`'s three
- * `.default()`s are exactly where the two diverge, so this is the one family
- * where the divergence must be proven, not just shown absent as the other
- * `*-op-contract.test.ts` files do.
- */
+// preferencesSchema's three `.default()`s are exactly where z.input and z.output diverge, so this contract test must prove the divergence rather than show it absent (#1395).
 import { preferencesSchema, type UserPreferences } from "@character-sheet/contracts";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { z } from "zod";

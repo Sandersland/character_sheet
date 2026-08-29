@@ -1,46 +1,34 @@
-// Pure model + formatting for the multi-attack tally (#802): the per-attack rows
-// the attack sheet records, the auto-verdict rule (crit range met → crit, nat 1
-// → miss, #1120), and the "Turn summary" banner lines. No JSX — rendered by
-// AttackTallyStrip and TurnSummaryBanner, recorded by useTurnState.
-
 import { isCriticalRoll, isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
 import type { RollResult } from "@/lib/dice";
 
 export type TallyVerdict = "hit" | "miss" | "crit";
 
-/** Which economy slot a tally row came from — the Attack action or the TWF bonus action (#813). */
 export type TallyRowSource = "action" | "bonusAction";
 
-/** The kept-d20 snapshot for one recorded attack roll. */
 export interface TallyAttackRoll {
   total: number;
   keptFace: number | null;
-  /** Literally rolled 20 on the kept die — display-only ("nat 20" text/badge), never the crit decision (#1120: Champion's widened crit range crits below 20 too). */
+  // Display-only ("nat 20" badge) — never the crit decision; Champion's widened crit range crits below 20 too (#1120).
   nat20: boolean;
   nat1: boolean;
-  /** Kept die met the character's crit range (defaults to `nat20` at range 20) — the ONE crit-decision field autoVerdict/isVerdictLocked/isCritRow read. */
+  // The ONE crit-decision field — autoVerdict/isVerdictLocked/isCritRow all read this, never nat20.
   criticalHit: boolean;
 }
 
-/** One recorded attack this turn: the roll, an optional damage slot, a verdict. */
 export interface AttackTallyRow {
-  /** Stable per-row id — damage/rider/override writes target it, not "the last row" (#813). */
+  // Stable id — damage/rider/override writes target it, not "the last row" (#813).
   id: string;
-  /** Which slot recorded it — `action` (Attack) or `bonusAction` (off-hand TWF). */
   source: TallyRowSource;
   formId: string;
   formName: string;
   attack: TallyAttackRoll;
   damage?: number;
   verdict?: TallyVerdict;
-  /** Correlates this row's roll events (attack/damage/rider) as one swing (#1235). */
+  // Correlates this row's attack/damage/rider events as one swing (#1235).
   swingId?: string;
 }
 
-// A kept-d20 result → the tally's roll snapshot (#1120: the crit DECISION
-// reads the character's served critRange, never a hardcoded 20). Shared by
-// useAttackRolls' handleAttack and useResolution (#1831) so the "roll → build
-// a TallyAttackRoll" step has exactly one implementation.
+// Shared by useAttackRolls.handleAttack and useResolution so the roll-to-TallyAttackRoll step has exactly one implementation (#1831).
 export function toHitSnapshot(result: RollResult, critRange: number): TallyAttackRoll {
   return {
     total: result.total,
@@ -51,20 +39,16 @@ export function toHitSnapshot(result: RollResult, critRange: number): TallyAttac
   };
 }
 
-// Verdict forced by the die: crit range met → crit (auto hit), nat 1 → miss.
-// Any other roll returns undefined so the row is a tap-to-cycle manual call.
 export function autoVerdict(attack: TallyAttackRoll): TallyVerdict | undefined {
   if (attack.criticalHit) return "crit";
   if (attack.nat1) return "miss";
   return undefined;
 }
 
-// A row is locked (no manual verdict changes) when the die auto-decided it.
 export function isVerdictLocked(row: AttackTallyRow): boolean {
   return row.attack.criticalHit || row.attack.nat1;
 }
 
-// Explicit-miss only — an unresolved row is undecided, never a miss.
 export function isMissRow(row: AttackTallyRow): boolean {
   return row.verdict === "miss";
 }
@@ -73,14 +57,10 @@ export function isCritRow(row: AttackTallyRow): boolean {
   return row.verdict === "crit" || row.attack.criticalHit;
 }
 
-// No verdict yet — the attack was rolled but never called hit or miss (#811).
-// Unresolved rows are tappable everywhere they render; resolved rows are final.
 export function isUnresolvedRow(row: AttackTallyRow): boolean {
   return row.verdict === undefined;
 }
 
-// One "Turn summary" banner line. An unresolved row asks the question instead of
-// claiming a hit (#811); miss rows drop damage; crit rows say so.
 export function attackTallyLine(row: AttackTallyRow): string {
   const name = row.formName;
   if (isUnresolvedRow(row)) {

@@ -60,10 +60,8 @@ describe("buildChronicleSpine — no arcs (flat)", () => {
     expect(spine.hasParts).toBe(false);
     expect(spine.parts).toEqual([]);
     expect(spine.chapters.map((c) => c.id)).toEqual(["s12", "s11", "s10"]);
-    // Title fallback uses the derived sessionNumber; explicit title kept.
     expect(spine.chapters[0].title).toBe("The Sack of Greenest");
     expect(spine.chapters[1].title).toBe("Session 11");
-    // Arabic sessionNumber lands in the gold slot.
     expect(spine.chapters[0].sessionNumber).toBe(12);
     expect(spine.chapterCount).toBe(3);
     expect(spine.totalNotes).toBe(22);
@@ -81,7 +79,6 @@ describe("buildChronicleSpine — between-sessions bucket", () => {
     expect(spine.between?.sessionNumber).toBeNull();
     expect(spine.between?.noteCount).toBe(3);
     expect(spine.totalNotes).toBe(3);
-    // A campaign-less character (no sessions, no arcs) is the between bucket only.
     expect(spine.chapterCount).toBe(0);
     expect(spine.hasParts).toBe(false);
   });

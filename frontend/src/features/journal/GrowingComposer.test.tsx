@@ -20,7 +20,6 @@ beforeEach(() => vi.clearAllMocks());
 describe("GrowingComposer (#865)", () => {
   it("starts one line tall as a pill (rounded-full field)", () => {
     setup();
-    // editor (contenteditable) → MentionAutocomplete's .relative wrapper → field
     const editor = screen.getByRole("textbox", { name: /quick note/i });
     const field = editor.parentElement?.parentElement;
     expect(field?.className).toContain("rounded-full");
@@ -86,7 +85,6 @@ describe("GrowingComposer (#865)", () => {
     await user.type(screen.getByRole("textbox", { name: /quick note/i }), "secret");
     await user.keyboard("{Enter}");
     expect(onSave).toHaveBeenCalledWith("secret", "PRIVATE");
-    // Privacy never leaks forward — the toggle resets after a successful save.
     expect(screen.getByRole("checkbox", { name: /private/i })).not.toBeChecked();
   });
 
@@ -104,7 +102,6 @@ describe("GrowingComposer (#865)", () => {
     it("renders the lock as an aria-pressed icon button and sends PRIVATE", async () => {
       const user = userEvent.setup();
       const { onSave } = setup({ variant: "mobile", campaignId: "camp-1" });
-      // No checkbox — the lock is a compact toggle button beside the field.
       expect(screen.queryByRole("checkbox", { name: /private/i })).toBeNull();
       const lock = screen.getByRole("button", { name: /private/i });
       expect(lock).toHaveAttribute("aria-pressed", "false");
@@ -114,7 +111,6 @@ describe("GrowingComposer (#865)", () => {
       await user.type(screen.getByRole("textbox", { name: /quick note/i }), "secret");
       await user.keyboard("{Enter}");
       expect(onSave).toHaveBeenCalledWith("secret", "PRIVATE");
-      // Privacy never leaks forward — the lock resets after a successful save.
       expect(lock).toHaveAttribute("aria-pressed", "false");
     });
 

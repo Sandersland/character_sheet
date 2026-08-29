@@ -13,7 +13,6 @@ export interface ConcentrationNote {
   held: boolean;
 }
 
-/** Build the player-facing text for a resolved concentration check (issue #41). */
 function concentrationMessage(check: ConcentrationCheck): ConcentrationNote {
   if (check.reason === "death") {
     return { text: `Lost concentration on ${check.spellName} (dropped to 0 HP)`, held: false };
@@ -24,19 +23,10 @@ function concentrationMessage(check: ConcentrationCheck): ConcentrationNote {
     : { text: `Concentration save: ${roll} — lost ${check.spellName}`, held: false };
 }
 
-/**
- * The shared HP-apply engine behind both surfaces (#768): submits op batches
- * through applyHitPointOperations, swaps the character, and surfaces the
- * concentration check identically (auto-roll banner vs deferred roll modal).
- * The HP tracker (HitPointTracker) and the session HP sheet both consume this, so
- * damage/heal/temp + concentration behave the same everywhere.
- */
 export function useHitPointApply(character: Character) {
   const [concentrationNote, setConcentrationNote] = useState<ConcentrationNote | null>(null);
   const [pendingSave, setPendingSave] = useState<PendingConcentrationSave | null>(null);
 
-  // Standing player preference (#1166) — no per-roll UI here anymore; the
-  // control lives in PreferencesSheet (#1167) and applies to the next damage op.
   const [autoRollConcentration] = useAutoRollConcentrationPref();
 
   const mutation = useCharacterMutation({
@@ -46,11 +36,6 @@ export function useHitPointApply(character: Character) {
     fallbackMessage: "Something went wrong — try again",
   });
 
-  /**
-   * Submit a batch of operations, returns true on success. `silentConcentration`
-   * skips the inline banner/modal handling — used when the save modal is already
-   * showing the result itself (issue #76).
-   */
   async function submit(
     ops: HitPointOperation[],
     opts: { silentConcentration?: boolean } = {},
@@ -79,7 +64,6 @@ export function useHitPointApply(character: Character) {
     }
   }
 
-  // Apply the active HP mode; returns true on success so the child clears its field.
   async function handleApply(
     mode: HpMode,
     value: number,
@@ -90,7 +74,6 @@ export function useHitPointApply(character: Character) {
     return submit(ops);
   }
 
-  // The save die settled in the modal — persist it with the natural d20 (issue #76).
   async function resolveConcentrationSave(roll: number) {
     if (!pendingSave) return;
     await submit(

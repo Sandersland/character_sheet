@@ -105,9 +105,6 @@ const mockCharacter: Character = {
   speciesTraits: [],
 };
 
-// BannerVitals (and its nested ArmorClassBreakdown) reads useCurrentCharacter(),
-// so every render seeds the cache and mounts CurrentCharacterProvider via
-// renderWithCharacter.
 function renderWithRoll() {
   return renderWithCharacter(
     <RollProvider>
@@ -131,9 +128,9 @@ describe("BannerVitals", () => {
     await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
     const dialog = screen.getByRole("dialog", { name: "Armor Class breakdown" });
     expect(dialog).toHaveTextContent("Leather");
-    expect(dialog).toHaveTextContent("11"); // base part: plain number
+    expect(dialog).toHaveTextContent("11");
     expect(dialog).toHaveTextContent("Dex");
-    expect(dialog).toHaveTextContent("+3"); // later parts: formatted modifier
+    expect(dialog).toHaveTextContent("+3");
     expect(dialog).toHaveTextContent("Total");
     expect(dialog).toHaveTextContent("14");
   });
@@ -150,11 +147,9 @@ describe("BannerVitals", () => {
   it("renders speed with ft suffix and proficiency as a formatted modifier", () => {
     renderWithRoll();
     expect(screen.getByText("35 ft")).toBeInTheDocument();
-    expect(screen.getByText("+2")).toBeInTheDocument(); // proficiencyBonus=2
+    expect(screen.getByText("+2")).toBeInTheDocument();
   });
 
-  // #1085: HP left the header entirely (it lives in the Combat tab). The banner
-  // is four self-labeled stat cards, no HP readout and no manage-HP entry point.
   it("renders no HP readout or manage-HP control in the header", () => {
     renderWithRoll();
     expect(screen.queryByText(/hit points/i)).not.toBeInTheDocument();

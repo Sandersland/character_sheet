@@ -1,7 +1,3 @@
-// The ceremony's "advancement" step (#888): pick an Ability Score Improvement or
-// a feat. A segmented branch toggle swaps between the two; each branch stages its
-// op into draft.advancement, which the footer Continue gate reads (draftSatisfies).
-
 import { useEffect, useReducer, useState } from "react";
 
 import AsiAbilityGrid from "@/features/level-up/AsiAbilityGrid";
@@ -28,20 +24,16 @@ export default function AbilityScoreStep() {
 
   const asi = useAsiDraft();
 
-  // Gate the feat picker on the level being reached, not the current one.
   const feats = useFeatCatalog(branch === "feat", plan.target.newLevel, character.rulesEdition);
   const [view, dispatchView] = useReducer(featViewReducer, FEAT_VIEW_INITIAL);
   const custom = useCustomFeatDraft();
 
-  // Reactively stage the ASI op so the footer Continue reads it — no Apply button.
   useEffect(() => {
     if (branch !== "asi") return;
     setDraft((d) => ({ ...d, advancement: asi.totalPoints === 2 ? asi.buildOperation() : undefined }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildOperation is a render-fresh closure; asi.totalPoints/increases are the real triggers, listing it would re-run every render and loop
   }, [branch, asi.totalPoints, asi.increases, setDraft]);
 
-  // Switching branches must drop any op the other branch staged, or a stale op
-  // could satisfy Continue for the wrong choice.
   function switchBranch(next: Branch) {
     if (next === branch) return;
     setBranch(next);
@@ -51,8 +43,7 @@ export default function AbilityScoreStep() {
     setDraft((d) => ({ ...d, advancement: undefined }));
   }
 
-  // Mirrors AdvancementPanel.handleFeatSubmit — half-feats default to the first
-  // ability option when the player left the picker on its single option.
+  // Mirrors AdvancementPanel.handleFeatSubmit — keep half-feat default-choice logic in sync.
   function stageFeat() {
     if (view.customMode) {
       const op = custom.buildOperation();

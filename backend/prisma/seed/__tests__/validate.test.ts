@@ -1,17 +1,14 @@
 // NO database — pure checks on assertSeedContentValid, the seed-time zod gate
-// (#1277). Two concerns:
-//   1. it actually rejects a malformed row (the M1/M3-shaped mutations,
-//      reverted after confirming the failure — transcript in the PR);
-//   2. the permanent positive control (#1370's lesson): a validator that
-//      short-circuits, has an empty registry, or is `.optional()` all the way
-//      down would report "all valid" vacuously. familiesChecked/rowsChecked
-//      make that impossible to fake — and feeding a deliberately-broken
-//      FIXTURE array (never the real SUBCLASSES) through the real schema
-//      proves the schema itself still rejects bad content, independent of
-//      what's currently seeded.
+// (#1277). Two concerns: it actually rejects a malformed row, and the
+// permanent positive control (#1370's lesson): a validator that
+// short-circuits, has an empty registry, or is `.optional()` all the way down
+// would report "all valid" vacuously. familiesChecked/rowsChecked make that
+// impossible to fake — and feeding a deliberately-broken FIXTURE array (never
+// the real SUBCLASSES) through the real schema proves the schema itself still
+// rejects bad content, independent of what's currently seeded.
 import { describe, it, expect } from "vitest";
 
-import { assertSeedContentValid, assertCatalogNamesResolve } from "../validate.js";
+import { assertSeedContentValid, assertCatalogNamesResolve, assertNoDuplicatePoolDeclaringRows, assertNoDuplicateChoiceDeclaringRows } from "../validate.js";
 import { subclassSeedSchema } from "../subclasses.js";
 
 describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
@@ -111,11 +108,50 @@ describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
     expect(() => assertCatalogNamesResolve(fixture)).not.toThrow();
   });
 
-  // #1565: the nine background-package catalog additions must resolve the
-  // same way any other ITEMS row does — a FIXTURE package referencing all of
-  // them, never the real BACKGROUND_STARTING_EQUIPMENT_PACKAGES (which cites
-  // them via `backgroundName`, not `className`, but assertCatalogNamesResolve
-  // only reads `.package`, so a class-shaped fixture proves the same thing).
+  // #906: findOverrideRow picks the FIRST matching row — two pool-declaring
+  // rows sharing (class, subclass, resourceKey, edition) is content
+  // ambiguity, never a legal seed shape.
+  it("assertNoDuplicatePoolDeclaringRows rejects two rows sharing (class, subclass, resourceKey, edition)", () => {
+    const brokenFixture = [
+      { className: "Druid", subclassSlug: "druid-circle-of-the-moon", edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }] },
+      { className: "Druid", subclassSlug: "druid-circle-of-the-moon", edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 3 }] },
+    ];
+    expect(() => assertNoDuplicatePoolDeclaringRows(brokenFixture)).toThrow(/duplicate pool-declaring ClassFeature row/);
+  });
+
+  it("assertNoDuplicatePoolDeclaringRows accepts the same resourceKey across DIFFERENT subclasses/editions", () => {
+    const okFixture = [
+      { className: "Druid", subclassSlug: null, edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }] },
+      { className: "Druid", subclassSlug: "druid-circle-of-the-moon", edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }] },
+      { className: "Druid", subclassSlug: null, edition: "EDITION_2024", resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }] },
+    ];
+    expect(() => assertNoDuplicatePoolDeclaringRows(okFixture)).not.toThrow();
+  });
+
+  it("assertNoDuplicatePoolDeclaringRows ignores identity-only rows (resourceKey with no resourceTotals, the Metamagic pattern)", () => {
+    const okFixture = [
+      { className: "Sorcerer", subclassSlug: null, edition: "EDITION_2014", resourceKey: "metamagic" },
+      { className: "Sorcerer", subclassSlug: null, edition: "EDITION_2024", resourceKey: "metamagic" },
+    ];
+    expect(() => assertNoDuplicatePoolDeclaringRows(okFixture)).not.toThrow();
+  });
+
+  it("assertNoDuplicateChoiceDeclaringRows rejects two rows sharing (class, subclass, choiceKey, edition)", () => {
+    const brokenFixture = [
+      { className: "Monk", subclassSlug: "monk-way-of-the-four-elements", edition: "EDITION_2014", choiceKey: "fourElementsDisciplines" },
+      { className: "Monk", subclassSlug: "monk-way-of-the-four-elements", edition: "EDITION_2014", choiceKey: "fourElementsDisciplines" },
+    ];
+    expect(() => assertNoDuplicateChoiceDeclaringRows(brokenFixture)).toThrow(/duplicate choice-declaring ClassFeature row/);
+  });
+
+  it("assertNoDuplicateChoiceDeclaringRows accepts the same choiceKey across DIFFERENT editions", () => {
+    const okFixture = [
+      { className: "Monk", subclassSlug: "monk-way-of-the-four-elements", edition: "EDITION_2014", choiceKey: "fourElementsDisciplines" },
+      { className: "Monk", subclassSlug: "monk-way-of-the-four-elements", edition: "EDITION_2024", choiceKey: "fourElementsDisciplines" },
+    ];
+    expect(() => assertNoDuplicateChoiceDeclaringRows(okFixture)).not.toThrow();
+  });
+
   it("assertCatalogNamesResolve accepts every #1565 catalog addition", () => {
     const newNames = [
       "Traveler's Clothes", "Common Clothes", "Pouch", "Calligrapher's Supplies", "Prayer Book",

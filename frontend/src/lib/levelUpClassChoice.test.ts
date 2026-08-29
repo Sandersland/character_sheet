@@ -84,7 +84,7 @@ describe("buildClassChoiceOptions", () => {
   });
 
   it("keeps an ineligible new class listed, disabled, with its requirement", () => {
-    const character = makeCharacter(); // Int 10 — doesn't meet Int 13
+    const character = makeCharacter();
     const options = buildClassChoiceOptions(character, [
       makeClass({
         id: "cls-wizard",

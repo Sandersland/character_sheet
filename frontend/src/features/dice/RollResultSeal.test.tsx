@@ -36,9 +36,9 @@ describe("RollResultSeal outcome variants", () => {
     rollWith([7, 18], { count: 1, faces: 20, modifier: 5, mode: "advantage" });
 
     expect(screen.getByText("Advantage")).toBeInTheDocument();
-    expect(screen.getByText("7")).toBeInTheDocument(); // dropped die still visible
-    expect(screen.getByText("18")).toBeInTheDocument(); // taken die
-    expect(screen.getByText("23")).toBeInTheDocument(); // 18 + 5
+    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.getByText("18")).toBeInTheDocument();
+    expect(screen.getByText("23")).toBeInTheDocument();
   });
 
   it("marks a natural 20 on the taken die as a critical outcome", () => {
@@ -49,7 +49,6 @@ describe("RollResultSeal outcome variants", () => {
   });
 
   it("does not mark a dropped natural 20 (disadvantage) as critical", () => {
-    // disadvantage keeps the lower die (5); the dropped 20 must NOT crit.
     rollWith([20, 5], { count: 1, faces: 20, mode: "disadvantage" });
 
     expect(screen.getByTestId("roll-result-seal")).toHaveAttribute("data-outcome", "normal");
@@ -140,8 +139,6 @@ describe("RollResultSeal (never suppressed / tap-anywhere dismiss)", () => {
       });
       expect(screen.getByTestId("roll-result-seal")).toBeInTheDocument();
 
-      // The scrim intercepts pointer events, so it must clear itself — a roll
-      // must not block the next tap/roll indefinitely.
       act(() => {
         vi.advanceTimersByTime(2200);
       });

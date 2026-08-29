@@ -22,9 +22,8 @@ interface LoadoutFilledRowProps {
   onReplace: (incoming: InventoryItem, outgoing: InventoryItem) => void;
 }
 
-// A single occupied loadout slot — kept as its own component, not inlined
-// into LoadoutList's row map, so that callback's own cyclomatic/cognitive
-// score stays under the fallow complexity gate (.fallowrc.jsonc).
+// Kept as its own component, not inlined into LoadoutList's row map, so that
+// callback's own cyclomatic/cognitive score stays under the fallow complexity gate.
 export default function LoadoutFilledRow({
   row,
   pending,

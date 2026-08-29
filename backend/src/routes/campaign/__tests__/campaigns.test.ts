@@ -9,13 +9,13 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 // Unique fixture ids for this file (parallel-safe on the shared dev DB).
-const OWNER_A = "owner-campaigns-a"; // creator
-const OWNER_B = "owner-campaigns-b"; // a different user
+const OWNER_A = "owner-campaigns-a";
+const OWNER_B = "owner-campaigns-b";
 const CHAR_A = "test-campaigns-char-a";
 const CHAR_B = "test-campaigns-char-b";
-const CHAR_C = "test-campaigns-char-c"; // owned by A, used for the reassignment guard
-const CHAR_D = "test-campaigns-char-d"; // owned by A, used for the PC-entity attach test
-const CHAR_E = "test-campaigns-char-e"; // owned by A, used for the campaign-delete survival test
+const CHAR_C = "test-campaigns-char-c";
+const CHAR_D = "test-campaigns-char-d";
+const CHAR_E = "test-campaigns-char-e";
 
 async function makeCharacter(id: string, ownerId: string) {
   await prisma.character.deleteMany({ where: { id } });
@@ -75,8 +75,6 @@ describe("campaigns (#246)", () => {
     expect(owner?.role).toBe("OWNER");
   });
 
-  // #1285: the campaign wire returns raw Prisma rows, so the column surfaces
-  // without a mapper — pinned here so a future mapper can't silently drop it.
   it("exposes rulesEdition on create and on GET, defaulting to EDITION_2024", async () => {
     const created = await supertest(app)
       .post("/api/campaigns")
@@ -94,8 +92,6 @@ describe("campaigns (#246)", () => {
     expect(fetched.body.rulesEdition).toBe("EDITION_2024");
   });
 
-  // #1286: the DM picks the edition at campaign creation; it's the default new
-  // characters inherit (never authoritative for an existing sheet).
   it("honours an explicit rulesEdition on create", async () => {
     const created = await supertest(app)
       .post("/api/campaigns")
@@ -106,10 +102,7 @@ describe("campaigns (#246)", () => {
     expect(created.body.rulesEdition).toBe("EDITION_2014");
   });
 
-  // #1436: the label rides every campaign row so the client's edition badge is
-  // synchronous and holds no copy of the label table. All four campaign-returning
-  // responses are covered in one spec because withEditionLabel is applied per
-  // res.json site — a missed site is invisible from any single one of them.
+  // All four campaign-returning responses are checked together, since withEditionLabel is applied per res.json site.
   it("carries rulesEditionLabel on create, list, detail and join", async () => {
     const created = await supertest(app)
       .post("/api/campaigns")
@@ -125,7 +118,7 @@ describe("campaigns (#246)", () => {
       (c) => c.id === id,
     );
     expect(listed?.rulesEditionLabel).toBe("2014 rules");
-    // The list spread must not have clobbered `role` (#1436's wrap-don't-replace).
+    // The list spread must not have clobbered `role`.
     expect(listed?.role).toBe("OWNER");
 
     const detail = await supertest(app).get(`/api/campaigns/${id}`).set("Cookie", cookieA);
@@ -205,8 +198,6 @@ describe("campaigns (#246)", () => {
     expect(res.body.campaignId).toBe(id);
   });
 
-  // #1286 supersedes the old "warn, never auto-convert" stance: a mismatched
-  // join is now blocked outright, before it ever reaches the attach updateMany.
   it("blocks attaching a character whose rulesEdition differs from the campaign's, naming both editions", async () => {
     const createdChar = await supertest(app)
       .post("/api/characters")
@@ -247,7 +238,6 @@ describe("campaigns (#246)", () => {
       expect(attach.body.error).toMatch(/2024 rules/);
       expect(attach.body.error).toMatch(/can't be changed/i);
 
-      // Never wrote the mismatched campaignId (rejected before the updateMany).
       const stillUnattached = await prisma.character.findUniqueOrThrow({
         where: { id: charId },
         select: { campaignId: true, rulesEdition: true },
@@ -259,13 +249,7 @@ describe("campaigns (#246)", () => {
     }
   });
 
-  // End-to-end happy path (#1285/#1286): a same-edition attach succeeds and the
-  // response reflects the edition. NOT a regression pin for the "attach never
-  // converts rulesEdition" invariant — a same-edition write is a no-op even if
-  // a future bug started forwarding rulesEdition on attach, so this test alone
-  // could never catch that. campaign-attach.test.ts's attachCharacterUpdate
-  // pin covers the invariant itself, seeding a DB-level mismatch that bypasses
-  // the guard below (proven red against an injected converting write).
+  // Not a pin for "attach never converts rulesEdition" — a same-edition write is a no-op either way.
   it("does not convert a character's rulesEdition when it joins a same-edition campaign", async () => {
     const createdChar = await supertest(app)
       .post("/api/characters")
@@ -309,12 +293,7 @@ describe("campaigns (#246)", () => {
     }
   });
 
-  // #1286: a campaign's rulesEdition is the default new characters inherit,
-  // set once at creation and never touched by the attach flow — true today
-  // only because there is no PATCH /campaigns/:id at all. Shaped so a future
-  // PATCH handler that forwards rulesEdition (e.g. a "rename campaign" form
-  // that blindly spreads the whole body) trips it: re-fetch after a join and
-  // assert the CAMPAIGN row, not just the character, is unchanged.
+  // Shaped to catch a future handler that blindly forwards rulesEdition onto the campaign row.
   it("leaves a campaign's rulesEdition unchanged after a character joins", async () => {
     const campaign = await supertest(app)
       .post("/api/campaigns")
@@ -422,7 +401,6 @@ describe("campaigns (#246)", () => {
       .set("Cookie", cookieA)
       .send({ characterId: CHAR_D });
 
-    // A PC entity now exists for the attached character, with a 1:1 link.
     const link = await prisma.campaignCharacterLink.findUnique({
       where: { characterId: CHAR_D },
       include: { campaignEntity: true },
@@ -432,7 +410,6 @@ describe("campaigns (#246)", () => {
     expect(link?.campaignEntity.name).toBe(`Char ${CHAR_D}`);
     expect(link?.campaignEntity.campaignId).toBe(id);
 
-    // Re-attach (same campaign) does not duplicate the entity.
     await supertest(app)
       .post(`/api/campaigns/${id}/characters`)
       .set("Cookie", cookieA)
@@ -440,7 +417,6 @@ describe("campaigns (#246)", () => {
     const pcEntities = await prisma.campaignEntity.findMany({ where: { campaignId: id, type: "PC" } });
     expect(pcEntities).toHaveLength(1);
 
-    // A second member sees the PC entity via GET …/entities.
     await supertest(app).post("/api/campaigns/join").set("Cookie", cookieB).send({ inviteCode });
     const list = await supertest(app)
       .get(`/api/campaigns/${id}/entities`)
@@ -522,10 +498,7 @@ describe("campaigns (#246)", () => {
       expect(await prisma.campaign.findUnique({ where: { id } })).toBeNull();
     });
 
-    // The double-delete race pin: the loser reaches the tx after the winner's
-    // commit, so its view is "campaign already gone" — which must resolve as a
-    // success, not throw P2025 into a 500. Deterministic via the extracted tx
-    // body; the concurrent-requests spec below is the end-to-end net.
+    // Must resolve as a success (not P2025-into-500) when the campaign is already gone.
     it("resolves already-gone as success in the delete tx body", async () => {
       const result = await prisma.$transaction((tx) =>
         deleteCampaignRows(tx, "00000000-0000-0000-0000-000000000000"),
@@ -548,8 +521,7 @@ describe("campaigns (#246)", () => {
 
     it("409s while a session is active, then deletes once it has ended", async () => {
       const { id } = await makeCampaign("Mid-Session Campaign");
-      // A live session has a present participant — a participantless one would
-      // auto-settle in the guard instead of 409ing.
+      // A live session has a present participant — a participantless one would auto-settle instead of 409ing.
       const active = await prisma.session.create({
         data: { campaignId: id, status: "active", participants: { create: { characterId: CHAR_A } } },
       });
@@ -586,14 +558,12 @@ describe("campaigns (#246)", () => {
       .send({ characterId: CHAR_C });
     expect(attach.status).toBe(200);
 
-    // Same-campaign re-attach is an idempotent success.
     const reSame = await supertest(app)
       .post(`/api/campaigns/${first.body.id}/characters`)
       .set("Cookie", cookieA)
       .send({ characterId: CHAR_C });
     expect(reSame.status).toBe(200);
 
-    // Reassigning to a different campaign is rejected.
     const reOther = await supertest(app)
       .post(`/api/campaigns/${second.body.id}/characters`)
       .set("Cookie", cookieA)

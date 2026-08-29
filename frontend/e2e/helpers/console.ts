@@ -1,7 +1,6 @@
 import type { Page } from "@playwright/test";
 
-// Collect console errors + uncaught page errors into a live array a spec can
-// assert is empty. Attach before navigating so early errors are captured.
+// Call before navigating, or early errors go uncaptured.
 export function collectConsoleErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (msg) => {

@@ -1,11 +1,3 @@
-// #1714 (content slice of epic #1517): shape + cross-check invariants for the
-// Wizard by-class spell bucket. Pure data tests on the array itself — same
-// pattern as spells-2014-shared-data.test.ts (#1713) — because the DB
-// round-trip (one Spell row per name, SpellClass fan-out, `?class=`
-// resolution) is already proven generically by spell-fork-reseed.test.ts
-// (#1710) and spells.test.ts's SpellClass-join describe blocks (#1711); this
-// file's only job is to prove THIS SLICE'S DATA is correct, not re-prove the
-// plumbing.
 import { describe, expect, it } from "vitest";
 
 import type { CatalogSpell } from "../spells.js";
@@ -14,14 +6,7 @@ import { SHARED_SPELLS_2014 } from "../spells-2014/shared.js";
 
 const CLASS_ROSTER = new Set(["wizard", "cleric", "druid", "bard", "sorcerer", "warlock", "paladin", "ranger"]);
 
-// Chromatic Orb and Fire Shield are the two deliberate exceptions to
-// "damageType iff effectKind 'damage'": each one's damage type is the
-// CASTER'S CHOICE (6 options for Chromatic Orb, warm-vs-chill for Fire
-// Shield), not a spell-level constant, so effectKind is still "damage"
-// (dice are real, fixed values) but damageType is intentionally absent —
-// there's no single correct value to put there. Shared at module scope
-// since both the field invariant and the prose-audit describe blocks below
-// need the same exception list.
+// Chromatic Orb and Fire Shield: damage type is the caster's choice, so damageType stays absent despite effectKind "damage".
 const DAMAGE_TYPE_EXCEPTIONS = new Set(["Chromatic Orb", "Fire Shield"]);
 
 function duplicates(names: string[]): string[] {
@@ -36,9 +21,7 @@ function duplicates(names: string[]): string[] {
 
 describe("WIZARD_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
   it("is non-empty and clears a sane floor (the whole point of this slice)", () => {
-    // Not an exact count — future refinement can still add/move rows — but a
-    // regression that silently emptied the array (e.g. a bad merge) must fail
-    // loudly rather than pass an "empty array has no bad rows" vacuous green.
+    // Guards against an empty array passing vacuously.
     expect(WIZARD_SPELLS_2014.length).toBeGreaterThanOrEqual(90);
   });
 
@@ -113,11 +96,7 @@ describe("WIZARD_SPELLS_2014 — structured-field invariants (mirrors SPELLS' #1
   });
 });
 
-// The critical lesson from a prior content slice (CLAUDE.md): a row's
-// STRUCTURED saveEffect must match its own DESCRIPTION prose, or the frontend
-// shows "half on success" text that contradicts (or omits) what the spell
-// actually does. Every damage spell in this file is checked against its own
-// text, not spot-checked.
+// A row's structured saveEffect must match its own description prose, or the frontend shows contradicting "half on success" text.
 describe("WIZARD_SPELLS_2014 — saveEffect matches its own description text (field/text mismatch guard)", () => {
   const HALF_ON_SUCCESS = /half as much damage|half damage|half the damage/i;
 
@@ -134,24 +113,7 @@ describe("WIZARD_SPELLS_2014 — saveEffect matches its own description text (fi
   });
 });
 
-// A rules-accuracy pass found dnd5eapi's own damage/dc JSON has real gaps —
-// Flaming Sphere and Scorching Ray had dc/attack_type: null despite their
-// prose clearly describing a save/attack, and Weird had damage: null
-// despite describing unconditional 4d10 psychic damage (the API simply
-// failed to structure them, unlike the mechanically-identical Phantasmal
-// Killer). derive-wizard.mjs's "trust the API's own fields" approach can't
-// catch what the API itself dropped, so this describe block audits the
-// PROSE directly against every row's structured fields — the same sweep
-// that found 5 more gaps (Levitate, Web, Otto's Irresistible Dance,
-// Antipathy/Sympathy, Contact Other Plane) beyond the first 4 — as a
-// permanent regression guard, not a one-time spot-check.
 describe("WIZARD_SPELLS_2014 — prose-vs-structured-field audit (catches what dnd5eapi's own JSON gaps hid)", () => {
-  // Rows where a damage/attack-shaped phrase in the prose is NOT the row's
-  // own primary structured effect — each has its own comment at the row
-  // explaining why (conditional/optional branch, weapon-damage buff, a
-  // per-ray/per-layer choice, or a narrative drawback unrelated to casting
-  // the spell itself). Every one of these was individually reviewed, not
-  // bulk-excluded.
   const CONDITIONAL_OR_MULTI_EFFECT = new Set([
     "Alter Self", // Natural Weapons is one of 3 selectable forms, chosen type
     "Enlarge/Reduce", // 1d4 extra/less damage is a WEAPON-ATTACK buff, not a spell effect
@@ -203,12 +165,6 @@ describe("WIZARD_SPELLS_2014 — scraping-artifact guards (same shapes spells-20
     expect(bad).toEqual([]);
   });
 
-  // Fire Shield's dnd5eapi source had a duplicated "bright light bright
-  // light" phrase and a garbled, un-parseable sentence that reads like a
-  // French-to-English machine-translation artifact ("depending on the
-  // model" for what should be "depending on the shield you chose") — caught
-  // by the mandatory rules-accuracy pass. Guarded here so a future dnd5eapi
-  // re-scrape can't quietly reintroduce either shape.
   it("no description repeats a whole word back-to-back (e.g. 'bright light bright light'), or carries a stray 'depending on the model' translation artifact", () => {
     const bad = WIZARD_SPELLS_2014.filter((s) => {
       const dupedWordPhrase = /\b(\w+ \w+)\b \1\b/i.test(s.description);
@@ -237,13 +193,6 @@ describe("WIZARD_SPELLS_2014 — scraping-artifact guards (same shapes spells-20
   });
 });
 
-// #1746: an audit of every pre-#1717 2014 slice for the same dropped-tail bug
-// PR #1745's review found in Heroism (dnd5eapi's higher_level JSON can be
-// empty despite the real SRD 5.1 text carrying an "At Higher Levels" clause).
-// Ground truth below was cross-checked against 5etools' PHB spell dataset
-// (its entriesHigherLevel field, hand-transcribed from the book): every one
-// of this slice's 95 leveled rows was checked, and none was found missing a
-// genuine upcast clause.
 describe("WIZARD_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, #1746)", () => {
   const HAS_AT_HIGHER_LEVELS_TEXT = new Set([
     "Burning Hands",
@@ -296,10 +245,6 @@ function find(name: string): CatalogSpell {
   return s;
 }
 
-// Spot-checks on the trickiest edge cases this slice hand-authored or
-// hand-transcribed — not exhaustive (99 rows), but enough to catch a
-// transcription or transform regression on the rows most likely to be
-// touched again.
 describe("WIZARD_SPELLS_2014 — value spot-checks", () => {
   it("Melf's Acid Arrow: PHB'14's real title (dnd5eapi serves it as 'Acid Arrow'), wizard-exclusive, 4d4 acid + upcast", () => {
     const s = find("Melf's Acid Arrow");
@@ -321,8 +266,7 @@ describe("WIZARD_SPELLS_2014 — value spot-checks", () => {
     expect(s.effectDiceCount).toBe(3);
     expect(s.effectDiceFaces).toBe(8);
     expect(s.upcastDicePerLevel).toBe(1);
-    // damageType is deliberately unset (caster's choice among 6 options) —
-    // covered by the invariant test's DAMAGE_TYPE_EXCEPTIONS, not re-asserted here.
+    // damageType is covered by DAMAGE_TYPE_EXCEPTIONS, not re-asserted here.
     expect(s.description).toMatch(/3d8 damage of the type you chose/);
     expect(s.description).not.toMatch(/leaps? to a new target/i);
   });

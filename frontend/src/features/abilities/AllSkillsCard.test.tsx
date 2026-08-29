@@ -47,25 +47,20 @@ describe("AllSkillsCard", () => {
   it("renders all 18 skills as roll rows — including non-proficient ones — with no modal", () => {
     renderCard(allEighteen({ stealth: { proficient: true } }));
 
-    // A proficient skill AND a non-proficient one are both present inline.
     expect(screen.getByText("Stealth")).toBeInTheDocument();
     expect(screen.getByText("Arcana")).toBeInTheDocument();
     expect(screen.getByText("Survival")).toBeInTheDocument();
 
-    // Every skill is a one-tap roll button; 18 of them.
     const rollButtons = screen.getAllByTitle(/^Roll .+ check:/);
     expect(rollButtons).toHaveLength(18);
 
-    // The retired modal path is gone.
     expect(screen.queryByText(/All 18/)).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("groups skills under their governing ability heading", () => {
     renderCard(allEighteen());
-    // Canonical ability headings present.
     for (const ability of ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]) {
-      // Constitution has no skills, so it must NOT appear; the rest do.
       if (ability === "Constitution") {
         expect(screen.queryByRole("heading", { name: ability })).not.toBeInTheDocument();
       } else {
@@ -92,17 +87,13 @@ describe("AllSkillsCard", () => {
         },
       }),
     );
-    // Badge: "+4 Enhance Ability" on the Stealth row (source label, never a raw key).
     expect(screen.getByText(/\+4 Enhance Ability/)).toBeInTheDocument();
-    // Bonus folds the buff in: Dex +3 + proficiency +2 + temp +4 = +9.
     expect(screen.getByTitle(/^Roll Stealth check: 1d20 \+ 9\b/)).toBeInTheDocument();
   });
 
   it("rolls a skill check with the correct bonus (ability mod + proficiency)", () => {
     renderCard(allEighteen({ stealth: { proficient: true } }));
-    // Stealth = Dex mod (+3) + proficiency (+2) = +5.
     expect(screen.getByTitle(/^Roll Stealth check: 1d20 \+ 5\b/)).toBeInTheDocument();
-    // Non-proficient Acrobatics = Dex mod (+3) only.
     expect(screen.getByTitle(/^Roll Acrobatics check: 1d20 \+ 3\b/)).toBeInTheDocument();
   });
 });

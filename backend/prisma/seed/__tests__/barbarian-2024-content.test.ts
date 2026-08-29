@@ -1,11 +1,3 @@
-// #1223 commit 2 of 3: Barbarian's real SRD 5.2 (2024) content. Every
-// assertion below is pinned against an actual SRD 5.2 VALUE (a duration, a DC
-// formula, a level, a maximum) transcribed from the researched delta list —
-// never against "differs from the 2014 row", which a garbage 2024 paraphrase
-// would also satisfy. Mirrors barbarian-2014-snapshot.test.ts's shape (same
-// file, same BARBARIAN_FEATURES export) but pins the OTHER edition, plus the
-// structural collision this issue's own Improved Brutal Strike row exists to
-// avoid (see BARBARIAN_FEATURES' own comment on that row).
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -20,7 +12,6 @@ function rowsNamed(subclassSlug: string | null, name: string) {
   return BARBARIAN_FEATURES.filter((r) => r.subclassSlug === subclassSlug && r.name === name);
 }
 
-/** Exactly one row for (subclassSlug, name, edition), or the test fails with a precise locator. */
 function row(subclassSlug: string | null, name: string, edition: Edition) {
   const found = rowsNamed(subclassSlug, name).filter((r) => r.edition === edition);
   expect(found, `${subclassSlug ?? "(base)"}/${name}/${edition}`).toHaveLength(1);
@@ -249,13 +240,6 @@ const ABILITY_SCORES = {
   charisma: 15,
 };
 
-// Integration-level proof (mirrors feature-edition.test.ts's
-// loadDbFeatureRows pattern): the REAL seeded rows, read through the REAL
-// derivation path, actually reach a serialized character's derived features —
-// not just BARBARIAN_FEATURES' in-memory shape. Barbarian is an ordinary
-// already-seeded class/no-subclass pair, so this needs no bespoke catalog row
-// (unlike fighter-resource-rows.ts's precedent, which exists for a domain
-// this commit doesn't touch — resource pools).
 describe("integration (#1223): a level-13 Barbarian's derived features differ by edition exactly where authored", () => {
   it("2024 has Instinctive Pounce/Primal Knowledge/Brutal Strike/Improved Brutal Strike and NOT Brutal Critical; 2014 is the reverse", async () => {
     const featureRows = await loadDbFeatureRows("barbarian", undefined);

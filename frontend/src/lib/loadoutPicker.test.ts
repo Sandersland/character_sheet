@@ -11,8 +11,7 @@ import {
 } from "@/lib/loadoutPicker";
 import type { InventoryItem } from "@/types/character";
 
-// `allowedSlots` is served (#1433) and `bagItemsForSlot` reads it — a fixture
-// omitting it throws rather than degrading, so the cast must still supply it.
+// `allowedSlots` is served (#1433) and `bagItemsForSlot` reads it, so the cast below must still supply it.
 function weapon(over: Partial<InventoryItem>, twoHanded = false): InventoryItem {
   return {
     category: "weapon",
@@ -32,10 +31,10 @@ const bagDagger1 = weapon({ id: "d1", name: "Dagger" });
 const bagDagger2 = weapon({ id: "d2", name: "Dagger" });
 const bagGreataxe = weapon({ id: "ga", name: "Greataxe" }, true);
 
-const fresh = { attackEquipCredits: 0, freeInteractionUsed: false }; // full turn, nothing spent
-const attackCredit = { attackEquipCredits: 1, freeInteractionUsed: false }; // one attack made
-const freeSpent = { attackEquipCredits: 0, freeInteractionUsed: true }; // free interaction already used
-const exhausted = { attackEquipCredits: 0, freeInteractionUsed: true }; // nothing left at all (same as freeSpent w/ no credits)
+const fresh = { attackEquipCredits: 0, freeInteractionUsed: false };
+const attackCredit = { attackEquipCredits: 1, freeInteractionUsed: false };
+const freeSpent = { attackEquipCredits: 0, freeInteractionUsed: true };
+const exhausted = { attackEquipCredits: 0, freeInteractionUsed: true };
 
 describe("interactionBudgetRemaining", () => {
   it("is 1 on a fresh turn (the free object interaction)", () => {
@@ -114,7 +113,7 @@ describe("loadoutPicker", () => {
       const ctx = handContext([longsword, bagDagger1], 1, freeSpent);
       const [dagger] = handPickerOptions([longsword, bagDagger1], "MAIN_HAND", ctx);
       expect(dagger.cost).toBe("action");
-      expect(dagger.disabledReason).toBeNull(); // 1 action → affordable
+      expect(dagger.disabledReason).toBeNull();
     });
 
     it("blocks an option needing more units than the budget when no Action is left either", () => {
@@ -125,11 +124,8 @@ describe("loadoutPicker", () => {
     });
 
     it("treats a two-handed draw as needing 3 units when both hands are occupied", () => {
-      // Main empty, off holds a shield: greataxe needs to stow off-hand (1) + draw (1) = 2 units for THIS case,
-      // but with main also occupied by a dagger it would be 3 — here main is empty so it's 2.
       const ctx = handContext([shield, bagGreataxe], 1, fresh);
       const [greataxe] = handPickerOptions([shield, bagGreataxe], "MAIN_HAND", ctx);
-      // fresh budget = 1 unit only, greataxe needs 2 (stow off-hand + draw) → costs the Action.
       expect(greataxe.cost).toBe("action");
     });
 
@@ -138,7 +134,7 @@ describe("loadoutPicker", () => {
       const withStow = handPickerOptions([longsword, bagDagger1], "MAIN_HAND", occ);
       const stow = withStow.find((o) => o.item === null);
       expect(stow).toBeDefined();
-      expect(stow?.cost).toBe("free"); // fresh turn: the free interaction covers it
+      expect(stow?.cost).toBe("free");
       expect(stow?.disabledReason).toBeNull();
 
       const empty = handContext([bagDagger1], 1, fresh);

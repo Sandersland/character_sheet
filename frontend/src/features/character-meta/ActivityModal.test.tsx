@@ -8,8 +8,6 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { Character, CharacterEvent, Session } from "@/types/character";
 
-// Mock the API client — ActivityModal is an orchestrator over the activity
-// timeline + session list + revert calls.
 vi.mock("@/api/client", () => ({
   fetchActivity: vi.fn(),
   fetchSessions: vi.fn(),
@@ -40,8 +38,6 @@ beforeEach(() => {
   vi.mocked(client.fetchSessions).mockResolvedValue(SESSIONS);
 });
 
-// ActivityModal reads useCurrentCharacter(), so every render seeds the cache
-// and mounts CurrentCharacterProvider via renderWithCharacter.
 function render(ui: ReactElement) {
   return renderWithCharacter(ui, { id: "char-1" } as unknown as Character);
 }
@@ -64,7 +60,6 @@ describe("ActivityModal filtering", () => {
     await screen.findByText("Sold Shortsword ×1");
 
     await user.selectOptions(screen.getByRole("combobox", { name: "Category" }), "inventory");
-    // The inventory type chips appear under Inventory.
     const soldChip = await screen.findByRole("button", { name: "sold", pressed: false });
     await user.click(soldChip);
 
@@ -82,7 +77,6 @@ describe("ActivityModal filtering", () => {
     render(<ActivityModal characterId="char-1" onClose={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
 
-    // Wait for the session picker (populated async) to appear, then select.
     const select = await screen.findByRole("combobox", { name: "Session" });
     await user.selectOptions(select, "sess-1");
 
@@ -123,13 +117,10 @@ describe("ActivityModal filtering", () => {
     render(<ActivityModal characterId="char-1" onClose={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
 
-    // The mount load's AbortSignal (3rd arg of the first call).
     const firstSignal = vi.mocked(client.fetchActivity).mock.calls[0][2] as AbortSignal;
     expect(firstSignal).toBeInstanceOf(AbortSignal);
     expect(firstSignal.aborted).toBe(false);
 
-    // Changing the category supersedes that load — its signal must abort so a
-    // slow stale response can't overwrite the fresher one.
     await user.selectOptions(screen.getByRole("combobox", { name: "Category" }), "inventory");
     await waitFor(() => expect(firstSignal.aborted).toBe(true));
   });

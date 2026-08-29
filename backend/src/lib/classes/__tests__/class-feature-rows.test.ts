@@ -1,8 +1,3 @@
-// #1524: featuresFromRows — the ONE place the edition rule for feature TEXT
-// lives, retired here from featureAppliesToEdition (registry.ts). Truth-table
-// coverage for the predicate (edition match + level gate), plus the
-// no-Prisma-import assertion that keeps lib/classes/ a pure leaf (mirrors
-// lib/spellcasting/granted-spells.ts's GrantedSpellSource pattern).
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -16,6 +11,8 @@ import {
   improvementsFromRows,
   poolsFromRows,
   type ClassFeatureRow,
+  type ResourceDetailTier,
+  type ResourceRechargeTier,
 } from "@/lib/classes/class-feature-rows.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
@@ -126,11 +123,23 @@ describe("evaluateResourceTotal (#1685) — the formula vocabulary poolFromRow r
 
   it("{ abilityMod, min } floors a low/negative modifier at min — the Math.max(1, mod) shape every migrated pool uses", () => {
     expect(evaluateResourceTotal({ abilityMod: "charisma", min: 1 }, ctx)).toBe(1); // Cha 8 -> -1, floored to 1
-    expect(evaluateResourceTotal({ abilityMod: "wisdom", min: 1 }, ctx)).toBe(3); // above min, min is a no-op
+    expect(evaluateResourceTotal({ abilityMod: "wisdom", min: 1 }, ctx)).toBe(3); // Wis 16 -> +3, above min
   });
 
   it("{ levelTimes } multiplies ctx.level — the Lay on Hands (5 x level) shape", () => {
     expect(evaluateResourceTotal({ levelTimes: 5 }, { ...ctx, level: 7 })).toBe(35);
+  });
+
+  it("{ abilityMod, plus } adds plus to the modifier — Divine Sense's 1 + Charisma modifier shape (PHB'14 p.84)", () => {
+    expect(evaluateResourceTotal({ abilityMod: "wisdom", plus: 1 }, ctx)).toBe(4); // Wis 16 -> +3, +1 = 4
+  });
+
+  it("{ abilityMod, plus, min } floors the SUM of modifier and plus, not the bare modifier — Cha 8 (-1) + 1 = 0, floored to 1", () => {
+    expect(evaluateResourceTotal({ abilityMod: "charisma", plus: 1, min: 1 }, ctx)).toBe(1);
+  });
+
+  it("{ abilityMod } with plus omitted is unaffected by the widening", () => {
+    expect(evaluateResourceTotal({ abilityMod: "wisdom", min: 1 }, ctx)).toBe(3);
   });
 });
 
@@ -156,6 +165,201 @@ describe("poolsFromRows resolves a tier's formula total end to end (#1685)", () 
     const rows = [row({ resourceKey: "loh", resourceTotals: [{ minLevel: 1, total: { levelTimes: 5 } }] })];
     expect(poolsFromRows(rows, 3, {}, 2, "EDITION_2014")[0].total).toBe(15);
     expect(poolsFromRows(rows, 7, {}, 2, "EDITION_2014")[0].total).toBe(35);
+  });
+});
+
+describe("poolsFromRows resolves resourceRechargeTiers (level-tiered recharge cadence)", () => {
+  const rechargeTiers: ResourceRechargeTier[] = [
+    { minLevel: 1, recharge: "longRest" },
+    { minLevel: 5, recharge: "short-or-long" },
+  ];
+
+  it("below the first tier's minLevel, falls back to the scalar resourceRecharge", () => {
+    const rows = [
+      row({
+        resourceKey: "bardic",
+        resourceTotals: [{ minLevel: 1, total: 2 }],
+        resourceRecharge: "longRest",
+        resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+      }),
+    ];
+    expect(poolsFromRows(rows, 4, {}, 2, "EDITION_2014")[0].recharge).toBe("longRest");
+  });
+
+  it("at/above a tier's minLevel, the tier's recharge wins over the scalar — last-match-wins across two tiers", () => {
+    const rows = [
+      row({ resourceKey: "bardic", resourceTotals: [{ minLevel: 1, total: 2 }], resourceRecharge: "none", resourceRechargeTiers: rechargeTiers }),
+    ];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].recharge).toBe("longRest");
+    expect(poolsFromRows(rows, 4, {}, 2, "EDITION_2014")[0].recharge).toBe("longRest");
+    expect(poolsFromRows(rows, 5, {}, 2, "EDITION_2014")[0].recharge).toBe("short-or-long");
+    expect(poolsFromRows(rows, 20, {}, 2, "EDITION_2014")[0].recharge).toBe("short-or-long");
+  });
+
+  it("with no resourceRechargeTiers, resolves from the scalar resourceRecharge unchanged", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }], resourceRecharge: "shortRest" })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].recharge).toBe("shortRest");
+  });
+
+  it("with neither resourceRechargeTiers nor resourceRecharge, resolves to \"none\"", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }] })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].recharge).toBe("none");
+  });
+});
+
+describe("poolsFromRows resolves resourceDetailTiers (labeled display parts, #1685's DerivedResource.details)", () => {
+  it("no resourceDetailTiers on the row means `details` is absent entirely", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }] })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].details).toBeUndefined();
+  });
+
+  it("resolves each label's own last-match-wins tier independently — interleaved labels in one flat array", () => {
+    const detailTiers: ResourceDetailTier[] = [
+      { minLevel: 2, label: "Max CR", value: "1/4" },
+      { minLevel: 2, label: "Duration", value: "1 hour(s)" },
+      { minLevel: 4, label: "Max CR", value: "1/2 (no flying speed)" },
+      { minLevel: 6, label: "Duration", value: "3 hour(s)" },
+    ];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 3, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Max CR", value: "1/4" },
+      { label: "Duration", value: "1 hour(s)" },
+    ]);
+    expect(poolsFromRows(rows, 5, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Max CR", value: "1/2 (no flying speed)" },
+      { label: "Duration", value: "1 hour(s)" },
+    ]);
+    expect(poolsFromRows(rows, 6, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Max CR", value: "1/2 (no flying speed)" },
+      { label: "Duration", value: "3 hour(s)" },
+    ]);
+  });
+
+  it("preserves first-appearance order of labels, not alphabetical or minLevel order", () => {
+    const detailTiers: ResourceDetailTier[] = [
+      { minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" },
+      { minLevel: 1, label: "Duration", value: "1 hour(s)" },
+      { minLevel: 1, label: "Max CR", value: "1/4" },
+    ];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 20, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Uses", value: "Unlimited (Archdruid)" },
+      { label: "Duration", value: "1 hour(s)" },
+      { label: "Max CR", value: "1/4" },
+    ]);
+  });
+
+  it("a label whose first tier isn't reached yet is omitted, while other labels still resolve", () => {
+    const detailTiers: ResourceDetailTier[] = [
+      { minLevel: 2, label: "Max CR", value: "1/4" },
+      { minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" },
+    ];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 10, {}, 2, "EDITION_2014")[0].details).toEqual([{ label: "Max CR", value: "1/4" }]);
+  });
+
+  it("an empty resourceDetailTiers array resolves `details` to absent, not an empty array", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }], resourceDetailTiers: [] })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].details).toBeUndefined();
+  });
+
+  it("every label below its own first tier at the character's level means `details` is absent entirely", () => {
+    const detailTiers: ResourceDetailTier[] = [{ minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" }];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 5, {}, 2, "EDITION_2014")[0].details).toBeUndefined();
+  });
+});
+
+describe("poolsFromRows resolves overrideRows (#906/#1226 druid retab) — a base row's resourceKey resolves from a matching active-subclass row instead", () => {
+  it("a base row with no matching override row resolves from itself unchanged", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", [])[0].total).toBe(2);
+  });
+
+  it("an override row with the SAME resourceKey wins on every descriptor column (die/recharge/total/shortRestRegain/details), never per-field — EXCEPT description, which stays the base row's own text (S2)", () => {
+    const rows = [
+      row({
+        name: "Base Feature",
+        description: "base feature text",
+        resourceKey: "wildShape",
+        resourceLabel: "Base Label",
+        resourceRecharge: "longRest",
+        resourceTotals: [{ minLevel: 1, total: 2, shortRestRegain: 1 }],
+        resourceDieTiers: [{ minLevel: 1, die: "d6" }],
+        resourceDetailTiers: [{ minLevel: 1, label: "Max CR", value: "base value" }],
+      }),
+    ];
+    const overrideRows = [
+      row({
+        name: "Override Feature",
+        description: "override feature text",
+        resourceKey: "wildShape",
+        resourceLabel: "Override Label",
+        resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 1, total: 5 }],
+        resourceDieTiers: [{ minLevel: 1, die: "d8" }],
+        resourceDetailTiers: [{ minLevel: 1, label: "Max CR", value: "override value" }],
+      }),
+    ];
+    const pool = poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0];
+    expect(pool.label).toBe("Override Label");
+    expect(pool.recharge).toBe("short-or-long");
+    expect(pool.total).toBe(5);
+    expect(pool.die).toBe("d8");
+    expect(pool.shortRestRegain).toBeUndefined();
+    expect(pool.details).toEqual([{ label: "Max CR", value: "override value" }]);
+    expect(pool.description).toBe("base feature text");
+  });
+
+  it("an override row for a DIFFERENT resourceKey never applies", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ resourceKey: "somethingElse", resourceTotals: [{ minLevel: 1, total: 99 }] })];
+    expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(2);
+  });
+
+  it("an override row not yet reached at the character's level is ignored — the base row resolves instead", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ level: 6, resourceKey: "wildShape", resourceTotals: [{ minLevel: 6, total: 5 }] })];
+    expect(poolsFromRows(rows, 3, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(2);
+    expect(poolsFromRows(rows, 6, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(5);
+  });
+
+  it("an override row for the wrong edition never applies", () => {
+    const rows = [row({ edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ edition: "EDITION_2024", resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 99 }] })];
+    expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(2);
+  });
+
+  // S1: an identity-only row (resourceKey with no resourceTotals — the
+  // established Metamagic pattern, #1909) must never be picked as an
+  // override; without findOverrideRow's tierAt guard, it would match and
+  // poolFromRow would then return null (no totalTier), silently DELETING
+  // the base pool instead of leaving it alone.
+  it("an identity-only override row (resourceKey with no resourceTotals) never applies — the base pool survives unchanged", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ resourceKey: "wildShape" })];
+    const pool = poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0];
+    expect(pool).toBeDefined();
+    expect(pool.total).toBe(2);
+  });
+
+  // Review Finding 1: a non-empty resourceTotals is NOT enough — the row's
+  // OWN first tier must also be reached at the character's level. Here the
+  // override row's grant level (2) is reached at character level 3, but its
+  // resourceTotals only starts at minLevel 5, so tierAt(resourceTotals, 3)
+  // is undefined. Without the tierAt guard, findOverrideRow would still
+  // match on resourceTotals?.length alone and poolFromRow would return null,
+  // silently deleting the base pool the same way an identity-only row would.
+  it("an override row whose grant level is reached but whose FIRST totals tier isn't yet degrades to base-wins, not pool deletion", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ level: 2, resourceKey: "wildShape", resourceTotals: [{ minLevel: 5, total: 99 }] })];
+    const pool = poolsFromRows(rows, 3, {}, 0, "EDITION_2014", overrideRows)[0];
+    expect(pool).toBeDefined();
+    expect(pool.total).toBe(2);
   });
 });
 
@@ -185,7 +389,6 @@ describe("improvementsFromRows (#1691) — same edition/level truth table as fea
       { target: "skillProficiency", amount: 1, key: "athletics" },
       { target: "armorClass", amount: 1 },
     ]);
-    // Below B's level, only A's grant is active.
     expect(improvementsFromRows(rows, 2, "EDITION_2014")).toEqual([
       { target: "skillProficiency", amount: 1, key: "athletics" },
     ]);
@@ -219,7 +422,6 @@ describe("conditionImmunitiesFromRows (#1121) — same edition/level truth table
     ];
     expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set())).toEqual([]);
     expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set(["rage"]))).toEqual(["charmed", "frightened"]);
-    // A different active buff key doesn't satisfy the gate.
     expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set(["bardicInspiration"]))).toEqual([]);
   });
 

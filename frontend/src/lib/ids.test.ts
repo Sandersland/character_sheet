@@ -15,9 +15,6 @@ describe("randomId", () => {
   });
 
   it("works where crypto.randomUUID is absent (insecure contexts)", () => {
-    // Chromium removes randomUUID (but keeps getRandomValues) on plain-http
-    // non-localhost origins — the exact environment a LAN device or the e2e
-    // container sees (#1458).
     vi.stubGlobal("crypto", {
       getRandomValues: crypto.getRandomValues.bind(crypto),
     });

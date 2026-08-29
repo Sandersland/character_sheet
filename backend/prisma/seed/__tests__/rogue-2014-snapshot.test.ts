@@ -1,16 +1,4 @@
-// #1231: Rogue's EDITION_2014 rows must be byte-identical transcriptions of
-// what lib/classes/rogue.ts's ROGUE_FEATURES/ARCANE_TRICKSTER_FEATURES/
-// ASSASSIN_FEATURES/THIEF_FEATURES said BEFORE this migration — 2014 is a
-// supported edition, not a rewrite target. This snapshot is that pre-change
-// text, pinned by hand from the tree at the commit before #1231 landed, NOT
-// re-derived from anything this migration touches — a hardcoded oracle is the
-// whole point, mirroring barbarian-2014-snapshot.test.ts's shape.
-//
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (ROGUE_FEATURES is authored as a byte-identical copy in the
-// same commit that adds this file). Its job is to catch commit 2 (#1231)
-// silently editing a 2014 row while authoring 2024 content. Must pass
-// unmodified through commits 2, 3 and 4.
+// Guard, not red/green: ROGUE_FEATURES' EDITION_2014 rows must stay byte-identical to the pre-#1231 tree, pinned by hand, not re-derived from anything this migration touches.
 import { describe, expect, it } from "vitest";
 
 import { ROGUE_FEATURES } from "../rogue-features.js";
@@ -23,7 +11,6 @@ interface Pinned {
 }
 
 const PRE_CHANGE_2014: Pinned[] = [
-  // ---- Base class ------------------------------------------------------
   {
     subclassSlug: null,
     name: "Expertise",
@@ -95,7 +82,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "If your attack misses a target in range, you can turn the miss into a hit. Or if you fail an ability check, you can treat the d20 roll as a 20. Once used, regain on a short or long rest.",
   },
-  // ---- Arcane Trickster --------------------------------------------------
   {
     subclassSlug: "rogue-arcane-trickster",
     name: "Arcane Trickster Spellcasting",
@@ -131,7 +117,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "Immediately after a creature casts a spell that targets you, use your reaction to force it to make a saving throw with its spellcasting ability modifier (DC = your spell save DC). On failure, you negate the spell and steal it — you can cast it (same level) once without a slot within 8 hours. Once used, regain on a long rest.",
   },
-  // ---- Assassin -----------------------------------------------------------
   {
     subclassSlug: "rogue-assassin",
     name: "Bonus Proficiencies",
@@ -166,7 +151,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "When you hit a surprised creature, it must make a Constitution save (DC 8 + your Dexterity modifier + proficiency bonus) or take double damage from the attack.",
   },
-  // ---- Thief ----------------------------------------------------------------
   {
     subclassSlug: "rogue-thief",
     name: "Fast Hands",

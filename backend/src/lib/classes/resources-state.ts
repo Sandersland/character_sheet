@@ -1,56 +1,31 @@
-// Leaf module: persisted class/subclass-resource JSON shape + its normalizer,
-// plus the initiative-regen once-per-long-rest marker helpers — no
-// back-imports. Split out of resources.ts (#1243) so combat/ modules
-// (hp-in-tx.ts for the feat max-HP bonus on every heal; rest.ts for
-// clearInitiativeRegenMarkers) can depend on this leaf instead of on
-// resources.ts itself — resources.ts now also composes applyHealInTx (Uncanny
-// Metabolism's bonus heal), which would otherwise close an import cycle
-// through combat/hitpoints.ts. Mirrors spellcasting/spell-state.ts.
+// Leaf module (no back-imports): split out so combat code can depend on this without an import cycle through the hit-points module. Mirrors the spellcasting state module's shape.
 
 import { Prisma } from "@/generated/prisma/client.js";
 
-// Canonical mutable state shape. Stored in Character.resources JSON column.
-// `used`: resource key (string) → number of units currently spent.
-// `maneuversKnown`: snapshot array of learned maneuvers; each entry has a
-//   locally-generated `id` (the operation target), optional `maneuverId`
-//   (catalog Maneuver.id provenance — null for custom maneuvers), and a
-//   snapshot of name + description at learn time.
+// Canonical mutable state shape, stored in Character.resources JSON column.
 
 export interface ManeuverEntry {
   id: string;           // per-character entry UUID (operation target)
   maneuverId?: string;  // catalog GrantedAbility.id provenance — undefined for custom
   name: string;
   description: string;
-  // Session-UI routing snapshot from the catalog at learn time (undefined for
-  // custom maneuvers → frontend defaults to "damageRoll").
+  // Session-UI routing snapshot from the catalog at learn time (undefined for custom maneuvers → frontend defaults to "damageRoll").
   placement?: string;
   actionSlot?: string | null;
 }
 
-/** A tool proficiency granted by a level-gated subclass feature (Student of War). */
 export interface ToolProfEntry {
   id: string;   // per-character entry UUID (operation target)
   name: string; // matches a TOOLS entry name
 }
 
-/**
- * A skill chosen for Expertise (#1588) — doubles proficiency bonus on that
- * skill's checks (buildSkillsView sets `expertise: true` for its `skill`).
- * Capped at the level-derived `expertiseChoiceCount` (Rogue/Bard/Ranger/
- * Wizard grantor rows); clamped on read and reconciled on level-down the
- * same way toolProficienciesKnown is.
- */
+// Capped at the level-derived expertiseChoiceCount; clamped on read and reconciled on level-down the same way toolProficienciesKnown is.
 export interface ExpertiseEntry {
   id: string;    // per-character entry UUID (operation target)
   skill: string; // camelCase skill key, e.g. "stealth"
 }
 
-/**
- * One picked option of a generic subclass "choose N" feature (#899) —
- * e.g. a Ranger's Hunter's Prey selection. Mirrors ManeuverEntry but carries
- * no mechanics: the option catalog is GrantedAbility rows, the selection is
- * just this snapshot. Stored under choicesKnown[choiceKey].
- */
+// Mirrors ManeuverEntry but carries no mechanics — the option catalog is GrantedAbility rows, this is just the selection snapshot. Stored under choicesKnown[choiceKey].
 export interface ChoiceEntry {
   id: string;         // per-character entry UUID (operation target)
   optionId?: string;  // catalog GrantedAbility.id provenance — undefined for custom
@@ -58,94 +33,55 @@ export interface ChoiceEntry {
   description: string;
 }
 
-/**
- * A structured mechanical effect defined on a catalog or custom feat.
- * Snapshot into AdvancementEntry.improvements at take-time so removal/derivation
- * never depend on the catalog row being present.
- *
- * Supported targets (enforced in advancement route, applied in serializeCharacter):
- *
- * Numeric (summed by deriveFeatBonuses, applied as additive bonuses):
- *   "initiative" | "speed" | "armorClass" | "maxHp"
- *
- * Keyed proficiency (collected by deriveFeatProficiencies, OR'd with stored proficiencies):
- *   "skillProficiency"       — imp.key = camelCase skill key e.g. "athletics" / "animalHandling"
- *   "savingThrowProficiency" — imp.key = ability name e.g. "strength"
- *
- * `perLevel`: when true, the effective bonus = amount × character's applied level
- * (hitDice.total). Only meaningful for numeric targets. Used by Tough (+2 HP per level).
- */
+// Snapshot into AdvancementEntry.improvements at take-time so removal/derivation never depend on the catalog row being present.
+// Numeric targets (summed by deriveFeatBonuses): initiative | speed | armorClass | maxHp.
+// Keyed targets (collected by deriveFeatProficiencies, OR'd with stored proficiencies): skillProficiency (key = camelCase skill, e.g. "athletics") | savingThrowProficiency (key = ability name, e.g. "strength").
+// perLevel: effective bonus = amount × hitDice.total — numeric targets only (e.g. Tough's +2 HP/level).
 export interface FeatImprovement {
   target: string;
   amount: number;
   perLevel?: boolean;
-  /** Required for keyed targets (skillProficiency, savingThrowProficiency). */
   key?: string;
-  /** PHB'24: "proficiencyBonus" multiplies amount by PB at read time (e.g. Alert). */
+  // PHB'24: "proficiencyBonus" multiplies amount by PB at read time (e.g. Alert).
   scaling?: "proficiencyBonus";
 }
 
-/**
- * One taken Ability Score Improvement or feat.
- * Stores the deltas applied so reversal subtracts exactly what was added —
- * never recomputes from ability scores, which may have changed since.
- */
-// fallow-ignore-next-line code-duplication -- FeatImprovement/AdvancementEntry intentionally mirror the frontend wire types (types/character/leveling.ts); cross-workspace clone, shared-types consolidation is #820
+// Stores the deltas applied so reversal subtracts exactly what was added — never recomputes from ability scores, which may have changed since.
+// fallow-ignore-next-line code-duplication -- FeatImprovement/AdvancementEntry intentionally mirror the frontend's wire types; cross-workspace clone, shared-types consolidation is #820
 export interface AdvancementEntry {
   id: string;                            // per-character entry UUID (operation target)
   level: number;                         // character level when taken (informational)
   kind: "asi" | "feat";
-  /** PHB'24 Origin feat granted by a background (#1130): exempt from the ASI
-   *  slot cap and never reversed on level-down; can't be removed via the route. */
+  // PHB'24 Origin feat (background grant): exempt from the ASI slot cap, never reversed on level-down, can't be removed via the route.
   origin?: true;
-  /** Fighting Style feat (#1137): consumes a `fightingStyle` slot, not an ASI
-   *  slot. Absent ⇒ ASI-slot feat/ASI. Both partitions live in this one array. */
+  // Fighting Style feat: consumes a fightingStyle slot, not an ASI slot. Absent means ASI-slot feat/ASI — both partitions live in this one array.
   slot?: "fightingStyle";
-  /** The raw score increases applied: e.g. { strength: 2 } or { dexterity: 1, constitution: 1 } */
+  // e.g. { strength: 2 } or { dexterity: 1, constitution: 1 }
   abilityDeltas: Record<string, number>;
-  /** HP added to hitPoints.max/current (CON-mod change × hitDice.total). */
+  // HP added to hitPoints.max/current (CON-mod change × hitDice.total).
   hpDelta: number;
-  /** Addend applied to initiativeBonus (DEX-mod change). */
+  // Addend applied to initiativeBonus (DEX-mod change).
   initDelta: number;
-  /** Catalog Feat.id provenance — undefined for ASI or custom feat. */
+  // Catalog Feat.id provenance — undefined for ASI or custom feat.
   featId?: string;
-  /** Display name snapshot taken at time of choice (for feats). */
   featName?: string;
-  /** Description snapshot taken at time of choice (for feats). */
   featDescription?: string;
-  /**
-   * Snapshot of the feat's structured mechanical effects at take-time.
-   * Applied as a derived modifier layer in serializeCharacter / effective-max
-   * computations — never persisted into separate columns.
-   * Empty for ASI entries.
-   */
+  // Snapshot of the feat's structured mechanical effects at take-time, applied as a derived modifier layer in serializeCharacter/effective-max computations — never persisted into separate columns. Empty for ASI entries.
   improvements?: FeatImprovement[];
 }
 
 export interface ResourcesMutableState {
   used: Record<string, number>;
   maneuversKnown: ManeuverEntry[];
-  /** Level-gated tool proficiency choices (currently: Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
-  /** Level-gated Expertise skill choices (#1588 — Rogue/Bard/Ranger/Wizard). */
   expertiseKnown: ExpertiseEntry[];
-  /**
-   * Generic subclass "choose N" selections (#899), keyed by SubclassChoice.key
-   * (e.g. "huntersPrey"). Each list is capped at the level-derived count and
-   * trimmed by reconcileSubclassChoices on level-down. A new choose-N feature
-   * adds a subclass declaration + seed rows — no new state key here.
-   */
+  // Keyed by SubclassChoice.key (e.g. "huntersPrey"); capped at the level-derived count, trimmed by reconcileSubclassChoices on level-down. A new choose-N feature adds a subclass declaration + seed rows — no new state key here.
   choicesKnown: Record<string, ChoiceEntry[]>;
-  /** Ability Score Improvements and feats taken, in the order chosen. Fighting
-   *  Style feats (#1137) live here tagged slot:"fightingStyle" — no separate key. */
+  // Fighting Style feats live here too, tagged slot: "fightingStyle" — no separate key.
   advancements: AdvancementEntry[];
 }
 
-// Subclass "choose N" cap policy: single-sourced level-gating for choicesKnown, shared by reconcile-on-write
-// (trimChoicesToCaps) and clamp-on-read (buildResourcesPayload). Caps each key's
-// list to its derived count (LIFO: keep the oldest picks); keys absent from
-// `caps` (subclass/tier no longer grants them) get cap 0 and are dropped from
-// `clamped`. `removedCount` is the total entries over cap.
+// Single-sourced level-gating for choicesKnown, shared by reconcile-on-write (trimChoicesToCaps) and clamp-on-read (buildResourcesPayload). Keys absent from `caps` get cap 0 and are dropped from `clamped`; `removedCount` is the total entries over cap.
 export function clampChoicesToCaps(
   choicesKnown: Record<string, ChoiceEntry[]>,
   caps: Map<string, number>,
@@ -160,16 +96,9 @@ export function clampChoicesToCaps(
   return { clamped, removedCount };
 }
 
-// Single source of the ASI-slot cap policy (#1130/#1137), shared by every
-// clamp-on-read and reconcile-on-write site. Three partitions in one array:
-// Origin feats (background grants) are always kept and consume no slot; Fighting
-// Style feats (slot "fightingStyle", #1137) keep the earliest `fightingStyleSlotTotal`
-// against their OWN cap; every other ASI/feat keeps the earliest `slotTotal`. Each
-// partition trims LIFO (the tail beyond its cap becomes `excess`). `kept` preserves
-// the original order; `usedSlots`/`usedFightingStyleSlots` count the kept
-// slot-consuming entries of each partition. fightingStyleSlotTotal defaults to
-// Infinity so non-reconcile callers (HP/concentration feat-bonus reads) keep every
-// fs feat without trimming — only the serialize clamp + reconciler pass the real cap.
+// Single source of the ASI-slot cap policy, shared by every clamp-on-read and reconcile-on-write site.
+// Three partitions: origin feats always kept (no slot); fighting-style feats keep the earliest fightingStyleSlotTotal against their own cap; every other ASI/feat keeps the earliest slotTotal. Each partition trims the tail beyond its cap into `excess`.
+// fightingStyleSlotTotal defaults to Infinity so non-reconcile callers (HP/concentration feat-bonus reads) keep every fs feat untrimmed — only the serialize clamp + reconciler pass the real cap.
 export function splitAdvancementsBySlotCap(
   advancements: AdvancementEntry[],
   slotTotal: number,
@@ -199,9 +128,7 @@ export function splitAdvancementsBySlotCap(
   return { kept, excess, usedSlots, usedFightingStyleSlots };
 }
 
-// Normalizer: tolerant of null (character has never used any resources) and future schema
-// additions. Mirror of normalizeSpellcastingMutable.
-
+// Tolerant of null (never-used resources) and future schema additions — mirrors normalizeSpellcastingMutable.
 export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMutableState {
   if (!json || typeof json !== "object" || Array.isArray(json)) {
     return {
@@ -229,11 +156,7 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
   };
 }
 
-/**
- * Serializes the full mutable resource state to the shape written to
- * Character.resources. Route every update through this helper so all keys
- * round-trip — required now that multiple level-gated lists share one column.
- */
+// Route every update through this helper so all keys round-trip — required now that multiple level-gated lists share one column.
 export function serializeResourcesState(state: ResourcesMutableState): Prisma.InputJsonValue {
   return {
     used: state.used,
@@ -245,13 +168,7 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
   } as unknown as Prisma.InputJsonValue;
 }
 
-/**
- * Canonical deep-clone of the COMPLETE resources audit-snapshot shape — the one
- * source of truth for every before/after event snapshot, so no field can be
- * omitted per-site (the undo handlers restore before.resources wholesale, so an
- * omitted key silently wipes on revert). Copies every entry, so mutating `state`
- * after capture can't retroactively alter the snapshot.
- */
+// The one source of truth for every before/after event snapshot — the undo handlers restore before.resources wholesale, so an omitted key here silently wipes on revert.
 export function snapshotResources(state: ResourcesMutableState): ResourcesMutableState {
   return {
     used: { ...state.used },
@@ -264,30 +181,18 @@ export function snapshotResources(state: ResourcesMutableState): ResourcesMutabl
     advancements: state.advancements.map((a) => ({
       ...a,
       abilityDeltas: { ...a.abilityDeltas },
-      // Shallow-copy the improvements array so a later mutation of state can't
-      // retroactively alter this snapshot; its FeatImprovement elements are
-      // treated as immutable snapshots.
+      // Shallow-copy so a later mutation of state can't retroactively alter this snapshot — FeatImprovement elements are treated as immutable.
       improvements: a.improvements ? [...a.improvements] : undefined,
     })),
   };
 }
 
-// Marker in `used` recording that a oncePerLongRest initiative-regen has fired
-// for a pool since the last long rest (#1239). The `__` prefix + `:` separator
-// can't collide with a real camelCase pool key, so it stays out of the wire
-// `pools` view (which reads only derived pool keys) and out of rest/reconcile
-// pool math. Exported (not just clearInitiativeRegenMarkers) so resources.ts's
-// initiativeRegenMarkerKey builds the exact same keys.
+// The `__` prefix + `:` separator can't collide with a real camelCase pool key, so it stays out of the wire `pools` view and rest/reconcile pool math.
+// Exported so initiativeRegenMarkerKey builds the exact same keys.
 export const INITIATIVE_REGEN_MARKER_PREFIX = "__onInitiativeUsed:";
 
-/**
- * Clear every once-per-long-rest initiative-regen marker (#1239) so the next
- * combat's regen fires again. Called from the long-rest path only (rest.ts) —
- * the cap is per LONG rest, so a short rest must leave the markers in place.
- * Lives here (not resources.ts) so rest.ts doesn't need to import
- * resources.ts, which would close an import cycle through combat/hitpoints.ts
- * (#1243 — resources.ts composes applyHealInTx for Uncanny Metabolism's heal).
- */
+// Called from the long-rest path only — the cap is per LONG rest, so a short rest must leave the markers in place.
+// Lives here, not with the rest of resource state, so the rest-handling code doesn't need to import that module — avoiding an import cycle through the hit-points module.
 export function clearInitiativeRegenMarkers(state: ResourcesMutableState): void {
   for (const key of Object.keys(state.used)) {
     if (key.startsWith(INITIATIVE_REGEN_MARKER_PREFIX)) delete state.used[key];

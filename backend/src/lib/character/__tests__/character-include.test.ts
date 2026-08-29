@@ -1,13 +1,4 @@
-// #1524: characterInclude's widened `class`/`subclassRef` relations
-// (lib/character/character-include.ts) load ClassFeature rows (#1522/#1523)
-// for the derivation to read. The `subclassId: null` filter on the `class`
-// side is load-bearing — ClassFeature.classId is required on subclass rows
-// too, so an unfiltered `class.features` would return every subclass under
-// that class. This is DB-backed (real seeded Fighter/Battle Master/Champion/
-// Eldritch Knight rows), not a fixture, per the issue's own warning that this
-// filter is "the single most likely place this loop goes wrong." Characters
-// are created through the real API (like subclass-feature-edition-1374.test.ts)
-// so every NOT NULL column production requires gets filled the same way.
+// class.features filters subclassId: null — ClassFeature.classId is required on subclass rows too, so unfiltered it would return every subclass under that class.
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -77,9 +68,7 @@ describe("characterInclude loads ClassFeature rows scoped correctly (#1524)", ()
     const names = new Set(classFeatures.map((f) => f.name));
     expect(names.has("Second Wind")).toBe(true);
     expect(names.has("Action Surge")).toBe(true);
-    // Anti-vacuity: a Battle Master feature must be ABSENT from class.features —
-    // proves the filter actually excludes rows that share this classId, not just
-    // that base rows happen to be present.
+    // Anti-vacuity: a Battle Master feature must be ABSENT from class.features.
     expect(names.has("Combat Superiority")).toBe(false);
   });
 
@@ -93,8 +82,8 @@ describe("characterInclude loads ClassFeature rows scoped correctly (#1524)", ()
     const names = new Set(subclassFeatures.map((f) => f.name));
     expect(names.has("Combat Superiority")).toBe(true);
     // Anti-vacuity: a sibling subclass's feature must be absent.
-    expect(names.has("Improved Critical")).toBe(false); // Champion
-    expect(names.has("Weapon Bond")).toBe(false); // Eldritch Knight
+    expect(names.has("Improved Critical")).toBe(false);
+    expect(names.has("Weapon Bond")).toBe(false);
   });
 
   it("a Champion Fighter's class.features is IDENTICAL to a Battle Master's — the base-class rows don't depend on subclass", async () => {

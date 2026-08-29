@@ -1,33 +1,7 @@
-// Quivering Palm (Open Hand L17) — a two-step feature: SET on an Unarmed
-// Strike hit, then later TRIGGER the vibrations to force a Constitution
-// save. 2024 (Warrior of the Open Hand, SRD 5.2 / PHB'24 p.90): spend 4
-// focus to SET; a Magic action to TRIGGER, forcing a Constitution save
-// (focus DC) for 10d12 Force damage, half as much on a success. 2014 (Way of
-// the Open Hand, SRD 5.1 / PHB'14 p.79, #1501): spend 3 ki to SET; an action
-// to TRIGGER, and the outcome mapping is INVERTED — a failed save drops the
-// target to 0 hit points outright, a successful one takes the full 10d10
-// necrotic (never halved). Cost forks via quiveringPalmCost/monkPoolKey; the
-// damage-outcome fork lives in resolveQuiveringPalmDamage/
-// quiveringPalmSummary below.
-//
-// "Only one creature at a time" + the day-count duration aren't modeled as
-// real state — this app has no NPC combatant or calendar/downtime tracker (see
-// stunning-strike.ts's header for the same "no NPC combatant" call). The one
-// piece that IS really persisted is the active/inactive flag, so it survives a
-// reload or a new session: it reuses the activeEffects buff registry as an
-// inert marker (modifier 0, target "quiveringPalm" — a key nothing else reads),
-// exactly like Rage's "while-active" buff persists across a reload. The day
-// countdown itself is narrated — the player/DM track elapsed days.
-//
-// Roll ownership (mirrors Stunning Strike): the Con save is a flat d20 with no
-// modifier — DC is exact, the roll is a deliberate simplification pending an
-// NPC stat-block model. The damage (10d12 Force / 10d10 necrotic) is the
-// monk's OWN supernatural effect, so — like Second Wind/Lay on Hands/Deflect
-// Attacks' redirect — the client rolls it and sends the total; the server
-// only decides the outcome from its own save roll. 2014's drop-to-0 outcome
-// needs no roll at all (see resolveQuiveringPalmDamage) — there is no target
-// combatant to actually zero out, so it is reported text only, same as
-// `appliedDamage` on the 2024 path.
+// Quivering Palm, Open Hand L17. 2024 (SRD 5.2 / PHB'24 p.90): 4 focus to SET; Magic action to TRIGGER, Con save (focus DC) for 10d12 Force, half on success.
+// 2014 (SRD 5.1 / PHB'14 p.79): 3 ki to SET; action to TRIGGER — outcome mapping is INVERTED: a failed save drops the target to 0 HP outright, a success takes the full 10d10 necrotic (never halved).
+// No NPC/calendar model: only the active/inactive flag persists (an inert activeEffects buff, like Rage's while-active buff) — the day-count duration is narrated only.
+// The Con save is a flat d20 with no modifier (simplification pending an NPC stat-block model); the client rolls the damage and sends the total, the server only decides the outcome from its own save roll.
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { QuiveringPalmOperation, TriggerQuiveringPalmOperation } from "@character-sheet/contracts";
@@ -40,28 +14,23 @@ import { runCharacterTransaction, type CharacterTxContext } from "@/lib/characte
 import { appendActiveBuffInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { clearBuffByKeyInTx } from "@/lib/combat/buff-end.js";
 import { applySpendResourceInTx } from "./resources.js";
-import { monkSaveDC, monkPoolKey } from "./monk.js";
+import { monkSaveDC, monkPoolKey } from "./ki-focus.js";
 import { resolveSubclassSlug, type SubclassSlug } from "./subclass-slug.js";
 
 export class InvalidQuiveringPalmOperationError extends Error {}
 
 export const QUIVERING_PALM_BUFF_KEY = "quiveringPalm";
 
-// Quivering Palm's grant level (#1337): Open Hand monk L17 in BOTH editions
-// (SRD 5.2 / PHB'24 p.90, SRD 5.1 / PHB'14 p.79 — see the module header's
-// citations) — edition-invariant, so no `edition` parameter. The single
-// source for this gate; quiveringPalmRider imports hasQuiveringPalm rather
-// than re-declaring the threshold.
+// SRD 5.2 / PHB'24 p.90; SRD 5.1 / PHB'14 p.79 — edition-invariant grant level.
 export const QUIVERING_PALM_LEVEL = 17;
 
-/** Whether an Open Hand monk entry (its own level, never `character.level`) has Quivering Palm. */
+// monkLevel is the entry's own level, never character.level.
 export function hasQuiveringPalm(monkLevel: number): boolean {
   return monkLevel >= QUIVERING_PALM_LEVEL;
 }
 
-// Cost by edition (#1501): SRD 5.1 / PHB'14 p.79 spends 3 ki; SRD 5.2 /
-// PHB'24 p.90 spends 4 focus. The pool NAME forks through monkPoolKey; only
-// the AMOUNT needs its own switch here.
+// SRD 5.1 / PHB'14 p.79: 3 ki. SRD 5.2 / PHB'24 p.90: 4 focus — the pool NAME
+// forks via monkPoolKey; only the amount needs its own switch here.
 function quiveringPalmCost(edition: RulesEdition): number {
   return edition === "EDITION_2014" ? 3 : 4;
 }
@@ -85,17 +54,8 @@ export interface TriggerQuiveringPalmResult {
 
 export type QuiveringPalmResult = SetQuiveringPalmResult | TriggerQuiveringPalmResult;
 
-/**
- * 2024 (SRD 5.2 "half as much"): fail (roll < DC) takes full rolled damage;
- * success halves it, rounded down.
- *
- * 2014 (SRD 5.1, #1501): the outcome mapping is INVERTED, not merely
- * reworded — a FAILED save drops the target to 0 hit points outright
- * (`rawDamage` is irrelevant, `appliedDamage` reads 0); a SUCCESSFUL save
- * takes the full rolled damage (10d10 necrotic), never halved. Transcribed
- * as SRD 5.1 actually states it — do not normalize this to 2024's
- * fail-full/success-half shape.
- */
+// 2024 (SRD 5.2): fail takes full rolled damage, success halves it (rounded down). 2014 (SRD 5.1): INVERTED — a failed save drops the target to 0 HP outright, a success takes the full rolled damage, never halved.
+// Transcribed as SRD 5.1 actually states it — do not normalize this to 2024's shape.
 export function resolveQuiveringPalmDamage(
   roll: number,
   dc: number,
@@ -109,10 +69,6 @@ export function resolveQuiveringPalmDamage(
   return { outcome, appliedDamage: outcome === "success" ? Math.floor(rawDamage / 2) : rawDamage };
 }
 
-// 2014's fail branch narrates a drop-to-0, not a damage number — this app has
-// no NPC/target combatant to actually zero out (CLAUDE.md's self-or-announce
-// non-negotiable; see this file's own header), so like `appliedDamage` on the
-// 2024 path, this is reported text only, never persisted state.
 function quiveringPalmSummary(
   dc: number,
   saveRoll: number,
@@ -149,13 +105,7 @@ function monkEntry(row: QuiveringPalmRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
-// Both editions' Open Hand subclasses grant this feature — "Warrior of the
-// Open Hand" (SRD 5.2, EDITION_2024) and "Way of the Open Hand" (SRD 5.1,
-// EDITION_2014, #1501) are SEPARATE subclasses, not one forked across
-// editions, so a character can only ever resolve to one of the two slugs.
-// Resolved via slug (#1277: FK preferred, exact normalized name as
-// fallback). Was substring-matched on the words "open hand" — the same
-// failure class #1339 fixed at the DERIVED_ACTIONS gate.
+// The two editions' Open Hand subclasses are SEPARATE subclass rows, not one row forked across editions — a character resolves to at most one, so matching either slug is safe.
 const OPEN_HAND_SLUGS: readonly SubclassSlug[] = ["monk-warrior-of-the-open-hand", "monk-way-of-the-open-hand"];
 
 function isOpenHandFamily(row: QuiveringPalmRow): boolean {
@@ -164,7 +114,6 @@ function isOpenHandFamily(row: QuiveringPalmRow): boolean {
   return !!slug && OPEN_HAND_SLUGS.includes(slug);
 }
 
-/** Throws unless this is a level-17+ Open Hand monk (either edition); returns the monk level. */
 function assertQuiveringPalmAvailable(row: QuiveringPalmRow): number {
   const monk = monkEntry(row);
   if (!monk || !hasQuiveringPalm(monk.level) || !isOpenHandFamily(row)) {
@@ -269,10 +218,6 @@ async function triggerQuiveringPalm(
   return { dc, saveRoll, outcome, rawDamage: op.roll, appliedDamage, summary };
 }
 
-/**
- * Applies a batch of Quivering Palm operations atomically. Mirrors
- * applyStunningStrikeOperations: one batchId, state re-read per op.
- */
 export async function applyQuiveringPalmOperations(
   characterId: string,
   operations: QuiveringPalmOperation[],

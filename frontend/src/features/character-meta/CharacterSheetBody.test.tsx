@@ -3,7 +3,6 @@ import { render, screen } from "@testing-library/react";
 
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
 
-// Stub the panels so we assert only the combat-branch routing (#960 slot logic).
 vi.mock("@/features/character-meta/panels/OverviewPanel", () => ({ default: () => <div>overview-panel</div> }));
 vi.mock("@/features/character-meta/panels/ClassPanel", () => ({ default: () => <div>class-panel</div> }));
 vi.mock("@/features/character-meta/panels/CombatPanel", () => ({ default: () => <div>static-combat-panel</div> }));
@@ -15,8 +14,7 @@ const props = { reference: null };
 
 describe("CharacterSheetBody combat slot (#960)", () => {
   it("renders the static CombatPanel on Combat when there is no live panel", async () => {
-    // CombatPanel is tab-lazied (#1279) — the mock still resolves, just on
-    // a microtask, so this assertion needs to await it.
+    // CombatPanel is tab-lazied — the mock resolves on a microtask, so this needs to await it.
     render(<CharacterSheetBody {...props} activeTab="combat" />);
     expect(await screen.findByText("static-combat-panel")).toBeInTheDocument();
   });
@@ -38,7 +36,6 @@ describe("CharacterSheetBody combat slot (#960)", () => {
     render(
       <CharacterSheetBody {...props} activeTab="overview" livePanel={<div>live-turn-tracker</div>} />,
     );
-    // Still in the DOM (state survives), but hidden.
     const live = screen.getByText("live-turn-tracker");
     expect(live).toBeInTheDocument();
     expect(live.closest("[hidden]")).not.toBeNull();
@@ -46,7 +43,6 @@ describe("CharacterSheetBody combat slot (#960)", () => {
   });
 });
 
-// #1169: the Class tab routes to its own panel.
 describe("CharacterSheetBody Class tab (#1169)", () => {
   it("renders ClassPanel when activeTab is class", () => {
     render(<CharacterSheetBody {...props} activeTab="class" />);
@@ -54,7 +50,6 @@ describe("CharacterSheetBody Class tab (#1169)", () => {
   });
 });
 
-// #1083: +16px mobile breathing room under the collapsed-flush header.
 describe("CharacterSheetBody mobile breathing room (#1083)", () => {
   it("pads the main landmark's top on mobile (pt-4), flush at bottom", () => {
     render(<CharacterSheetBody {...props} activeTab="overview" />);

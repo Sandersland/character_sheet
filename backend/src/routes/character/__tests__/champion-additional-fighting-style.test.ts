@@ -1,10 +1,4 @@
-/**
- * Champion's Additional Fighting Style (#1148) — end-to-end. A Champion
- * fighter earns a SECOND Fighting Style feat slot at a level that forks by
- * edition: L7 in 2024 (SRD 5.2 p.82), L10 in 2014 (PHB'14 p.72). Mirrors
- * fighting-style-feats.test.ts's fixture/helper shape.
- */
-
+// Champion's Additional Fighting Style feat slot: L7 in 2024 (SRD 5.2 p.82), L10 in 2014 (PHB'14 p.72).
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -36,15 +30,12 @@ const takeStyle = (featId: string) =>
 const setXp = (value: number) =>
   supertest.agent(app).set("Cookie", COOKIE).post(xpUrl()).send({ operations: [{ type: "set", value }] });
 
-// XP thresholds (experience.ts): L6=14000, L7=23000, L9=48000, L10=64000.
 const L6_XP = 14000;
 const L7_XP = 23000;
 const L9_XP = 48000;
 const L10_XP = 64000;
 
-// hitDice.total tracks the XP-derived level at creation, so a later
-// setXp DOWN drives revertLevelUps' real level-down path (levelsToReverse =
-// currentHdTotal - targetLevel) instead of an artificial mismatch.
+// hitDice.total tracks the XP-derived level at creation, so a later setXp DOWN drives revertLevelUps' real level-down path instead of an artificial mismatch.
 async function createFighter(id: string, ownerId: string, xp: number, rulesEdition: "EDITION_2014" | "EDITION_2024", subclassId: string | null) {
   const level = levelForExperience(xp);
   await prisma.character.create({
@@ -65,12 +56,7 @@ async function createFighter(id: string, ownerId: string, xp: number, rulesEditi
   });
 }
 
-// The level-up ceremony (POST …/level-up/transactions) requires an actual
-// PENDING level-up: experiencePoints at the TARGET level's threshold while
-// hitDice.total (and the entry's own level) stay at the level BELOW it — the
-// opposite of createFighter above, which puts XP and hitDice.total at the
-// SAME level (so a direct GET/advancement read serves that level "at rest",
-// with no pending level-up for the endpoint to apply).
+// A pending level-up needs experiencePoints at the target level's threshold while hitDice.total (and the entry's own level) stay at the level below it.
 async function createPendingFighter(
   id: string,
   ownerId: string,
@@ -191,11 +177,6 @@ describe("2014 Champion", () => {
   });
 });
 
-// #1148 review finding 2: the tests above drive the slot count through the
-// advancement/experience endpoints directly, never through the level-up
-// CEREMONY (POST …/level-up/transactions) — the actual player-facing path
-// that offers the fightingStyleFeat STEP in the first place (buildLevelUpPlan/
-// fightingStyleFeatStep, level-up-plan.ts). These exercise that path.
 describe("level-up ceremony (POST …/level-up/transactions)", () => {
   const levelUpUrl = () => `/api/characters/${FIXTURE_ID}/level-up/transactions`;
 
@@ -224,15 +205,7 @@ describe("level-up ceremony (POST …/level-up/transactions)", () => {
     expect(res.body.fightingStyleSlots).toMatchObject({ total: 2, used: 1 });
   });
 
-  // #1148 review finding 1 regression pin: CharacterClassEntry.name/subclass
-  // are free-to-diverge display columns (#1495's own rationale) — a Champion
-  // whose entry got renamed off "Fighter"/"Champion" but still carries the
-  // correct subclassId FK must still be offered the L7 slot.
-  // resolveExistingTargetEntry (level-up-transaction.ts) previously sourced
-  // `targetClassName` from the entry's own drifting `name` column and never
-  // propagated `subclassRef` at all, so resolveSubclassSlug had no FK path
-  // here — this fixture's DRIFTED name/subclass text is what would have
-  // 400'd (no fightingStyleFeat step to submit against) before that fix.
+  // CharacterClassEntry.name/subclass are free-to-diverge display columns (#1495) — resolveSubclassSlug must use the real subclassId FK, not this drifting text.
   it("a 2024 Champion 6→7 ceremony still offers the second slot when the entry's name/subclass display text has drifted", async () => {
     await createPendingFighter(
       FIXTURE_ID, OWNER_ID, 6, L7_XP, "EDITION_2024",

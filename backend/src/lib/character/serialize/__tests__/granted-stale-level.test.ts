@@ -39,10 +39,7 @@ describe("granted-only path uses XP-derived level for single-class (#1019)", () 
         classId: monkClassId,
         name: "Warrior of Shadow",
         description: "Test subclass",
-        // Distinct from the real seeded "monk-warrior-of-shadow" — this test
-        // creates its OWN throwaway Monk class, and (slug, edition) is unique
-        // catalog-wide regardless of classId, so reusing the real slug here
-        // would collide with the seeded row (#1277).
+        // Distinct from the real seeded slug — (slug, edition) is unique catalog-wide regardless of classId, so reusing it would collide with the seeded row (#1277).
         slug: "monk-warrior-of-shadow-granted-stale-level-test",
       },
       {},
@@ -50,8 +47,7 @@ describe("granted-only path uses XP-derived level for single-class (#1019)", () 
     shadowId = shadow.id;
     const minorIllusion = await prisma.spell.findFirst({ where: { name: "Minor Illusion" }, select: { id: true } });
     if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
-    // upsertEditionRow: the widened (subclassId, spellId, edition) shorthand
-    // can't express a null edition at runtime (#1625).
+    // upsertEditionRow: the widened (subclassId, spellId, edition) shorthand can't express a null edition at runtime (#1625).
     await upsertEditionRow(
       prisma.subclassGrantedSpell,
       { subclassId: shadow.id, spellId: minorIllusion.id, edition: null },
@@ -64,15 +60,8 @@ describe("granted-only path uses XP-derived level for single-class (#1019)", () 
     await prisma.character.deleteMany({ where: { id: CHAR_ID } });
   });
 
-  // #1543: beforeEach upserts a transient TestMonkStale CharacterClass with no
-  // ClassFeature rows. Left behind, it trips seedClassFeatures's
-  // assertEveryClassEditionPopulated guard (#1525) in whichever OTHER test
-  // file happens to reseed later in the same worker — deterministic given
-  // vitest's file-shuffle sharding, not a flake. Delete by NAME (never a var
-  // that could read to Prisma as "no filter"), matching the idiom in
-  // maneuvers.test.ts / conditions.test.ts / class-add.test.ts. Subclass and
-  // SubclassGrantedSpell rows cascade off CharacterClass's onDelete: Cascade,
-  // so nothing else needs deleting here.
+  // Left behind, this transient CharacterClass trips seedClassFeatures's assertEveryClassEditionPopulated guard (#1525) in whichever OTHER test file reseeds later in the same worker — deterministic, not a flake.
+  // Delete by NAME, never a var that could read to Prisma as "no filter". Subclass/SubclassGrantedSpell rows cascade off CharacterClass's onDelete: Cascade.
   afterAll(async () => {
     await prisma.characterClass.deleteMany({ where: { name: MONK_CATALOG_NAME } });
   });
@@ -95,8 +84,7 @@ describe("granted-only path uses XP-derived level for single-class (#1019)", () 
         ownerId: OWNER_ID,
         spellcasting: { slotsUsed: {}, spells: [] } as Prisma.InputJsonValue,
         classEntries: {
-          // Stale-low per-class level (2) below the XP-derived total (3). The
-          // granted-only path must gate on the XP-derived level, not entry.level.
+          // Stale-low per-class level (2) below the XP-derived total (3) — the granted-only path must gate on the XP-derived level, not entry.level.
           create: [{ name: "monk", classId: monkClassId, position: 0, level: 2, subclass: "Warrior of Shadow", subclassId: shadowId }],
         },
       },

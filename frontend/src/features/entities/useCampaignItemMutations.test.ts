@@ -31,10 +31,8 @@ const baseItem: CampaignItem = {
   updatedAt: "2026-07-05T00:00:00.000Z",
 };
 
-// Adversarial review, should-fix #5: #1283 named "a DM item award touches both
-// the campaign items list and the recipient's character" — with the global
-// staleTime:30_000 and no invalidation, a DM who awards then opens the
-// recipient's sheet within that window sees stale inventory.
+// A DM item award/revoke also touches the recipient's character, not just the
+// items list — invalidate rather than assume, or a stale sheet lingers (#1283).
 describe("useCampaignItemMutations recipient-character invalidation (#1299 review)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

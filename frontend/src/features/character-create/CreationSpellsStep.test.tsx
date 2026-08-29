@@ -1,9 +1,3 @@
-// #1778: CreationSpellsStep is now the single Spells-step host — it absorbs
-// SpeciesCantripSection (retired) and hands an ordered group list (species
-// cantrip first, then class cantrips, then class spells/spellbook) to
-// SpellPickerTabs. Two fetches can be in flight at once (the species spec's
-// own class-list request, always maxLevel:0, and the character's class
-// band) — the mock below tells them apart the same way the real filters do.
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -34,9 +28,7 @@ function spell(over: Partial<CatalogSpell>): CatalogSpell {
   };
 }
 
-// What the server returns for ?class=warlock&maxLevel=1 (#1377). The class and
-// level filters live there now, so a mock returning off-list rows would only
-// test a filter this component no longer has — it would render them.
+// CATALOG mocks an already-filtered server response for ?class=warlock&maxLevel=1; the component applies no class/level filter of its own.
 const CATALOG: CatalogSpell[] = [
   spell({ id: "eb", name: "Eldritch Blast", level: 0, classes: ["warlock"], description: "A beam of crackling energy." }),
   spell({ id: "charm", name: "Charm Person", level: 1, classes: ["warlock", "bard"], description: "Charm a humanoid." }),
@@ -85,26 +77,19 @@ describe("CreationSpellsStep", () => {
     fetchMock.mockResolvedValue(CATALOG);
   });
 
-  // Eligibility is a server rule now, so the component's contract is the REQUEST
-  // it makes, plus splitting the answer on the served level. It must not filter.
   it("asks the server for the class's legal band, passing the served maxSpellLevel", async () => {
     renderStep();
     await screen.findByRole("button", { name: "Open Eldritch Blast" });
     expect(fetchMock).toHaveBeenCalledWith("EDITION_2024", { className: "warlock", maxLevel: 1 });
   });
 
-  // #1510: a 2014 Cleric/Druid serves maxSpellLevel: 0 (cantrips-only — see
-  // level1SpellPicksFor's comment). `0` must survive to the request unchanged,
-  // not get floored to 1 — the cantrips-only fetch seam #1377 built on the wire
-  // (fetchSpells' `!== undefined` check, spells.test.ts's `?maxLevel=0` pin).
+  // #1510: maxSpellLevel: 0 (cantrips-only) must survive to the request unchanged, not get floored to 1 like a missing value would.
   it("passes maxSpellLevel: 0 through to the fetch for a cantrips-only class", async () => {
     renderStep({ className: "cleric", counts: { cantrips: 3, spells: 0, maxSpellLevel: 0 } });
     await screen.findByRole("button", { name: "Open Eldritch Blast" });
     expect(fetchMock).toHaveBeenCalledWith("EDITION_2024", { className: "cleric", maxLevel: 0 });
   });
 
-  // Each render keeps exactly one group alive, which is how the level-0 split can
-  // be observed without the picker's <section>s carrying accessible names.
   it("routes level-0 rows to the Cantrips group only", async () => {
     renderStep({ counts: { ...COUNTS, spells: 0 } });
     expect(await screen.findByRole("button", { name: "Open Eldritch Blast" })).toBeInTheDocument();
@@ -119,14 +104,10 @@ describe("CreationSpellsStep", () => {
 
   it("omits the Spells group when the class learns zero level-1 spells", async () => {
     renderStep({ counts: { ...COUNTS, spells: 0 } });
-    // A cantrip row proves the catalog loaded; the Spells heading must be absent.
     await screen.findByRole("button", { name: "Open Eldritch Blast" });
     expect(screen.queryByText("Spells", { exact: true })).not.toBeInTheDocument();
   });
 
-  // #1778: Cantrips and Spells are separate tabs now, so the counts split
-  // across the active tab's own headline and the OTHER tab's segment caption
-  // — there is no longer a single combined "Cantrips X/Y · Spells X/Y" line.
   it("reflects the pick counts across the active headline and the other tab's segment", async () => {
     renderStep({ cantripIds: ["eb"] });
     expect(await screen.findByText("Cantrips 1/2")).toBeInTheDocument();
@@ -141,8 +122,6 @@ describe("CreationSpellsStep", () => {
 
   it("disables unselected cantrip pills once the cap is reached", async () => {
     renderStep({ cantripIds: ["eb"], counts: { ...COUNTS, cantrips: 1 } });
-    // Eldritch Blast fills the single cantrip slot; the served list holds no
-    // second warlock cantrip, so the cap shows as the picked pill staying pressed.
     const added = await screen.findByRole("button", { name: "Add Eldritch Blast" });
     expect(added).toHaveAttribute("aria-pressed", "true");
   });
@@ -153,8 +132,6 @@ describe("CreationSpellsStep", () => {
     expect(screen.getByText("A beam of crackling energy.")).toBeInTheDocument();
   });
 
-  // #1826: a successful-but-empty class fetch (e.g. the EK/AT resolver bug)
-  // must read as distinctly different from a search that matched nothing.
   it("shows a misconfiguration message when the class fetch succeeds with an empty catalog", async () => {
     fetchMock.mockResolvedValue([]);
     renderStep();
@@ -187,10 +164,6 @@ describe("CreationSpellsStep", () => {
     vi.useRealTimers();
   });
 
-  // #1513: the Wizard's Spells group relabels to "Spellbook" and carries the
-  // split-explaining note when counts.spellbookSize is served. Every other
-  // caster (this file's default `counts` has no spellbookSize) is unaffected —
-  // the existing tests above pin that byte-identical "Spells" behavior.
   describe("Wizard spellbook (#1513)", () => {
     const WIZARD_COUNTS = { cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 };
 
@@ -212,10 +185,6 @@ describe("CreationSpellsStep", () => {
     });
   });
 
-  // #1689/#1778: the species-granted cantrip choice folded in from the retired
-  // SpeciesCantripSection — driven purely by the served spec
-  // (speciesCantripChoice.applicable); no panel at all when the server serves
-  // no chooseCantrip.
   describe("species cantrip (#1689/#1778)", () => {
     beforeEach(() => {
       fetchMock.mockImplementation((_edition, filter) =>
@@ -290,20 +259,14 @@ describe("CreationSpellsStep", () => {
       expect(onSpeciesCantripChange).toHaveBeenCalledWith("");
     });
 
-    // The species-cantrip-only case (a non-caster High Elf Fighter): no class
-    // picks at all, so the merged step must show ONE view with no tab bar.
     it("shows a single view with no segmented control for a species-cantrip-only (non-caster) class", async () => {
       renderStep({ counts: undefined, speciesCantripChoice: APPLICABLE_SPECIES_CHOICE });
       expect(await screen.findByRole("button", { name: "Open Fire Bolt" })).toBeInTheDocument();
       expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
       expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-      // No class fetch at all for a non-caster.
       expect(fetchMock).not.toHaveBeenCalledWith("EDITION_2024", { className: "warlock", maxLevel: 1 });
     });
 
-    // #1826: same guard on the species tab — an empty-but-successful species
-    // catalog (e.g. a `spells` spec that narrows to zero eligible names) must
-    // not read as a search miss.
     it("shows a misconfiguration message when the species catalog succeeds with an empty pool", async () => {
       fetchMock.mockImplementation((_edition, filter) =>
         Promise.resolve(filter?.maxLevel === 0 ? [] : CATALOG),

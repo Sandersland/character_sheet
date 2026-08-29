@@ -7,7 +7,6 @@ import {
 } from "@/features/session/RecapPrimitives";
 import type { CampaignRecap } from "@/types/character";
 
-// Levels-gained + combat-rounds callouts (each shown only when nonzero).
 export function RecapSecondaryFacts({
   levelsGained,
   combatRounds,
@@ -37,8 +36,7 @@ export function RecapSecondaryFacts({
   );
 }
 
-// The party-wide optional recap groups: sold, loot, slots spent, feats/ASIs.
-// Legacy stored blobs predate some fields — coalesce before reading length.
+// Legacy stored recap blobs predate some fields — coalesce before reading length.
 export function RecapDomainGroups({ recap }: { recap: CampaignRecap }) {
   return (
     <>

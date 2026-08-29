@@ -21,14 +21,8 @@ import type { DiceRollerProps } from "@/features/dice/diceRollerTypes";
 import DieMesh from "@/features/dice/DieMesh";
 import { useDieFaceData } from "@/features/dice/useDieFaceData";
 
-// FIXED_DT (imported from physicsDice.ts) is the fixed simulated-time step used
-// to fast-forward a roll with no animation (reduced-motion, or a mid-tumble
-// Skip): each synchronous tick advances the same amount of sim time a real
-// animated frame would. Sharing the constant keeps the two paths in lockstep.
-// Safety cap on instant-resolve loop iterations. Belt-and-suspenders
-// alongside the resolver's own MAX_ROLL_MS-based cutoff — elapsedMs climbs
-// by a fixed amount every tick regardless of real time, so this should never
-// actually bind, but it guarantees the loop can't spin forever if it did.
+// Safety cap — belt-and-suspenders alongside the resolver's own MAX_ROLL_MS
+// cutoff; should never actually bind.
 const INSTANT_RESOLVE_MAX_TICKS = 600;
 
 interface DicePhysics {
@@ -37,11 +31,8 @@ interface DicePhysics {
   resolver: ReturnType<typeof createRollResolver>;
 }
 
-// Builds this instance's cannon-es world + dice + resolver once (lazily). Kept
-// out of the component body so the render stays a thin mapping. Advantage/
-// disadvantage rolls two d20s and keeps one — mirror DiceRoller's dieCount guard
-// so the world spawns both dice (spec.count alone would silently drop advantage;
-// see usesAdvantage in dice.ts).
+// Mirrors DiceRoller's dieCount guard: spec.count alone would silently drop
+// the second die under advantage (see usesAdvantage in dice.ts).
 function createDicePhysics(spec: DiceRollerProps["spec"], groups: FaceGroup[]): DicePhysics {
   const dieCount = usesAdvantage(spec) ? 2 : spec.count;
   const { world, diceMaterial } = createDiceWorld(dieCount);
@@ -51,9 +42,8 @@ function createDicePhysics(spec: DiceRollerProps["spec"], groups: FaceGroup[]): 
   const dice: PhysicsDie[] = Array.from({ length: dieCount }, (_, index) => {
     const laneX = (index - (dieCount - 1) / 2) * DIE_GAP;
     const body = createDieBody(diceMaterial, spec.faces);
-    // Rest in its tidy lane from the very first paint, same as the scripted
-    // roller's idle pose, rather than at the cannon body default of the world
-    // origin until the first roll throws it somewhere real.
+    // Starts in its tidy lane immediately, matching the scripted roller's
+    // idle pose, instead of the cannon body's world-origin default.
     body.position.set(laneX, FLOOR_Y + restY, 0);
     world.addBody(body);
     return { body, groups, laneX, restY };
@@ -73,15 +63,10 @@ interface PhysicsRigProps {
   rolling: boolean;
 }
 
-/**
- * Lives inside `DiceScene`'s `<Canvas>` (required for `useFrame`) and owns
- * the only per-frame work: stepping the shared cannon-es world while a roll
- * is animating, and copying each die's body transform onto its `DieMesh`
- * every frame regardless of *why* the body moved — a real animated step
- * here, or a synchronous instant-resolve the parent already ran before this
- * frame was even scheduled. That split is what lets the reduced-motion/skip
- * path reuse the exact same physics resolution without a visible tumble.
- */
+/** Lives inside DiceScene's Canvas (needed for useFrame). Copies each die's
+ *  body transform onto its DieMesh every frame regardless of why it moved,
+ *  which is what lets reduced-motion/skip reuse the same physics resolution
+ *  without a visible tumble. */
 function PhysicsRig({ dice, resolver, activeRef, onSettled, geometry, groups, rounded, result, rolling }: PhysicsRigProps) {
   const groupRefs = useRef(dice.map(() => createRef<THREE.Group>())).current;
   const onSettledRef = useRef(onSettled);
@@ -123,21 +108,10 @@ function PhysicsRig({ dice, resolver, activeRef, onSettled, geometry, groups, ro
   );
 }
 
-/**
- * Real-physics dice roller: thrown with randomized velocity/spin into an
- * invisible tray (gravity, collisions, bouncing — see `createDiceWorld`/`throwDie`),
- * and the result is *read off whichever face lands up* rather than decided
- * in advance — physics is the source of randomness here, unlike the
- * scripted `DiceRoller`. Shares the same look (`DieMesh`/`DiceScene`) and
- * the same public props as `DiceRoller` so the two are interchangeable
- * (see `DiceRollSequence`'s `roller` prop); character creation's ability
- * scores use this one.
- *
- * Reduced-motion and a mid-tumble Skip both fast-forward the *same* physics
- * resolution synchronously (many fixed simulated steps with nothing
- * rendered in between) rather than substituting a different source of
- * randomness — so a skipped roll is exactly as fair as a watched one.
- */
+/** Physics is the source of randomness — the result is read off whichever
+ *  face lands, not decided in advance. Reduced-motion/skip fast-forward the
+ *  same resolution synchronously, so a skipped roll is exactly as fair as a
+ *  watched one. */
 export default function PhysicsDiceRoller({
   spec,
   onResult,
@@ -162,11 +136,8 @@ export default function PhysicsDiceRoller({
   const lastRollKeyRef = useRef<number | string | undefined>(undefined);
   const hasAutoRolledRef = useRef(false);
   const reducedMotionRef = useRef(false);
-  // Whether an animated (multi-frame) roll is currently in flight — read and
-  // written by both this component (to start/cancel one) and `PhysicsRig`'s
-  // `useFrame` (to step it and notice when it's done). A plain mutable ref
-  // rather than state since per-frame physics has no business going through
-  // React's render cycle.
+  // Shared with PhysicsRig's useFrame; a plain ref (not state) since
+  // per-frame physics shouldn't go through React's render cycle.
   const activeRef = useRef(false);
 
   useEffect(() => {
@@ -174,12 +145,9 @@ export default function PhysicsDiceRoller({
       typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }, []);
 
-  // The world/bodies/resolver are created once, lazily, for this instance's
-  // whole lifetime — cannon-es objects hold no GPU resources to dispose, and
-  // a given roller instance always rolls the same spec.count/spec.faces (the
-  // orchestrators that mount this component, e.g. DiceRollSequence, keep one
-  // instance alive across an entire multi-step sequence and only ever change
-  // *which* roll via rollKey, never the spec shape).
+  // Created once lazily for this instance's lifetime — cannon-es objects need
+  // no disposal, and spec.count/faces never change across rollKey (only
+  // which roll, e.g. via DiceRollSequence).
   const physicsRef = useRef<DicePhysics | null>(null);
   if (physicsRef.current === null) {
     physicsRef.current = createDicePhysics(spec, groups);
@@ -193,8 +161,6 @@ export default function PhysicsDiceRoller({
     onResultRef.current?.(next);
   }
 
-  /** Runs the resolver to completion synchronously, with nothing rendered in
-   *  between — used for reduced motion and for fast-forwarding a Skip. */
   function resolveInstantly() {
     let tick = resolver.tick(FIXED_DT);
     let iterations = 0;
@@ -204,8 +170,7 @@ export default function PhysicsDiceRoller({
     }
     activeRef.current = false;
     // tick.values is always set once tick.done is true (see
-    // createRollResolver) — the fallback below is unreachable in practice,
-    // a last-resort guard against ever hanging if that invariant breaks.
+    // createRollResolver); the fallback is an unreachable last-resort guard.
     finalize(tick.values ?? dice.map(() => 1));
   }
 
@@ -223,14 +188,9 @@ export default function PhysicsDiceRoller({
     activeRef.current = true;
   }
 
-  // This effect owns the *entire* lifecycle of a triggered roll, including
-  // tearing it down — see DiceRoller's identical pattern for why: StrictMode
-  // double-invokes every effect on mount (setup → cleanup → setup again) in
-  // dev, and a cleanup declared separately would still run in between those
-  // two setups and cancel the roll this effect just started, with nothing
-  // left to reschedule it. Returning the matching undo here instead means
-  // the second StrictMode setup sees a fresh state and re-rolls for real,
-  // while genuine unmounts/rollKey changes still cancel cleanly.
+  // Owns its own cleanup (see DiceRoller's identical pattern) so
+  // StrictMode's dev double-invoke re-triggers cleanly instead of cancelling
+  // a roll it just started.
   useEffect(() => {
     if (rollKey !== undefined) {
       if (lastRollKeyRef.current === rollKey) return undefined;
@@ -238,11 +198,9 @@ export default function PhysicsDiceRoller({
       lastRollKeyRef.current = rollKey;
       roll();
       return () => {
-        // Only undo the dedupe if there's an actual animated roll in flight
-        // to cancel — instant resolution (skip/reduced-motion) has nothing
-        // pending by the time `roll()` returns, and letting the replay reset
-        // lastRollKeyRef there would re-roll and fire onResult a second time
-        // for an already-delivered result.
+        // Only undo the dedupe if an animated roll is actually in flight —
+        // instant resolution has nothing pending, and undoing there would
+        // re-roll and fire onResult twice.
         if (activeRef.current) {
           activeRef.current = false;
           lastRollKeyRef.current = previousRollKey;
@@ -265,23 +223,14 @@ export default function PhysicsDiceRoller({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot lifecycle roll trigger; roll() reads every reactive value via refs, so completing the deps would restart the StrictMode-owned roll and re-fire onResult for an already-delivered result; useEffectEvent (the sanctioned extraction) isn't in React 18.3.1 (#1056)
   }, [rollKey, autoRollOnMount]);
 
-  // Lets a parent (e.g. DiceRollSequence) interrupt an in-flight tumble on
-  // demand — same [skip]-only dependency reasoning as DiceRoller's matching
-  // effect. Rather than substituting a different result, this fast-forwards
-  // the *same* in-flight resolver (whatever sim time it's already
-  // accumulated, picking up right where the animated ticks left off) to
-  // completion with nothing rendered in between, so a skipped roll is just a
-  // faster-watched one, not a different roll.
+  // Fast-forwards the same in-flight resolver to completion (not a
+  // different roll) — same [skip]-only dependency reasoning as DiceRoller's
+  // matching effect.
   useEffect(() => {
     if (!skip) return;
-    if (!activeRef.current) return; // nothing in flight to interrupt
+    if (!activeRef.current) return;
     activeRef.current = false;
     resolveInstantly();
-    // Deliberately keyed on [skip] alone, not [skip, resolveInstantly] —
-    // resolveInstantly only reads the refs above (always current), and
-    // depending on a function recreated every render would fire this on
-    // every render, fighting the lifecycle effect above for ownership of
-    // activeRef the same way depending on `rolling`/`result` would.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- skip-interrupt keyed on [skip] alone; resolveInstantly reads live refs, so adding its per-render identity would fire this every render and fight the lifecycle effect for activeRef ownership; useEffectEvent (the sanctioned extraction) isn't in React 18.3.1 (#1056)
   }, [skip]);
 

@@ -1,9 +1,4 @@
-// Drives full auth-boundary coverage off routeManifest: each entry's scope
-// dictates the expected status of one concretely-routed request into its
-// router. A manifest entry whose router has no ROUTER_ENTRIES row below fails
-// the completeness check BY NAME (looked up by router identity, not by mount
-// — many routers share the "/api" mount) instead of quietly dropping out of
-// the it.each cases; adding a mount still means adding a row here.
+// A manifest entry whose router has no ROUTER_ENTRIES row fails the completeness check by name — adding a mount to routeManifest still means adding a row to ROUTER_ENTRIES here.
 import { describe, expect, it } from "vitest";
 import supertest from "supertest";
 import type { Router } from "express";
@@ -62,22 +57,13 @@ interface RouterEntry {
   probe: Probe;
 }
 
-// One row per router the manifest can mount, keyed by router IDENTITY (a
-// Map below), not by mount string or scope: identity survives a scope typo
-// on an already-known router, which is exactly the bug this table exists to
-// name. `probe` is a request that really routes into that specific router —
-// requireAuth is a blanket /api gate, so a made-up path would 401 regardless
-// of wiring; only a route the router itself registers proves this entry sits
-// on the correct side of it. Several routers expose no GET at all
-// (mutation-only transactions endpoints); those are probed with POST
-// instead, called out inline rather than silently substituted.
+// Keyed by router IDENTITY (a Map below), not mount string or scope, so a scope typo on an already-known router still resolves a name instead of silently dropping from it.each.
+// `probe` must be a route the router itself registers — requireAuth is a blanket /api gate, so a made-up path would 401 regardless of wiring.
 const ROUTER_ENTRIES: RouterEntry[] = [
   { name: "healthRouter", router: healthRouter, probe: { method: "get", path: "/api/health" } },
-  // NOT /api/auth/me: that route deliberately 401s itself when unauthenticated
-  // (it IS the session-check endpoint), so it would false-positive as public.
+  // NOT /api/auth/me: that route deliberately 401s itself when unauthenticated (it IS the session-check endpoint), so it would false-positive as public.
   { name: "authRouter", router: authRouter, probe: { method: "get", path: "/api/auth/providers" } },
   { name: "charactersRouter", router: charactersRouter, probe: { method: "get", path: "/api/characters" } },
-  // No GET on preferencesRouter — only PATCH "/" (#1178).
   {
     name: "preferencesRouter",
     router: preferencesRouter,
@@ -86,70 +72,58 @@ const ROUTER_ENTRIES: RouterEntry[] = [
   { name: "referenceRouter", router: referenceRouter, probe: { method: "get", path: "/api/reference" } },
   { name: "itemsRouter", router: itemsRouter, probe: { method: "get", path: "/api/items" } },
   { name: "spellsRouter", router: spellsRouter, probe: { method: "get", path: "/api/spells" } },
-  // No GET on customSpellsRouter — only POST/PATCH/DELETE (#1785).
   {
     name: "customSpellsRouter",
     router: customSpellsRouter,
     probe: { method: "post", path: "/api/spells/custom" },
   },
   { name: "featsRouter", router: featsRouter, probe: { method: "get", path: "/api/feats" } },
-  // No GET on grantsRouter — POST .../grants and DELETE .../grants/:campaignId
-  // (#1799); POST alone is enough to prove requireAuth gates this router.
   {
     name: "grantsRouter",
     router: grantsRouter,
     probe: { method: "post", path: `/api/catalog/entries/${FAKE_ID}/grants` },
   },
-  // No GET on forkRouter — only POST "/:entryId/fork" (#1800).
   {
     name: "forkRouter",
     router: forkRouter,
     probe: { method: "post", path: `/api/catalog/entries/${FAKE_ID}/fork` },
   },
   { name: "editionsRouter", router: editionsRouter, probe: { method: "get", path: "/api/editions" } },
-  // No GET on hitPointsRouter — only POST "/".
   {
     name: "hitPointsRouter",
     router: hitPointsRouter,
     probe: { method: "post", path: `/api/characters/${FAKE_ID}/hp` },
   },
-  // No GET on inventoryRouter — only POST /transactions.
   {
     name: "inventoryRouter",
     router: inventoryRouter,
     probe: { method: "post", path: `/api/characters/${FAKE_ID}/inventory/transactions` },
   },
-  // No GET on experienceRouter — only POST "/".
   {
     name: "experienceRouter",
     router: experienceRouter,
     probe: { method: "post", path: `/api/characters/${FAKE_ID}/experience` },
   },
-  // No GET on spellcastingRouter — only POST /transactions.
   {
     name: "spellcastingRouter",
     router: spellcastingRouter,
     probe: { method: "post", path: `/api/characters/${FAKE_ID}/spellcasting/transactions` },
   },
-  // No GET on resourcesRouter — only POST /transactions.
   {
     name: "resourcesRouter",
     router: resourcesRouter,
     probe: { method: "post", path: `/api/characters/${FAKE_ID}/resources/transactions` },
   },
-  // No GET on resolveActionRouter — only POST /transactions (#1829).
   {
     name: "resolveActionRouter",
     router: resolveActionRouter,
     probe: { method: "post", path: `/api/characters/${FAKE_ID}/resolve-action/transactions` },
   },
-  // No GET on conditionsRouter — only POST /transactions.
   {
     name: "conditionsRouter",
     router: conditionsRouter,
     probe: { method: "post", path: `/api/characters/${FAKE_ID}/conditions/transactions` },
   },
-  // No GET on classRouter — only POST /transactions.
   {
     name: "classRouter",
     router: classRouter,
@@ -160,7 +134,6 @@ const ROUTER_ENTRIES: RouterEntry[] = [
     router: channelDivinityRouter,
     probe: { method: "get", path: `/api/characters/${FAKE_ID}/channel-divinity` },
   },
-  // No GET on advancementRouter — only POST /transactions.
   {
     name: "advancementRouter",
     router: advancementRouter,
@@ -168,13 +141,11 @@ const ROUTER_ENTRIES: RouterEntry[] = [
   },
   { name: "levelUpRouter", router: levelUpRouter, probe: { method: "get", path: `/api/characters/${FAKE_ID}/level-up/plan` } },
   { name: "portraitRouter", router: portraitRouter, probe: { method: "get", path: `/api/characters/${FAKE_ID}/portrait` } },
-  // No GET on actionsRouter by design — see actions.ts's file banner.
   {
     name: "actionsRouter",
     router: actionsRouter,
     probe: { method: "post", path: `/api/characters/${FAKE_ID}/actions/transactions` },
   },
-  // No GET on abilitiesRouter — only POST /:abilityKey/transactions.
   {
     name: "abilitiesRouter",
     router: abilitiesRouter,
@@ -190,7 +161,6 @@ const ROUTER_ENTRIES: RouterEntry[] = [
     probe: { method: "get", path: "/api/subclass-choices/huntersPrey" },
   },
   { name: "sessionsRouter", router: sessionsRouter, probe: { method: "get", path: `/api/characters/${FAKE_ID}/sessions` } },
-  // No GET on journalRouter — probed with its POST (create-entry) route.
   { name: "journalRouter", router: journalRouter, probe: { method: "post", path: `/api/characters/${FAKE_ID}/journal` } },
   { name: "campaignsRouter", router: campaignsRouter, probe: { method: "get", path: "/api/campaigns" } },
   { name: "entitiesRouter", router: entitiesRouter, probe: { method: "get", path: `/api/campaigns/${FAKE_ID}/entities` } },
@@ -205,9 +175,6 @@ const ROUTER_ENTRIES: RouterEntry[] = [
 
 const ENTRY_BY_ROUTER = new Map(ROUTER_ENTRIES.map((e) => [e.router, e] as const));
 
-// Pairs each manifest entry of `scope` with its ROUTER_ENTRIES row (by router
-// identity) so a scope typo on a KNOWN router still resolves a name, instead
-// of only being detectable as a vanished test case.
 function namedEntries(scope: "public" | "authed") {
   return routeManifest
     .filter((entry) => entry.scope === scope)
@@ -234,9 +201,7 @@ describe("route manifest auth boundary", () => {
     expect(res.status).toBe(401);
   });
 
-  // Asserts the concrete 200, not merely "not 401": a public router mounted
-  // ahead of requireAuth but still reading req.user (e.g. a scope flip that
-  // drops the gate) 500s rather than 401s, which "not 401" would miss.
+  // Asserts the concrete 200, not merely "not 401": a public router mounted ahead of requireAuth but still reading req.user 500s rather than 401s, which "not 401" would miss.
   it.each(
     namedEntries("public")
       .map((e) => e.named)

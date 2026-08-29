@@ -10,10 +10,7 @@ import MeterBar from "@/components/ui/MeterBar";
 
 type ApplyXp = (op: ExperienceOperation) => Promise<Character | null>;
 
-// One XP mutation with shared pending + error state; resolves to the updated
-// character (or null on failure) so callers can resync their input fields.
-// `error` stays a boolean here (not the mutation's message) — deliberate,
-// matching this hook's pre-#1283 contract; don't widen it to a string.
+// `error` stays a boolean here (not the mutation's message) — don't widen it to a string.
 function useExperienceActions(character: Character) {
   const mutation = useCharacterMutation({
     characterId: character.id,
@@ -167,7 +164,6 @@ function SetExactTotalRow({
       <button
         type="button"
         onClick={() => {
-          // Seed from the live total so the field opens on the current XP.
           setValue(String(experiencePoints));
           setOpen(true);
         }}

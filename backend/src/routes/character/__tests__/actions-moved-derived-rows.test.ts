@@ -1,22 +1,3 @@
-/**
- * Route-level cast tests for the eight DERIVED_ACTIONS entries #1909 moved
- * onto their class's own ClassFeature rows (bardicInspiration, wildShape,
- * divineSense, layOnHands x2, metamagic x2, channelDivinity) — proving the
- * WRITE path (POST /api/characters/:id/actions/transactions) stays
- * byte-identical, exactly as the issue's own comment on
- * applyActionOpInTx/ACTION_EFFECT_FN promises: the route checks
- * `ACTION_EFFECT_FN[op.actionKey]` BEFORE the row-driven path, so nothing
- * about moving these keys off DERIVED_ACTIONS changes how casting them
- * spends/heals. Mirrors actions-rage.test.ts's pattern: real seeded classIds
- * (a bespoke test-only CharacterClass carries no ClassFeature rows of its
- * own, so a row-driven action would never appear for one), one character per
- * describe block, deleted in afterEach.
- *
- * The Cleric 2 / Paladin 3 multiclass "exactly one channelDivinity card, one
- * merged pool" regression (#1340) already has dedicated route coverage in
- * channel-divinity-multiclass.test.ts — not duplicated here.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -75,7 +56,7 @@ describe("POST /:id/actions/transactions — Bardic Inspiration (#1909, row-driv
         id: CHAR_ID,
         name: "1909 Bard",
         ownerId: OWNER_ID,
-        experiencePoints: 0, // level 1
+        experiencePoints: 0,
         hitPoints: { current: 8, max: 8, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 1, die: "d8", spent: 0 },
         abilityScores: { strength: 10, dexterity: 14, constitution: 12, intelligence: 10, wisdom: 10, charisma: 16 },
@@ -88,7 +69,7 @@ describe("POST /:id/actions/transactions — Bardic Inspiration (#1909, row-driv
     await prisma.character.deleteMany({ where: { id: CHAR_ID } });
   });
 
-  it("spends 1 bardicInspiration use (pool total 3 — max(1, +3 Cha mod) — still resourceFn-derived, #1909 only added the row-driven ACTION)", async () => {
+  it("spends 1 bardicInspiration use (pool total 3 — max(1, +3 Cha mod) — row-driven pool AND action)", async () => {
     const res = await executeAction(CHAR_ID, "bardicInspiration");
     expect(res.status).toBe(200);
     expect(pool(res.body, "bardicInspiration")).toMatchObject({ total: 3, used: 1, remaining: 2 });
@@ -114,7 +95,7 @@ describe("POST /:id/actions/transactions — Wild Shape (#1909, row-driven)", ()
         id: CHAR_ID,
         name: "1909 Druid",
         ownerId: OWNER_ID,
-        experiencePoints: 300, // level 2
+        experiencePoints: 300,
         hitPoints: { current: 15, max: 15, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 2, die: "d8", spent: 0 },
         abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 16, charisma: 10 },
@@ -146,7 +127,7 @@ describe("POST /:id/actions/transactions — Paladin base pools (#1909, row-driv
         name: "1909 Paladin 2014",
         rulesEdition: "EDITION_2014",
         ownerId: OWNER_ID,
-        experiencePoints: 900, // level 3
+        experiencePoints: 900,
         hitPoints: { current: 10, max: 28, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 3, die: "d10", spent: 0 },
         abilityScores: { strength: 16, dexterity: 10, constitution: 14, intelligence: 10, wisdom: 10, charisma: 14 },
@@ -169,7 +150,7 @@ describe("POST /:id/actions/transactions — Paladin base pools (#1909, row-driv
     const res = await executeAction(CHAR_ID, "layOnHands", 7);
     expect(res.status).toBe(200);
     expect(pool(res.body, "layOnHands")).toMatchObject({ total: 15, used: 7, remaining: 8 });
-    expect(res.body.hitPoints.current).toBe(17); // 10 + 7
+    expect(res.body.hitPoints.current).toBe(17);
   });
 
   it("layOnHands with no roll (amount 0) 400s — spendResource rejects a non-positive amount (pre-existing resources.ts guard, unrelated to #1909)", async () => {
@@ -195,7 +176,7 @@ describe("POST /:id/actions/transactions — Paladin Lay on Hands cost fork (#19
         id: CHAR_ID,
         name: "1909 Paladin 2024",
         ownerId: OWNER_ID,
-        experiencePoints: 0, // level 1
+        experiencePoints: 0,
         hitPoints: { current: 5, max: 12, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 1, die: "d10", spent: 0 },
         abilityScores: { strength: 16, dexterity: 10, constitution: 14, intelligence: 10, wisdom: 10, charisma: 14 },
@@ -208,10 +189,7 @@ describe("POST /:id/actions/transactions — Paladin Lay on Hands cost fork (#19
     await prisma.character.deleteMany({ where: { id: CHAR_ID } });
   });
 
-  // Cost forks to a Bonus Action in 2024 (SRD 5.2) — availableActions[]'s own
-  // `cost` field is what actually carries this, not the spend mechanics
-  // (identical write path either edition); checked here alongside the spend
-  // to keep the edition-fork assertion next to its own fixture.
+  // Cost forks to a Bonus Action in 2024 (SRD 5.2).
   it("layOnHands availableActions reports cost bonusAction (2024), and the spend/heal is unchanged", async () => {
     const sheet = await agent().get(`/api/characters/${CHAR_ID}`);
     const card = (sheet.body.availableActions as { key: string; cost: string }[]).find((a) => a.key === "layOnHands");
@@ -220,7 +198,7 @@ describe("POST /:id/actions/transactions — Paladin Lay on Hands cost fork (#19
     const res = await executeAction(CHAR_ID, "layOnHands", 5);
     expect(res.status).toBe(200);
     expect(pool(res.body, "layOnHands")).toMatchObject({ total: 5, used: 5, remaining: 0 });
-    expect(res.body.hitPoints.current).toBe(10); // 5 + 5
+    expect(res.body.hitPoints.current).toBe(10);
   });
 });
 
@@ -236,7 +214,8 @@ describe("POST /:id/actions/transactions — Metamagic (#1909, row-driven, enabl
         name: "1909 Sorcerer",
         rulesEdition: "EDITION_2014",
         ownerId: OWNER_ID,
-        experiencePoints: 900, // level 3 — PHB'14 grants Metamagic at 3
+        // PHB'14 grants Metamagic at level 3.
+        experiencePoints: 900,
         hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 3, die: "d6", spent: 0 },
         abilityScores: { strength: 8, dexterity: 14, constitution: 12, intelligence: 10, wisdom: 10, charisma: 16 },
@@ -249,20 +228,16 @@ describe("POST /:id/actions/transactions — Metamagic (#1909, row-driven, enabl
     await prisma.character.deleteMany({ where: { id: CHAR_ID } });
   });
 
-  // Metamagic's identity ("metamagic") differs from its cost pool
-  // ("sorceryPoints") — the actionFromRow enablement fix's real-world
-  // consumer. A >1-point spend (Twinned Spell, level x2 SP) exercises the
-  // variable-amount op the same way layOnHands' own variable spend does.
+  // The metamagic action key differs from its cost pool key (sorceryPoints).
   it("spends MORE THAN 1 Sorcery Point (a >1-point Metamagic option, e.g. Twinned Spell) off the sorceryPoints pool, not an identity-named one", async () => {
     const res = await executeAction(CHAR_ID, "metamagic", 2);
     expect(res.status).toBe(200);
     expect(pool(res.body, "sorceryPoints")).toMatchObject({ total: 3, used: 2, remaining: 1 });
-    // No phantom "metamagic" pool is ever created — identity-only resourceKey.
     expect(res.body.resources.pools.some((p: Pool) => p.key === "metamagic")).toBe(false);
   });
 
   it("availableActions reports metamagic as enabled/disabled off the sorceryPoints pool (the enablement-fix's own regression pin)", async () => {
-    await executeAction(CHAR_ID, "metamagic", 3); // spend all 3 remaining sorceryPoints
+    await executeAction(CHAR_ID, "metamagic", 3);
     const sheet = await agent().get(`/api/characters/${CHAR_ID}`);
     const card = (sheet.body.availableActions as { key: string; enabled: boolean; disabledReason?: string }[]).find(
       (a) => a.key === "metamagic",
@@ -283,7 +258,7 @@ describe("POST /:id/actions/transactions — Cleric Channel Divinity (#1909, row
         id: CHAR_ID,
         name: "1909 Cleric",
         ownerId: OWNER_ID,
-        experiencePoints: 300, // level 2
+        experiencePoints: 300,
         hitPoints: { current: 16, max: 16, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 2, die: "d8", spent: 0 },
         abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 16, charisma: 10 },

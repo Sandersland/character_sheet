@@ -1,21 +1,17 @@
-// Roll-mode taxonomy shared by conditions (srd) and active-effect buffs (combat):
-// a state can grant advantage/disadvantage on a class of d20 roll, optionally
-// narrowed to one ability. Merged into the derived rollModifiers list on read
-// (serializeCharacter) and resolved per roll on the frontend.
+// Merged into the derived rollModifiers list on read (serializeCharacter); resolved per roll on the frontend.
 
 export type RollAdvantage = "advantage" | "disadvantage";
 
-/** The four d20 roll categories a state can bind to. */
 export type RollModeKind = "attack" | "check" | "save" | "initiative";
 
-/** One advantage/disadvantage grant; `ability` (lowercase key) narrows it to a single ability. */
+// `ability` (lowercase key) narrows the grant to a single ability.
 export interface AdvantageRollEffect {
   mode: RollAdvantage;
   kind: RollModeKind;
   ability?: string;
 }
 
-/** A flat numeric d20 modifier, e.g. 2024 exhaustion's −2×level (SRD 5.2). */
+// e.g. 2024 exhaustion's −2×level (SRD 5.2).
 export interface FlatRollEffect {
   mode: "flat";
   modifier: number;
@@ -23,8 +19,6 @@ export interface FlatRollEffect {
   ability?: string;
 }
 
-/** A state-driven grant on a class of d20 roll: adv/dis or a flat modifier. */
 export type RollEffect = AdvantageRollEffect | FlatRollEffect;
 
-/** A RollEffect resolved with its provenance label (e.g. "Rage", "Poisoned", "Exhaustion"). */
 export type RollModifier = RollEffect & { source: string };

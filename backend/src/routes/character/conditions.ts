@@ -1,7 +1,3 @@
-// Owns POST /characters/:id/conditions/transactions (apply/remove conditions,
-// set exhaustion). Mutation-router contract: apply ops atomically in the lib
-// layer, then re-fetch with characterInclude and return
-// serializeCharacter(updated).
 import { conditionOperationSchema } from "@character-sheet/contracts";
 import { Router } from "express";
 import { z } from "zod";
@@ -20,13 +16,7 @@ const transactionsRequestSchema = z.object({
 
 /**
  * POST /api/characters/:id/conditions/transactions
- * Intent-bearing batch mutation for status-condition state — mirrors
- * POST /api/characters/:id/resources/transactions. Operations:
- *   applyCondition   — add a standard 5e condition (prone, poisoned, …)
- *   removeCondition  — remove an active condition by key
- *   setExhaustion    — set exhaustion to an absolute level (0–6)
- *
- * Returns the full updated character on success.
+ * Operations: applyCondition, removeCondition, setExhaustion (absolute level 0-6).
  */
 makeTransactionsEndpoint({
   router: conditionsRouter,

@@ -1,30 +1,8 @@
 /**
- * Turn-state hook for the action-economy tracker.
- *
- * `round`/`inCombat` are server-authoritative (#1030, `Session.combatActive`/
- * `round`): `syncCombat` reconciles them from a poll or a confirmed
- * combat/start|end|round response; `startCombatState()`'s local `round: 1` on
- * click is only an optimistic guess, corrected by the first sync. The economy
- * bookkeeping (have I used my action? how many attacks remain?) stays LOCAL:
- * its *effects* (spending resources, applying HP heals, decrementing
- * inventory) flow through the existing transaction endpoints and land in the
- * audit log, but the slots themselves are never persisted server-side.
- *
- * The state is persisted to localStorage (keyed by sessionId) so it survives
- * page refreshes and brief disconnects. It is cleared on session end.
- *
- * Combat gating:
- *   - `inCombat` must be true before `startTurn()` can be called (the UI gates
- *     the Start Turn button). This is enforced by the caller in TurnHub.
- *   - `round` is set by the server: 1 when combat starts, +1 per confirmed
- *     end-turn (`advanceCombatRound`). The client never increments it locally.
- *
- * Reaction lifecycle note (5e rules):
- *   - A reaction is consumed DURING another creature's turn (opportunity attack,
- *     Shield spell, etc.) or sometimes on your own turn (readied action).
- *   - It RESETS at the START of YOUR turn.
- *   - `startTurn()` resets action + bonus action + reaction.
- *   - `consumeReaction()` can be called at any time (during your turn or between turns).
+ * `round`/`inCombat` are server-authoritative (`syncCombat` reconciles them); the turn economy (actions/attacks remaining) stays purely local — only its effects (resource spends, HP, inventory) persist through transactions.
+ * Persisted to localStorage keyed by sessionId (survives refreshes/brief disconnects); cleared on session end.
+ * startTurn() isn't gated on inCombat here — TurnHub's caller enforces that before calling it.
+ * consumeReaction() can fire any time (opportunity attacks, readied actions) — it only resets at the start of YOUR turn via startTurn().
  */
 
 import { useReducer, useMemo, useEffect, useRef } from "react";
@@ -42,12 +20,11 @@ import type { Character, SpellEconomyState } from "@/types/character";
 
 export type { AttackTallyRow, TallyAttackRoll } from "@/lib/attackTallySummary";
 
-/** Payload recordAttack appends to the tally: the form plus its kept-d20 snapshot. */
 export interface RecordedAttack {
   formId: string;
   formName: string;
   attack: TallyAttackRoll;
-  /** Which economy slot recorded it (#813). Defaults to `action` when omitted. */
+  /** Defaults to `action` when omitted (#813). */
   source?: TallyRowSource;
   /** Correlates this row's roll events as one swing (#1235). */
   swingId?: string;
@@ -60,7 +37,6 @@ function nextRowId(): string {
   return `tally-${Date.now().toString(36)}-${rowIdSeq}`;
 }
 
-/** Payload InlineSpellPicker appends to the cast tally once a cast settles (#1164). */
 export interface RecordedSpellCast {
   spellName: string;
   /** Slot level cast at (0 = cantrip). */
@@ -72,73 +48,38 @@ export interface RecordedSpellCast {
   announce?: string;
 }
 
-/** One row of the turn card's "Spells cast" tally (#1164) — a cast already
- *  resolved when it lands here, so unlike AttackTallyRow there's no verdict. */
+/** Already resolved when it lands here — unlike AttackTallyRow there's no verdict field. */
 export interface CastTallyRow extends RecordedSpellCast {
   id: string;
 }
 
 export type TurnPhase = "idle" | "active";
 
-/** State of the Extra-Attack counter while the Attack action is in progress. */
 export interface AttackState {
-  /** Total attacks available (from deriveAttacksPerAction + possible extra from Action Surge). */
+  /** From deriveAttacksPerAction + possible extra from Action Surge. */
   total: number;
-  /** How many attacks have been rolled so far this action. */
   used: number;
 }
 
 export interface TurnState {
-  /** Whether the character is currently in a combat encounter. Gates turn-taking. */
   inCombat: boolean;
-  /** Current combat round (1-indexed). 0 when not in combat. */
+  /** 0 when not in combat. */
   round: number;
-  /**
-   * `Session.updatedAt` of the last sync applied (#1030 finding #2) — the
-   * monotonicity baseline `syncCombat` compares against so an out-of-order
-   * poll response can't roll `round`/`inCombat` backward. Null until the first
-   * sync ever lands. Survives local lifecycle resets (startCombat/endCombat)
-   * so a response that raced an optimistic click is still judged against the
-   * last CONFIRMED server timestamp, not against the local optimistic reset.
-   */
+  /** The monotonicity baseline `syncCombat` compares against so an out-of-order poll can't roll round/inCombat backward; survives local startCombat/endCombat resets so a race is still judged against the last CONFIRMED server timestamp (#1030 finding #2). */
   combatUpdatedAt: string | null;
   phase: TurnPhase;
-  /** How many actions remain this turn (normally 1; +1 after Action Surge). */
+  /** Normally 1; +1 after Action Surge. */
   actionsRemaining: number;
-  /** Bonus action available this turn. */
   bonusActionUsed: boolean;
-  /** Reaction used (resets at start of YOUR turn via startTurn). */
   reactionUsed: boolean;
-  /** Non-null while the current action is an Attack action. */
   attack: AttackState | null;
-  /**
-   * Non-null while the bonus action is a multi-swing attack resolution — the
-   * TWF off-hand (always total 1) or Flurry of Blows (total 2, or 3 at
-   * Heightened Focus monk L10, #1244). The two never coexist: both consume
-   * the single bonus-action slot, so only one resolver is ever live.
-   */
+  /** TWF off-hand (total 1) or Flurry of Blows (total 2, 3 at Heightened Focus L10 #1244) — the two never coexist, sharing the one bonus-action slot. */
   bonusAttack: AttackState | null;
-  /**
-   * Per-attack tally for the CURRENT Attack action (#802). One row per rolled
-   * attack; survives sheet close/reopen (Resume). Cleared by endTurn and on
-   * entering a NEW Attack action. Snapshotted for undo alongside the economy.
-   */
+  /** One row per rolled attack; survives sheet close/reopen (Resume); cleared by endTurn and on a new Attack action; snapshotted for undo (#802). */
   attackTally: AttackTallyRow[];
-  /**
-   * Turn-card "Spells cast" tally (#1164): one row per settled cast this turn,
-   * appended by InlineSpellPicker's `onCastSettled`. Cleared by endTurn/startTurn
-   * and by the banner's dismiss, mirroring attackTally's lifecycle — including
-   * the undo snapshot: undo of a cast now reverts the server cast too (its
-   * entry carries the batchId, #758), so the receipt leaves with it.
-   */
+  /** One row per settled cast, appended by InlineSpellPicker's onCastSettled; cleared by endTurn/startTurn and banner dismiss; undo of a cast reverts the server cast too via its batchId (#1164/#758). */
   castTally: CastTallyRow[];
-  /**
-   * The 5e bonus-action spell interlock, RESOLVED SERVER-SIDE (#1439) and
-   * synced in through `syncCombat` — no longer computed from a client-held
-   * `spellCastThisTurn`, which moved to SessionParticipant so two clients agree
-   * and the block survives a reload. The picker reads these two booleans; it
-   * never re-derives the rule. Default `{false, false}` until the first sync.
-   */
+  /** RESOLVED SERVER-SIDE and synced via syncCombat (#1439) — the picker reads these booleans, never re-derives the rule; defaults to {false,false} until the first sync. */
   spellEconomy: SpellEconomyState;
   /** Made an attack this turn — feeds the durable-buff turn-hook (#457). */
   attackedThisTurn: boolean;
@@ -150,33 +91,15 @@ export interface TurnState {
   stunningStrikeUsedThisTurn: boolean;
   /** Open Hand Technique rider imposed this turn — enforces the monk once-per-turn guard (#1245). */
   openHandRiderUsedThisTurn: boolean;
-  /**
-   * Equip/unequip credits earned this turn — one per attack made with the
-   * Attack action (PHB'24: "you can equip or unequip one weapon when you make
-   * this attack as part of the Attack action"). Spent by a mid-turn loadout
-   * swap (#1165); resets each turn.
-   */
+  /** One equip/unequip credit per attack with the Attack action (PHB'24: "you can equip or unequip one weapon when you make this attack"); spent by a mid-turn swap (#1165), resets each turn. */
   attackEquipCredits: number;
-  /**
-   * Whether this turn's one free object interaction (SRD 5.2 "Interacting
-   * with Things") has been spent on a loadout swap (#1165). Resets each turn.
-   */
+  /** SRD 5.2 "Interacting with Things" — this turn's one free object interaction, spent on a loadout swap (#1165); resets each turn. */
   freeInteractionUsed: boolean;
-  /**
-   * Turn-scoped undo stack (#730): a snapshot of the economy is pushed before
-   * each consuming mutation and popped by `undo()`. Cleared on every turn/combat
-   * boundary so undo never reaches across turns.
-   */
+  /** A snapshot is pushed before each consuming mutation and popped by undo(); cleared at every turn/combat boundary so undo never reaches across turns (#730). */
   history: HistoryEntry[];
 }
 
-/**
- * The turn-economy fields captured for undo. Deliberately EXCLUDES lifecycle
- * (`inCombat`/`round`/`phase`) and the activity flags (`attackedThisTurn`/
- * `tookDamageThisTurn`) — the latter are driven by `recordAttack` + the
- * server-HP watcher, so reverting them would either fight the watcher or wrongly
- * relax a durable-buff auto-end. Undo restores only what the player *spent*.
- */
+/** Deliberately excludes lifecycle and the activity flags — reverting those would fight the HP watcher or wrongly relax a durable-buff auto-end; undo restores only what the player spent. */
 export type EconomySnapshot = Pick<
   TurnState,
   | "actionsRemaining"
@@ -190,209 +113,74 @@ export type EconomySnapshot = Pick<
   | "freeInteractionUsed"
 >;
 
-/**
- * An undo-stack entry: the pre-mutation economy snapshot plus, for a mutation
- * that wrote a server effect — Second Wind, Rage, a resolveAction swing/cast
- * (#758) — the audit batchId to revert on undo. A local-only entry (Dodge,
- * Dash, enter-attack-mode) has no batchId.
- */
+/** batchId is present only for a mutation that wrote a server effect (Second Wind, Rage, a resolveAction swing/cast, #758); a local-only entry (Dodge, Dash) has none. */
 export interface HistoryEntry extends EconomySnapshot {
   batchId?: string;
 }
 
 export interface TurnStateActions {
-  /** Enter combat: sets inCombat=true, round=1, resets turn economy. */
   startCombat: () => void;
-  /** Exit combat: resets all state to idle/out-of-combat. */
   endCombat: () => void;
-  /** Begin the turn — resets action+bonus+reaction, derives TWF from loadout. */
   startTurn: () => void;
-  /**
-   * End the turn — returns to idle within combat and increments the round
-   * counter. If not in combat, resets to full initialState.
-   */
   endTurn: () => void;
-  /** Consume one action without entering Attack mode (Dodge, Cast a Spell, etc.). */
   consumeAction: () => void;
-  /** Enter Attack mode: consume one action and open the Extra Attack counter. */
   enterAttackMode: () => void;
-  /**
-   * Record one attack roll during Attack mode (auto-increments counter). When a
-   * `RecordedAttack` payload is passed, a tally row is appended (#802).
-   */
   recordAttack: (recorded?: RecordedAttack) => void;
-  /** Write/replace the damage slot on tally row `rowId` (#802, by-id since #813). */
   setTallyDamage: (rowId: string, damage: number) => void;
-  /** Write/replace the damage slot on row `index` — banner inline resolve (#811). */
   setTallyDamageAt: (index: number, damage: number) => void;
-  /**
-   * Override the to-hit total on tally row `rowId` after a Precision Attack die
-   * is added (#809). Touches only `attack.total` — the kept-d20 face and
-   * criticalHit/nat-1 flags (which decide crit/miss, #1120) stay put.
-   */
+  /** Touches only `attack.total` — the kept-d20 face and criticalHit/nat-1 flags (which decide crit/miss) stay put (#809/#1120). */
   setTallyAttackTotal: (rowId: string, total: number) => void;
-  /** Fold an on-hit rider's total into tally row `rowId`'s damage slot. */
   addTallyDamageRider: (rowId: string, amount: number) => void;
-  /** Set a row's verdict directly; nat-locked rows refuse (#811). */
   setTallyVerdict: (index: number, verdict: TallyVerdict | undefined) => void;
-  /** Clear the attack tally (Turn-summary banner dismiss / new action). */
   clearAttackTally: () => void;
-  /** Append a settled cast to the turn card's "Spells cast" tally (#1164). */
   recordSpellCast: (recorded: RecordedSpellCast) => void;
-  /** Clear the cast tally (its banner's dismiss / new turn). */
   clearCastTally: () => void;
-  /**
-   * Cancel the Attack action if no attacks have been rolled yet — refunds the
-   * action so the player can choose a different action.
-   */
   cancelAttack: () => void;
-  /**
-   * Finalize the Attack action after at least one attack was rolled — clears
-   * the attack counter (marking the action as fully spent) without refunding.
-   */
   finishAttack: () => void;
-  /** Consume the bonus action slot without entering TWF mode. */
   consumeBonusAction: () => void;
-  /** Enter TWF bonus-attack mode: consume the bonus action and open the TWF counter. */
   enterTwfMode: () => void;
-  /**
-   * Record the TWF off-hand attack roll: spends the bonus attack and, when a
-   * `RecordedAttack` payload is passed, appends a `bonusAction`-source tally
-   * row so the swing lands in the turn-summary banner (#813).
-   */
   recordTwfAttack: (recorded?: RecordedAttack) => void;
-  /**
-   * Cancel the off-hand attack if it hasn't been rolled yet — refunds the bonus
-   * action so the player can choose a different bonus action. Mirrors cancelAttack.
-   */
   cancelTwf: () => void;
-  /**
-   * Arm the `bonusAttack` strike counter for Flurry of Blows (#1217) — the bonus
-   * action itself is already consumed by the generic action-click path (like
-   * Rage), so this only opens the counter. `count` is the caller-supplied
-   * strike total (2 today; the Heightened Focus seam, #1244, just passes a
-   * different number). No-ops if a bonus-attack resolution is already live
-   * (e.g. a rehydrated mid-flurry snapshot), so it never resets progress.
-   */
   enterFlurryMode: (count: number) => void;
-  /**
-   * Record one Flurry of Blows strike (auto-increments the counter, clamped at
-   * total). When a `RecordedAttack` payload is passed, appends a
-   * `bonusAction`-source tally row — mirrors recordAttack's multi-attack loop,
-   * not recordTwfAttack's single-swing shape, since Flurry resolves 2+ strikes.
-   */
   recordFlurryAttack: (recorded?: RecordedAttack) => void;
-  /** Cancel Flurry if no strikes have landed yet — refunds the bonus action. */
   cancelFlurry: () => void;
-  /**
-   * Finalize Flurry after at least one strike was rolled — clears the counter
-   * (bonus action stays spent) without refunding. Mirrors finishAttack.
-   */
   finishFlurry: () => void;
-  /** Mark the reaction as used. Can be called at any time. */
   consumeReaction: () => void;
-  /**
-   * Grant an extra action (Action Surge). The resource spend itself is handled
-   * by the caller (via applyResourceTransactions); this just bumps the UI counter.
-   */
+  /** The resource spend itself is handled by the caller (applyResourceTransactions) — this only bumps the UI counter. */
   grantExtraAction: () => void;
-  /**
-   * Return the action spent on a mid-turn loadout swap (#733, Decision #2) — the
-   * caller re-issues the inverse inventory ops at its surface. Mechanically a
-   * +1 to actionsRemaining, so it shares grantExtraAction's implementation.
-   */
+  /** Mechanically +1 actionsRemaining — shares grantExtraAction's implementation (#733); the caller re-issues the inverse inventory ops separately. */
   refundAction: () => void;
-  /**
-   * Pay `spend` from the interaction budget (#1165) — the caller (useLoadoutSwap)
-   * computes it via loadoutPicker's planInteractionSpend before dispatching.
-   */
+  /** The caller (useLoadoutSwap) computes `spend` via planInteractionSpend before dispatching — this only books it (#1165). */
   spendInteractionBudget: (spend: InteractionSpend) => void;
-  /** Reverse a prior spendInteractionBudget — the loadout-swap Refund surface. */
   refundInteractionBudget: (spend: InteractionSpend) => void;
-  /**
-   * Commit the action slot for a spell cast (consumes the action). Call on
-   * successful cast. The 5e bonus-action interlock is no longer recorded here
-   * (#1439) — it's resolved server-side and arrives via `syncCombat`.
-   */
   commitActionSpell: () => void;
-  /**
-   * Commit the bonus-action slot for a spell cast. Call on successful cast.
-   */
   commitBonusActionSpell: () => void;
-  /**
-   * Commit the reaction slot for a spell cast. Call on successful cast.
-   */
   commitReactionSpell: () => void;
-  /**
-   * Tag the most-recent history entry with the audit batchId of the server effect
-   * a server-effect action just wrote (#758) — so a later `undo()` can revert that
-   * batch server-side. No-op when the history is empty.
-   */
   attachBatchId: (batchId: string) => void;
-  /**
-   * Undo the last consuming economy mutation this turn (#730) — pops the history
-   * stack and restores the prior economy snapshot. No-op when the stack is empty.
-   * LOCAL only: it does not reverse server-committed effects. A server-effect
-   * entry's batch is reverted by the useTurnActions `handleUndo` wrapper (#758)
-   * BEFORE this pop; other server effects (a loadout swap) refund at their surface.
-   */
+  /** LOCAL only — never reverses a server-committed effect; useTurnActions' handleUndo wrapper reverts the batch server-side BEFORE this pop (#758); a loadout swap refunds at its own surface. */
   undo: () => void;
-  /** Mark Sneak Attack applied this turn — enforces the once-per-turn guard (#902). */
   markSneakAttackUsed: () => void;
-  /** Mark Stunning Strike attempted this turn — enforces the once-per-turn guard (#1242). */
   markStunningStrikeUsed: () => void;
-  /** Mark Open Hand Technique's rider imposed this turn — enforces the once-per-turn guard (#1245). */
   markOpenHandRiderUsed: () => void;
   /**
-   * Server-event seam (#1030): apply `round`/`inCombat` from a poll or a
-   * just-confirmed combat/start|end|round response. `startCombatState()` also
-   * sets an optimistic local `round: 1` on click — this is what reconciles
-   * that guess to the real value, not the only writer of `round`.
-   *
-   * Ignores a sync whose `updatedAt` is not strictly newer than the last one
-   * applied (`combatUpdatedAt`) — an out-of-order poll answered before a
-   * fresher sync already landed must not roll `round`/`inCombat` backward
-   * (finding #2). Equal timestamps are also a no-op: nothing changed since the
-   * last applied sync, so there's nothing new to apply.
-   *
-   * A `combatActive` false→true transition is treated as a NEW encounter
-   * starting (finding #3), not a round bump on the current one: it resets
-   * phase/economy to a fresh idle encounter so a remote start never arrives
-   * with the previous fight's spent actions/bonus/reaction. A true→true,
-   * false→false, or true→false sync only ever touches round/inCombat —
-   * economy stays local, per this hook's header comment.
+   * Ignores a sync whose updatedAt isn't strictly newer than combatUpdatedAt — an out-of-order poll can't roll round/inCombat backward (finding #2).
+   * A combatActive false→true transition resets phase/economy as a NEW encounter (finding #3) rather than bumping the round on the current one — a remote start must never carry over the previous fight's spent economy.
    */
   syncCombat: (round: number, combatActive: boolean, updatedAt: string, spellEconomy: SpellEconomyState) => void;
   /**
-   * Post-failure reconcile seam (#1030 finding #1): applies an authoritative
-   * refetch even when its `updatedAt` is not newer than `combatUpdatedAt` —
-   * unlike `syncCombat`, never rejected by the monotonic guard. For when a
-   * `startCombat`/`endCombat` call fails: the optimistic local flip never
-   * happened server-side, so the server's `updatedAt` is UNCHANGED from the
-   * last-applied baseline, and every future ordinary poll would report that
-   * same timestamp and be silently discarded by `syncCombat`'s guard, leaving
-   * the client stuck. This bypasses that specific case; it must never be
-   * wired to routine poll results, or the guard it deliberately skips would be
-   * pointless.
+   * Bypasses syncCombat's monotonic guard entirely — for when start/endCombat fails and the server's updatedAt is unchanged, so routine polls would otherwise be silently discarded and the client stuck (#1030 finding #1).
+   * Must never be wired to routine poll results, or the guard it deliberately skips is pointless.
    */
   reconcileCombat: (round: number, combatActive: boolean, updatedAt: string, spellEconomy: SpellEconomyState) => void;
 }
 
-/**
- * The full value returned by useTurnState: the persisted economy state, the
- * action callbacks, plus `twfAvailable` — DERIVED from the live loadout (not
- * persisted), so a mid-turn weapon swap updates the off-hand affordance
- * immediately (#733). Components read this; the persisted slice is `TurnState`.
- */
+/** twfAvailable is DERIVED from the live loadout, not persisted — a mid-turn weapon swap updates it immediately without a new startTurn (#733). */
 export type TurnStateView = TurnState &
   TurnStateActions & {
-    /** Whether TWF is available for the bonus action (gates the affordance). */
     twfAvailable: boolean;
   };
 
-// The interlock's cleared state — used at every turn boundary and as the
-// pre-first-sync default. Server-authoritative (#1439): a real cast's flags
-// arrive via syncCombat, never from a local commit.
+// Server-authoritative (#1439) — a real cast's flags arrive only via syncCombat, never a local commit.
 const NO_SPELL_ECONOMY: SpellEconomyState = {
   bonusActionBlockedByActionSpell: false,
   bonusActionLimitedToCantrips: false,
@@ -424,7 +212,6 @@ function initialState(): TurnState {
   };
 }
 
-/** Snapshot the current economy fields for the undo stack (#730). */
 function economyOf(s: TurnState): EconomySnapshot {
   return {
     actionsRemaining: s.actionsRemaining,
@@ -439,20 +226,14 @@ function economyOf(s: TurnState): EconomySnapshot {
   };
 }
 
-/**
- * Backfill a hydrated snapshot to the current schema (#750 reconciler pattern):
- * merge over defaults for a missing top-level field, and backfill `attackTally`
- * into every undo entry so a pre-#802 snapshot's `undo()` doesn't restore
- * `undefined` over the tally.
- */
+// Merges over defaults for a missing top-level field and backfills attackTally into every undo entry, so a pre-#802 snapshot's undo() doesn't restore undefined over the tally (#750).
 function hydrateTurnState(loaded: TurnState): TurnState {
   const base = { ...initialState(), ...loaded };
   return {
     ...base,
     attackTally: backfillRows(base.attackTally),
     castTally: base.castTally ?? [],
-    // Pre-#1165 entries lack the interaction-budget fields — default them so a
-    // later undo() spread doesn't overwrite live state with `undefined`.
+    // Pre-#1165 entries lack the interaction-budget fields — default them so a later undo() spread doesn't overwrite live state with `undefined`.
     history: (base.history ?? []).map((h) => ({
       ...h,
       attackTally: backfillRows(h.attackTally),
@@ -463,23 +244,19 @@ function hydrateTurnState(loaded: TurnState): TurnState {
   };
 }
 
-// Pre-#802/pre-#813 rows lack `id`/`source`: mint an id and default the source
-// to `action` (the only kind before the off-hand adopted the tally) so hydrated
-// snapshots resolve, target, and clear like freshly-recorded rows (#813).
+// Pre-#802/#813 rows lack id/source — default source to "action" (the only kind before off-hand adopted the tally) so hydrated rows behave like freshly-recorded ones.
 function backfillRows(rows: AttackTallyRow[] | undefined): AttackTallyRow[] {
   return (rows ?? []).map((r) => ({ ...r, id: r.id ?? nextRowId(), source: r.source ?? "action" }));
 }
 
-// Pure state transitions: module-scope, one per economy mutation. A `return s`
-// no-op means `mutate` pushes nothing onto the undo stack (guards stay history-free).
+// A `return s` no-op here means nothing is pushed onto the undo stack — guards stay history-free.
 
 const consumeActionState = (s: TurnState): TurnState =>
   s.actionsRemaining <= 0 ? s : { ...s, actionsRemaining: s.actionsRemaining - 1, attack: null };
 
 function enterAttackModeState(s: TurnState, attacksPerAction: number): TurnState {
   if (s.actionsRemaining <= 0) return s;
-  // A NEW Attack action clears the previous action's rows only — a bonus-action
-  // off-hand row from earlier this turn stays in the banner (#813).
+  // A NEW Attack action clears the previous action's rows only — a bonus-action off-hand row from earlier this turn stays in the banner (#813).
   return {
     ...s,
     actionsRemaining: s.actionsRemaining - 1,
@@ -490,17 +267,14 @@ function enterAttackModeState(s: TurnState, attacksPerAction: number): TurnState
 
 function recordAttackState(s: TurnState, recorded?: RecordedAttack): TurnState {
   if (!s.attack) return s;
-  // Clamp at total — keep attack non-null so the picker stays open for damage rolls.
-  // The picker is closed explicitly by the player via the "Done" button.
+  // Clamps at total but keeps attack non-null so the picker stays open for damage rolls — closed explicitly via the player's Done button.
   const atCap = s.attack.used >= s.attack.total;
   const used = Math.min(s.attack.used + 1, s.attack.total);
-  // Append a tally row only for a genuinely new attack (not a clamped over-click).
   const attackTally =
     !atCap && recorded
       ? [...s.attackTally, tallyRowFor(recorded, "action")]
       : s.attackTally;
-  // PHB'24 Attack action: one equip/unequip credit per genuine attack made
-  // (#1165) — not earned on a clamped over-click, matching the tally guard.
+  // PHB'24: one equip/unequip credit per genuine attack (#1165) — not earned on a clamped over-click, matching the tally guard.
   const attackEquipCredits = atCap ? s.attackEquipCredits : s.attackEquipCredits + 1;
   return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true, attackTally, attackEquipCredits };
 }
@@ -514,22 +288,16 @@ function tallyRowFor(recorded: RecordedAttack, fallbackSource: TallyRowSource): 
     formName: recorded.formName,
     attack: recorded.attack,
     ...(verdict ? { verdict } : {}),
-    // Carries the attack-time swingId (#1235/#1354) so a later rollDamageFor
-    // on this row — which has no access to useAttackRolls' swingIdRef — can
-    // still correlate its damage event with the attack event.
+    // Carries the attack-time swingId (#1235/#1354) so a later rollDamageFor on this row can still correlate its damage event with the attack event.
     ...(recorded.swingId ? { swingId: recorded.swingId } : {}),
   };
 }
 
-// Rolling damage is an implicit hit call (#811): an unset verdict resolves to
-// "hit" the moment damage lands on the row. Explicit verdicts (miss/crit/nat-
-// locked) are never overwritten.
+// An unset verdict resolves to "hit" the moment damage lands (#811); explicit verdicts (miss/crit/nat-locked) are never overwritten.
 function withAutoHit(row: AttackTallyRow): AttackTallyRow {
   return row.verdict ? row : { ...row, verdict: "hit" };
 }
 
-// Shared shell for the "rewrite one tally row" writers: no-op when the row is
-// out of range (empty tally / bad index), otherwise replace it immutably.
 function updateTallyRow(
   s: TurnState,
   index: number,
@@ -542,9 +310,7 @@ function updateTallyRow(
   return { ...s, attackTally };
 }
 
-// By-id sibling of updateTallyRow: targets a specific row so two interleaved
-// sources (action + off-hand bonus action) never misattribute a damage/override
-// write to "the last row" (#813). No-op when the id isn't present.
+// Targets a specific row so two interleaved sources (action + off-hand) never misattribute a write to "the last row" (#813).
 function updateTallyRowById(
   s: TurnState,
   rowId: string,
@@ -553,35 +319,26 @@ function updateTallyRowById(
   return updateTallyRow(s, s.attackTally.findIndex((r) => r.id === rowId), update);
 }
 
-// Write/replace the damage slot on tally row `rowId` — never appends, so
-// re-rolling attack N's damage replaces N's number rather than double-counting (#802).
+// Never appends, so re-rolling attack N's damage replaces N's number rather than double-counting (#802).
 const setTallyDamageState = (s: TurnState, rowId: string, damage: number): TurnState =>
   updateTallyRowById(s, rowId, (row) => withAutoHit({ ...row, damage }));
 
-// Write/replace the damage slot on an arbitrary row by index — the Turn-summary
-// banner's inline resolve rolls damage for skipped rows after the action ended (#811).
 const setTallyDamageAtState = (s: TurnState, index: number, damage: number): TurnState =>
   updateTallyRow(s, index, (row) => withAutoHit({ ...row, damage }));
 
-// Override the to-hit total on row `rowId` after a superiority die is added
-// (#809). Only `attack.total` changes — keptFace + nat flags stay so the verdict
-// (crit/miss) reads the die face, never the boosted total.
 const setTallyAttackTotalState = (s: TurnState, rowId: string, total: number): TurnState =>
   updateTallyRowById(s, rowId, (row) => ({
     ...row,
     attack: { ...row.attack, total },
   }));
 
-// Fold a rider total into row `rowId`'s damage slot (breakdown add). A rider roll
-// is a damage roll, so it also resolves an unset verdict to hit.
+// A rider roll is a damage roll too, so it also resolves an unset verdict to hit.
 const addTallyDamageRiderState = (s: TurnState, rowId: string, amount: number): TurnState =>
   updateTallyRowById(s, rowId, (row) =>
     withAutoHit({ ...row, damage: (row.damage ?? 0) + amount }),
   );
 
-// Set a row's verdict directly (#811 — replaces the old unset→Hit→Miss cycle).
-// Die-locked rows (a crit-range hit, #1120, or nat 1) refuse: the die already
-// decided. Switching to miss drops the row's damage — a missed attack dealt none.
+// Die-locked rows (crit-range hit or nat 1) refuse — the die already decided; switching to miss also drops the row's damage (#811/#1120).
 function setTallyVerdictState(
   s: TurnState,
   index: number,
@@ -598,9 +355,7 @@ function setTallyVerdictState(
   });
 }
 
-// Banner dismissal (#812): clearing the tally must be durable — history
-// snapshots also drop their tally rows so a later undo can't resurrect a
-// dismissed banner with stale lines (the economy fields still restore).
+// Clearing must be durable — history snapshots also drop their tally rows so undo can't resurrect a dismissed banner (#812); economy fields still restore normally.
 const clearAttackTallyState = (s: TurnState): TurnState => {
   if (s.attackTally.length === 0 && s.history.every((h) => h.attackTally.length === 0)) return s;
   return {
@@ -610,9 +365,7 @@ const clearAttackTallyState = (s: TurnState): TurnState => {
   };
 };
 
-// Append a settled cast to the turn card's tally (#1164) — write-through, never
-// pushes an undo snapshot (a cast's economy spend already went through its own
-// commitActionSpell/etc, which IS undoable; the tally row is just its receipt).
+// Write-through, never pushes an undo snapshot — the cast's economy spend already went through commitActionSpell/etc (which IS undoable); this tally row is just its receipt.
 const recordSpellCastState = (s: TurnState, recorded: RecordedSpellCast): TurnState => ({
   ...s,
   castTally: [...s.castTally, { ...recorded, id: nextRowId() }],
@@ -629,9 +382,7 @@ const clearCastTallyState = (s: TurnState): TurnState => {
 };
 
 function cancelAttackState(s: TurnState): TurnState {
-  // Only refund if no attacks have been rolled yet — once rolled, the action
-  // is committed per 5e rules. Drop only this action's rows so an earlier
-  // off-hand (bonusAction) row survives the refund (#813).
+  // Only refunds if no attacks have been rolled — once rolled, the action is committed per 5e rules; drops only this action's rows, so an earlier off-hand row survives (#813).
   if (!s.attack || s.attack.used > 0) return s;
   return {
     ...s,
@@ -641,15 +392,13 @@ function cancelAttackState(s: TurnState): TurnState {
   };
 }
 
-// Clear the attack counter (action stays spent). No-op when attack is null
-// (a resolver that never called enterAttackMode, e.g. an opportunity attack).
+// No-ops when attack is null — a resolver that never called enterAttackMode, e.g. an opportunity attack.
 const finishAttackState = (s: TurnState): TurnState => (s.attack ? { ...s, attack: null } : s);
 
 const consumeBonusActionState = (s: TurnState): TurnState =>
   s.bonusActionUsed ? s : { ...s, bonusActionUsed: true, bonusAttack: null };
 
-// TWF off-hand is always exactly 1 attack. Entering it clears any prior
-// bonus-action row so the swing's own row is the only one this slot owns (#813).
+// TWF off-hand is always exactly 1 attack. Entering it clears any prior bonus-action row so the swing's own row is the only one this slot owns (#813).
 const enterTwfModeState = (s: TurnState): TurnState =>
   s.bonusActionUsed
     ? s
@@ -660,8 +409,6 @@ const enterTwfModeState = (s: TurnState): TurnState =>
         attackTally: s.attackTally.filter((r) => r.source !== "bonusAction"),
       };
 
-// Spend the off-hand swing and append its bonusAction-source row (when recorded)
-// so it lands in the turn-summary banner alongside the Attack-action rows (#813).
 function recordTwfAttackState(s: TurnState, recorded?: RecordedAttack): TurnState {
   if (!s.bonusAttack) return s;
   const attackTally = recorded
@@ -670,17 +417,11 @@ function recordTwfAttackState(s: TurnState, recorded?: RecordedAttack): TurnStat
   return { ...s, bonusAttack: null, attackedThisTurn: true, attackTally };
 }
 
-// Mirror cancelAttack for the off-hand: refund the bonus action only if the
-// off-hand attack hasn't been rolled yet (bonusAttack still pending). Once
-// recordTwfAttack has cleared it to null, the bonus action stays committed.
+// Mirrors cancelAttack for the off-hand — refunds only while bonusAttack is still pending; once recordTwfAttack clears it, the bonus action stays committed.
 const cancelTwfState = (s: TurnState): TurnState =>
   s.bonusAttack ? { ...s, bonusActionUsed: false, bonusAttack: null } : s;
 
-// Arm Flurry's strike counter. Guarded on bonusAttack already being non-null
-// (rather than on bonusActionUsed, unlike enterTwfModeState) because the bonus
-// action slot was already consumed by the generic action-click path before
-// this fires — the guard here only protects against re-arming over a
-// rehydrated, in-progress flurry and resetting its used count.
+// Guarded on bonusAttack being non-null (not bonusActionUsed, unlike enterTwfModeState) — the bonus action was already consumed by the generic action-click path; this only guards against re-arming a rehydrated in-progress flurry.
 function enterFlurryModeState(s: TurnState, count: number): TurnState {
   if (s.bonusAttack) return s;
   return {
@@ -690,11 +431,7 @@ function enterFlurryModeState(s: TurnState, count: number): TurnState {
   };
 }
 
-// Increment-and-clamp, like recordAttackState — Flurry resolves 2+ strikes in
-// one bonus action, unlike TWF's always-1 single swing, so it can't reuse
-// recordTwfAttackState's unconditional null-out. Deliberately omits the
-// Attack-action's attackEquipCredits grant (PHB'24 ties that credit to the
-// Attack action specifically, not to Flurry).
+// Increments and clamps like recordAttackState (Flurry resolves 2+ strikes, unlike TWF's single swing) and deliberately omits the attackEquipCredits grant — PHB'24 ties that credit to the Attack action, not Flurry.
 function recordFlurryAttackState(s: TurnState, recorded?: RecordedAttack): TurnState {
   if (!s.bonusAttack) return s;
   const atCap = s.bonusAttack.used >= s.bonusAttack.total;
@@ -704,23 +441,17 @@ function recordFlurryAttackState(s: TurnState, recorded?: RecordedAttack): TurnS
   return { ...s, bonusAttack: { ...s.bonusAttack, used }, attackedThisTurn: true, attackTally };
 }
 
-// Mirror cancelAttackState: refund the bonus action only if no strike has
-// landed yet. Once a strike is recorded, the bonus action stays committed.
 const cancelFlurryState = (s: TurnState): TurnState =>
   s.bonusAttack && s.bonusAttack.used === 0
     ? { ...s, bonusActionUsed: false, bonusAttack: null }
     : s;
 
-// Mirror finishAttackState: clear the counter — the bonus action stays spent.
 const finishFlurryState = (s: TurnState): TurnState =>
   s.bonusAttack ? { ...s, bonusAttack: null } : s;
 
 const consumeReactionState = (s: TurnState): TurnState =>
   s.reactionUsed ? s : { ...s, reactionUsed: true };
 
-// Interaction-budget spend/refund (#1165) — the caller (useLoadoutSwap) computes
-// `spend` via loadoutPicker's planInteractionSpend and just tells the reducer
-// how to book it; the reducer itself holds no rule knowledge.
 const spendInteractionBudgetState = (s: TurnState, spend: InteractionSpend): TurnState => ({
   ...s,
   attackEquipCredits: s.attackEquipCredits - spend.fromAttackCredits,
@@ -743,8 +474,6 @@ function attachBatchIdState(s: TurnState, batchId: string): TurnState {
 function undoState(s: TurnState): TurnState {
   const prev = s.history[s.history.length - 1];
   if (!prev) return s;
-  // Restore the prior economy snapshot; leave lifecycle + the activity flags
-  // (attackedThisTurn/tookDamageThisTurn) as they are (see EconomySnapshot).
   // Drop batchId so it never leaks onto the live state (#758).
   const economy = { ...prev };
   delete economy.batchId;
@@ -752,17 +481,9 @@ function undoState(s: TurnState): TurnState {
 }
 
 function endTurnState(s: TurnState): TurnState {
-  // Out-of-combat (shouldn't normally happen now, but safe fallback).
   if (!s.inCombat) return initialState();
-  // Stay in combat — return to idle within the same encounter. Round is
-  // deliberately NOT bumped here (#1030): the server decides the next round
-  // (advanceCombatRound), and useTurnActions' handleEndTurn dispatches
-  // syncCombat once that call resolves (see syncCombatState for every other
-  // way round can change: a poll, or a start/end response). Reset the
-  // activity window HERE (not in startTurn): handleEndTurn has already
-  // evaluated the durable-buff auto-end against these flags, so clearing them
-  // now opens a fresh window that still captures damage/attacks taken before
-  // the next startTurn (out-of-turn / enemy turns).
+  // Round is deliberately NOT bumped here (#1030) — the server decides the next round, and useTurnActions' handleEndTurn dispatches syncCombat once that call resolves.
+  // Resets the activity window HERE, not in startTurn — handleEndTurn already evaluated the durable-buff auto-end against these flags, so clearing them now still captures out-of-turn damage/attacks before the next startTurn.
   return {
     ...s,
     phase: "idle",
@@ -784,10 +505,7 @@ function endTurnState(s: TurnState): TurnState {
   };
 }
 
-// The server-event seam (#1030) — see TurnStateActions.syncCombat for the full
-// rationale. `updatedAt` strings are Session's DB @updatedAt column, JSON-
-// serialized via Date#toISOString(): fixed-width UTC, so lexicographic string
-// comparison is chronological comparison — no Date parsing needed.
+// updatedAt strings are Session's @updatedAt column via Date#toISOString() — fixed-width UTC, so lexicographic string comparison IS chronological comparison; no Date parsing needed.
 function syncCombatState(
   s: TurnState,
   round: number,
@@ -799,9 +517,7 @@ function syncCombatState(
   return applyCombatState(s, round, combatActive, updatedAt, spellEconomy);
 }
 
-// Shared by syncCombatState (guarded) and reconcileCombatState (unguarded, see
-// TurnStateActions.reconcileCombat) so the two seams can never drift on what
-// "apply" means — only on whether the monotonic guard runs first.
+// Shared by syncCombatState (guarded) and reconcileCombatState (unguarded) so the two seams never drift on what "apply" means — only on whether the monotonic guard runs first.
 function applyCombatState(
   s: TurnState,
   round: number,
@@ -809,19 +525,12 @@ function applyCombatState(
   updatedAt: string,
   spellEconomy: SpellEconomyState,
 ): TurnState {
-  // A fresh encounter honors the SERVED interlock (#1439 review): startCombat
-  // resets it server-side, so this is normally false/false — but the client
-  // must not assume that (a late-joiner observing an encounter already past its
-  // first cast would otherwise drop a real block). Apply what the server sent.
+  // A late joiner observing an encounter already past its first cast must not assume a fresh false/false interlock — always apply what the server sent (#1439).
   if (!s.inCombat && combatActive) return freshEncounterState(round, updatedAt, spellEconomy);
-  // The interlock rides every sync (#1439): even a round/inCombat no-op must
-  // still apply the served flags, since a cast advances `updatedAt` (participant
-  // change) without changing the round — this is the seam the block arrives on.
+  // Even a round/inCombat no-op must still apply the served spellEconomy flags — a cast advances updatedAt without changing the round, and this is the seam the block arrives on (#1439).
   return { ...s, round, inCombat: combatActive, combatUpdatedAt: updatedAt, spellEconomy };
 }
 
-// Bypasses syncCombatState's monotonic guard entirely — see
-// TurnStateActions.reconcileCombat for when this is safe to call.
 function reconcileCombatState(
   s: TurnState,
   round: number,
@@ -832,7 +541,6 @@ function reconcileCombatState(
   return applyCombatState(s, round, combatActive, updatedAt, spellEconomy);
 }
 
-// Remaining transitions extracted for the reducer (#967).
 function startCombatState(): TurnState {
   return {
     inCombat: true,
@@ -858,44 +566,34 @@ function startCombatState(): TurnState {
   };
 }
 
-// A remote false→true transition (#1030 finding #3): reuses startCombatState's
-// fresh-encounter fields but with the SERVER's round (not a hardcoded 1 — a
-// late joiner can observe combat already past round 1), the sync's updatedAt as
-// the new monotonicity baseline, and the SERVED interlock (#1439 review — a
-// late joiner may observe a block already in effect, so don't force-clear it).
+// Uses the SERVER's round (not hardcoded 1) since a late joiner can observe combat already past round 1, and keeps the served interlock rather than force-clearing it (#1030 finding #3 / #1439).
 function freshEncounterState(round: number, updatedAt: string, spellEconomy: SpellEconomyState): TurnState {
   return { ...startCombatState(), round, combatUpdatedAt: updatedAt, spellEconomy };
 }
 
-// Begin the turn. Deliberately does NOT reset attackedThisTurn/tookDamageThisTurn
-// (cleared in endTurn) so damage/attacks between your turns carry into the
-// auto-end check. The HP-drop baseline sync (`prevHpRef`) is a side effect kept
-// in the dispatch wrapper — the reducer stays pure.
+// Deliberately does not reset attackedThisTurn/tookDamageThisTurn (cleared in endTurn instead) so damage/attacks between your turns carry into the auto-end check; the HP-drop baseline sync stays a side effect in the dispatch wrapper to keep this pure.
 function startTurnState(s: TurnState): TurnState {
   return {
     ...s,
     phase: "active",
     actionsRemaining: 1,
     bonusActionUsed: false,
-    reactionUsed: false, // reaction resets at start of YOUR turn
+    reactionUsed: false,
     attack: null,
     bonusAttack: null,
     attackTally: [],
     castTally: [],
     spellEconomy: NO_SPELL_ECONOMY,
-    sneakAttackUsedThisTurn: false, // once per turn — resets each of your turns
-    stunningStrikeUsedThisTurn: false, // once per turn — resets each of your turns
-    openHandRiderUsedThisTurn: false, // once per turn — resets each of your turns
-    attackEquipCredits: 0, // interaction-budget credits reset each of your turns (#1165)
+    sneakAttackUsedThisTurn: false,
+    stunningStrikeUsedThisTurn: false,
+    openHandRiderUsedThisTurn: false,
+    attackEquipCredits: 0,
     freeInteractionUsed: false,
-    history: [], // undo never reaches across turns
+    history: [],
   };
 }
 
-// Spend the local Action slot for a spell cast. The cast KIND is no longer
-// recorded here (#1439): the 5e interlock is resolved server-side from the
-// SessionParticipant row the resolveAction cast wrote, and arrives via
-// syncCombat. The economy slot itself stays local (this hook's header comment).
+// The interlock is no longer recorded here (#1439) — it's resolved server-side from the SessionParticipant row the cast wrote, and arrives via syncCombat; the economy slot itself stays local.
 function commitActionSpellState(s: TurnState): TurnState {
   return {
     ...s,
@@ -912,23 +610,11 @@ function commitBonusActionSpellState(s: TurnState): TurnState {
   };
 }
 
-// Reducer: actions-as-data over the pure transitions above (#967).
-// Collapses the former ~24 delegating useCallbacks into one stable dispatch.
-// Every real transition still lives in a module-level pure fn; the reducer only
-// routes an action to its handler and — for the CONSUMING actions — pushes the
-// pre-mutation economy snapshot onto the undo stack, exactly reproducing the old
-// `mutate` wrapper (push iff the transition changed state, so no-op guards stay
-// history-free). Lifecycle actions reset history; tally refinements + meta ops
-// write through untouched. This is the seam a future server-pushed combat event
-// (DM view / multiplayer) dispatches into — a remote event is the same action.
-
 type TurnAction =
-  // Lifecycle — reset history, never push a snapshot.
   | { type: "startCombat" }
   | { type: "endCombat" }
   | { type: "startTurn" }
   | { type: "endTurn" }
-  // Consuming — push a pre-mutation snapshot iff the transition changes state.
   | { type: "consumeAction" }
   | { type: "enterAttackMode"; attacksPerAction: number }
   | { type: "recordAttack"; recorded?: RecordedAttack }
@@ -948,7 +634,6 @@ type TurnAction =
   | { type: "refundInteractionBudget"; spend: InteractionSpend }
   | { type: "commitActionSpell" }
   | { type: "commitBonusActionSpell" }
-  // Non-undoable tally refinements — write through, never push.
   | { type: "setTallyDamage"; rowId: string; damage: number }
   | { type: "setTallyDamageAt"; index: number; damage: number }
   | { type: "setTallyAttackTotal"; rowId: string; total: number }
@@ -957,7 +642,6 @@ type TurnAction =
   | { type: "clearAttackTally" }
   | { type: "recordSpellCast"; recorded: RecordedSpellCast }
   | { type: "clearCastTally" }
-  // Meta / effect-driven — write through, never push.
   | { type: "attachBatchId"; batchId: string }
   | { type: "undo" }
   | { type: "markDamageTaken" }
@@ -968,9 +652,7 @@ type TurnAction =
   | { type: "syncCombat"; round: number; combatActive: boolean; updatedAt: string; spellEconomy: SpellEconomyState }
   | { type: "reconcileCombat"; round: number; combatActive: boolean; updatedAt: string; spellEconomy: SpellEconomyState };
 
-// The action types whose transition pushes an undo snapshot (the former `mutate`
-// callers). refundAction and commitReactionSpell are facade aliases that dispatch
-// grantExtraAction / consumeReaction, so they inherit the push behavior.
+// refundAction and commitReactionSpell are facade aliases that dispatch grantExtraAction/consumeReaction, so they inherit push behavior without needing their own CONSUMING entry.
 const CONSUMING: ReadonlySet<TurnAction["type"]> = new Set([
   "consumeAction",
   "enterAttackMode",
@@ -993,17 +675,13 @@ const CONSUMING: ReadonlySet<TurnAction["type"]> = new Set([
   "commitBonusActionSpell",
 ]);
 
-// One handler per action, each narrowed to its member via key remapping. A flat
-// table keeps the router at cyclomatic 1 (a 28-case switch would breach the
-// ceiling).
+// A flat table keeps the router at cyclomatic 1 — a 28-case switch would breach the complexity ceiling.
 type TurnActionHandlers = {
   [K in TurnAction as K["type"]]: (s: TurnState, action: K) => TurnState;
 };
 
 const HANDLERS: TurnActionHandlers = {
-  // Preserve combatUpdatedAt across the local optimistic reset (#1030 finding
-  // #2) — a stale in-flight poll that raced this click must still be judged
-  // against the last CONFIRMED server timestamp, not a nulled-out baseline.
+  // Preserves combatUpdatedAt across the local optimistic reset — a stale in-flight poll must still be judged against the last CONFIRMED timestamp, not a nulled baseline (#1030 finding #2).
   startCombat: (s) => ({ ...startCombatState(), combatUpdatedAt: s.combatUpdatedAt }),
   endCombat: (s) => ({ ...initialState(), combatUpdatedAt: s.combatUpdatedAt }),
   startTurn: (s) => startTurnState(s),
@@ -1052,8 +730,7 @@ const HANDLERS: TurnActionHandlers = {
 function turnReducer(state: TurnState, action: TurnAction): TurnState {
   const handler = HANDLERS[action.type] as (s: TurnState, a: TurnAction) => TurnState;
   const next = handler(state, action);
-  // CONSUMING actions push a pre-mutation snapshot — but only when the transition
-  // actually changed state (no-op guards stay history-free), matching old `mutate`.
+  // Pushes a pre-mutation snapshot only when the transition actually changed state — no-op guards stay history-free.
   if (next !== state && CONSUMING.has(action.type)) {
     return { ...next, history: [...state.history, economyOf(state)] };
   }
@@ -1067,17 +744,11 @@ function hydrateOrInit(sessionId: string | null): TurnState {
 
 export function useTurnState(character: Character, sessionId: string): TurnStateView;
 export function useTurnState(character: Character, sessionId: string | null): TurnStateView | null;
-// A null sessionId means "no live joined session" (#959): the hook still runs
-// every hook unconditionally but returns null, so the single TurnStateProvider
-// instance can hold a null value off-combat without violating rules-of-hooks.
+// A null sessionId means no live joined session (#959) — every hook still runs unconditionally and only the return value is null, so TurnStateProvider can hold null without violating rules-of-hooks.
 export function useTurnState(character: Character, sessionId: string | null): TurnStateView | null {
-  // Lazily hydrate (merge over defaults so a stale-schema snapshot backfills a
-  // newer field, e.g. history pre-#730, #750). `dispatch` is stable for #967.
   const [state, dispatch] = useReducer(turnReducer, sessionId, hydrateOrInit);
 
-  // Re-hydrate when the session identity changes — a session may go live (null →
-  // id) or end (id → null) while the sheet stays mounted, and the lazy
-  // initializer above only runs on first mount.
+  // Re-hydrates when session identity changes — the lazy initializer only runs on first mount, but a session can go live or end while the sheet stays mounted.
   const prevSessionIdRef = useRef(sessionId);
   useEffect(() => {
     if (prevSessionIdRef.current === sessionId) return;
@@ -1085,15 +756,10 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
     dispatch({ type: "hydrate", state: hydrateOrInit(sessionId) });
   }, [sessionId]);
 
-  // Server-resolved (#1435): the off-hand eligibility is served on the
-  // `offHandAttack` action row (backend bothWeaponsLight), read off the live
-  // `character` prop — a mid-turn weapon swap refetches the character, so the
-  // affordance still updates immediately without a new startTurn (#733).
+  // Server-resolved (#1435, backend bothWeaponsLight) — read off the live character prop so a mid-turn weapon swap updates the affordance immediately without a new startTurn (#733).
   const twfAvailable = offHandAttackEnabled(character);
 
-  // Server-derived, multiclass-correct (max across classes); see srd.ts. Mirrored
-  // into refs so the action facade stays a stable, dependency-free useMemo while
-  // still dispatching the latest per-render values (#967).
+  // Mirrored into refs so the action facade below stays a stable, dependency-free useMemo while still reading the latest per-render values.
   const attacksPerAction = character.attacksPerAction;
   const currentHp = character.hitPoints?.current ?? 0;
   const attacksPerActionRef = useRef(attacksPerAction);
@@ -1101,31 +767,18 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
   const currentHpRef = useRef(currentHp);
   currentHpRef.current = currentHp;
 
-  // Persist state to localStorage whenever it changes — a no-op while there is
-  // no live session (null sessionId).
   useEffect(() => {
     if (sessionId) saveTurnState(sessionId, state);
   }, [sessionId, state]);
 
-  // Watch current HP: any drop marks damage taken (feeds the durable-buff
-  // turn-hook). NOT gated by phase — so damage taken out of turn (opportunity
-  // attacks, reactions during another creature's turn) counts too. The activity
-  // window is bounded by the flag reset in `endTurn` (which runs AFTER the
-  // auto-end evaluation), so damage between your turns survives into the next
-  // turn's check — matching the 5e rule "took damage since your last turn".
-  // Heals and non-HP updates are ignored.
+  // Not gated by phase, so damage taken out-of-turn (opportunity attacks, reactions on another creature's turn) counts too — matches the 5e rule "took damage since your last turn"; heals and non-HP changes are ignored.
   const prevHpRef = useRef(currentHp);
   useEffect(() => {
     if (currentHp < prevHpRef.current) dispatch({ type: "markDamageTaken" });
     prevHpRef.current = currentHp;
   }, [currentHp]);
 
-  // The TurnStateActions facade — a stable useMemo over the stable `dispatch`
-  // (#967). Every callback is the same named affordance components already use;
-  // per-render values (currentHp for the startTurn HP-drop baseline sync,
-  // attacksPerAction for the Extra-Attack counter) are read from refs so the
-  // facade never needs rebuilding. Aliases (refundAction, commitReactionSpell)
-  // dispatch grantExtraAction / consumeReaction, preserving their old behavior.
+  // Per-render values (currentHp, attacksPerAction) are read from refs so this facade never needs rebuilding despite being a stable, dependency-free useMemo.
   const actions = useMemo<TurnStateActions>(
     () => ({
       startCombat: () => dispatch({ type: "startCombat" }),
@@ -1178,7 +831,6 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
     [],
   );
 
-  // No live joined session → no turn tracker. Every hook above still ran.
   if (sessionId === null) return null;
 
   return { ...state, twfAvailable, ...actions };

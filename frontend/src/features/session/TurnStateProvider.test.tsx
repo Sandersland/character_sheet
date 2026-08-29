@@ -11,13 +11,9 @@ import { useLiveRound } from "@/features/session/useLiveRound";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Session, SessionDoorwayState, SpellEconomyState } from "@/types/character";
 
-// The cleared 5e interlock every combat mock returns (#1439).
 const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
 
-// fetchCombatState must be mocked even where a test ignores it: TurnStateProvider
-// mounts useCombatPoll, so leaving it off the factory makes the poll call
-// undefined and the outcome timing-dependent — green under one worker sharding,
-// red under another (#1030).
+// fetchCombatState must be mocked even when unused — TurnStateProvider mounts useCombatPoll, and an unmocked call makes results timing-dependent across worker sharding.
 vi.mock("@/api/client", () => ({
   fetchSessionDoorway: vi.fn(),
   fetchActiveSession: vi.fn(),
@@ -80,29 +76,20 @@ describe("TurnStateProvider single instance + useLiveRound", () => {
       doorway({ kind: "liveNotJoined", session: { id: "s1", status: "active", startedAt: "x", scheduledAt: null, title: null, joined: false, round: 4 } }),
     );
     renderStack();
-    // Not joined → turn context null; useLiveRound falls back to the doorway's
-    // server round. Both assertions need their own waitFor: "null" is also the
-    // pre-fetch value, so the first check alone could pass before the
-    // query-backed doorway read has actually landed (#1299).
+    // Separate waitFors: "null" is also the pre-fetch value, so a single check could pass before the doorway read lands.
     await waitFor(() => expect(screen.getByTestId("turn")).toHaveTextContent("null"));
     await waitFor(() => expect(screen.getByTestId("round")).toHaveTextContent("4"));
   });
 
   it("exposes the LOCAL round from the mounted tracker when joined + in combat", async () => {
-    // Seed a persisted in-combat turn state for this session.
     localStorage.setItem("cs:turn:s1", JSON.stringify({ inCombat: true, round: 3 }));
     mockDoorway.mockResolvedValue(
       doorway({ kind: "liveJoined", session: { id: "s1", status: "active", startedAt: "x", scheduledAt: null, title: null, joined: true, round: 99 } }),
     );
     mockActive.mockResolvedValue(fullSession);
-    // The poll agrees with the seeded local round, so this pins what the test is
-    // named for — the doorway's stale 99 losing — rather than the poll racing it.
     mockCombat.mockResolvedValue({ round: 3, combatActive: true, updatedAt: "2026-07-26T00:00:01.000Z", spellEconomy: NO_ECON });
     renderStack();
     await waitFor(() => expect(screen.getByTestId("turn")).toHaveTextContent("present"));
-    // Own waitFor, same reason as the not-joined case above: "present" can land
-    // before the tracker's round does, so a bare assertion here fails only under
-    // full-suite CPU contention — green alone, red in CI.
     await waitFor(() => expect(screen.getByTestId("round")).toHaveTextContent("3"));
   });
 
@@ -139,12 +126,7 @@ function findUseTurnStateCallSites(): string[] {
   return hits;
 }
 
-// PIN (plan §7/§8): useTurnState must be called from exactly one place —
-// TurnStateProvider — or a second surface would hydrate the same
-// `cs:turn:<sessionId>` localStorage key and silently diverge (last write
-// wins). A future "simplification" that calls useTurnState directly now that
-// the character is available via useCurrentCharacter() is the regression this
-// guards against.
+// PIN: useTurnState must be called from exactly one place (TurnStateProvider) or a second caller would diverge via the shared localStorage key.
 describe("useTurnState exactly-once invariant (#1284 §7)", () => {
   it("has exactly one call site: TurnStateProvider", () => {
     expect(findUseTurnStateCallSites()).toEqual(["features/session/TurnStateProvider.tsx"]);

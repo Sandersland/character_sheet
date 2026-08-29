@@ -1,10 +1,4 @@
-/**
- * DB-backed test for the pool branch of payAbilityCostInTx.
- *
- * The pool branch delegates to applySpendResourceInTx, which reads the
- * character + derives the pool from class/level, so it needs Postgres. Seeds a
- * level-5 Monk (focus total 5) and pays a focus cost inside a real transaction.
- */
+// Needs Postgres — the pool branch delegates to applySpendResourceInTx, which reads the character and derives the pool from class/level.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -16,7 +10,6 @@ import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
 
 const OWNER_ID = "owner-ability-cost-pool";
 
-// Level-5 Monk: XP 6500 → level 5 → focus total 5.
 const MONK_L5 = {
   name: "Ability Cost Pool Test Monk",
   alignment: "Lawful Neutral",
@@ -37,13 +30,15 @@ describe("payAbilityCostInTx — pool branch (DB-backed)", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    // Focus resolves through the real Monk class's ClassFeature rows — a classId-less entry would see no pools at all.
+    const monkClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } })).id;
     const character = await prisma.character.create({
       data: {
         ...MONK_L5,
         ownerId: OWNER_ID,
         spellcasting: Prisma.JsonNull,
         resources: Prisma.JsonNull,
-        classEntries: { create: [{ name: "monk", position: 0 }] },
+        classEntries: { create: [{ name: "monk", classId: monkClassId, position: 0 }] },
       },
     });
     characterId = character.id;

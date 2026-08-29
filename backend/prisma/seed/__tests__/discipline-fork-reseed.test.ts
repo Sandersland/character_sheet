@@ -1,11 +1,3 @@
-// Proves seedDisciplines' shape (#1503): upsertEditionRow run twice is
-// idempotent (no duplicate rows, no drift), and staleCatalogRowsWhere with an
-// all-EDITION_2014 seeded list sweeps the orphaned NULL-edition rows the
-// pre-retirement disciplines engine (34f5a4cf) left behind in a long-lived
-// dev database — same idiom as granted-ability-fork-reseed.test.ts
-// (seedDisciplines is inline in seed.ts, which self-invokes main() at module
-// load and exports nothing a test can re-run directly, per that file's own
-// header).
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -62,12 +54,7 @@ describe("seedDisciplines' prune sweeps orphaned NULL-edition rows (#1503's own 
       { description: "current" },
     );
 
-    // Exactly what seedDisciplines passes: every DISCIPLINES row's OWN
-    // (always EDITION_2014) edition — never a flat null. Scoped to this
-    // file's own fixture name too (name: {in: [ORPHAN_NAME]}), same as
-    // granted-ability-fork-reseed.test.ts's ONLY_THIS_FILES_ROWS — without it
-    // this delete matches every OTHER source:"discipline" row not in this
-    // test's tiny seeded list too, i.e. the real 16-row catalog.
+    // Scoped to this fixture's name — without it, staleCatalogRowsWhere would match the real 16-row discipline catalog too.
     const seededAllEdition2014 = [{ identity: ORPHAN_NAME, edition: "EDITION_2014" as const }];
     const staleWhere = staleCatalogRowsWhere("name", seededAllEdition2014, {
       source: "discipline",

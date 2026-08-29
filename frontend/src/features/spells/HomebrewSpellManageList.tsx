@@ -1,7 +1,3 @@
-// "Your homebrew spells" list (#1788, epic #1782 5/5) — the management
-// surface for the caller's own Spell.ownerId rows, rendered inside
-// HomebrewTab alongside the create/edit form. Mirrors SpellCatalogTab's
-// list/empty-state shape.
 import HomebrewSpellManageRow from "@/features/spells/HomebrewSpellManageRow";
 import type { CatalogSpell } from "@/types/character";
 

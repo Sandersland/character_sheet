@@ -1,7 +1,3 @@
-// The ceremonies' adaptive step rail (#886, generalized #1176): numbered dots
-// joined by rules, reflecting whatever steps the flow contains. Presentational
-// only — state comes from railState.
-
 import { Check } from "lucide-react";
 
 import { railState, type CeremonyStepState, type RailStep } from "@/lib/ceremonySteps";
@@ -24,8 +20,7 @@ export default function CeremonyStepRail({ steps, currentKey }: { steps: RailSte
     currentKey,
   );
   return (
-    // No flex-wrap: below md the ol fills its width and connectors flex/shrink so
-    // any realistic step count stays on one line (#1182); md+ is unchanged.
+    // Below md the ol fills its width and connectors flex/shrink so any realistic step count stays on one line (#1182).
     <ol className="flex w-full items-center gap-y-2 md:w-auto md:justify-center">
       {steps.map((step, i) => {
         const state = states[i];
@@ -45,7 +40,6 @@ export default function CeremonyStepRail({ steps, currentKey }: { steps: RailSte
             >
               {state === "done" ? <Check className="h-4 w-4" /> : i + 1}
             </span>
-            {/* Names collapse below md — the dots alone carry the rail on phones. */}
             <span aria-hidden className={`ml-2 hidden text-xs font-semibold md:inline ${NAME_STYLE[state]}`}>
               {step.label}
             </span>

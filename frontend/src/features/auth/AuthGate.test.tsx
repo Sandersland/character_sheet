@@ -47,11 +47,9 @@ describe("AuthGate + AppHeader", () => {
     vi.mocked(fetchMe).mockResolvedValue(USER);
     renderGate();
 
-    // Loading: gate hasn't resolved yet, so protected content isn't shown.
     expect(screen.queryByText("secret content")).not.toBeInTheDocument();
 
     expect(await screen.findByText("secret content")).toBeInTheDocument();
-    // Chrome surfaces the signed-in identity behind the account menu.
     await userEvent.click(screen.getByRole("button", { name: "Account" }));
     expect(screen.getByText("Ada")).toBeInTheDocument();
   });
@@ -60,7 +58,6 @@ describe("AuthGate + AppHeader", () => {
     vi.mocked(fetchMe).mockResolvedValue(null);
     renderGate();
 
-    // The login card heading renders; protected content does not.
     expect(await screen.findByText(/^sign in$/i)).toBeInTheDocument();
     expect(screen.queryByText("secret content")).not.toBeInTheDocument();
   });

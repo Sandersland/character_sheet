@@ -9,8 +9,6 @@ import { fetchSession } from "@/api/client";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Session } from "@/types/character";
 
-// Mock the turn engine + session log so this targets CombatLivePanel's layout
-// (the CombatColumn parity + the log overlay), not the turn machinery.
 vi.mock("@/features/session/TurnHub", () => ({
   default: ({ onOpenLog }: { onOpenLog?: () => void }) => (
     <div data-testid="turn-hub">
@@ -56,8 +54,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
 
 const session = { id: "sess-1", campaignId: null, status: "active", startedAt: "x", participants: [] } as unknown as Session;
 
-// The compact HP card is desktop-only; force md+ so it (and DesktopUtilityLine)
-// render. jsdom's default matchMedia stub reports mobile.
+// jsdom's default matchMedia stub reports mobile; force md+ to render desktop-only content.
 function forceDesktop() {
   window.matchMedia = ((query: string) =>
     ({
@@ -154,8 +151,6 @@ describe("CombatLivePanel (#1086)", () => {
   });
 });
 
-// #1237 §10: the mockup's header subtitle under "Session Log" — CombatLivePanel
-// already has `session` in scope, so this needs no extra plumbing.
 describe("CombatLivePanel log overlay subtitle (#1237 §10)", () => {
   it("shows the session's title as the overlay subtitle", async () => {
     const user = userEvent.setup();
@@ -167,10 +162,8 @@ describe("CombatLivePanel log overlay subtitle (#1237 §10)", () => {
 
   it("falls back to the session's date when it has no title", async () => {
     const user = userEvent.setup();
-    renderPanel(); // `session` fixture has no title
+    renderPanel();
     await user.click(screen.getByRole("button", { name: "hub-open-log" }));
-    // startedAt "x" isn't a real date, but the fallback still renders SOME subtitle
-    // text distinct from the title, proving the date-fallback path ran.
     expect(await screen.findByText(/^Session Log$/)).toBeInTheDocument();
     const heading = screen.getByRole("heading", { name: "Session Log" });
     expect(heading.parentElement?.textContent).not.toBe("Session Log");

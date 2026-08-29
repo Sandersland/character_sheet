@@ -1,10 +1,4 @@
-// capabilityColumnsFromSnapshot (#1649) — the inverse of readCapability, so
-// every existing capability consumer (chargePoolOf, readCapability itself,
-// deriveItemGrants/deriveItemPassiveBonuses, serializeCapability) keeps
-// working unchanged once InventoryItem's capabilities come from the snapshot
-// rather than the InventoryCapability table. Round-tripping a snapshot
-// capability through this adapter and back through readCapability must
-// reproduce the same Capability the pre-#1649 flat row would have.
+// #1649: capabilityColumnsFromSnapshot is readCapability's inverse — a snapshot capability round-tripped through both must reproduce the pre-#1649 flat row's Capability.
 import { describe, expect, it } from "vitest";
 
 import type { SnapshotCapability } from "@character-sheet/contracts";

@@ -14,9 +14,6 @@ interface CastSpellFieldsProps {
   onChange: (patch: Partial<ItemCapability>) => void;
 }
 
-// DM authoring for a castSpell capability (#528). Save DC / Attack fields are
-// only shown for the referenced spell's roll kind — DC for save spells, attack
-// for attack spells, neither for utility/buff spells (#363 fallout).
 export default function CastSpellFields({ cap, index, spells, spellcasterAttunable, onChange }: CastSpellFieldsProps) {
   const spellAttackType = spells.find((s) => s.id === cap.spellId)?.attackType;
 

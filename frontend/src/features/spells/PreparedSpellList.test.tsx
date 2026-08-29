@@ -40,8 +40,6 @@ describe("PreparedSpellList", () => {
     expect(screen.getByText("Fireball")).toBeInTheDocument();
   });
 
-  // Casting left the roster for the record's single "Cast a spell" door (#1162);
-  // this list is read-only.
   it("renders no Cast affordance", () => {
     render(
       <PreparedSpellList
@@ -56,7 +54,6 @@ describe("PreparedSpellList", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // #1511 D7: the roster heading reads the served label for a known caster.
   it("reads the served label in the roster heading for a known caster", () => {
     render(
       <PreparedSpellList

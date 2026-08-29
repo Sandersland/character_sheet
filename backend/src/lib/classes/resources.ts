@@ -1,13 +1,4 @@
-/**
- * Resource + maneuver transaction handler — the analog to applySpellcastingOperations
- * for trackable class/subclass resources (superiority dice, focus, rage) and
- * known-maneuver lists.
- *
- * What is persisted: `used` counts per resource key and the `maneuversKnown`
- * snapshot array. What is derived at read time (in serializeCharacter): pool
- * totals, die size, recharge timing, maneuver choice count — all via
- * deriveResources().
- */
+// Persisted: `used` counts + `maneuversKnown` snapshot array. Derived at read time (serializeCharacter, via deriveResources()): pool totals, die size, recharge timing, maneuver choice count.
 
 import { randomUUID } from "node:crypto";
 
@@ -26,12 +17,7 @@ import { SKILL_KEYS } from "@/lib/srd/alignments.js";
 import { deriveFeatProficiencies } from "@/lib/srd/feats.js";
 import { deriveItemGrants, type GrantItem } from "@/lib/inventory/capabilities.js";
 import { rollDie } from "@/lib/core/dice.js";
-// Cross-domain HP heal for Uncanny Metabolism's bonusHeal (#1243) — precedented
-// by lib/spellcasting/ability-cast.ts, which also composes applyHealInTx from a
-// sibling domain's lib file. hp-in-tx.ts needs the mutable-state normalizer for
-// its own feat max-HP bonus lookup, so that shape lives in the leaf module
-// resources-state.ts (no back-imports) rather than here — importing
-// combat/hitpoints.ts from THIS file would otherwise close a cycle through it.
+// Cross-domain HP heal for Uncanny Metabolism's bonusHeal — precedented by castAbilityInTx's own cross-domain heal. applyHealInTx needs the mutable-state normalizer for its own feat max-HP lookup, so that normalizer lives in a leaf module with no back-imports — importing it directly here would otherwise close an import cycle through the hit-points module.
 import { applyHealInTx } from "@/lib/combat/hitpoints.js";
 import type { DerivedResource, InitiativeBonusHeal, InitiativeRegen } from "./types.js";
 import {
@@ -65,17 +51,11 @@ import type {
   SpendResourceOperation,
 } from "@character-sheet/shared-types";
 
-// The op shapes + audit payload are the wire contract and live in shared-types
-// (#1273); re-exported so the modules importing them from here (level-up
-// submission/transaction, ability-cost, the actions + resources routes) keep
-// resolving them unchanged.
+// The op shapes + audit payload live in shared-types; re-exported so modules importing them from here (level-up submission/transaction, ability-cost, the actions + resources routes) keep resolving them unchanged.
 export type {
   ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
-  // #1588: LearnExpertiseOperation only — no ceremony ever reuses
-  // ForgetExpertiseOperation (freely reversible, no ceremony-scoped forget
-  // list), so it stays imported-but-not-re-exported, mirroring
-  // ForgetToolProficiencyOperation below.
+  // ForgetExpertiseOperation stays imported-but-not-re-exported (freely reversible, no ceremony-scoped forget list) — mirrors ForgetToolProficiencyOperation below.
   LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
@@ -85,9 +65,7 @@ export type {
   SpendResourceOperation,
 };
 
-// Re-exported so existing consumers (character-serialize/classes.ts, hp-core.ts,
-// route/test files, …) keep resolving the mutable-state shape + its helpers from
-// this module — the definitions now live in resources-state.ts (#1243).
+// Re-exported so existing consumers keep resolving the mutable-state shape + its helpers from this module — the definitions moved to a separate leaf module (no back-imports).
 export {
   clampChoicesToCaps,
   clearInitiativeRegenMarkers,
@@ -106,13 +84,11 @@ export type {
   ToolProfEntry,
 };
 
-// status → the 400 the central `errorHandler` maps (client op-validation error).
 export class InvalidResourceOperationError extends Error {
   status = 400;
 }
 
-// Per-op appliers: each validates + mutates `state` in place (throwing on any illegal op) and
-// returns the audit payload the dispatcher writes to the event log.
+// Each op applier validates + mutates `state` in place (throwing on any illegal op) and returns the audit payload the dispatcher writes to the event log.
 
 function applySpendResourceOp(
   state: ResourcesMutableState,
@@ -178,55 +154,25 @@ function applyRestoreResourceOp(
   };
 }
 
-// Discriminator defaults to the descriptor's position in its pool's
-// onInitiative array (#1243) so two oncePerLongRest descriptors on the same
-// pool (not used today, but supported) don't collide; a lone descriptor keeps
-// a stable key across calls since resourceFn returns array order deterministically.
+// Discriminator defaults to the descriptor's position in its pool's onInitiative array so two oncePerLongRest descriptors on the same pool don't collide — a lone descriptor keeps a stable key since resourceFn returns array order deterministically.
 function initiativeRegenMarkerKey(poolKey: string, discriminator: string | number): string {
   return `${INITIATIVE_REGEN_MARKER_PREFIX}${poolKey}:${discriminator}`;
 }
 
-/** One pool's regain from an onInitiative application, for the audit payload. */
 export interface InitiativeRegenResult {
   key: string;
   label: string;
   restored: number;
   remaining: number;
-  /**
-   * Present when the firing descriptor grants a bonus HP heal (Uncanny
-   * Metabolism, #1243) — the impure rollInitiative op rolls the die and
-   * applies the heal; this pure function only surfaces the descriptor.
-   */
+  // Present when the firing descriptor grants a bonus HP heal (Uncanny Metabolism) — the impure rollInitiative op rolls the die and applies the heal; this pure function only surfaces the descriptor.
   bonusHeal?: InitiativeBonusHeal;
 }
 
-/**
- * Apply every derived pool's `onInitiative` regen(s) (#1239/#1243) to
- * `state.used`, returning what was regained. A pool's `onInitiative` may be a
- * single descriptor or an array of them (#1243 — e.g. Monk Focus at L15+
- * combines Uncanny Metabolism with Perfect Focus); each fires independently.
- * "all" fully refills; a numeric amount tops the pool up to at least that many
- * available (never spends). oncePerLongRest descriptors fire at most once per
- * long-rest cycle — tracked by a marker in `used` (set whenever the descriptor
- * fires, even if nothing was expended to regain) that clearInitiativeRegenMarkers
- * resets on a long rest. A oncePerLongRest descriptor carrying a `bonusHeal`
- * always reports once it fires (even restoring nothing) so the impure caller
- * still rolls the heal; a plain top-up descriptor reports only when it actually
- * restores something. Generic: any class pool can declare onInitiative (Focus,
- * superiority dice, Bardic Inspiration); inert for pools without it. Pure +
- * exported so it's unit-testable and a future combat-start hook can reuse it.
- * Mirrors applyRestoreResourceOp.
- */
-// One onInitiative descriptor's regen against its pool: fires (respecting the
-// once-per-long-rest marker), tops up state.used, and returns the result — or
-// null when there's nothing to report (already fired this rest, or nothing
-// restored and no bonusHeal to signal). Split into three single-purpose
-// helpers (marker gate / target math / orchestration) so a pool's multiple
-// descriptors (#1243) stay under the complexity gate — one combined function
-// tripped it (CRAP 43).
+// Applies every derived pool's onInitiative regen(s) to state.used. A pool's onInitiative may be a single descriptor or an array (each fires independently); "all" fully refills, a numeric amount tops the pool up to at least that many available (never spends).
+// oncePerLongRest descriptors fire at most once per long-rest cycle (tracked by a marker in `used` that clearInitiativeRegenMarkers resets on a long rest) — one carrying bonusHeal always reports once it fires (even restoring nothing) so the impure caller still rolls the heal; a plain top-up descriptor reports only when it actually restores something.
+// Generic: any class pool can declare onInitiative; inert for pools without it. Mirrors applyRestoreResourceOp.
 
-// Whether `regen` may fire right now, consuming its once-per-long-rest marker
-// as a side effect when it does. Always true for a descriptor with no rest cap.
+// Mutates state.used as a side effect when it allows firing (sets the once-per-long-rest marker) — always true for a descriptor with no rest cap.
 function markerAllowsFiring(
   state: ResourcesMutableState,
   pool: DerivedResource,
@@ -240,28 +186,16 @@ function markerAllowsFiring(
   return true;
 }
 
-// "all" clears all spend; a numeric target N tops up to N available, i.e.
 // used = total − N, never raising `used` (never spends) and never below 0.
 function regenTargetUsed(pool: DerivedResource, regen: InitiativeRegen, used: number): number {
   return regen.amount === "all" ? 0 : Math.max(0, Math.min(used, pool.total - regen.amount));
 }
 
-// Whether `regen`'s explicit threshold (#1500) permits firing, given the
-// pool's current REMAINING count — independent of `amount` (Perfect Self
-// only fires at 0 remaining, not "below 4" the way topping to 4 alone would
-// imply). Always true for a descriptor with no threshold. Split out (mirrors
-// markerAllowsFiring above) so applyOneInitiativeDescriptor itself stays
-// under the complexity gate — one combined function tripped it (CRAP 43)
-// even before this field existed.
+// Independent of `amount` — Perfect Self only fires at 0 remaining, not "below 4" the way topping to 4 alone would imply. Always true for a descriptor with no threshold.
 function meetsThreshold(pool: DerivedResource, regen: InitiativeRegen, used: number): boolean {
   return regen.threshold === undefined || pool.total - used <= regen.threshold;
 }
 
-// The InitiativeRegenResult object, or null when there's nothing to report
-// (nothing restored and no bonusHeal to signal) — split out purely to keep
-// applyOneInitiativeDescriptor's own branching budget low (fallow's
-// complexity gate; one combined function tripped it at CRAP 43 even before
-// the #1500 threshold field existed).
 function regenResult(
   state: ResourcesMutableState,
   pool: DerivedResource,
@@ -309,13 +243,7 @@ export function applyInitiativeRegen(
   return regenerated;
 }
 
-/**
- * Roll Initiative op core: applies every pool's onInitiative regen(s), then
- * resolves any bonusHeal that fired (Uncanny Metabolism, #1243) — rolling its
- * die server-side (no client input; automatic combat-start effect) and
- * applying the heal via the shared HP path, atomic with the resources write in
- * this same transaction/batch.
- */
+// Rolls any fired bonusHeal's die server-side (no client input — automatic combat-start effect) and applies the heal via the shared HP path, atomic with the resources write in this same transaction/batch.
 async function applyRollInitiativeOp(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -361,7 +289,6 @@ async function applyLearnManeuverOp(
     );
   }
 
-  // Enforce choice count limit.
   const choiceCount = derivedInfo?.maneuverChoiceCount;
   if (choiceCount !== undefined && state.maneuversKnown.length >= choiceCount) {
     throw new InvalidResourceOperationError(
@@ -372,7 +299,6 @@ async function applyLearnManeuverOp(
   let newEntry: ManeuverEntry;
 
   if (op.maneuverId) {
-    // Dedup check.
     if (state.maneuversKnown.some((m) => m.maneuverId === op.maneuverId)) {
       throw new InvalidResourceOperationError(
         `Maneuver already known (maneuverId: ${op.maneuverId})`
@@ -384,11 +310,7 @@ async function applyLearnManeuverOp(
         `Maneuver not found in catalog: ${op.maneuverId}`
       );
     }
-    // The maneuver's name/description/placement/actionSlot are snapshotted
-    // into maneuversKnown below, permanently — this is prevention, not just
-    // admission, the same failure mode #1345 guards against for Feat (#1345's
-    // audit found this site; the issue as filed named only three sites, all
-    // Feat/Subclass, and missed this one).
+    // Snapshotted into maneuversKnown below, permanently — this guard is prevention, not just admission, the same failure mode #1345 guards against for Feat.
     const mismatch = crossEditionRejection(catalogManeuver, `Maneuver "${catalogManeuver.name}"`, edition);
     if (mismatch) throw new InvalidResourceOperationError(`learnManeuver: ${mismatch}`);
     newEntry = {
@@ -420,15 +342,8 @@ async function applyLearnManeuverOp(
   };
 }
 
-// #1516: "Each time you learn new maneuvers, you can also replace one
-// maneuver you know with a different one" (PHB'14 Battle Master p.73; SRD 5.2
-// carries the equivalent grant) — RAW bounds a maneuver replacement to
-// learn-time, so this primitive is unreachable outside a validated level-up
-// step (ctx.allowChooseNForget), same guard shape as
-// applyForgetSubclassChoiceOp below. The reconciler (level-reconciliation.ts)
-// trims maneuversKnown directly, never through this op, so it is unaffected —
-// gating HERE (the op boundary), not inside a shared trim primitive, is what
-// keeps level-down reconciliation working (#1516 decision).
+// PHB'14 Battle Master p.73 (SRD 5.2 equivalent): RAW bounds a maneuver replacement to learn-time — this primitive is unreachable outside a validated level-up step (ctx.allowChooseNForget), same guard shape as applyForgetSubclassChoiceOp below.
+// The reconciler trims maneuversKnown directly, never through this op — gating HERE (the op boundary), not inside a shared trim primitive, is what keeps level-down reconciliation working.
 function applyForgetManeuverOp(
   state: ResourcesMutableState,
   op: ForgetManeuverOperation,
@@ -459,7 +374,6 @@ function applyLearnToolProficiencyOp(
   op: LearnToolProficiencyOperation,
   derivedInfo: DerivedClassInfo | null,
 ): ResourceOpAudit {
-  // Validate the name is a known artisan's tool.
   const artisanTools = toolsByCategory("artisan");
   if (!artisanTools.some((t) => t.name === op.name)) {
     throw new InvalidResourceOperationError(
@@ -467,7 +381,6 @@ function applyLearnToolProficiencyOp(
     );
   }
 
-  // Enforce choice count limit (Student of War = 1).
   const toolChoiceCount = derivedInfo?.toolProfChoiceCount;
   if (toolChoiceCount !== undefined && state.toolProficienciesKnown.length >= toolChoiceCount) {
     throw new InvalidResourceOperationError(
@@ -475,7 +388,6 @@ function applyLearnToolProficiencyOp(
     );
   }
 
-  // Dedup check.
   if (state.toolProficienciesKnown.some((t) => t.name === op.name)) {
     throw new InvalidResourceOperationError(
       `Tool proficiency already known: ${op.name}`
@@ -510,22 +422,9 @@ function applyForgetToolProficiencyOp(
   };
 }
 
-/**
- * Learn Expertise in a skill (#1588) — doubles proficiency bonus on that
- * skill's checks (buildSkillsView, serialize/proficiencies.ts). Validates
- * BOTH the skill key is real and the character is actually proficient in it
- * (`proficientSkillsOf`'s own scoped read, the same way the read path
- * resolves proficiency — base skill rows + feat/class-feature-row + item
- * grants — never trusted from the client) and the level-derived
- * expertiseChoiceCount cap. Takes `tx`/`characterId` (mirrors
- * applyLearnManeuverOp's own tx.grantedAbility.findUnique) so the
- * skills/inventory query stays scoped to THIS op, not RESOURCES_SELECT's
- * every-op read (#1588 perf review — spendResource/restoreResource are the
- * combat hot path and never need this). Freely reversible
- * (applyForgetExpertiseOp below carries no learn-time gate, unlike
- * applyForgetManeuverOp/applyForgetSubclassChoiceOp): Expertise has no RAW
- * swap-only text to bound it to a ceremony step.
- */
+// Validates the character is actually proficient in the skill via proficientSkillsOf's own scoped read (the same way the read path resolves proficiency) — never trusted from the client.
+// Takes tx/characterId directly (mirrors applyLearnManeuverOp) so the skills/inventory query stays scoped to THIS op, not RESOURCES_SELECT's every-op read — spendResource/restoreResource are the combat hot path and never need this.
+// Freely reversible (applyForgetExpertiseOp carries no learn-time gate, unlike applyForgetManeuverOp/applyForgetSubclassChoiceOp): Expertise has no RAW swap-only text to bound it to a ceremony step.
 async function applyLearnExpertiseOp(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -543,17 +442,7 @@ async function applyLearnExpertiseOp(
     );
   }
 
-  // #1588 (Opus review): undefined (no grantor class at all) is treated as
-  // cap 0 here, NOT skipped — deliberately diverging from
-  // applyLearnToolProficiencyOp/applyLearnManeuverOp's `!== undefined &&`
-  // pattern above, which leaves an undefined cap unlimited. That's a live
-  // exploit for Expertise specifically: FOUR classes grant it, so a crafted
-  // op on any character (e.g. a pure Fighter) could otherwise take Expertise
-  // in any proficient skill via a direct API call the UI never offers.
-  // Matches the clamp-on-read's own undefined -> 0 treatment
-  // (buildResourcesPayload, serialize/classes.ts) so learn/clamp/reconcile
-  // all agree a non-grantor class holds zero Expertise, never "however many
-  // happen to already be stored."
+  // undefined (no grantor class) is treated as cap 0 here, NOT skipped — deliberately diverging from the `!== undefined &&` pattern above (applyLearnToolProficiencyOp/applyLearnManeuverOp), which leaves an undefined cap unlimited. That's a live exploit for Expertise: four classes grant it, so a crafted op on a non-grantor character could otherwise take Expertise via a direct API call. Matches the clamp-on-read's own undefined -> 0 treatment (buildResourcesPayload) so learn/clamp/reconcile all agree.
   const expertiseChoiceCount = derivedInfo?.expertiseChoiceCount ?? 0;
   if (state.expertiseKnown.length >= expertiseChoiceCount) {
     throw new InvalidResourceOperationError(
@@ -591,13 +480,7 @@ function applyForgetExpertiseOp(
   };
 }
 
-// Generic subclass "choose N" appliers (#899): validate against the level-derived subclassChoices declaration: the choice
-// must be available at this level/subclass, the option must belong to the
-// choice's catalog source, and the pick must stay within the derived count.
-
-// Resolve a subclass-choice op's target (catalog optionId or custom) to a new
-// ChoiceEntry, enforcing catalog membership + dedup; keeps
-// applyLearnSubclassChoiceOp under the complexity bar.
+// Generic subclass "choose N" appliers: validate against the level-derived subclassChoices declaration — the choice must be available at this level/subclass, the option must belong to the choice's catalog source, and the pick must stay within the derived count.
 async function resolveChoiceOption(
   tx: Prisma.TransactionClient,
   op: LearnSubclassChoiceOperation,
@@ -618,9 +501,7 @@ async function resolveChoiceOption(
       `Option not found in the ${choice.label} catalog: ${op.optionId}`,
     );
   }
-  // Snapshotted into choicesKnown below, permanently — same prevention
-  // reasoning as applyLearnManeuverOp's guard above (#1345, found by this
-  // plan's audit, not named in the issue).
+  // Snapshotted into choicesKnown below, permanently — same prevention reasoning as applyLearnManeuverOp's guard above.
   const mismatch = crossEditionRejection(option, `${choice.label} option "${option.name}"`, edition);
   if (mismatch) throw new InvalidResourceOperationError(`learnSubclassChoice: ${mismatch}`);
   return { id: randomUUID(), optionId: option.id, name: option.name, description: option.description };
@@ -667,18 +548,8 @@ async function applyLearnSubclassChoiceOp(
   };
 }
 
-// #1516: both editions bound a choose-N replacement to learn-time (PHB'14
-// Battle Master maneuvers p.73, Way of the Four Elements disciplines p.81;
-// SRD 5.2 carries the equivalent grants) — this primitive is unreachable
-// outside a validated level-up step (ctx.allowChooseNForget), which itself
-// only carries a forget when subclassChoiceSwapCadence resolved "onLevelUp"
-// for that catalogSource (assertSubclassChoiceForgets, level-up-submission.ts)
-// — so a non-swappable choice (e.g. Hunter's Prey) is rejected at the
-// ceremony layer before it would ever reach here. The reconciler
-// (reconcileSubclassChoices) trims choicesKnown directly via
-// clampChoicesToCaps, never through this op, so it is unaffected — gating
-// HERE (the op boundary), not inside that shared trim primitive, is what
-// keeps level-down reconciliation working (#1516 decision).
+// PHB'14 Battle Master maneuvers p.73, Way of the Four Elements disciplines p.81 (SRD 5.2 equivalent grants): both editions bound a choose-N replacement to learn-time — unreachable outside a validated level-up step (ctx.allowChooseNForget), itself only carrying a forget when subclassChoiceSwapCadence resolved "onLevelUp" for that catalogSource (assertSubclassChoiceForgets).
+// The reconciler trims choicesKnown directly via clampChoicesToCaps, never through this op — gating HERE (the op boundary), not inside that shared trim primitive, is what keeps level-down reconciliation working.
 function applyForgetSubclassChoiceOp(
   state: ResourcesMutableState,
   op: ForgetSubclassChoiceOperation,
@@ -708,38 +579,23 @@ function applyForgetSubclassChoiceOp(
   };
 }
 
-// applyOp dispatch: shared per-op context (mirrors spellcasting.ts's SpellOpContext) + a
-// discriminant-keyed handler map, so the transaction handler's applyOp reduces
-// to "build context, dispatch, persist" instead of a growing switch.
+// Shared per-op context (mirrors SpellOpContext) + a discriminant-keyed handler map, so applyOp reduces to build context, dispatch, persist instead of a growing switch.
 
 interface ResourceOpContext {
   tx: Prisma.TransactionClient;
   state: ResourcesMutableState;
   derivedInfo: DerivedClassInfo | null;
-  /** rollInitiative's bonusHeal composes applyHealInTx in the same tx/batch
-   *  (#1243); applyLearnExpertiseOp's own scoped proficient-skill read
-   *  (#1588) also uses both — see proficientSkillsOf. */
+  // rollInitiative's bonusHeal composes applyHealInTx in the same tx/batch; applyLearnExpertiseOp's own scoped proficient-skill read also uses both (see proficientSkillsOf).
   characterId: string;
   batchId: string;
   sessionId: string | null;
-  /** Gates a client-supplied maneuverId/optionId against the row's edition (#1345). */
+  // Gates a client-supplied maneuverId/optionId against the row's edition.
   edition: RulesEdition;
-  /**
-   * #1516: whether this call site is a validated level-up ceremony step
-   * (level-up-transaction.ts, after validateLevelUpSubmission's
-   * assertManeuverForgets/assertSubclassChoiceForgets already proved the
-   * forgetManeuver/forgetSubclassChoice op belongs to a canSwap-carrying
-   * step) — false for every other caller, including the generic
-   * POST .../resources/transactions route, so a choose-N forget is
-   * unreachable outside learn-time. The client never sets this: it is
-   * server-computed per call site, never a client-supplied op field.
-   */
+  // Whether this call site is a validated level-up ceremony step (after validateLevelUpSubmission already proved the forget op belongs to a canSwap-carrying step) — false for every other caller. Server-computed per call site, never a client-supplied op field.
   allowChooseNForget: boolean;
 }
 
-// The handler-map return type — async ops return a Promise. Unrelated to the
-// frontend's ResourceOpResult, which is an alias for ResourceOpAudit that #1275
-// collapses once it rewrites the client.
+// Unrelated to the frontend's ResourceOpResult, which is a separate alias for ResourceOpAudit.
 type ResourceOpResult = ResourceOpAudit | Promise<ResourceOpAudit>;
 
 const RESOURCE_OP_HANDLERS: {
@@ -770,26 +626,14 @@ function dispatchResourceOp(ctx: ResourceOpContext, op: ResourceOperation): Reso
   return handler(ctx, op);
 }
 
-// Shared before/after event snapshot shape for the per-op event log
-// (applyResourceOpInTx).
 function snapshotResourcesState(state: ResourcesMutableState): {
   resources: ReturnType<typeof snapshotResources>;
 } {
   return { resources: snapshotResources(state) };
 }
 
-// Columns/relations applyResourceOpInTx re-reads per op; the batch wrapper's
-// scaffold row is an existence-only { id: true } check. Every entry (not just
-// the primary) + its level is selected so deriveEntryScopedResources can derive
-// each entry's own choice-cap fields (#1177).
-//
-// Deliberately LEAN (#1588 perf review): this select re-runs on EVERY resource
-// op, including spendResource/restoreResource — the combat hot path. `skills`/
-// `inventoryItems` (needed only by applyLearnExpertiseOp's proficient-skill
-// validation) do NOT live here; they're a scoped follow-on read inside that one
-// applier (see EXPERTISE_PROFICIENCY_SELECT/proficientSkillsOf below), the same
-// "extra read only on the path that needs it" shape applyLearnManeuverOp's own
-// tx.grantedAbility.findUnique already uses.
+// Every entry (not just primary) + its level, so deriveEntryScopedResources can derive each entry's own choice-cap fields.
+// Deliberately LEAN: this select re-runs on EVERY resource op, including spendResource/restoreResource — the combat hot path. skills/inventoryItems (needed only by applyLearnExpertiseOp) do NOT live here; they're a scoped follow-on read inside that one applier (EXPERTISE_PROFICIENCY_SELECT/proficientSkillsOf) — the same "extra read only on the path that needs it" shape applyLearnManeuverOp's own tx.grantedAbility.findUnique uses.
 export const RESOURCES_SELECT = {
   resources: true,
   experiencePoints: true,
@@ -801,23 +645,14 @@ export const RESOURCES_SELECT = {
   },
 } satisfies Prisma.CharacterSelect;
 
-// applyLearnExpertiseOp's own scoped read (#1588 perf review) — `skills` +
-// `inventoryItems` (via inventoryItemDetailInclude, the same fan-in every op
-// applier's live-row read uses, #1649) live ONLY here, not in RESOURCES_SELECT,
-// so spendResource/restoreResource and every other op never pay this cost.
+// Lives ONLY here, not in RESOURCES_SELECT, so spendResource/restoreResource and every other op never pay this cost.
 const EXPERTISE_PROFICIENCY_SELECT = {
   skills: true,
   inventoryItems: { include: inventoryItemDetailInclude },
 } satisfies Prisma.CharacterSelect;
 
-// The character's proficient skill set (#1588) — base skill rows +
-// feat-granted (deriveFeatProficiencies over the UNCLAMPED state.advancements;
-// an over-cap feat is a transient not-yet-reconciled state that the next XP
-// op self-heals, same tolerance clamp-on-read already extends elsewhere) +
-// item-granted (deriveItemGrants over the resolved inventory). Re-reads its
-// own narrow row (EXPERTISE_PROFICIENCY_SELECT) rather than taking one from
-// the caller, so only applyLearnExpertiseOp ever pays the skills/inventory
-// query cost — never the RESOURCES_SELECT read every other op shares.
+// base skill rows + feat-granted (deriveFeatProficiencies over the UNCLAMPED state.advancements — an over-cap feat is a transient not-yet-reconciled state the next XP op self-heals) + item-granted (deriveItemGrants over the resolved inventory).
+// Re-reads its own narrow row rather than taking one from the caller, so only applyLearnExpertiseOp ever pays this query cost.
 async function proficientSkillsOf(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -845,21 +680,8 @@ async function proficientSkillsOf(
   return new Set([...baseProficient, ...featProficiencies.skills, ...itemSkillProfs]);
 }
 
-/**
- * Applies one resource op inside a caller-supplied transaction/batchId, so the
- * unified level-up endpoint (#885) and the actions orchestrator can compose a
- * resource change with other domains under one batchId. Reads fresh state via
- * `tx` on every call (a batch of spends sees each prior result), dispatches via
- * dispatchResourceOp → writes back → logs its own event (the single copy of the
- * logic; applySpendResourceInTx is a thin, spend-typed delegate over this).
- *
- * `allowChooseNForget` (#1516) defaults false: only level-up-transaction.ts's
- * caller — after validateLevelUpSubmission already proved a
- * forgetManeuver/forgetSubclassChoice op belongs to a canSwap-carrying step —
- * passes true. Every other caller (the generic resources route, the actions
- * orchestrator's spend/restore composition) leaves it false, which is what
- * makes a choose-N forget unreachable outside learn-time.
- */
+// Composes under a caller-supplied tx/batchId (unified level-up endpoint, actions orchestrator). Reads fresh state via tx on every call so a batch of spends sees each prior result; this is the single copy of the dispatch/write/log logic — applySpendResourceInTx is a thin, spend-typed delegate over this.
+// allowChooseNForget defaults false — only LEVEL_UP_OP_APPLIERS' resources entry passes true, after validateLevelUpSubmission already proved the forget op belongs to a canSwap-carrying step.
 export async function applyResourceOpInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -877,12 +699,9 @@ export async function applyResourceOpInTx(
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
-  // One read, two consumers: deriveEntryScopedResources' edition-aware
-  // derivation and the ctx.edition the cross-edition guard (#1345) checks a
-  // client-supplied maneuverId/optionId against.
+  // One read, two consumers: deriveEntryScopedResources' edition-aware derivation and the ctx.edition the cross-edition guard checks a client-supplied maneuverId/optionId against.
   const edition = editionOf(row);
-  // Entry-scoped caps (#1177): a secondary Battle Master's maneuver cap must
-  // come from THAT entry's own effective level, not the primary entry's.
+  // A secondary Battle Master's maneuver cap must come from THAT entry's own effective level, not the primary entry's.
   const { derived: derivedInfo } = deriveEntryScopedResources(
     row.classEntries,
     level,
@@ -900,9 +719,7 @@ export async function applyResourceOpInTx(
     op,
   );
 
-  // Write the updated state back — always via serializeResourcesState so
-  // all keys round-trip (prevents clobbering toolProficienciesKnown when
-  // updating maneuversKnown and vice-versa).
+  // Always via serializeResourcesState so all keys round-trip — prevents clobbering toolProficienciesKnown when updating maneuversKnown and vice-versa.
   await tx.character.update({
     where: { id: characterId },
     data: { resources: serializeResourcesState(state) },
@@ -925,24 +742,8 @@ export async function applyResourceOpInTx(
   return audit;
 }
 
-/**
- * Applies a batch of resource operations atomically in one Prisma transaction.
- * Mirrors applySpellcastingOperations exactly:
- *   - one batchId groups all ops in this request on the activity timeline
- *   - any throw rolls back the entire batch (state unchanged)
- *   - CharacterEvent logged per op with full before/after resource snapshot
- *     for revert symmetry with the HP/XP undo handler
- *   - state is re-read per op so a batch of multiple spends sees each prior result
- *
- * The scaffold's per-op row is only the existence check: applyResourceOpInTx
- * re-reads its own state via RESOURCES_SELECT so it composes under a caller tx.
- *
- * Returns one ResourceOpAudit per op (mirrors applyManeuverOperations) so the
- * route can surface roll/regen outcomes (e.g. rollInitiative's Focus-regen +
- * Uncanny Metabolism heal summary, #1243) for the client toast — most callers
- * (spendResource, learnManeuver, …) ignore it, same as before this return
- * type existed.
- */
+// Mirrors applySpellcastingOperations: one batchId groups all ops on the activity timeline; any throw rolls back the entire batch; CharacterEvent is logged per op with full before/after snapshot for revert symmetry with the HP/XP undo handler; state is re-read per op so a batch of multiple spends sees each prior result.
+// Returns one ResourceOpAudit per op (mirrors applyManeuverOperations) so the route can surface roll/regen outcomes (e.g. rollInitiative's Focus-regen + Uncanny Metabolism heal) for the client toast — most callers ignore it.
 export async function applyResourceOperations(
   characterId: string,
   operations: ResourceOperation[]
@@ -958,13 +759,7 @@ export async function applyResourceOperations(
   return results;
 }
 
-/**
- * Applies a single spendResource op inside a caller-supplied Prisma transaction.
- *
- * Exported so the actions orchestrator (actionsRouter) can include a
- * resource spend alongside an inventory adjust or HP heal in one atomic
- * $transaction. Thin spend-typed delegate over applyResourceOpInTx.
- */
+// Exported so the actions orchestrator can include a resource spend alongside an inventory adjust or HP heal in one atomic $transaction — a thin spend-typed delegate over applyResourceOpInTx.
 export async function applySpendResourceInTx(
   tx: Prisma.TransactionClient,
   characterId: string,

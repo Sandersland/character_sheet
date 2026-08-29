@@ -1,19 +1,5 @@
-/**
- * Spellcasting transaction handler — the spellcasting counterpart to
- * lib/inventory/inventory.ts and lib/combat/hitpoints.ts.
- *
- * The per-character mutable spell state lives in a single JSON column
- * (Character.spellcasting) rather than relational rows — see the plan note
- * in CLAUDE.md. This keeps revert/undo identical to the HP/XP undo pattern
- * (restore `before.spellcasting` from a CharacterEvent) and avoids a new
- * `CharacterSpell` table.
- *
- * What is persisted: slot `used` counts and the learned `spells[]` array.
- * What is derived at read time (in lib/character/character-serialize.ts serializeCharacter):
- *   - slot totals (from srd/srd.ts FULL_CASTER_SLOTS + class + level)
- *   - spellSaveDC / spellAttackBonus / ability (from srd/srd.ts deriveSpellcasting)
- *   - preparedSpellLimit / preparedSpellCount (from srd/srd.ts derivePreparedSpellLimit)
- */
+// Only slot `used` counts and the learned `spells[]` are persisted, in one JSON column (Character.spellcasting) — revert/undo restores `before.spellcasting` exactly like the HP/XP undo pattern.
+// Slot totals, save DC/attack bonus, and the prepared limit are derived at read time in serializeCharacter.
 
 import { randomUUID } from "node:crypto";
 
@@ -24,7 +10,7 @@ import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/buff-e
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { applyResourceOpInTx } from "@/lib/classes/resources.js";
-import { sorceryPointCostForSlot, FONT_OF_MAGIC_MAX_SLOT_LEVEL } from "@/lib/classes/sorcerer.js";
+import { sorceryPointCostForSlot, FONT_OF_MAGIC_MAX_SLOT_LEVEL } from "@/lib/classes/font-of-magic.js";
 import { readEffectSpec } from "@/lib/combat/effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
@@ -72,25 +58,12 @@ import type {
   UnprepareSpellOperation,
 } from "@character-sheet/shared-types";
 
-// Defined in ability-cost.ts (one-directional dep graph); re-exported so
-// existing importers (spellcastingRouter) keep resolving it here unchanged.
 export { InvalidSpellcastingOperationError };
 
-// Persisted spell state shape + normalizer live in the leaf module spell-state.ts
-// (extracted to break the hitpoints ↔ spellcasting import cycle). Re-exported
-// here so this module's public surface stays stable.
+// normalizeSpellcastingMutable lives in a leaf module to break the hitpoints <-> spellcasting import cycle; re-exported for import-path stability.
 export { normalizeSpellcastingMutable };
 
-// Spell transaction-op wire types now live in shared-types (#820); the ops the
-// dispatcher references are imported above, and the ones other backend modules
-// import from here are re-exported so their import paths stay unchanged. The
-// shared CastSpell/CastItemSpell ops type `apply.target` as the same structural
-// union CastTarget aliases, so the dispatcher forwards it to castAbilityInTx
-// unchanged.
 export type { ForgetSpellOperation, LearnSpellOperation, SpellcastingOperation };
-
-// Each helper mutates ctx.state in place and returns an OpOutcome, or null for a
-// no-op (which skips both the state write-back and the logEvent in the dispatcher).
 
 interface SpellOpContext {
   tx: Prisma.TransactionClient;
@@ -104,23 +77,14 @@ interface SpellOpContext {
   casterUserId: string;
   casterName: string;
   casterCampaignId: string | null;
-  // The character's own derived spell save DC / attack bonus, used to resolve a
-  // wielder-mode item spell's DC/attack (#528). Null for a non-caster.
+  // The character's own derived spell save DC/attack bonus, used to resolve a wielder-mode item spell's DC/attack (#528); null for a non-caster.
   wielderSpellSaveDC: number | null;
   wielderSpellAttackBonus: number | null;
-  // Derived prepared-spell cap (#883, edition-forked #1507): null only when no
-  // class entry is a caster at its level — every SRD 5.2 caster and every SRD
-  // 5.1 caster (known or prepared) resolves to a real number via
-  // derivePreparedSpellLimit; Pact Magic is the one caster this cap never
-  // governs, but it still resolves non-null through Warlock's shared array.
+  // Derived prepared-spell cap (#883, edition-forked #1507) — null only when no class entry is a caster at its level; Pact Magic never counts against it but still resolves non-null via Warlock's shared array.
   preparedSpellLimit: number | null;
-  // Known vs prepared (#1507 D5/D7): "known" for a 2014 Bard/Sorcerer/Warlock/
-  // Ranger/EK/AT, "prepared" for everything else, null for a non-caster.
-  // Drives applyLearnSpellOp's D7 born-prepared rule below.
+  // Known vs prepared (#1507 D5/D7): "known" for a 2014 Bard/Sorcerer/Warlock/Ranger/EK/AT, "prepared" otherwise, null for a non-caster — drives applyLearnSpellOp's D7 born-prepared rule.
   casterModel: "known" | "prepared" | null;
-  // Arcane Recovery (#904): the mutable resources state (the once-per-long-rest
-  // use counter lives here), whether the character has the pool, and the wizard
-  // level driving the ceil(level/2) slot-level cap.
+  // Arcane Recovery (#904): the mutable resources state (once-per-long-rest counter), whether the character has the pool, and the wizard level driving the ceil(level/2) slot-level cap.
   resources: ResourcesMutableState;
   arcaneRecoveryAvailable: boolean;
   wizardLevel: number;
@@ -166,9 +130,7 @@ function applyRestoreSlotOp(ctx: SpellOpContext, op: RestoreSlotOperation): OpOu
 
 const ARCANE_RECOVERY_KEY = "arcaneRecovery";
 
-// Aggregate the requested recoveries into a level→count map so duplicate entries
-// at the same level are summed once (a per-entry check would let two entries each
-// pass against the full expended count and over-recover, #904 review).
+// Summed once per level so duplicate entries can't each pass against the full expended count and over-recover (#904 review).
 function aggregateArcaneRecovery(op: ArcaneRecoveryOperation): Map<number, number> {
   const byLevel = new Map<number, number>();
   for (const { level, count } of op.slots) {
@@ -177,9 +139,7 @@ function aggregateArcaneRecovery(op: ArcaneRecoveryOperation): Map<number, numbe
   return byLevel;
 }
 
-// Validate the aggregated recoveries against the 5th-level ceiling, the number of
-// slots actually expended at each level, and the total slot-level cap. Returns
-// the total slot-levels recovered.
+// Returns the total slot-levels recovered.
 function validateArcaneRecovery(ctx: SpellOpContext, byLevel: Map<number, number>): number {
   const cap = Math.ceil(ctx.wizardLevel / 2);
   let totalLevels = 0;
@@ -203,9 +163,7 @@ function validateArcaneRecovery(ctx: SpellOpContext, byLevel: Map<number, number
   return totalLevels;
 }
 
-// Recover expended spell slots (Wizard Arcane Recovery, #904). Gated to once per
-// long rest via the arcaneRecovery resource pool (recharge longRest, total 1),
-// which is written here and snapshotted into the event for undo.
+// Gated to once per long rest via the arcaneRecovery resource pool (recharge longRest, total 1); snapshotted into the event for undo.
 async function applyArcaneRecoveryOp(ctx: SpellOpContext, op: ArcaneRecoveryOperation): Promise<OpOutcome> {
   const { state, resources } = ctx;
   if (!ctx.arcaneRecoveryAvailable) {
@@ -236,13 +194,10 @@ async function applyArcaneRecoveryOp(ctx: SpellOpContext, op: ArcaneRecoveryOper
   };
 }
 
-// Normalize a nullable catalog column to the SpellEntry's optional (undefined).
 const orUndef = <T>(v: T | null): T | undefined => v ?? undefined;
 
-// Snapshot a catalog Spell row into a new learned SpellEntry (buff fields #363).
 // Coupling latch: if you add a catalog-content field here, also add it to
-// overlaySpellMechanics (spell-catalog.ts, #1806) or a fork won't override it
-// on already-learned spells.
+// overlaySpellMechanics (#1806) or a fork won't override it on already-learned spells.
 function catalogSpellToEntry(catalogSpell: Spell): SpellEntry {
   return {
     id: randomUUID(),
@@ -273,16 +228,11 @@ function catalogSpellToEntry(catalogSpell: Spell): SpellEntry {
   };
 }
 
-// #1131: a creation-time pick — the same catalog snapshot, but prepared (a fresh
-// caster's chosen cantrips + level-1 spells are all prepared from the start).
-// #1513: a Wizard's spellbook (6) can exceed its prepared cap (4) — that
-// exception is applied AFTER this, by persistCreatedCharacter's write-time
-// clampPreparedToLimit call, not here; every entry is still born prepared:true.
+// #1131: a creation-time pick is born prepared. #1513: persistCreatedCharacter's clampPreparedToLimit applies the Wizard spellbook-cap exception AFTER this; every entry here is still born prepared:true.
 export function creationSpellEntry(catalogSpell: Spell): SpellEntry {
   return { ...catalogSpellToEntry(catalogSpell), prepared: true };
 }
 
-// Reject a duplicate, look up the catalog row, and snapshot it into an entry.
 async function resolveCatalogSpellEntry(
   tx: Prisma.TransactionClient,
   state: SpellcastingMutableState,
@@ -298,18 +248,8 @@ async function resolveCatalogSpellEntry(
   return catalogSpellToEntry(catalogSpell);
 }
 
-// #1440: deliberately NOT class- or spell-level-gated. This op is the
-// manual/homebrew scribing surface (scroll-scribing, DM grants via
-// SpellCatalogTab/AddSpellPanel, name+level filters only), so a class gate here
-// would break those flows. The level-up ceremony's own eligibility gate (class
-// list + spell-level ceiling) lives in `assertPickSpellEligibility`, which
-// validates against the server-built plan step before this op ever runs.
-//
-// #1507 D7: a 2014 "known" caster's chosen spell is castable the moment it's
-// learned — SRD 5.1 has no separate preparation step for Bard/Sorcerer/
-// Warlock/Ranger/EK/AT, so `ctx.casterModel === "known"` births the entry
-// `prepared: true` here. Cantrips are unaffected either way — always castable,
-// never toggled.
+// #1440: deliberately NOT class- or spell-level-gated — this is the manual/homebrew scribing surface; the level-up ceremony's own eligibility gate lives in assertPickSpellEligibility.
+// #1507 D7: SRD 5.1 has no separate preparation step for a "known" caster, so a 2014 known caster's spell is castable the moment it's learned — casterModel === "known" births the entry prepared; cantrips unaffected.
 async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): Promise<OpOutcome> {
   const { tx, state } = ctx;
   const newEntry = await resolveCatalogSpellEntry(tx, state, op.spellId);
@@ -324,14 +264,7 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
 
 async function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): Promise<OpOutcome> {
   const { state } = ctx;
-  // Subclass- AND species/lineage-granted (#1683) spells are derived, not
-  // persisted — they cannot be forgotten. Both share the `granted:` id
-  // prefix (deriveGrantedSpells' id scheme); the source check is
-  // defense-in-depth for the subclass half only — NOT extended to
-  // source === "species", which also matches a #1689 species-CHOICE entry
-  // (High Elf's Cantrip) that IS meant to be forgettable-eligible the same
-  // as any other stored spell (its id is never `granted:`-prefixed, so it
-  // never trips the first branch either).
+  // Subclass- and species/lineage-granted (#1683) spells are derived, not persisted, so they can't be forgotten — both use deriveGrantedSpells' `granted:` id prefix. The source check covers only the subclass half: source === "species" also matches a forgettable #1689 species-CHOICE entry.
   const idx = state.spells.findIndex((s) => s.id === op.entryId);
   if (op.entryId.startsWith("granted:") || state.spells[idx]?.source === "subclass") {
     throw new InvalidSpellcastingOperationError("Cannot forget a subclass- or species-lineage-granted spell.");
@@ -341,8 +274,7 @@ async function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation)
   }
   const forgotten = state.spells[idx];
   state.spells.splice(idx, 1);
-  // Forgetting the spell you're concentrating on ends that concentration and
-  // drops any buffs it maintained (#438).
+  // Forgetting the spell you're concentrating on ends that concentration and drops any buffs it maintained (#438).
   if (state.concentratingOn?.entryId === op.entryId) {
     state.concentratingOn = null;
     await clearBuffsForSourceInTx(ctx.tx, ctx.characterId, op.entryId, ctx.batchId, ctx.sessionId, "removal");
@@ -369,9 +301,8 @@ function applyPrepareSpellOp(
     );
   }
   const preparing = op.type === "prepareSpell";
-  // Already in the desired state — no-op (skip write + log).
   if (preparing === entry.prepared) return null;
-  // Prepared-spell cap (#883). Grants (source!=null) and cantrips never count.
+  // Prepared-spell cap (#883) — grants (source!=null) and cantrips never count.
   if (preparing && ctx.preparedSpellLimit != null) {
     const count = state.spells.filter((s) => s.prepared && s.level > 0 && s.source == null).length;
     if (count >= ctx.preparedSpellLimit) {
@@ -388,8 +319,7 @@ function applyPrepareSpellOp(
   };
 }
 
-// Adapt a SpellOpContext to the ability-cost payer's context. The slot maps are
-// the same references as state.slotsUsed/arcanumUsed, so in-place spends persist.
+// The slot maps are the same references as state.slotsUsed/arcanumUsed, so in-place spends persist.
 function costCtx(ctx: SpellOpContext): PayCostContext {
   return {
     tx: ctx.tx,
@@ -403,9 +333,7 @@ function costCtx(ctx: SpellOpContext): PayCostContext {
   };
 }
 
-// Thin wrapper over the shared castAbilityInTx: cantrips cost nothing, leveled
-// spells cost a slot (with Mystic Arcanum fallback in the payer). The shared
-// caster formats the summary, drops/sets concentration, and self-applies.
+// A leveled spell's slot cost falls back to Mystic Arcanum in the payer.
 async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Promise<OpOutcome> {
   const entry = ctx.state.spells.find((s) => s.id === op.entryId);
   if (!entry) {
@@ -438,13 +366,6 @@ async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Pr
   );
 }
 
-// Cast a spell granted by a held item (#528). Adapts the item's castSpell
-// capability into a CastAbilityInput: effect = the referenced Spell's EffectSpec,
-// cost = none (the item resource is spent here, not a character slot), DC/attack
-// per the fixed/wielder mode. Decrements the item's per-capability use counter —
-// or, for a charges-costed cast (#555), the item's shared pool by chargeCost.
-// A held item spell resolved and validated for casting: the entry, its item
-// meta, the referenced catalog spell, and the resolved cost/DC/attack.
 interface ResolvedItemSpell {
   entry: SpellEntry;
   meta: ItemSpellMeta;
@@ -454,14 +375,13 @@ interface ResolvedItemSpell {
   attack: number | null;
 }
 
-// The item resource-use snapshot folded into the event for undo refunds (#580).
+// Folded into the event for undo refunds (#580).
 interface ItemResourceSpend {
   poolUsedAfter: number | null;
   capabilityUsedBefore: { capabilityId: string; used: number } | null;
   capabilityUsedAfter: { capabilityId: string; used: number } | null;
 }
 
-// Throw unless the item has enough remaining uses/charges for this cast.
 function assertItemSpellUses(entry: SpellEntry, meta: ItemSpellMeta, chargeCost: number | null): void {
   if (chargeCost != null && meta.usesRemaining < chargeCost) {
     throw new InvalidSpellcastingOperationError(
@@ -475,8 +395,7 @@ function assertItemSpellUses(entry: SpellEntry, meta: ItemSpellMeta, chargeCost:
   }
 }
 
-// Resolve the announced DC/attack: fixed uses the item's value, wielder the
-// character's own (null-safe: a non-caster wielder is prevented at authoring).
+// Fixed mode uses the item's value, wielder the character's own (a non-caster wielder is prevented at authoring).
 function resolveItemDcAttack(
   ctx: SpellOpContext,
   meta: ItemSpellMeta,
@@ -487,8 +406,6 @@ function resolveItemDcAttack(
   };
 }
 
-// Find the item spell entry, validate availability + remaining uses, load the
-// referenced catalog spell, and resolve the announced DC/attack.
 async function resolveItemSpellCast(
   ctx: SpellOpContext,
   op: CastItemSpellOperation,
@@ -500,8 +417,7 @@ async function resolveItemSpellCast(
     );
   }
   const meta = entry.item;
-  // Charges-costed casts (#555) spend chargeCost from the item's shared pool;
-  // usesRemaining already mirrors the pool's remaining (deriveItemSpells).
+  // Charges-costed casts (#555) spend chargeCost from the item's shared pool; usesRemaining already mirrors the pool's remaining (deriveItemSpells).
   const chargeCost = meta.resource === "charges" ? meta.chargeCost ?? 1 : null;
   assertItemSpellUses(entry, meta, chargeCost);
   if (!entry.spellId) {
@@ -515,11 +431,8 @@ async function resolveItemSpellCast(
   return { entry, meta, spell, chargeCost, dc, attack };
 }
 
-// Spend the item's resource (skip for at-will), persisted outside the spell
-// blob. Charges-costed casts increment the shared POOL row by chargeCost;
-// everything else increments the capability's own per-period counter by 1.
-// Snapshot the row's used counter before/after so undo can refund it (#580) —
-// mirrors the #555 activate-op capabilityUsed pattern.
+// Persisted outside the spell blob: charges-costed casts increment the shared POOL row by chargeCost, everything else the capability's own per-period counter by 1.
+// Used-counter snapshots feed undo refunds (#580).
 async function spendItemSpellResource(
   ctx: SpellOpContext,
   entry: SpellEntry,
@@ -533,16 +446,8 @@ async function spendItemSpellResource(
     if (!meta.poolCapabilityId) {
       throw new InvalidSpellcastingOperationError(`${meta.itemName} has no charges pool to spend from`);
     }
-    // Atomic conditional spend (TOCTOU guard): under READ COMMITTED, two
-    // concurrent casts can both pass the derived remaining-check above. The
-    // WHERE re-evaluates against the committed row under its write lock, so
-    // racers serialize and an overdraw loses (count 0 → whole tx rolls back)
-    // instead of pushing `used` past maxCharges.
-    // Scoped by inventoryItemId as well as the key: the unique constraint is
-    // (inventoryItemId, capabilityKey), so the key alone does not identify a
-    // row. Keys are per-acquisition UUIDs and a collision is not reachable
-    // today, but this is the overdraw guard — resting it on an unstated
-    // assumption is what makes such a guard quietly stop guarding.
+    // Atomic conditional spend (TOCTOU guard): under READ COMMITTED two concurrent casts can both pass the remaining-check above; the WHERE re-evaluates against the committed row under its write lock, so racers serialize and an overdraw rolls back the whole tx instead of pushing `used` past maxCharges.
+    // Scoped by inventoryItemId as well as the key — the unique constraint is (inventoryItemId, capabilityKey), so the key alone doesn't identify a row; this is the overdraw guard, so it must not rest on the unstated assumption that keys never collide.
     const spent = await ctx.tx.inventoryCapabilityUse.updateMany({
       where: {
         inventoryItemId: meta.inventoryItemId,
@@ -576,8 +481,6 @@ async function spendItemSpellResource(
   return { poolUsedAfter, capabilityUsedBefore, capabilityUsedAfter };
 }
 
-// Fold the item-cast DC/attack text, the capability-used snapshot (undo refund,
-// #580), and the item provenance into the cast outcome.
 function decorateItemSpellOutcome(
   outcome: OpOutcome,
   resolved: ResolvedItemSpell,
@@ -608,6 +511,7 @@ function decorateItemSpellOutcome(
   };
 }
 
+// The item's resource is spent, never a character slot (#528); DC/attack resolve per the fixed/wielder mode.
 async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperation): Promise<OpOutcome> {
   const resolved = await resolveItemSpellCast(ctx, op);
   const { entry, meta, spell, chargeCost } = resolved;
@@ -644,7 +548,6 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
 async function applyDropConcentrationOp(ctx: SpellOpContext): Promise<OpOutcome | null> {
   const { state } = ctx;
   const prior = state.concentratingOn;
-  // Nothing to drop — idempotent no-op (skip write + log).
   if (!prior) return null;
   state.concentratingOn = null;
   // Ending concentration drops any buffs it was maintaining (#438).
@@ -656,19 +559,13 @@ async function applyDropConcentrationOp(ctx: SpellOpContext): Promise<OpOutcome 
   };
 }
 
-// Dismiss an active while-active spell buff (e.g. ending Mage Armor early, #363).
-// The clear helper logs its own undoable `effects` event and no-ops when the buff
-// is absent or is concentration-scoped, so this returns null (no spellcasting-blob
-// change) and the dispatcher skips its own event.
+// The clear helper logs its own undoable `effects` event and no-ops when the buff is absent or concentration-scoped, so this returns null — no spellcasting-blob event, but not necessarily a true no-op.
 async function applyDismissBuffOp(ctx: SpellOpContext, op: DismissBuffOperation): Promise<OpOutcome | null> {
   await clearBuffByKeyInTx(ctx.tx, ctx.characterId, op.entryId, ctx.batchId, ctx.sessionId, "dismissed");
   return null;
 }
 
-// Font of Magic (#903). Composes with the resources handler for the SP pool
-// (validates the pool exists + bounds, logs its own resources event under this
-// batch) and mutates the slot state here (logged as the spellcasting event) —
-// both revert on one LIFO undo of the batch.
+// Composes with the resources handler for the SP pool (validates + logs its own resources event under this batch) and mutates slot state here (logged as the spellcasting event) — both revert on one LIFO undo of the batch (#903).
 async function applyConvertSorceryPointsOp(
   ctx: SpellOpContext,
   op: ConvertSorceryPointsOperation,
@@ -687,7 +584,6 @@ async function applyConvertSorceryPointsOp(
     if ((slotTotals[level] ?? 0) === 0) {
       throw new InvalidSpellcastingOperationError(`You have no level-${level} spell slots`);
     }
-    // Spend the SP first — validates the pool exists and enough points remain.
     await applyResourceOpInTx(tx, characterId, { type: "spendResource", key: "sorceryPoints", amount: cost }, batchId, sessionId);
     // Creating a slot = one more available; `used` may go negative (extra slot).
     state.slotsUsed[key] = (state.slotsUsed[key] ?? 0) - 1;
@@ -703,8 +599,7 @@ async function applyConvertSorceryPointsOp(
     throw new InvalidSpellcastingOperationError(`No level-${level} spell slots remaining to convert`);
   }
   state.slotsUsed[key] = used + 1;
-  // Gain SP = slot level; restoreResource throws if this would exceed the max,
-  // rejecting the whole conversion (slot stays unspent) — it does not clamp.
+  // restoreResource throws if this would exceed the max, rejecting the whole conversion (slot stays unspent) — it does not clamp.
   await applyResourceOpInTx(tx, characterId, { type: "restoreResource", key: "sorceryPoints", amount: level }, batchId, sessionId);
   return {
     eventType: "convertSorceryPoints",
@@ -715,8 +610,7 @@ async function applyConvertSorceryPointsOp(
 
 type DerivedSpellcasting = ReturnType<typeof deriveSpellcasting>;
 
-// Build the slot/arcana level→total maps from derived spellcasting, falling back
-// to any stored legacy totals for unsupported caster classes.
+// Falls back to any stored legacy totals for unsupported caster classes.
 function computeSlotTables(
   spellcasting: Prisma.JsonValue,
   derived: DerivedSpellcasting,
@@ -734,10 +628,7 @@ function computeSlotTables(
   return { slotTotals, arcanaTotals };
 }
 
-// Inject derived subclass-granted (#438) + species-granted (#1683) +
-// item-granted (#528) spells into the working state so ops that target them
-// resolve. Disjoint id spaces; stripped again before persist
-// (persistSpellState) — they live only in the read view.
+// Disjoint id spaces; stripped again before persist (persistSpellState) — these grants live only in the read view.
 function injectDerivedSpells(
   state: SpellcastingMutableState,
   subclassRef: GrantedSpellSource | null | undefined,
@@ -757,7 +648,6 @@ function injectDerivedSpells(
   for (const s of deriveItemSpells(itemSources)) state.spells.push(s);
 }
 
-// Shallow-clone the mutable state for an event before/after snapshot.
 function cloneSpellState(state: SpellcastingMutableState): { spellcasting: SpellcastingMutableState } {
   return {
     spellcasting: {
@@ -769,11 +659,7 @@ function cloneSpellState(state: SpellcastingMutableState): { spellcasting: Spell
   };
 }
 
-// Strip derived grants (subclass + #1683 species/lineage) + item spells
-// (all re-derived on read) and persist the state. A #1689 species-CHOICE
-// entry (source:"species", but never `granted:`-id-prefixed) is deliberately
-// KEPT — it IS the persisted record, not a re-derivable grant; see
-// SpellEntry's own `source` comment (spell-state.ts) for the full split.
+// A #1689 species-CHOICE entry (source: "species", never `granted:`-id-prefixed) is deliberately KEPT here — it IS the persisted record, not a re-derivable grant; see SpellEntry.source for the full split.
 async function persistSpellState(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -799,8 +685,7 @@ async function persistSpellState(
 
 type SpellOpResult = OpOutcome | null | Promise<OpOutcome | null>;
 
-// Per-op handlers keyed by discriminant. A null outcome means no-op — the
-// dispatcher skips both the state write-back and the logEvent.
+// Per-op handlers keyed by discriminant. A null outcome means no-op — the dispatcher skips both the state write-back and the logEvent.
 const SPELL_OP_HANDLERS: {
   [K in SpellcastingOperation["type"]]: (
     ctx: SpellOpContext,
@@ -828,7 +713,6 @@ function dispatchSpellOp(ctx: SpellOpContext, op: SpellcastingOperation): SpellO
 
 type SpellStateSnapshot = ReturnType<typeof cloneSpellState>;
 
-// Assemble the per-op context, resolving the wielder's own DC/attack (#528).
 function buildSpellOpContext(
   ids: {
     tx: Prisma.TransactionClient;
@@ -863,8 +747,7 @@ function buildSpellOpContext(
   };
 }
 
-// Log the per-op CharacterEvent with the full before/after snapshot (+ any
-// capability-used extras) for revert symmetry with the HP/XP undo handler.
+// Full before/after snapshot for revert symmetry with the HP/XP undo handler.
 async function logSpellcastingEvent(
   tx: Prisma.TransactionClient,
   ids: { characterId: string; batchId: string; sessionId: string | null },
@@ -885,11 +768,7 @@ async function logSpellcastingEvent(
   });
 }
 
-// Character columns loadSlotPayContext needs to derive slot/arcana totals
-// from scratch — a lean subset of SPELLCASTING_SELECT for a caller (the
-// row-driven ability dispatcher, routes/character/actions.ts, and
-// resolveAction, lib/combat/resolve-action.ts, #1829) with no SpellOpContext
-// of its own.
+// The lean subset of SPELLCASTING_SELECT needed to derive slot/arcana totals for a caller with no SpellOpContext of its own.
 const SLOT_PAY_SELECT = {
   experiencePoints: true,
   abilityScores: true,
@@ -901,26 +780,9 @@ const SLOT_PAY_SELECT = {
   },
 } satisfies Prisma.CharacterSelect;
 
-/**
- * Loads the character, derives its slot/arcana totals, and assembles the
- * `PayCostContext` a `{kind:"slot"}` payment needs — the "load → derive →
- * build cost context" preamble `castAbilityWithSlotInTx` and
- * `applyResolveActionOperations` (lib/combat/resolve-action.ts, #1829) both
- * run before paying a slot cost. Extracted so the two callers can never
- * compute slotTotals/arcanaTotals two different ways (fallow dup:0f5f60c3).
- *
- * `onMissing` is the ONE thing this helper does NOT unify: each caller keeps
- * its own not-found semantics (castAbilityWithSlotInTx's 5xx internal
- * invariant vs a domain's 400 op error) by supplying its own error to throw.
- * The caller also owns its own before/after snapshot (cloneSpellState vs
- * snapshotSpellcasting — equivalent shapes, kept as each call site already
- * had them) since that isn't part of the shared preamble either.
- *
- * Mirrors buildSpellcastingOp's own derivation exactly: primary class only,
- * XP-derived TOTAL level — a pre-existing scope limit shared by every caller
- * (a spell cast has never combined multiclass slot tables here either), not
- * something this widens.
- */
+// Shared by castAbilityWithSlotInTx and applyResolveActionOperations so the two can never compute slot/arcana totals differently.
+// onMissing lets each caller pick 5xx (internal invariant) vs 400 (client op error) semantics; each caller owns its own before/after snapshot.
+// Same scope as buildSpellcastingOp's derivation: primary class only, XP-derived total level.
 export async function loadSlotPayContext(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -959,16 +821,7 @@ export async function loadSlotPayContext(
   return { state, costCtx };
 }
 
-/**
- * Pays + logs a `{kind:"slot"}` ability cost for a caller with no
- * SpellOpContext of its own (#1687) — the row-driven ability dispatcher's
- * counterpart to applySpellcastingOpInTx's own load → pay → persist → log
- * sequence for a spell cast. Before this, a row-driven cost could only be
- * "pool" or "none": `costKind:"slot"` on a ClassFeature row typed, but
- * nothing loaded the slot/arcanum maps `payAbilityCostInTx` requires, and the
- * cast's OpOutcome was discarded (no event logged), so a spend would have
- * mutated nothing durable and left no undo trail.
- */
+// The row-driven ability dispatcher's counterpart to applySpellcastingOpInTx's load -> pay -> persist -> log sequence (#1687).
 export async function castAbilityWithSlotInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -981,9 +834,7 @@ export async function castAbilityWithSlotInTx(
     characterId,
     batchId,
     sessionId,
-    // Internal invariant, not a client error: the character was already loaded
-    // in this same transaction (applyRowDrivenActionInTx) — a miss here is a
-    // server fault (5xx), so a plain Error, not the 400-mapped op error.
+    // Internal invariant, not a client error: the character was already loaded in this same transaction (applyRowDrivenActionInTx) — a miss here is a server fault (5xx), not the 400-mapped op error.
     (id) => new Error(`Character not found: ${id}`),
   );
   const before = cloneSpellState(state);
@@ -998,10 +849,7 @@ export async function castAbilityWithSlotInTx(
   return outcome;
 }
 
-// Shared "load row → build op context" preamble both applySpellcastingOpInTx
-// and castSpellForResolutionInTx run before dispatching an op (fallow
-// dup:534687ad) — the one not-found error is a client-facing domain error in
-// both callers, so it's safe to centralize here too.
+// Shared "load row → build op context" preamble for applySpellcastingOpInTx and castSpellForResolutionInTx; the not-found error is client-facing in both.
 async function loadSpellOpContext(
   ids: { tx: Prisma.TransactionClient; characterId: string; batchId: string; sessionId: string | null; casterUserId: string },
 ): Promise<{ ctx: SpellOpContext; state: SpellcastingMutableState; beforeState: SpellStateSnapshot }> {
@@ -1012,22 +860,7 @@ async function loadSpellOpContext(
   return buildSpellcastingOp(ids, row);
 }
 
-/**
- * Runs a `castSpell` op's full side-effect sequence (pay slot/arcanum cost,
- * concentration set/displace, self-buff append, self/ally apply —
- * castAbilityInTx) and persists the resulting spell state, but returns the
- * outcome + before/after snapshot INSTEAD OF logging a "castSpell" event
- * (#1833, epic #1827 slice 6). `applyCastSpellOp`'s callees each log their
- * OWN event under the caller's batchId (concentrationDropped, an
- * appendActiveBuffInTx effects event, an applyHealInTx hitPoints event) —
- * `resolveAction` (lib/combat/resolve-action.ts) is the caller, and logs its
- * OWN consolidated combat-rail event (toHit/save/effect/riders) under that
- * SAME batchId instead of a second "Cast X: N damage" row, so LIFO undo
- * reverts every sub-effect together as one batch (activity.ts's
- * revertBatch iterates every event sharing a batchId — no special-casing
- * needed here). Mirrors applySpellcastingOpInTx's own load → dispatch →
- * persist sequence; the one difference is the caller owns logging.
- */
+// Returns the outcome + before/after snapshots INSTEAD OF logging a "castSpell" event (#1833) — the caller (resolveAction) logs its own consolidated combat-rail event under the SAME batchId, so LIFO undo reverts every sub-effect together as one batch.
 export async function castSpellForResolutionInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -1037,40 +870,13 @@ export async function castSpellForResolutionInTx(
   op: CastSpellOperation,
 ): Promise<{ outcome: OpOutcome; before: SpellStateSnapshot; after: SpellStateSnapshot }> {
   const { ctx, state, beforeState } = await loadSpellOpContext({ tx, characterId, batchId, sessionId, casterUserId });
-  // Deliberately calls applyCastSpellOp directly, NOT dispatchSpellOp
-  // (#1848 review) — two reasons, not an oversight:
-  //   1. This function only ever handles op.type "castSpell" (its own
-  //      parameter is typed CastSpellOperation, not the general
-  //      SpellcastingOperation union dispatchSpellOp dispatches over) — going
-  //      through dispatchSpellOp would need a redundant cast/widen here with
-  //      no dispatch actually happening (there is exactly one handler this
-  //      call could ever reach).
-  //   2. dispatchSpellOp's return type is nullable (a no-op op like
-  //      learnSpell/prepareSpell can return null); applyCastSpellOp's is not
-  //      (a cast always produces a real OpOutcome). Routing through the
-  //      dispatcher would force a null-check here that can never actually
-  //      fire, for a case this function structurally cannot hit.
-  // The tradeoff this accepts: a future cross-cutting wrapper around
-  // dispatchSpellOp (metrics, pre/post hooks) would need to ALSO wrap
-  // applyCastSpellOp directly (or wrap SPELL_OP_HANDLERS itself, the actual
-  // single choke point both this and dispatchSpellOp read from) to cover the
-  // resolveAction path — noted here so that wrapper's author finds this
-  // comment instead of silently missing the spell-resolution entry point.
+  // Deliberately applyCastSpellOp, not dispatchSpellOp (#1848 review) — the op is statically "castSpell", so dispatching would only add a widen and a dead null-check. A cross-cutting wrapper around dispatchSpellOp must also cover this entry point (or wrap SPELL_OP_HANDLERS, the choke point both read from).
   const outcome = await applyCastSpellOp(ctx, op);
   await persistSpellState(tx, characterId, state);
   return { outcome, before: beforeState, after: cloneSpellState(state) };
 }
 
-/**
- * Applies a batch of spellcasting operations atomically in one Prisma
- * transaction. Mirrors applyInventoryOperations / applyHitPointOperations:
- *   - one batchId groups all ops in this request on the activity timeline
- *   - any throw rolls back the entire batch (state unchanged)
- *   - a CharacterEvent is logged per op (with full before/after spellcasting
- *     snapshot for revert symmetry with the HP/XP undo handler)
- *   - the mutable state is loaded once and written once per op loop iteration
- *     (loading inside the loop ensures each op sees the previous op's result)
- */
+// One batchId groups the ops; any throw rolls back the whole batch. State is reloaded per op so each op sees the previous op's result.
 export async function applySpellcastingOperations(
   characterId: string,
   operations: SpellcastingOperation[],
@@ -1086,8 +892,6 @@ export async function applySpellcastingOperations(
   });
 }
 
-// Columns/relations applySpellcastingOpInTx re-reads per op; the batch wrapper's
-// scaffold row is an existence-only { id: true } check.
 const SPELLCASTING_SELECT = {
   name: true,
   campaignId: true,
@@ -1103,27 +907,14 @@ const SPELLCASTING_SELECT = {
       name: true,
       level: true,
       subclass: true,
-      // #1528 finding 5 (now live, #1234 commit 3): resolveArcaneRecoveryContext
-      // reads `.resources` through deriveResources, whose only pool source
-      // besides a resourceFn is row-driven (poolsFromRows) — this featureRows
-      // carrier is what lets Wizard's arcaneRecovery pool resolve now that its
-      // resourceFn is deleted and the pool lives on the row instead.
-      // `subclassLevel` (#1576): featureRowsOf carries it into isSubclassActive
-      // so a 2014 subclass gates at its PHB'14 level here too, independent of
-      // whether its lib/classes/<class>.ts module still exists.
+      // features resolves Wizard's row-driven arcaneRecovery pool; subclassLevel lets featureRowsOf carry it into isSubclassActive so a 2014 subclass gates at its PHB'14 level here too (#1576).
       class: {
         select: {
           subclassLevel: true,
           features: FEATURE_ROWS_CLASS_FEATURES,
         },
       },
-      // Subclass-granted spells (#898) injected into the working view below.
-      // Switched from `include` to `select` (#1528) to add `features` without
-      // widening the fetched columns further — `name` is kept explicitly since
-      // injectDerivedSpells' GrantedSpellSource (granted-spells.ts) reads it
-      // (an `include` used to carry every scalar column along for free).
-      // `casterFraction`/`spellcastingAbility` (#1531): limitEntries' third-caster
-      // resolution below (derivePreparedSpellLimit/casterModelForEntries).
+      // grantedSpells feed injectDerivedSpells (#898), which reads `name` via GrantedSpellSource; casterFraction/spellcastingAbility drive the third-caster prepared-limit resolution (#1531).
       subclassRef: {
         select: {
           name: true,
@@ -1135,15 +926,9 @@ const SPELLCASTING_SELECT = {
       },
     },
   },
-  // Species/lineage-granted spells (#1683) injected into the working view
-  // below alongside subclassRef's, so a species grant (e.g. a Drow's Dancing
-  // Lights) is actually castable/preparable, not just visible on the read
-  // path. Shared RACE_SELECTION_GRANT_SELECT — level-reconciliation.ts uses
-  // the SAME fragment (granted-spells.ts).
+  // Injected into the working view so a species grant is actually castable/preparable, not just visible on the read path. RACE_SELECTION_GRANT_SELECT is the same fragment level reconciliation uses.
   raceSelection: { select: RACE_SELECTION_GRANT_SELECT },
-  // capabilities are reconstructed from `snapshot` + `capabilityUses` in
-  // buildSpellcastingOp below (#1649) — the four Inventory* mirror relations
-  // are gone.
+  // Capabilities are reconstructed from `snapshot` + `capabilityUses` in buildSpellcastingOp (#1649).
   inventoryItems: {
     select: { id: true, name: true, equippedSlot: true, attuned: true, snapshot: true, capabilityUses: true },
   },
@@ -1151,10 +936,7 @@ const SPELLCASTING_SELECT = {
 
 type SpellcastingRow = Prisma.CharacterGetPayload<{ select: typeof SPELLCASTING_SELECT }>;
 
-// Arcane Recovery (#904): the pool comes from the primary class's derived
-// resources — present only for a wizard — so usage and the long-rest refresh
-// (resetRestResources, also primary-class-scoped) key off the same fact.
-// Single-class uses the XP-derived level; multiclass uses the primary entry's.
+// The pool comes from the primary class's derived resources (present only for a wizard) so usage and resetRestResources' long-rest refresh key off the same fact. Single-class uses the XP-derived level; multiclass uses the primary entry's.
 function resolveArcaneRecoveryContext(
   row: SpellcastingRow,
   className: string,
@@ -1164,10 +946,6 @@ function resolveArcaneRecoveryContext(
 ): { resources: ResourcesMutableState; available: boolean; wizardLevel: number } {
   const primary = row.classEntries[0];
   const wizardLevel = row.classEntries.length === 1 ? level : primary?.level ?? level;
-  // SPELLCASTING_SELECT carries class/subclassRef.features (#1528 finding 5) so
-  // this caller's `.resources` read resolves the row-driven arcaneRecovery pool
-  // (wizard-features.ts, #1234 commit 3) — wizard.ts's resourceFn that used to
-  // supply it is deleted, so this carrier is now load-bearing, not inert.
   const resourceInfo = deriveResources(
     className,
     primary?.subclass ?? undefined,
@@ -1184,32 +962,24 @@ function resolveArcaneRecoveryContext(
   };
 }
 
-// Read fresh state and assemble the per-op context + before-snapshot. Split out
-// of applySpellcastingOpInTx to keep that seam under the unit-size gate.
 function buildSpellcastingOp(
   ids: { tx: Prisma.TransactionClient; characterId: string; batchId: string; sessionId: string | null; casterUserId: string },
   row: SpellcastingRow,
 ): { ctx: SpellOpContext; state: SpellcastingMutableState; beforeState: SpellStateSnapshot } {
-  // Derived stats needed for slot-bounds checks.
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const className = row.classEntries[0]?.name ?? "";
   const abilityScores = row.abilityScores as Record<string, number>;
   const edition = editionOf(row);
-  // `subclass` stays undefined here, matching this call's pre-existing behavior
-  // (mechanical edition thread-through only, #1507 — not a scope change).
+  // `subclass` stays undefined — deliberate primary-class-only scope (#1507).
   const derived = deriveSpellcasting(className, level, abilityScores, profBonus, undefined, edition);
-  // Single-class uses the XP-derived level (per-class column can be stale) so the
-  // enforced cap matches the serialized limit; multiclass uses per-entry levels.
+  // Single-class uses the XP-derived level (per-class column can be stale) so the enforced cap matches the serialized limit; multiclass uses per-entry levels.
   const limitEntries: Array<{ name: string; level: number; subclassRef?: SubclassCasterRef | null }> = row.classEntries.length === 1
     ? [{ name: className, level, subclassRef: row.classEntries[0]?.subclassRef ?? null }]
     : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclassRef: e.subclassRef }));
-  // Deliberate-coupling latch (#1507 D2/D3): resolves through the same
-  // derivePreparedSpellLimit as buildSpellcastingView's clamp-on-read and
-  // reconcilePreparedSpells — never a second inline copy of the cap.
+  // Coupling latch (#1507): the same derivePreparedSpellLimit as buildSpellcastingView's clamp-on-read and reconcilePreparedSpells — never a second inline copy of the cap.
   const preparedSpellLimit = derivePreparedSpellLimit(limitEntries, abilityScores, edition);
-  // D7: the ONE combiner buildSpellcastingView's served wire field also calls —
-  // never a second inline copy (#1507).
+  // The one combiner buildSpellcastingView's wire field also calls (#1507) — never a second inline copy.
   const casterModel = casterModelForEntries(limitEntries, edition);
 
   const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
@@ -1219,11 +989,7 @@ function buildSpellcastingOp(
   const state = normalizeSpellcastingMutable(row.spellcasting);
   const beforeState = cloneSpellState(state);
 
-  // #1683: the species source is independent of any class entry — resolved
-  // once here from raceSelection (SPELLCASTING_SELECT's shared
-  // RACE_SELECTION_GRANT_SELECT) via the SAME adapter level-reconciliation.ts
-  // uses, not the serialize layer's own (that would invert this module's
-  // dependency direction).
+  // #1683: the species source is independent of any class entry — resolved via the same adapter level reconciliation uses, not the serialize layer's own (that would invert this module's dependency direction).
   const speciesSource = speciesGrantedSpellSourceFromRaceSelection(row.raceSelection);
 
   injectDerivedSpells(
@@ -1250,13 +1016,7 @@ function buildSpellcastingOp(
   return { ctx, state, beforeState };
 }
 
-/**
- * Applies one spellcasting op inside a caller-supplied transaction/batchId, so the
- * unified level-up endpoint (#885) can compose spellcasting with other domains
- * under one batchId. Reads fresh state via `tx` on every call (a batch sees each
- * prior op's result), dispatches, and — unless the op is a no-op (null outcome) —
- * persists + logs its own event (the single copy of the logic).
- */
+// So the unified level-up endpoint (#885) can compose spellcasting with other domains under one batchId. Reads fresh state via tx on every call — a batch sees each prior op's result — dispatches, and persists + logs its own event unless the op is a no-op (null outcome).
 export async function applySpellcastingOpInTx(
   tx: Prisma.TransactionClient,
   characterId: string,

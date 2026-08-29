@@ -115,7 +115,6 @@ describe("grant summaries (#529)", () => {
   });
 
   it("ignores a stale skill/ability qualifier on a whole-axis (initiative) advantage", () => {
-    // Even if a stale grantValue survives, initiative renders without "(Perception)".
     expect(
       grantSummary({ kind: "grant", grantType: "advantage", grantOn: "initiative", grantValueKind: "skill", grantValue: "perception", cantBeSurprised: true }),
     ).toBe("Advantage on Initiative; can't be surprised");

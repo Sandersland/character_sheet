@@ -1,10 +1,3 @@
-// #1230 commit 2 of 3: Ranger's real SRD 5.2 (2024) content. Every assertion
-// below is pinned against an actual SRD 5.2 VALUE (a spell reference, a
-// damage die, a level, a mechanic name) transcribed from three independent
-// sources (5e24srd.com, aidedd.org, and the dnd2024.wikidot/roll20 pair) —
-// never against "differs from the 2014 row", which a garbage 2024 paraphrase
-// would also satisfy. Mirrors warlock-2024-srd.test.ts's row()/hasRow() shape
-// (same file, same RANGER_FEATURES export).
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -19,7 +12,6 @@ function rowsNamed(subclassSlug: string | null, name: string) {
   return RANGER_FEATURES.filter((r) => r.subclassSlug === subclassSlug && r.name === name);
 }
 
-/** Exactly one row for (subclassSlug, name, edition), or the test fails with a precise locator. */
 function row(subclassSlug: string | null, name: string, edition: Edition) {
   const found = rowsNamed(subclassSlug, name).filter((r) => r.edition === edition);
   expect(found, `${subclassSlug ?? "(base)"}/${name}/${edition}`).toHaveLength(1);
@@ -165,10 +157,6 @@ const ABILITY_SCORES = {
   charisma: 10,
 };
 
-// Integration-level proof (mirrors warlock-2024-srd.test.ts's loadDbFeatureRows
-// pattern): the REAL seeded rows, read through the REAL derivation path,
-// actually reach a serialized character's derived features — not just
-// RANGER_FEATURES' in-memory shape.
 describe("integration (#1230): a level-20 Hunter Ranger's derived features differ by edition exactly where authored", () => {
   it("2024 has Deft Explorer/Roving/Tireless/Nature's Veil/Hunter's Lore/Superior Hunter's Prey and NOT Natural Explorer/Primeval Awareness/Vanish/Giant-Killer-bearing Hunter's Prey/Multiattack; 2014 is the reverse", async () => {
     const featureRows = await loadDbFeatureRows("ranger", "hunter");

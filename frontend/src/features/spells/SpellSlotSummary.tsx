@@ -4,8 +4,6 @@ interface SpellSlotSummaryProps {
   slots: SpellSlots[];
 }
 
-// Compact read-only spell-slot glance for the Overview tab. Full expend/restore
-// management lives on the Magic tab (#926); this only shows the current standing.
 export default function SpellSlotSummary({ slots }: SpellSlotSummaryProps) {
   const rows = slots ?? [];
   if (rows.length === 0) return null;

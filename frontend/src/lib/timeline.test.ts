@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { formatBatchDate, groupByBatch, groupByDate } from "./timeline";
 
-// A fixed "now" so "Today" detection is deterministic.
 const NOW = new Date("2026-06-22T12:00:00Z");
 
 function at(iso: string) {
@@ -45,10 +44,10 @@ describe("groupByDate", () => {
     vi.setSystemTime(NOW);
 
     const items = [
-      at("2026-06-22T11:00:00Z"), // Today
-      at("2026-06-22T09:00:00Z"), // Today
-      at("2026-06-21T18:00:00Z"), // Jun 21
-      at("2026-06-19T10:00:00Z"), // Jun 19
+      at("2026-06-22T11:00:00Z"),
+      at("2026-06-22T09:00:00Z"),
+      at("2026-06-21T18:00:00Z"),
+      at("2026-06-19T10:00:00Z"),
     ];
 
     const sections = groupByDate(items);
@@ -74,7 +73,6 @@ describe("groupByDate", () => {
       "2026-06-22T11:00:00Z",
       "2026-06-22T09:00:00Z",
     ]);
-    // Section header reflects the first (newest) item of the group.
     expect(sections[0].createdAt).toBe("2026-06-22T11:00:00Z");
   });
 
@@ -97,7 +95,6 @@ describe("groupByDate", () => {
     const sections = groupByDate(batches);
 
     expect(sections.map((s) => s.label)).toEqual(["Today", "Jun 21"]);
-    // Two distinct batches share "Today".
     expect(sections[0].items.map((b) => b.key)).toEqual(["b1", "b2"]);
     expect(sections[1].items.map((b) => b.key)).toEqual(["b3"]);
   });

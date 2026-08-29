@@ -5,10 +5,6 @@ import {
   getProvider,
 } from "@/lib/auth/oauth/registry.js";
 
-// No Postgres: the provider registry is pure (env in, descriptors out).
-// Per-provider profile mapping is tested in isolation in the provider's own
-// test (e.g. auth-google-provider.test.ts).
-
 describe("auth provider registry", () => {
   beforeEach(() => {
     vi.stubEnv("GOOGLE_CLIENT_ID", "");
@@ -42,8 +38,7 @@ describe("auth provider registry", () => {
       expect(google.clientSecret).toBe("secret-xyz");
       expect(google.scopes).toEqual(["openid", "email", "profile"]);
       expect(google.authUrl).toBe("https://accounts.google.com/o/oauth2/v2/auth");
-      // Resolution must forward provider-specific descriptor fields, not just
-      // the enumerated core ones — extraAuthParams was previously dropped here.
+      // Resolution must forward provider-specific descriptor fields, not just the core ones.
       expect(google.extraAuthParams).toEqual({
         access_type: "offline",
         prompt: "consent",

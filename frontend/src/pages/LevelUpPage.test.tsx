@@ -8,8 +8,8 @@ import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 
 vi.mock("@/hooks/useCharacter", () => ({ useCharacter: vi.fn() }));
-// LevelUpCeremony now reads useCurrentCharacter() itself (#1284) rather than
-// taking a character prop, so the stub does the same — it still exercises
+// LevelUpCeremony reads useCurrentCharacter() itself (#1284) rather than a
+// character prop, so the stub does the same — this still exercises
 // LevelUpPage's own CurrentCharacterProvider mount, backed by the mocked
 // useCharacter above.
 vi.mock("@/features/level-up/LevelUpCeremony", () => ({

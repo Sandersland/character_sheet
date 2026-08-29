@@ -1,42 +1,21 @@
-/**
- * Loadout picker rules (#789, interaction-budget model #1165) — the JSX-free
- * core of InlineLoadoutPicker's per-hand cards and the Action-sheet's "Change
- * weapons" card.
- *
- * PHB'24 rules this models (settled on issue #1165):
- *  - one free object interaction per turn (SRD 5.2 "Interacting with Things")
- *  - the Attack action lets you equip/unequip one weapon per attack you make
- *    ("you can equip or unequip one weapon when you make this attack as part
- *    of the Attack action") — tracked as `attackEquipCredits` on the turn
- *  - beyond that, changing a weapon takes the Utilize action (mapped here to
- *    spending the turn's Action, since Utilize itself isn't modeled)
- *
- * Each equip or unequip is one interaction unit; a swap into an occupied hand
- * is 2 units (stow + draw), and — for a two-handed incoming weapon — up to 3
- * (stow both hands + draw). `planInteractionSpend` pays units from the budget
- * (attack credits first, then the free interaction); when the budget can't
- * cover it, the option costs the Action, or is blocked if that's gone too.
- */
+// SRD 5.2 "Interacting with Things": one free object interaction per turn, plus one equip/unequip per Attack-action attack (attackEquipCredits); beyond that, changing a weapon costs the Action (stand-in for the unmodeled Utilize action).
 import { bagItemsForSlot, itemsInSlot } from "@/lib/paperDoll";
 import type { EquipSlot, InventoryItem } from "@/types/character";
 
 export const NO_BUDGET_REASON =
   "No free interaction or Action left — this needs a Utilize action";
 
-/** The turn's interaction-budget fields (mirrors the matching TurnState slice). */
+/** Mirrors TurnState's interaction-budget slice. */
 export interface InteractionBudget {
   attackEquipCredits: number;
   freeInteractionUsed: boolean;
 }
 
-/** Free interaction units left this turn: unspent attack credits + the once-per-turn free interaction. */
 export function interactionBudgetRemaining(budget: InteractionBudget): number {
   return budget.attackEquipCredits + (budget.freeInteractionUsed ? 0 : 1);
 }
 
-/** What paying `unitsNeeded` from the budget would spend — attack credits first
- *  (the more restrictive, per-attack resource), then the free interaction. Null
- *  when the budget can't cover it (caller falls back to the Action). */
+/** Pays attack credits before the free interaction; null when the budget can't cover unitsNeeded (caller falls back to the Action). */
 export interface InteractionSpend {
   fromAttackCredits: number;
   usedFreeInteraction: boolean;
@@ -52,8 +31,6 @@ export function planInteractionSpend(
   return { fromAttackCredits, usedFreeInteraction };
 }
 
-/** Whether ANY interaction is possible right now — the budget covers the
- *  cheapest (1-unit) interaction, or the Action is still there to pay for it. */
 function canInteract(budget: InteractionBudget, actionsRemaining: number): boolean {
   return interactionBudgetRemaining(budget) > 0 || actionsRemaining > 0;
 }
@@ -68,19 +45,13 @@ export interface HandContext {
 export type SwapCost = "free" | "action" | "blocked";
 
 export interface PickerOption {
-  /** Representative bag item to equip; null for the Stow (empty-hand) option. */
   item: InventoryItem | null;
-  /** Display label — item name, or the Stow prompt. */
   label: string;
-  /** Copies of this item in the bag (dedup count); 0 for Stow. */
   count: number;
-  /** free = paid from the interaction budget; action = spends the turn's Action; blocked = neither is available. */
   cost: SwapCost;
-  /** Non-null when the option can't be chosen now — rendered as text, not title-only. */
   disabledReason: string | null;
 }
 
-/** The live MAIN/OFF occupants plus the actions + interaction budget, for gating. */
 export function handContext(
   inventory: InventoryItem[],
   actionsRemaining: number,
@@ -94,9 +65,7 @@ export function handContext(
   };
 }
 
-// Interaction units for equipping `incoming` into `slot`: one per hand stowed
-// (the target, plus the other hand too for a two-handed incoming weapon) plus
-// the draw itself.
+// Units needed: one per hand stowed (target hand, plus the other hand for a two-handed incoming weapon) plus the draw itself.
 function interactionsForEquip(incoming: InventoryItem, slot: EquipSlot, ctx: HandContext): number {
   const targetOcc = slot === "MAIN_HAND" ? ctx.mainOcc : ctx.offOcc;
   const otherOcc = slot === "MAIN_HAND" ? ctx.offOcc : ctx.mainOcc;
@@ -105,14 +74,12 @@ function interactionsForEquip(incoming: InventoryItem, slot: EquipSlot, ctx: Han
   return stows + 1;
 }
 
-/** Resolve how many units an interaction needs against the budget/Action. */
 function costFor(unitsNeeded: number, ctx: HandContext): { cost: SwapCost; disabledReason: string | null } {
   if (planInteractionSpend(ctx.budget, unitsNeeded)) return { cost: "free", disabledReason: null };
   if (ctx.actionsRemaining > 0) return { cost: "action", disabledReason: null };
   return { cost: "blocked", disabledReason: NO_BUDGET_REASON };
 }
 
-/** Deduped candidate options for one hand, plus a Stow when it's occupied. */
 export function handPickerOptions(
   inventory: InventoryItem[],
   slot: EquipSlot,
@@ -133,23 +100,18 @@ export function handPickerOptions(
 
   const targetOcc = slot === "MAIN_HAND" ? ctx.mainOcc : ctx.offOcc;
   if (targetOcc) {
-    // Stowing a held weapon is one object interaction — budget/Action-gated
-    // like any other, not unconditionally free (2024 RAW has no free stow).
+    // Stowing is one interaction, budget/Action-gated like any other — 2024 RAW has no free stow.
     const { cost, disabledReason } = costFor(1, ctx);
     options.push({ item: null, label: "Stow — empty hand", count: 0, cost, disabledReason });
   }
   return options;
 }
 
-/** Whether a hand's Change/Equip toggle should be reachable at all — blocked
- *  only when NO interaction (not even the cheapest 1-unit one) is possible.
- *  Same for both hands, so it takes no `slot` — the gate is turn-wide, not
- *  hand-specific. */
+/** Blocked only when NO interaction is possible; the gate is turn-wide, so no `slot` param is needed. */
 export function handButtonDisabledReason(ctx: HandContext): string | null {
   return canInteract(ctx.budget, ctx.actionsRemaining) ? null : NO_BUDGET_REASON;
 }
 
-/** Subtitle for the Action-sheet's "Change weapons" card — states the real cost. */
 export function changeWeaponsSubtitle(
   loadoutLabel: string,
   budgetRemaining: number,

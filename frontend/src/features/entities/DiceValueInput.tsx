@@ -7,7 +7,6 @@ interface DiceValueInputProps {
   onChange: (patch: Partial<ItemCapability>) => void;
 }
 
-// A passiveBonus dice roll (count·d·faces + optional damage type), e.g. +2d6 fire.
 export default function DiceValueInput({ index, dice, onChange }: DiceValueInputProps) {
   const count = dice?.count ?? 1;
   const faces = dice?.faces ?? 6;

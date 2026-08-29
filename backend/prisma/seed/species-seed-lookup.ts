@@ -1,8 +1,3 @@
-// Shared (slug, edition) -> Species row lookup, built from the just-seeded
-// Species/SpeciesVariant rows — the SAME shape seed-species-traits.ts and
-// seed-species-granted-spells.ts each resolve their own targets against
-// (fallow flagged the query+map pair as a clone; extracted once rather than
-// kept as two near-identical copies).
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import type { SeedEdition } from "./edition.js";
 
@@ -13,9 +8,7 @@ export interface SpeciesLookupRow {
   variants: { id: string; slug: string }[];
 }
 
-// `where` narrows the scan (seedSpeciesGrantedSpells only ever targets
-// EDITION_2024 rows this slice); omitted loads every species, matching
-// seedSpeciesTraits' unscoped 2014+2024 scan.
+// `where` narrows the scan (seedSpeciesGrantedSpells targets only EDITION_2024); omitted loads every species, matching seedSpeciesTraits' unscoped scan.
 export async function loadSpeciesByKey(
   prisma: PrismaClient,
   where?: { edition: SeedEdition },

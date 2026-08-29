@@ -38,7 +38,6 @@ describe("entity identity merges (#387)", () => {
   let campaignId: string;
   let otherCampaignId: string;
 
-  // Fresh entity ids re-created per scenario as needed.
   async function makeEntity(
     campaign: string,
     name: string,
@@ -89,7 +88,6 @@ describe("entity identity merges (#387)", () => {
       .send({ mergedEntityId: jenkins, survivorEntityId: vecna });
     expect(prep.status).toBe(403);
 
-    // Owner prepares so the player has a real record to attack.
     const ownerPrep = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
@@ -117,13 +115,11 @@ describe("entity identity merges (#387)", () => {
     expect(prep.status).toBe(201);
     expect(prep.body.status).toBe("PREPARED");
 
-    // Owner sees the PREPARED merge…
     const ownerMerges = await supertest(app)
       .get(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner);
     expect((ownerMerges.body as { id: string }[]).some((m) => m.id === prep.body.id)).toBe(true);
 
-    // …the player sees nothing: no merge record, and the hidden survivor stays hidden.
     const playerMerges = await supertest(app)
       .get(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookiePlayer);
@@ -140,35 +136,31 @@ describe("entity identity merges (#387)", () => {
     const vecna = await makeEntity(campaignId, "Vecna V", "HIDDEN");
     const foreign = await makeEntity(otherCampaignId, "Foreign V");
 
-    // self-merge
     const self = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
       .send({ mergedEntityId: jenkins, survivorEntityId: jenkins });
     expect(self.status).toBe(400);
 
-    // cross-campaign survivor
     const cross = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
       .send({ mergedEntityId: jenkins, survivorEntityId: foreign });
     expect(cross.status).toBe(400);
 
-    // valid prepare
     const ok = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
       .send({ mergedEntityId: jenkins, survivorEntityId: vecna });
     expect(ok.status).toBe(201);
 
-    // jenkins already merged
     const dup = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
       .send({ mergedEntityId: jenkins, survivorEntityId: vecna });
     expect(dup.status).toBe(400);
 
-    // cycle: vecna→jenkins would close the loop
+    // vecna→jenkins would close the loop (jenkins was already merged into vecna above).
     const cycle = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
@@ -192,13 +184,11 @@ describe("entity identity merges (#387)", () => {
     expect(exec.body.status).toBe("EXECUTED");
     expect(exec.body.executedAt).toBeTruthy();
 
-    // The survivor is now revealed to players.
     const playerList = await supertest(app)
       .get(`/api/campaigns/${campaignId}/entities`)
       .set("Cookie", cookiePlayer);
     expect((playerList.body as { id: string }[]).some((e) => e.id === vecna)).toBe(true);
 
-    // The player now sees the EXECUTED merge.
     const playerMerges = await supertest(app)
       .get(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookiePlayer);
@@ -223,7 +213,6 @@ describe("entity identity merges (#387)", () => {
         .set("Cookie", cookieOwner);
     }
 
-    // Seed one owner-authored note tagging each identity.
     const seed = async (entityId: string, body: string) => {
       const entry = await prisma.journalEntry.create({
         data: {
@@ -240,7 +229,6 @@ describe("entity identity merges (#387)", () => {
     await seed(vecna, "saw Vecna B");
     await seed(whispered, "feared Whispered B");
 
-    // The top survivor's backlinks union all three, each labeled by its identity.
     const res = await supertest(app)
       .get(`/api/campaigns/${campaignId}/entities/${whispered}/backlinks`)
       .set("Cookie", cookieOwner);
@@ -248,7 +236,6 @@ describe("entity identity merges (#387)", () => {
     const identityIds = (res.body as { identity: { id: string } }[]).map((b) => b.identity.id);
     expect(new Set(identityIds)).toEqual(new Set([jenkins, vecna, whispered]));
 
-    // Jenkins alone (a leaf) only carries its own ref.
     const leaf = await supertest(app)
       .get(`/api/campaigns/${campaignId}/entities/${jenkins}/backlinks`)
       .set("Cookie", cookieOwner);
@@ -314,7 +301,6 @@ describe("entity identity merges (#387)", () => {
       .set("Cookie", cookieOwner);
     expect(delUnknown.status).toBe(404);
 
-    // A real merge, but belonging to the other campaign.
     const foreignMerged = await makeEntity(otherCampaignId, "Foreign Merged X");
     const foreignSurvivor = await makeEntity(otherCampaignId, "Foreign Survivor X");
     const foreignPrep = await supertest(app)
@@ -352,7 +338,6 @@ describe("entity identity merges (#387)", () => {
       .set("Cookie", cookieOwner);
     expect((ownerMerges.body as { id: string }[]).some((m) => m.id === mergeId)).toBe(true);
 
-    // Executed, but the merged side is still HIDDEN — a player must not see it.
     const playerMerges = await supertest(app)
       .get(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookiePlayer);

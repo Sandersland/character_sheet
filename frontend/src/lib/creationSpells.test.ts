@@ -9,10 +9,6 @@ import {
 } from "@/lib/creationSpells";
 import type { CatalogSpell, ClassOption } from "@/types/character";
 
-// The eligibility suite that used to sit here went with the functions it covered
-// (#1377). GET /api/spells applies that rule now, and the guarantee is asserted
-// in the spells route test plus the request-shape assertion in
-// CreationSpellsStep.test.tsx.
 describe("creationSpellCounts", () => {
   it("returns the class's level1SpellPicks, or null for a non-caster", () => {
     const caster = { level1SpellPicks: { cantrips: 2, spells: 2, maxSpellLevel: 1 } } as ClassOption;
@@ -28,8 +24,7 @@ describe("splitCreationCatalog — grouping an already-eligible list", () => {
   it("routes level 0 to cantrips and everything above it to spells", () => {
     const { cantrips, spells } = splitCreationCatalog([row("c", 0), row("s1", 1), row("s2", 2)]);
     expect(cantrips.map((s) => s.id)).toEqual(["c"]);
-    // Level 2 is kept, not dropped: the level ceiling is the server's job, so
-    // re-filtering here would be the client re-deriving the rule.
+    // Level 2 is kept, not dropped: the level ceiling is the server's job — re-filtering here would be the client re-deriving the rule.
     expect(spells.map((s) => s.id)).toEqual(["s1", "s2"]);
   });
 
@@ -62,9 +57,7 @@ describe("creationSpellsMissing — completeness labels", () => {
   it("is empty for a non-caster (null counts) regardless of stray picks", () => {
     expect(creationSpellsMissing(null, ["x"], ["y"])).toEqual([]);
   });
-  // #1513: a Wizard's served `spells` already carries the spellbook figure (6),
-  // but the label goes through creationLeveledPickCap so the cap can never be
-  // read two ways if spellbookSize and spells ever diverge.
+  // The label goes through creationLeveledPickCap so the cap can never be read two ways if spellbookSize and spells ever diverge.
   it("names the Wizard's spellbook count via creationLeveledPickCap, not spells directly", () => {
     expect(
       creationSpellsMissing({ cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 }, ["c1", "c2", "c3"], []),

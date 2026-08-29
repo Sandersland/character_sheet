@@ -1,7 +1,3 @@
-// Selection state for the New Spells step (#890): reads the draft's learnSpell
-// ops and writes them back under the plan's hard cap. Split from the catalog
-// fetch so neither concern carries the other's complexity (precedent:
-// useChoiceSelection).
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { readNewSpellsMeta, selectedSpellIds, toggleForgetSpell, toggleLearnSpell } from "@/lib/newSpells";
 import type { LevelUpStep } from "@/types/character";
@@ -13,7 +9,6 @@ export interface NewSpellsSelection {
   /** #1101/#1127: an onLevelUp-cadence caster (either edition's model) may swap one spell this level-up. */
   canSwap: boolean;
   selectedIds: string[];
-  /** The entry id of the spell staged to be swapped out, or null. */
   forgottenEntryId: string | null;
   toggle: (spellId: string) => void;
   toggleForget: (entryId: string) => void;

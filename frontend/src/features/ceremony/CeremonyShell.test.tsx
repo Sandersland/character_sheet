@@ -3,9 +3,6 @@ import { render, screen } from "@testing-library/react";
 
 import { CeremonyFooter } from "@/features/ceremony/CeremonyShell";
 
-// The confirm button splits two concerns (#1176): confirmDisabled gates it on an
-// invalid form (a static block), while submitting reflects an in-flight save (a
-// busy affordance). Conflating them mislabels a merely-invalid form as busy.
 const baseProps = {
   isFirst: false,
   isLast: true,

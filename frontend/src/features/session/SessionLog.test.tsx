@@ -38,8 +38,8 @@ function renderWith(events: CharacterEvent[]) {
   return render(<SessionLog characterId="char-1" sessionId="sess-1" refreshKey={0} />);
 }
 
-// Sentences are split across multiple <span> segments (bold/toned pieces), so
-// a plain text query matches every ancestor span — find the containing <li> instead.
+// Sentences are split across multiple <span> segments, so a plain text query
+// matches every ancestor span — find the containing <li> instead.
 function findRow(substring: string): Promise<HTMLElement> {
   return screen.findByText(
     (_, element) => element?.tagName === "LI" && Boolean(element.textContent?.includes(substring)),
@@ -67,9 +67,7 @@ describe("SessionLog (#1237 chat feed)", () => {
     const row = await findRow("Shortsword — hit for");
     expect(row.textContent).toContain("8");
     expect(row.textContent).toContain("piercing");
-    // Only one line — a resolveAction event is already one consolidated
-    // resolution (the scroll sentinel li is aria-hidden and excluded from
-    // the listitem role query).
+    // aria-hidden excludes the scroll sentinel li from the listitem role query.
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 
@@ -90,8 +88,8 @@ describe("SessionLog (#1237 chat feed)", () => {
     ]);
 
     const row = await findRow("Shortsword — hit for");
-    // A closed <details>'s children stay in the DOM (just CSS-hidden) — assert
-    // via visibility, not presence, that the drill-in starts collapsed.
+    // A closed <details>'s children stay in the DOM (CSS-hidden) — assert via
+    // visibility, not presence.
     const attackLabel = within(row).getByText(/Attack/);
     expect(attackLabel).not.toBeVisible();
     fireEvent.click(row.querySelector("summary")!);
@@ -131,8 +129,6 @@ describe("SessionLog (#1237 chat feed)", () => {
     expect(await screen.findByText("Awarded Flametongue ×2 → Bruenor")).toBeInTheDocument();
   });
 
-  // #962: the Combat Turn/Log sub-nav mounts the log on demand, so it renders
-  // without a refreshKey — each mount refetches on its own.
   it("fetches and renders with no refreshKey prop", async () => {
     mockFetchSession.mockResolvedValue({
       events: [makeEvent({ category: "hitPoints", type: "damage", data: { amount: 5 } })],
@@ -144,9 +140,6 @@ describe("SessionLog (#1237 chat feed)", () => {
     expect(mockFetchSession).toHaveBeenCalledWith("char-1", "sess-1");
   });
 
-  // #964: both live-Combat call sites stay mounted and pass the shared
-  // logRefresh counter, so bumping refreshKey must re-fetch (a stale mounted log
-  // was the review regression this guards).
   it("re-fetches when refreshKey changes", async () => {
     mockFetchSession.mockResolvedValue({ events: [] } as never);
 
@@ -159,10 +152,9 @@ describe("SessionLog (#1237 chat feed)", () => {
     await waitFor(() => expect(mockFetchSession).toHaveBeenCalledTimes(2));
   });
 
-  // A refreshKey bump must NOT clear `events` before the refetch resolves — a
-  // naive `setEvents(null)` on every bump unmounts every rendered row (and any
-  // open <details> drill-in) on every character write, since the log's own
-  // refreshKey counter bumps on every one (investigate item, #1237).
+  // A refreshKey bump must not clear `events` before the refetch resolves — a
+  // naive setEvents(null) would unmount every rendered row, including any open
+  // <details> drill-in, on every character write.
   it("keeps the previously rendered row visible while a refreshKey-triggered refetch is in flight", async () => {
     const firstEvents = [makeEvent({ id: "a", category: "hitPoints", type: "damage", data: { amount: 3 } })];
     mockFetchSession.mockResolvedValueOnce({ events: firstEvents } as never);
@@ -178,7 +170,6 @@ describe("SessionLog (#1237 chat feed)", () => {
     );
     rerender(<SessionLog characterId="char-1" sessionId="sess-1" refreshKey={1} />);
 
-    // Still pending — the old row must still be there, not replaced by a spinner.
     expect(screen.getByText("Took 3 damage.")).toBeInTheDocument();
 
     resolveSecond({
@@ -212,8 +203,7 @@ describe("SessionLog ordering — newest at the bottom (#1237)", () => {
     expect(rows[rows.length - 1].textContent).toContain("3");
   });
 
-  // jsdom stubs scrollIntoView as a no-op (test/setup.ts) — it can't verify
-  // actual scroll position, only that the component REQUESTS the scroll on load.
+  // jsdom stubs scrollIntoView as a no-op, so this can only verify the request, not actual scroll position.
   it("requests a scroll to the bottom sentinel on load", async () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
@@ -237,9 +227,7 @@ describe("SessionLog roll-run collapsing (#983, raised threshold #1237 §2)", ()
     );
     renderWith(rolls);
 
-    // The 3 most recent initiative rows stay visible — the hidden 9 are
-    // collapsed behind the disclosure and not in the DOM at all until expanded
-    // (unlike native <details>, whose closed children stay present but hidden).
+    // Unlike native <details>, the hidden rows are absent from the DOM until expanded, not just CSS-hidden.
     await screen.findByText(/9 earlier initiative rolls/);
     expect(document.querySelectorAll("details")).toHaveLength(3);
     const visibleRow = await findRow("Rolled Initiative — 20");
@@ -247,7 +235,6 @@ describe("SessionLog roll-run collapsing (#983, raised threshold #1237 §2)", ()
 
     fireEvent.click(screen.getByText(/9 earlier initiative rolls/));
 
-    // Expanding reveals every hidden row, on top of the 3 already visible.
     await waitFor(() => expect(document.querySelectorAll("details")).toHaveLength(12));
   });
 });

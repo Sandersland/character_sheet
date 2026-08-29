@@ -9,8 +9,7 @@ interface AdvantageKeyFieldProps {
   onUpdate: (patch: Partial<ItemCapability>) => void;
 }
 
-// The optional per-skill (check) or per-ability (save) qualifier for an
-// advantage grant — a save stores an ability key, a check a skill key.
+// A save stores an ability key, a check stores a skill key.
 export default function AdvantageKeyField({ cap, index, onUpdate }: AdvantageKeyFieldProps) {
   const onSave = cap.grantOn === "save";
   const options = onSave ? ABILITY_OPTIONS : SKILL_OPTIONS;

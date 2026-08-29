@@ -1,7 +1,3 @@
-// Pure 5e-rules sanity checks on SPECIES_GRANTED_SPELLS — no database, same
-// role as species-data.test.ts. Pins the Drow Elf spell track the issue's
-// acceptance criteria name explicitly (Dancing Lights@1/Faerie Fire@3/
-// Darkness@5) and the shape every row must satisfy.
 import { describe, it, expect } from "vitest";
 
 import { SPECIES_GRANTED_SPELLS, speciesGrantedSpellSeedSchema } from "../species-granted-spells-data.js";

@@ -12,7 +12,6 @@ import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-ro
 const OWNER_ID = "owner-experience";
 let COOKIE: string;
 
-// XP thresholds from the 5e table (levelForExperience).
 const XP_LVL_1 = 0;
 const XP_LVL_3 = 900;
 
@@ -20,8 +19,6 @@ beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   COOKIE = await authCookie(OWNER_ID);
 });
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function postXp(characterId: string, body: object) {
   return supertest(app).post(`/api/characters/${characterId}/experience`).set("Cookie", COOKIE).send(body);
@@ -39,9 +36,6 @@ async function getActivity(characterId: string) {
   return supertest(app).get(`/api/characters/${characterId}/activity`).set("Cookie", COOKIE);
 }
 
-// ── Common catalog fixtures ───────────────────────────────────────────────────
-
-// Unique names avoid colliding with seeded rows.
 const FIGHTER_CLASS_NAME = "Test Fighter (XP Suite)";
 const BATTLE_MASTER_SUBCLASS_NAME = "battle master"; // exact lowercase key deriveResources uses
 const CLERIC_CLASS_NAME = "Test Cleric (XP Suite)";
@@ -64,10 +58,7 @@ const BASE_CHARACTER = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-// ── Suite ─────────────────────────────────────────────────────────────────────
-
 describe("POST /api/characters/:id/experience — subclass reset on level-down", () => {
-  // Catalog ids set once in beforeAll (cheaper than beforeEach upserts).
   let fighterClassId: string;
   let battleMasterSubclassId: string;
   let clericClassId: string;
@@ -92,14 +83,12 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     const bm = await upsertEditionRow(
       prisma.subclass,
       { classId: fighterClass.id, name: BATTLE_MASTER_SUBCLASS_NAME, edition: null },
-      // Distinct from the real seeded "fighter-battle-master" (#1277) — this
-      // test's Fighter class is its own throwaway row.
+      // Distinct slug from the real seeded "fighter-battle-master" (#1277) — this test's Fighter class is its own throwaway row.
       { classId: fighterClass.id, name: BATTLE_MASTER_SUBCLASS_NAME, description: "Maneuvers.", slug: "fighter-battle-master-experience-test" },
       {},
     );
     battleMasterSubclassId = bm.id;
-    // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy — see its
-    // own header for why every bespoke Battle Master Subclass row needs this.
+    // battleMasterResourceRowsData is a shared helper, not a per-file copy — every bespoke Battle Master Subclass row needs this (#1546).
     await prisma.classFeature.deleteMany({ where: { subclassId: battleMasterSubclassId } });
     await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId, battleMasterSubclassId) });
 
@@ -136,7 +125,6 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     });
   });
 
-  // Helper: create a fighter with hitDice.total = 3 (HP level-ups applied) at XP level 3.
   async function createFighterWithHpLevelUps(id: string) {
     await ensureTestOwner(OWNER_ID);
     const char = await prisma.character.create({
@@ -161,7 +149,6 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
       },
       include: { classEntries: true },
     });
-    // Seed level-up events so revertLevelUps can reverse HP exactly.
     await prisma.characterEvent.createMany({
       data: [
         {
@@ -187,7 +174,6 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     return char;
   }
 
-  // Helper: create a fighter with hitDice.total = 1 (XP at level 3 but no HP level-ups clicked).
   async function createFighterNoHpLevelUps(id: string) {
     await ensureTestOwner(OWNER_ID);
     return prisma.character.create({
@@ -215,12 +201,9 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
   }
 
   afterEach(async () => {
-    // Clean up any characters created in this suite — match the id prefix.
     await prisma.character.deleteMany({ where: { name: { startsWith: "Fighter" } } });
     await prisma.character.deleteMany({ where: { name: { startsWith: "Cleric" } } });
   });
-
-  // ── Root cause 1 (no HP level-ups): the core bug the fix addresses ───────
 
   it("clears subclass when XP drops below subclassLevel, even when hitDice.total = 1 (no HP level-ups applied)", async () => {
     const char = await createFighterNoHpLevelUps("test-xp-f-no-hp");
@@ -229,10 +212,8 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     const res = await postXp("test-xp-f-no-hp", { operations: [{ type: "set", value: XP_LVL_1 }] });
     expect(res.status).toBe(200);
 
-    // Serialized response shows no subclass (null → undefined).
     expect(res.body.classes?.[0]?.subclass).toBeUndefined();
 
-    // DB row is cleared.
     const entry = await prisma.characterClassEntry.findUnique({ where: { id: entryId } });
     expect(entry?.subclassId).toBeNull();
     expect(entry?.subclass).toBeNull();
@@ -248,8 +229,6 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     expect(removedEvent).toBeDefined();
     expect(removedEvent.category).toBe("class");
   });
-
-  // ── Fighter with HP level-ups applied ────────────────────────────────────
 
   it("clears subclass when XP drops below subclassLevel (HP level-ups have been applied)", async () => {
     const char = await createFighterWithHpLevelUps("test-xp-f-with-hp");
@@ -272,14 +251,12 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     expect(res.body.classes?.[0]?.level).toBe(1);
   });
 
-  // ── Resources cleared after subclass is removed ───────────────────────────
-
   it("serialized resources is undefined after subclass is cleared", async () => {
     await createFighterNoHpLevelUps("test-xp-f-res");
 
     const res = await postXp("test-xp-f-res", { operations: [{ type: "set", value: XP_LVL_1 }] });
     expect(res.status).toBe(200);
-    // No subclass → deriveResources returns null → resources undefined in response.
+    // No subclass → deriveResources returns null → resources undefined in the response.
     expect(res.body.resources).toBeUndefined();
   });
 
@@ -294,11 +271,7 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     expect(spendRes.status).toBe(400);
   });
 
-  // ── subclassLevel = 1 class preserves its subclass at level 1 ─────────────
-
-  // A subclassLevel=1 class is a PHB'14 shape (Cleric/Sorcerer/Warlock); SRD 5.2
-  // gates every class at 3. So this fixture is stamped EDITION_2014 — under 2024
-  // the catalog column is ignored and the subclass is correctly cleared (#1285).
+  // subclassLevel=1 is a PHB'14 shape (Cleric/Sorcerer/Warlock); SRD 5.2 gates every class at 3 (#1285).
   it("preserves a subclassLevel=1 subclass (Cleric) when XP drops to level 1", async () => {
     await ensureTestOwner(OWNER_ID);
     const cleric = await prisma.character.create({
@@ -328,7 +301,6 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     const res = await postXp("test-xp-cleric-1", { operations: [{ type: "set", value: XP_LVL_1 }] });
     expect(res.status).toBe(200);
 
-    // Subclass should be preserved (level 1 >= subclassLevel 1).
     expect(res.body.classes?.[0]?.subclass).toBe(LIFE_DOMAIN_SUBCLASS_NAME);
 
     const entry = await prisma.characterClassEntry.findUnique({
@@ -338,46 +310,34 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
     expect(entry?.subclass).toBe(LIFE_DOMAIN_SUBCLASS_NAME);
   });
 
-  // ── Undo restores the subclass ────────────────────────────────────────────
-
   it("undoing the XP reset restores the Fighter's subclass via the subclassRemoved event", async () => {
     const char = await createFighterNoHpLevelUps("test-xp-f-undo");
     const entryId = char.classEntries[0].id;
 
-    // Reset (clears subclass).
     const resetRes = await postXp("test-xp-f-undo", { operations: [{ type: "set", value: XP_LVL_1 }] });
     expect(resetRes.status).toBe(200);
     expect(resetRes.body.classes?.[0]?.subclass).toBeUndefined();
 
-    // The most recent batch in the activity log is the one we want to undo.
     const activityRes = await getActivity("test-xp-f-undo");
     expect(activityRes.status).toBe(200);
     const batchId: string = activityRes.body[0]?.batchId;
     expect(batchId).toBeTruthy();
 
-    // Undo it.
     const undoRes = await postUndo("test-xp-f-undo", batchId);
     expect(undoRes.status).toBe(200);
 
-    // Subclass is restored on the DB row.
     const entry = await prisma.characterClassEntry.findUnique({ where: { id: entryId } });
     expect(entry?.subclassId).toBe(battleMasterSubclassId);
     expect(entry?.subclass).toBe(BATTLE_MASTER_SUBCLASS_NAME);
   });
 });
 
-// ── Maneuver reconciliation suite ─────────────────────────────────────────────
-// Tests the reconcileManeuvers step in level-reconciliation.ts and the
-// read-clamp added to serializeCharacter.
-
 describe("POST /api/characters/:id/experience — maneuvers reconciled on level-down", () => {
-  const XP_LVL_7 = 23000; // battleMasterManeuverCount(7) = 5
-  // XP_LVL_3 = 900 already declared above (900 → level 3, maneuverCount = 3).
+  const XP_LVL_7 = 23000;
 
   let fighterClassId2: string;
   let battleMasterSubclassId2: string;
 
-  // Unique names to avoid colliding with the first suite's catalog rows.
   const FIGHTER_CLASS_NAME2 = "Test Fighter (Maneuver Suite)";
   const BM_SUBCLASS_NAME2 = "battle master"; // exact lowercase key
 
@@ -404,7 +364,7 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
       {},
     );
     battleMasterSubclassId2 = bm.id;
-    // #1546 Part B-i (Ruling 2): shared helper, not a per-file copy.
+    // battleMasterResourceRowsData is a shared helper, not a per-file copy (#1546).
     await prisma.classFeature.deleteMany({ where: { subclassId: battleMasterSubclassId2 } });
     await prisma.classFeature.createMany({ data: battleMasterResourceRowsData(fighterClassId2, battleMasterSubclassId2) });
   });
@@ -420,7 +380,6 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
     await prisma.character.deleteMany({ where: { name: { startsWith: "Maneuver" } } });
   });
 
-  /** Helper: 5 seeded maneuver entries. */
   function fiveManeuvers() {
     return [
       { id: "m1", name: "Disarming Attack", description: "Force target to drop." },
@@ -431,7 +390,6 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
     ];
   }
 
-  /** Creates a level-7 Fighter with Battle Master and 5 known maneuvers. */
   async function createLvl7FighterWithManeuvers(id: string) {
     await ensureTestOwner(OWNER_ID);
     return prisma.character.create({
@@ -462,25 +420,20 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
     });
   }
 
-  // ── Partial trim (level 7 → 3: 5 maneuvers → 3) ───────────────────────────
-
   it("trims maneuversKnown from 5 to 3 when XP drops from level 7 to level 3", async () => {
     await createLvl7FighterWithManeuvers("test-man-trim");
 
     const res = await postXp("test-man-trim", { operations: [{ type: "set", value: XP_LVL_3 }] });
     expect(res.status).toBe(200);
 
-    // Serialized response reflects trimmed list.
     expect(res.body.resources?.maneuverChoiceCount).toBe(3);
     expect(res.body.resources?.maneuversKnown).toHaveLength(3);
     // Oldest 3 kept (LIFO: drop from the tail).
     expect(res.body.resources?.maneuversKnown[0].id).toBe("m1");
     expect(res.body.resources?.maneuversKnown[2].id).toBe("m3");
 
-    // Subclass preserved (level 3 >= subclassLevel 3).
     expect(res.body.classes?.[0]?.subclass).toBe(BM_SUBCLASS_NAME2);
 
-    // Persisted state trimmed.
     const row = await prisma.character.findUnique({
       where: { id: "test-man-trim" },
       select: { resources: true },
@@ -489,19 +442,15 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
     expect(stored?.maneuversKnown).toHaveLength(3);
   });
 
-  // ── Full clear (level 7 → 0: subclass removed, all maneuvers emptied) ──────
-
   it("empties maneuversKnown when XP drops to 0 (subclass removed at same time)", async () => {
     await createLvl7FighterWithManeuvers("test-man-full");
 
     const res = await postXp("test-man-full", { operations: [{ type: "set", value: XP_LVL_1 }] });
     expect(res.status).toBe(200);
 
-    // No subclass → no resources block.
     expect(res.body.resources).toBeUndefined();
     expect(res.body.classes?.[0]?.subclass).toBeUndefined();
 
-    // Persisted maneuversKnown is empty.
     const row = await prisma.character.findUnique({
       where: { id: "test-man-full" },
       select: { resources: true },
@@ -509,8 +458,6 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
     const stored = (row?.resources as { maneuversKnown: unknown[] } | null);
     expect(stored?.maneuversKnown).toHaveLength(0);
   });
-
-  // ── Event emitted ──────────────────────────────────────────────────────────
 
   it("emits a resources/maneuversReconciled event in the activity log", async () => {
     await createLvl7FighterWithManeuvers("test-man-event");
@@ -525,27 +472,21 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
     expect(reconciledEvent.category).toBe("resources");
   });
 
-  // ── Undo restores both subclass and all 5 maneuvers ───────────────────────
-
   it("undoing a full XP reset restores the subclass and all 5 maneuvers", async () => {
     const char = await createLvl7FighterWithManeuvers("test-man-undo");
 
-    // Reset to 0 — both subclass and maneuvers gone.
     const resetRes = await postXp("test-man-undo", { operations: [{ type: "set", value: XP_LVL_1 }] });
     expect(resetRes.status).toBe(200);
     expect(resetRes.body.resources).toBeUndefined();
 
-    // Find the batch to undo.
     const activityRes = await getActivity("test-man-undo");
     expect(activityRes.status).toBe(200);
     const batchId: string = activityRes.body[0]?.batchId;
     expect(batchId).toBeTruthy();
 
-    // Undo it.
     const undoRes = await postUndo("test-man-undo", batchId);
     expect(undoRes.status).toBe(200);
 
-    // Resources restored.
     const row = await prisma.character.findUnique({
       where: { id: "test-man-undo" },
       select: {
@@ -558,14 +499,11 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
     expect(row?.classEntries[0]?.subclass).toBe(BM_SUBCLASS_NAME2);
     expect(row?.classEntries[0]?.subclassId).toBe(battleMasterSubclassId2);
 
-    // Suppress unused-var warning from beforeAll ids (char used only for type check).
+    // Suppresses an unused-var warning: char is used only for its type.
     void char;
   });
 
-  // ── Read-clamp (defense-in-depth — no XP op needed) ──────────────────────
-
   it("GET serializes only 3 maneuvers for a level-3 character with 5 stored (read-clamp)", async () => {
-    // Create directly at level 3 with 5 stored maneuvers (no reconciling XP op).
     await ensureTestOwner(OWNER_ID);
     await prisma.character.create({
       data: {
@@ -595,9 +533,7 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
 
     const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/characters/test-man-clamp");
     expect(res.status).toBe(200);
-    // Read-clamp: serialized to 3 even though 5 are stored.
     expect(res.body.resources?.maneuversKnown).toHaveLength(3);
-    // DB still has 5 (write-side reconciliation has not yet run).
     const row = await prisma.character.findUnique({
       where: { id: "test-man-clamp" },
       select: { resources: true },
@@ -607,11 +543,7 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
   });
 });
 
-// ── Subclass-granted spell reconciliation suite ───────────────────────────────
-// Defense-in-depth: subclass grants are derived and never persisted in the happy
-// path. This exercises reconcileGrantedSpells stripping a *leaked* persisted
-// source:"subclass" entry when a Warrior of Shadow monk drops below the grant level.
-
+// Subclass grants are derived and never persisted in the happy path.
 describe("POST /api/characters/:id/experience — granted spells reconciled on level-down", () => {
   let gsMonkClassId: string;
   const GS_MONK_NAME = "Test Monk (Granted Spell Suite)";
@@ -680,9 +612,7 @@ describe("POST /api/characters/:id/experience — granted spells reconciled on l
     await postXp("test-gs-event", { operations: [{ type: "set", value: XP_LVL_1 }] });
 
     const actRes = await getActivity("test-gs-event");
-    // #1683: the summary text generalized to "granted spell(s)" — the
-    // reconciler now strips a leaked SPECIES grant the same way, not just a
-    // subclass one (reconcileGrantedSpells, level-reconciliation.ts).
+    // reconcileGrantedSpells strips a leaked species grant the same way as a subclass one (#1683).
     const ev = actRes.body.find(
       (e: { category: string; summary: string }) => e.category === "spellcasting" && e.summary.includes("granted spell"),
     );
@@ -737,9 +667,6 @@ describe("POST /api/characters/:id/experience — granted spells reconciled on l
   });
 });
 
-// #1683: reconcileGrantedSpells' species-grant twin of the subclass suite
-// above — the SAME defense-in-depth reconciler, over a leaked source:"species"
-// entry, against the real seeded 2024 Elf/Drow rows.
 describe("POST /api/characters/:id/experience — species-granted spells reconciled on level-down (#1683)", () => {
   let elfSpeciesId: string;
   let drowVariantId: string;
@@ -757,7 +684,6 @@ describe("POST /api/characters/:id/experience — species-granted spells reconci
     await prisma.character.deleteMany({ where: { name: { startsWith: "SpeciesGrantedSpell" } } });
   });
 
-  // Faerie Fire (gate 3) leaked into storage — dropping to level 1 must strip it.
   const leakedSpellcasting = () => ({
     slotsUsed: {},
     spells: [{
@@ -811,10 +737,7 @@ describe("POST /api/characters/:id/experience — species-granted spells reconci
   });
 });
 
-// ── Fighting Style FEAT reconciliation (#1137) ────────────────────────────────
-// Fighting Style feats live in advancements[] tagged slot:"fightingStyle" and
-// reconcile through reconcileAdvancements' fs partition — independently of the
-// ASI partition and exempt origin feats.
+// Fighting Style feats live in advancements[] tagged slot:"fightingStyle" and reconcile through reconcileAdvancements' fs partition, independent of the ASI partition; origin feats are exempt.
 describe("POST /api/characters/:id/experience — Fighting Style feat reconciliation", () => {
   const XP_L1 = 0, XP_L2 = 300, XP_L4 = 2700, XP_L5 = 6500;
 
@@ -828,11 +751,7 @@ describe("POST /api/characters/:id/experience — Fighting Style feat reconcilia
     advancements, fightingStyle: null,
   } as unknown as Prisma.InputJsonValue);
 
-  // #1529: the fs-slot cap resolves via CharacterClass.fightingStyleFeatLevel
-  // through the class FK relation now — every entry below must link classId
-  // to its real seeded row, or the slot cap is 0 (homebrew) regardless of
-  // `name`, which would make every "removed" assertion in this block true
-  // vacuously (the feat was never validly granted in the first place).
+  // Every entry must link classId to its real seeded row, or the slot cap is 0 (homebrew) and every "removed" assertion here would be vacuously true.
   let classIds: Record<string, string>;
 
   beforeAll(async () => {
@@ -872,9 +791,9 @@ describe("POST /api/characters/:id/experience — Fighting Style feat reconcilia
     const res = await postXp("fsr-pal42", { operations: [{ type: "set", value: XP_L2 }] });
     expect(res.status).toBe(200);
     const adv = res.body.advancements as { kind: string; slot?: string; origin?: boolean }[];
-    expect(adv.some((a) => a.kind === "asi")).toBe(false);          // ASI over cap removed
-    expect(adv.some((a) => a.slot === "fightingStyle")).toBe(true); // fs kept (fs cap 1 at L2)
-    expect(adv.some((a) => a.origin)).toBe(true);                    // origin exempt
+    expect(adv.some((a) => a.kind === "asi")).toBe(false);
+    expect(adv.some((a) => a.slot === "fightingStyle")).toBe(true);
+    expect(adv.some((a) => a.origin)).toBe(true);
   });
 
   it("removes the fs feat when the multiclass Fighter entry vanishes on level-down", async () => {
@@ -888,11 +807,7 @@ describe("POST /api/characters/:id/experience — Fighting Style feat reconcilia
   });
 });
 
-// #1321: at exhaustion 4+ (PHB'14 p. 291 tier 4), any write site that lowers
-// hp.max must clamp `current` against the EFFECTIVE (halved) max, not the raw
-// column — both level-down paths below (revertLevelUps in experience-ops.ts
-// and reconcileAdvancements in level-reconciliation.ts) are on the ticket's
-// checklist as clamping against the raw column today.
+// At exhaustion 4+ (PHB'14 p. 291), any write site lowering hp.max must clamp current against the EFFECTIVE (halved) max, not the raw column.
 describe("POST /api/characters/:id/experience — level-down HP clamps to the exhaustion-halved effective max (#1321)", () => {
   const XP_L1 = 0, XP_L3 = 900, XP_L4 = 2700, XP_L5 = 6500;
 
@@ -901,9 +816,7 @@ describe("POST /api/characters/:id/experience — level-down HP clamps to the ex
   });
 
   it("XP drop reverses HP level-ups (no levelUp event, average fallback) and clamps current to the halved max, not the raw one", async () => {
-    // No levelUp CharacterEvent rows exist, so revertLevelUps falls back to
-    // fixedAverageForDie(10)+conMod(0) = 6 HP per reversed level. Con 10 →
-    // conMod 0 keeps the fallback arithmetic simple and exact.
+    // No levelUp CharacterEvent rows exist, so revertLevelUps falls back to fixedAverageForDie(10)+conMod per reversed level.
     await prisma.character.create({
       data: {
         ...BASE_CHARACTER,
@@ -920,13 +833,6 @@ describe("POST /api/characters/:id/experience — level-down HP clamps to the ex
       },
     });
 
-    // Drop from level 5 to level 3 → reverses 2 levels → RAW hp.max: 60 - 2×6
-    // = 48. Effective max at exhaustion 4: floor(48/2) = 24 — serializeCharacter
-    // ALWAYS serves the effective max (that part isn't new), so the response's
-    // `max`/`current` are both 24 either way. What #1321 changes is the
-    // PERSISTED raw current: the OLD (buggy) clamp is Math.min(current, RAW
-    // max) = min(60, 48) = 48; the fix clamps to the EFFECTIVE max (24) instead
-    // — re-read the row directly to prove it, not just the served response.
     const res = await postXp("eld-fallback", { operations: [{ type: "set", value: XP_L3 }] });
     expect(res.status).toBe(200);
     expect(res.body.hitPoints.max).toBe(24);
@@ -940,9 +846,7 @@ describe("POST /api/characters/:id/experience — level-down HP clamps to the ex
 
   it("reconcileAdvancements: removing an over-cap ASI on level-down clamps current to the halved max", async () => {
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-    // hpDelta baked into the AdvancementEntry (as applyTakeAsi would have
-    // written it live) — the value is arbitrary but large enough to make the
-    // raw-vs-effective clamp difference unambiguous.
+    // hpDelta is arbitrary but large enough to make the raw-vs-effective clamp difference unambiguous.
     const asi = { id: "eld-asi", level: 4, kind: "asi" as const, abilityDeltas: { constitution: 2 }, hpDelta: 20, initDelta: 0 };
     await prisma.character.create({
       data: {
@@ -951,15 +855,8 @@ describe("POST /api/characters/:id/experience — level-down HP clamps to the ex
         id: "eld-asi-recon",
         name: "ExhLevelDown asi-recon",
         rulesEdition: "EDITION_2014",
-        // XP says level 4 (an ASI slot is already available and was taken),
-        // but hitDice.total stays 1 — a "pending level-up" state (the
-        // advancement slot cap resolves off the XP-derived level directly,
-        // not hitDice.total) so revertLevelUps has nothing to reverse when
-        // XP later drops to level 1 (1 is not < hitDice.total 1) — isolating
-        // this test to ONLY reconcileAdvancements's clamp, not revertLevelUps'.
+        // The advancement slot cap resolves off the XP-derived level, not hitDice.total — this isolates the test to reconcileAdvancements's clamp, not revertLevelUps'.
         experiencePoints: XP_L4,
-        // hp.max already includes the ASI's +20 (applyTakeAsi writes it live) —
-        // 20 base + 20 from the ASI = 40.
         hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 1, die: "d10", spent: 0 },
         conditions: { active: [], exhaustion: 4 },
@@ -969,12 +866,6 @@ describe("POST /api/characters/:id/experience — level-down HP clamps to the ex
       },
     });
 
-    // Drop to level 1 (no ASI slots) → the ASI is reconciled away: RAW hp.max
-    // reverses to 40 - 20 = 20. Effective max at exhaustion 4: floor(20/2)=10 —
-    // serializeCharacter always serves the effective max, so response max/current
-    // are both 10 either way. What #1321 changes is the PERSISTED raw current:
-    // the OLD (buggy) clamp is Math.min(current, RAW max) = min(40, 20) = 20;
-    // re-read the row directly to prove the fix clamps to 10 instead.
     const res = await postXp("eld-asi-recon", { operations: [{ type: "set", value: XP_L1 }] });
     expect(res.status).toBe(200);
     expect(res.body.advancements.some((a: { kind: string }) => a.kind === "asi")).toBe(false);

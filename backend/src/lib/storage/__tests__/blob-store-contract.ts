@@ -13,11 +13,7 @@ async function collect(stream: Readable): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-// Every driver must pass this exact suite (#1614) — the port's semantics live
-// here, not per driver: get of a missing key throws BlobNotFoundError, delete
-// of a missing key is idempotent, and keys are /-separated paths. Keys are
-// namespaced per test run so a driver backed by a shared bucket (the CI MinIO
-// leg) never sees another run's objects.
+// Keys are namespaced per test run so a driver backed by a shared bucket (the CI MinIO leg) never sees another run's objects.
 export function runBlobStoreContract(
   name: string,
   makeStore: () => Promise<BlobStore>,
@@ -99,8 +95,7 @@ export function runBlobStoreContract(
       );
     });
 
-    // In the contract, not per driver: S3 would accept "../escape" as an opaque
-    // key, so only a shared assertion proves both drivers enforce one key space.
+    // Shared, not per driver: S3 would accept "../escape" as an opaque key, so only a shared assertion proves both drivers enforce one key space.
     it.each(["../escape", "a/../../escape", "/etc/passwd", "a//b", "", "a/./b"])(
       "rejects the traversal-capable key %j on every method",
       async (k) => {

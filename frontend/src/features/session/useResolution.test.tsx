@@ -107,15 +107,15 @@ describe("useResolution — attack-roll shape", () => {
     ]);
 
     act(() => result.current.view.onRollToHit());
-    expect(result.current.view.toHitRoll?.total).toBe(20); // 15 + bonus 5
-    expect(result.current.view.verdict).toBeUndefined(); // ambiguous — not crit/miss range
+    expect(result.current.view.toHitRoll?.total).toBe(20);
+    expect(result.current.view.verdict).toBeUndefined();
 
     act(() => result.current.view.onCallCrit());
     expect(result.current.view.verdict).toBe("crit");
     expect(result.current.view.isCrit).toBe(true);
 
     act(() => result.current.view.onRollEffect());
-    expect(result.current.view.effectRoll?.spec.crit).toBe(true); // crit-doubled dice
+    expect(result.current.view.effectRoll?.spec.crit).toBe(true);
 
     expect(result.current.view.readyToComplete).toBe(true);
     act(() => result.current.view.onComplete());
@@ -139,7 +139,6 @@ describe("useResolution — attack-roll shape", () => {
     expect(result.current.view.verdict).toBe("miss");
     expect(result.current.view.attack?.nat1).toBe(true);
 
-    // Die-locked: a manual call can't override it.
     act(() => result.current.view.onCallCrit());
     expect(result.current.view.verdict).toBe("miss");
 
@@ -159,7 +158,7 @@ describe("useResolution — attack-roll shape", () => {
     expect(result.current.view.verdict).toBe("crit");
 
     act(() => result.current.view.onCallMiss());
-    expect(result.current.view.verdict).toBe("crit"); // refused — die-locked
+    expect(result.current.view.verdict).toBe("crit");
   });
 
   it("rolling damage on an unresolved roll implicitly resolves the verdict to hit (#811)", () => {
@@ -190,7 +189,6 @@ describe("useResolution — attack-roll shape", () => {
     const { result, commit } = setup({ resolution: ATTACK_RESOLUTION, rollModifiers: exhausted });
 
     act(() => result.current.view.onRollToHit());
-    // die 15 + weapon bonus 5 + exhaustion −2 = 18.
     expect(result.current.view.toHitRoll?.total).toBe(18);
 
     act(() => result.current.view.onCallCrit());
@@ -211,7 +209,7 @@ describe("useResolution — attack-roll shape", () => {
     expect(result.current.view.verdict).toBe("hit");
 
     act(() => result.current.view.onCallCrit());
-    expect(result.current.view.verdict).toBe("hit"); // refused — damage already rolled
+    expect(result.current.view.verdict).toBe("hit");
     expect(result.current.view.isCrit).toBe(false);
   });
 
@@ -225,16 +223,10 @@ describe("useResolution — attack-roll shape", () => {
     expect(result.current.view.verdict).toBe("miss");
 
     act(() => result.current.view.onCallCrit());
-    expect(result.current.view.verdict).toBe("miss"); // refused — called a miss
+    expect(result.current.view.verdict).toBe("miss");
   });
 });
 
-// Champion widened crit range (#1120) end-to-end through useResolution:
-// TurnResolution.toHit.critRange → toHitSnapshot's criticalHit decision →
-// autoVerdict → the doubled-dice damage roll. Restores coverage lost when
-// useAttackRolls.combatLog.test.tsx was deleted alongside useAttackRolls.ts
-// (#1845) — that file's own nat-19/nat-18 Champion cases had no equivalent
-// on the migrated resolver path (every other test here pins critRange:20).
 describe("useResolution — Champion widened crit range (#1120, coverage restored #1845)", () => {
   it("nat 19 does NOT crit at critRange:20 (the SRD default)", () => {
     mockDice([{ face: 19, faces: 20 }]);
@@ -243,7 +235,7 @@ describe("useResolution — Champion widened crit range (#1120, coverage restore
     act(() => result.current.view.onRollToHit());
 
     expect(result.current.view.attack?.criticalHit).toBe(false);
-    expect(result.current.view.verdict).toBeUndefined(); // ambiguous — needs a manual call
+    expect(result.current.view.verdict).toBeUndefined();
     expect(result.current.view.isCrit).toBe(false);
   });
 
@@ -254,7 +246,7 @@ describe("useResolution — Champion widened crit range (#1120, coverage restore
     act(() => result.current.view.onRollToHit());
 
     expect(result.current.view.attack?.criticalHit).toBe(true);
-    expect(result.current.view.verdict).toBe("crit"); // die-locked, no manual call needed
+    expect(result.current.view.verdict).toBe("crit");
     expect(result.current.view.isCrit).toBe(true);
   });
 
@@ -284,12 +276,10 @@ describe("useResolution — Champion widened crit range (#1120, coverage restore
     const { result, commit } = setup({ resolution: attackResolutionWithCritRange(19) });
 
     act(() => result.current.view.onRollToHit());
-    expect(result.current.view.attack?.nat20).toBe(false); // widened range, not a literal nat 20
+    expect(result.current.view.attack?.nat20).toBe(false);
     expect(result.current.view.verdict).toBe("crit");
 
     act(() => result.current.view.onRollEffect());
-    // 1d8 doubles to 2d8 on the crit — the same critDamageSpec/doubling path
-    // a die-forced nat-20 crit uses, driven here by the widened range instead.
     expect(result.current.view.effectRoll?.spec.crit).toBe(true);
     expect(result.current.view.effectRoll?.dice).toHaveLength(2);
 
@@ -416,7 +406,7 @@ describe("useResolution — onComplete ordering (#1847 finding 3)", () => {
 
     expect(throwingCommit).toHaveBeenCalledTimes(1);
     expect(turnState.consumeAction).not.toHaveBeenCalled();
-    expect(result.current.view.completed).toBe(false); // recoverable — not permanently stuck
+    expect(result.current.view.completed).toBe(false);
   });
 });
 
@@ -426,9 +416,9 @@ describe("useResolution — external to-hit boost seam (#1844)", () => {
     const { result, commit } = setup({ resolution: ATTACK_RESOLUTION });
 
     act(() => result.current.view.onRollToHit());
-    expect(result.current.view.toHitRoll?.total).toBe(20); // 15 + weapon bonus 5
+    expect(result.current.view.toHitRoll?.total).toBe(20);
 
-    act(() => result.current.view.boostToHit(5)); // Precision Attack +5
+    act(() => result.current.view.boostToHit(5));
     act(() => result.current.view.onCallCrit());
     act(() => result.current.view.onRollEffect());
     act(() => result.current.view.onComplete());
@@ -447,7 +437,7 @@ describe("useResolution — external to-hit boost seam (#1844)", () => {
     act(() => result.current.view.onRollEffect());
     act(() => result.current.view.onComplete());
 
-    act(() => result.current.view.boostToHit(5)); // too late
+    act(() => result.current.view.boostToHit(5));
 
     expect(commit).toHaveBeenCalledTimes(1);
     const rolls = commit.mock.calls[0][0] as ResolutionRolls;
@@ -469,7 +459,7 @@ describe("useResolution — external to-hit boost seam (#1844)", () => {
     act(() => result.current.view.onComplete());
 
     const rolls = commit.mock.calls[0][0] as ResolutionRolls;
-    expect(rolls.toHit).toMatchObject({ total: 15, bonus: 5 }); // 10 + 5, no leftover boost
+    expect(rolls.toHit).toMatchObject({ total: 15, bonus: 5 });
   });
 });
 

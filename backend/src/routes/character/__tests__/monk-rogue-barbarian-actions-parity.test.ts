@@ -1,13 +1,3 @@
-/**
- * #1912 (epic #1903, 4/4) master regression pin: the 34-row monk/rogue/
- * barbarian DERIVED_ACTIONS sweep moved onto ClassFeature rows must leave
- * `availableActions[]` behaviour-identical and the `features[]` view
- * unchanged. Real Postgres + supertest — every character below is created
- * through the real `POST /api/characters` route against the real seeded
- * catalog (not a synthetic in-memory fixture), covering the level boundaries
- * the issue names (1/2/3/6/10/11/13/17/18) across every real monk subclass
- * slug (SUBCLASS_SLUGS), Thief L3, and Barbarian L2.
- */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -27,7 +17,6 @@ const BASE = {
   abilityScores: { strength: 12, dexterity: 16, constitution: 14, intelligence: 10, wisdom: 15, charisma: 10 },
 };
 
-// XP thresholds -> character level (levelForExperience's own table).
 const XP_BY_LEVEL: Record<number, number> = {
   1: 0, 2: 300, 3: 900, 5: 6500, 6: 14000, 7: 23000, 10: 64000, 11: 85000, 13: 120000, 17: 225000, 18: 265000,
 };
@@ -51,8 +40,7 @@ async function makeCharacter(
   await prisma.character.update({ where: { id }, data: { experiencePoints: XP_BY_LEVEL[level] } });
   if (subclass) {
     await prisma.characterClassEntry.updateMany({ where: { characterId: id }, data: { level, subclass } });
-    // Resolve the real subclassId FK too (#1912: row-driven actions need it;
-    // the pre-#1912 gate never did — see regrants-served.test.ts's own note).
+    // Row-driven actions need the real subclassId FK, not just the name/subclass text (#1912).
     const cls = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } });
     const sub = await prisma.subclass.findFirst({
       where: { classId: cls.classId!, name: { equals: subclass, mode: "insensitive" } },
@@ -106,8 +94,7 @@ describe("#1912 — availableActions parity across every real monk subclass slug
   const MONK_2024_SUBCLASSES = ["Warrior of the Open Hand", "Warrior of Shadow", "Warrior of the Elements", "Warrior of Mercy"];
   const MONK_2014_SUBCLASSES = ["Way of the Open Hand", "Way of Shadow", "Way of the Four Elements"];
 
-  // Every actionOnly row's identity key must be invisible in `features[]`
-  // (the "zero cards gained" AC) at every level checked below.
+  // Every actionOnly row's identity key must be invisible in `features[]` at every level checked below.
   const ACTION_ONLY_KEYS = new Set([
     "bonusUnarmedStrike", "flurryOfBlows", "patientDefense", "patientDefenseFocus", "stepOfTheWind",
     "stepOfTheWindFocus", "patientDefenseKi", "stepOfTheWindKi", "deflectAttacksRedirect",
@@ -143,7 +130,6 @@ describe("#1912 — availableActions parity across every real monk subclass slug
     });
   }
 
-  // Boundary levels named in the issue's own AC.
   const BOUNDARY_LEVELS = [1, 2, 3, 6, 10, 11, 13, 17, 18];
 
   it("2024 base monk: bonusUnarmedStrike/flurryOfBlows/patientDefense/stepOfTheWind/deflectAttacks appear at their exact gate levels across the boundary set", async () => {
@@ -158,11 +144,6 @@ describe("#1912 — availableActions parity across every real monk subclass slug
     }
   });
 
-  // Expected flurryOfBlows.count / deflectAttacks.damageTypeClause at a given
-  // 2024 boundary level, or undefined below either row's own grant level —
-  // split into a lookup table (not an if/else chain in the `it()` body
-  // itself) so this test's own branching budget stays flat (fallow's
-  // cyclomatic/CRAP gate).
   function expected2024Bump(level: number): { count: number | undefined; damageTypeClause: string | undefined } {
     const count = level >= 10 ? 3 : level >= 2 ? 2 : undefined;
     const damageTypeClause =
@@ -193,11 +174,9 @@ describe("#1912 — availableActions parity across every real monk subclass slug
       expect(keys.has("patientDefenseKi"), `L${level}`).toBe(level >= 2);
       expect(keys.has("deflectMissiles"), `L${level}`).toBe(level >= 3);
       expect(keys.has("emptyBody"), `L${level}`).toBe(level >= 18);
-      // 2014 Flurry of Blows never gains Heightened Focus's third strike.
       if (level >= 2) {
         expect(availableActions.find((a) => a.key === "flurryOfBlows")?.count, `L${level}`).toBe(2);
       }
-      // 2014's deflectAttacks damageTypeClause never widens (no Deflect Energy).
       expect(keys.has("deflectAttacks"), `L${level}`).toBe(false);
     }
   });
@@ -270,9 +249,7 @@ describe("#1912 — Thief L3 and Barbarian L2 (issue's own named boundary cases)
       expect(fast, edition).toBeDefined();
       expect(fast?.cost, edition).toBe("bonusAction");
       expect(fast?.regrants, edition).toEqual(["useObject"]);
-      // Cunning Action IS a real feature card; fastHands is too (both attach
-      // to their own pre-existing feature-text rows, #1912 — neither is
-      // actionOnly).
+      // Cunning Action and Fast Hands attach to their own pre-existing feature-text rows (#1912) — neither is actionOnly.
       const featureNames = new Set(featureList.map((f) => f.name));
       expect(featureNames.has("Cunning Action"), edition).toBe(true);
       expect(featureNames.has("Fast Hands"), edition).toBe(true);

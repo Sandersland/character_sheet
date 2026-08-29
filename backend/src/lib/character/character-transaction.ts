@@ -1,24 +1,9 @@
-/**
- * Shared character-transaction preamble — the plumbing every intent-bearing
- * domain handler (resources, spellcasting, conditions, advancement,
- * maneuvers, shadow-arts, channel-divinity) repeated verbatim. It owns the batch id, the
- * active-session lookup, the prisma.$transaction wrapper, and the per-op re-read
- * loop; the caller supplies its select extras (5e-rules columns stay in the
- * caller) and the per-op apply logic. This is the documented starting point for
- * the next #416 Phase B migration.
- *
- * No 5e rules live here — this is transaction scaffolding only.
- */
-
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";
 
-// Per-op context handed to a domain's applyOp callback. `row` is the freshly
-// re-read character narrowed to the caller's select; `batchId`/`sessionId` are
-// stable across the whole batch so revert groups the ops on one timeline entry.
 export interface CharacterTxContext<Row, Op> {
   tx: Prisma.TransactionClient;
   row: Row;
@@ -29,15 +14,13 @@ export interface CharacterTxContext<Row, Op> {
 }
 
 export interface RunCharacterTransactionOptions<S extends Prisma.CharacterSelect, Op> {
-  /** Columns/relations to re-read per op (5e-rules columns supplied by the caller). */
   select: S;
-  /** Error thrown when the character no longer exists mid-batch. */
   notFound: (characterId: string) => Error;
-  /** Validate + mutate for one op; a throw rolls back the whole batch. */
+  // A throw rolls back the whole batch.
   applyOp: (ctx: CharacterTxContext<Prisma.CharacterGetPayload<{ select: S }>, Op>) => Promise<void>;
-  /** When provided (incl. null), tag events with this id instead of getActiveSessionId. */
+  // Provided (including null) to tag events with this id instead of calling getActiveSessionId.
   sessionId?: string | null;
-  /** Runs inside the same $transaction after the op loop, incl. when operations is empty (e.g. retroactive summary recompute). */
+  // Runs inside the same $transaction after the op loop, including when operations is empty.
   afterOps?: (ctx: {
     tx: Prisma.TransactionClient;
     characterId: string;
@@ -46,11 +29,6 @@ export interface RunCharacterTransactionOptions<S extends Prisma.CharacterSelect
   }) => Promise<void>;
 }
 
-/**
- * Runs a batch of domain operations atomically: one batchId, one active-session
- * lookup, one $transaction, and a per-op re-read of the character (so a batch of
- * multiple ops sees each previous op's result). Any throw rolls back the batch.
- */
 export async function runCharacterTransaction<S extends Prisma.CharacterSelect, Op>(
   characterId: string,
   operations: Op[],
@@ -62,7 +40,7 @@ export async function runCharacterTransaction<S extends Prisma.CharacterSelect, 
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
-      // Re-read per-op so a batch sees each previous op's result.
+      // Re-read per op so a batch of multiple ops sees each previous op's result.
       const row = (await tx.character.findUnique({
         where: { id: characterId },
         select: opts.select,
@@ -73,6 +51,6 @@ export async function runCharacterTransaction<S extends Prisma.CharacterSelect, 
     if (opts.afterOps) await opts.afterOps({ tx, characterId, batchId, sessionId });
   });
 
-  // Returned so endpoints can hand the client the batch to revert on turn undo (#758).
+  // Returned so endpoints can hand the client the batch id to revert on turn undo (#758).
   return batchId;
 }

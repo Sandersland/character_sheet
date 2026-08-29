@@ -1,16 +1,7 @@
 /**
- * Patient Defense / Step of the Wind route tests (#1240) — the free vs 1-Focus
- * variants exercised through the real HTTP stack (POST
- * /api/characters/:id/actions/transactions), mirroring actions-rage.test.ts's
- * pattern for the Monk's `focus` pool.
- *
- * PHB'24 p.98 / SRD 5.2: each grants a free bonus-action option (Disengage /
- * Dash) plus a 1-Focus option that does more (Disengage+Dodge /
- * Disengage+Dash+doubled jump) — not the 2014 SRD's flat "always costs 1 ki"
- * shape. The free variants are economy-only client-side reminders (like Shadow
- * Step/Opportunist, #440): they have no ACTION_EFFECT_FN/ACTION_CAST_FN entry,
- * so the route rejects them as an unknown action key if ever sent — proving
- * the free variants can never reach the server, only the Focus variants do.
+ * PHB'24 p.98 / SRD 5.2: Patient Defense and Step of the Wind each grant a
+ * free bonus-action option plus a stronger 1-Focus option — unlike the 2014
+ * SRD's flat "always costs 1 ki" shape.
  */
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -29,11 +20,8 @@ const HEIGHTENED_MONK_ID = "test-actions-monk-focus-heightened";
 const MONK_CATALOG_NAME = "Actions Monk Focus Test Monk";
 let monkClassId: string;
 
-// XP threshold for level 2 (single-class): both Patient Defense and Step of
-// the Wind grant at monk L2.
-const L2_XP = 300;
-// XP threshold for level 10 (single-class): Heightened Focus (#1244).
-const L10_XP = 64000;
+const L2_XP = 300; // single-class monk level 2
+const L10_XP = 64000; // single-class monk level 10 (Heightened Focus)
 
 const MONK_BASE = {
   id: MONK_ID,
@@ -74,8 +62,6 @@ async function createMonk() {
   });
 }
 
-// Heightened Focus (monk L10, #1244) fixture — a separate character/id so the
-// L2 tests above stay untouched.
 async function createHeightenedMonk() {
   await prisma.character.create({
     data: {
@@ -107,6 +93,42 @@ function pool(body: { resources: { pools: Array<{ key: string; used: number; rem
   return body.resources.pools.find((p) => p.key === key)!;
 }
 
+async function seedFocusActionRows(classId: string) {
+  await prisma.classFeature.deleteMany({ where: { classId } });
+  await prisma.classFeature.createMany({
+    data: [
+      {
+        classId, subclassId: null, name: "Focus", level: 2, edition: "EDITION_2024",
+        description: "You have a pool of Focus Points equal to your monk level.",
+        resourceKey: "focus", resourceLabel: "Focus Points", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      },
+      {
+        classId, subclassId: null, name: "Flurry of Blows", level: 2, edition: "EDITION_2024",
+        description: "Immediately after the Attack action, spend 1 focus to make two Unarmed Strikes as a Bonus Action (three at Heightened Focus, monk L10).",
+        resourceKey: "flurryOfBlows", activationCost: "bonusAction", costKind: "pool", costPoolKey: "focus", costBase: 1, count: 2, actionOnly: true,
+      },
+      {
+        classId, subclassId: null, name: "Patient Defense (1 Focus)", level: 2, edition: "EDITION_2024",
+        description: "Spend 1 Focus to take Disengage + Dodge together as a Bonus Action (also grants temporary hit points at Heightened Focus, monk L10).",
+        resourceKey: "patientDefenseFocus", activationCost: "bonusAction", costKind: "pool", costPoolKey: "focus", costBase: 1,
+        regrants: ["disengage", "dodge"], actionOnly: true,
+      },
+      {
+        classId, subclassId: null, name: "Step of the Wind (1 Focus)", level: 2, edition: "EDITION_2024",
+        description: "Spend 1 Focus to take Disengage + Dash together as a Bonus Action, jump distance doubled this turn (also brings a willing creature along at Heightened Focus, monk L10).",
+        resourceKey: "stepOfTheWindFocus", activationCost: "bonusAction", costKind: "pool", costPoolKey: "focus", costBase: 1,
+        regrants: ["disengage", "dash"], actionOnly: true,
+      },
+      {
+        classId, subclassId: null, name: "Deflect Attacks — Redirect", level: 3, edition: "EDITION_2024",
+        description: "Once Deflect Attacks reduces a hit to 0, spend 1 Focus to redirect the damage at the attacker (melee) or another creature within range (ranged), forcing a Dexterity save.",
+        resourceKey: "deflectAttacksRedirect", activationCost: "free", costKind: "pool", costPoolKey: "focus", costBase: 1, actionOnly: true,
+      },
+    ],
+  });
+}
+
 describe("POST /:id/actions/transactions — Patient Defense / Step of the Wind (#1240)", () => {
   afterAll(async () => {
     await prisma.characterClass.deleteMany({ where: { name: MONK_CATALOG_NAME } });
@@ -129,6 +151,7 @@ describe("POST /:id/actions/transactions — Patient Defense / Step of the Wind 
       update: {},
     });
     monkClassId = cls.id;
+    await seedFocusActionRows(monkClassId);
     await createMonk();
   });
 
@@ -142,8 +165,6 @@ describe("POST /:id/actions/transactions — Patient Defense / Step of the Wind 
     expect(pool(res.body, "focus")).toMatchObject({ used: 1, remaining: 1 });
   });
 
-  // Heightened Focus (monk L10, #1244) grants no temp HP below L10 — see the
-  // dedicated describe block below for the L10+ roll.
   it("patientDefenseFocus grants no temp HP below monk L10", async () => {
     const res = await executeAction("patientDefenseFocus");
     expect(res.status).toBe(200);
@@ -170,12 +191,7 @@ describe("POST /:id/actions/transactions — Patient Defense / Step of the Wind 
     expect(spend).toBeDefined();
   });
 
-  // The free variants (Disengage-only / Dash-only) are economy-only client-side
-  // reminders — like Shadow Step/Opportunist (#440) — with no backend
-  // ACTION_EFFECT_FN/ACTION_CAST_FN entry. planActionClick never calls send()
-  // for a serverEffect:false resolver, so these keys should never actually
-  // reach this route; this pins that the route rejects them if they ever did,
-  // rather than silently no-opping.
+  // The free variants have no backend action entry and must 400, not silently no-op.
   it("patientDefense (free variant) is not a known server action key", async () => {
     const res = await executeAction("patientDefense");
     expect(res.status).toBe(400);
@@ -187,9 +203,7 @@ describe("POST /:id/actions/transactions — Patient Defense / Step of the Wind 
   });
 
   it("spending both patientDefenseFocus and flurryOfBlows in the same turn draws down the shared focus pool correctly", async () => {
-    // Level-2 monk: 2 focus total. Patient Defense (1) + Flurry (1, #1217) drains
-    // the pool to 0 — proves the two Focus-spending bonus actions share one real
-    // pool, not independent budgets. A third Focus spend then 400s (empty pool).
+    // Level-2 monk: 2 focus total, shared across every Focus-spending action.
     const first = await executeAction("patientDefenseFocus");
     expect(first.status).toBe(200);
     expect(pool(first.body, "focus")).toMatchObject({ used: 1, remaining: 1 });
@@ -203,14 +217,6 @@ describe("POST /:id/actions/transactions — Patient Defense / Step of the Wind 
   });
 });
 
-// Deflect Attacks — Redirect (#1241): the reaction's base 1d10+Dex+level
-// reduction is a pure client-side roll (no server call — see
-// useDeflectAttacksReaction's header comment), but the optional Redirect once
-// a ranged hit is reduced to 0 is a real 1-Focus spend through this same
-// route. actions.test.ts (lib) already pins ACTION_EFFECT_FN.deflectAttacksRedirect's
-// pure output and TurnHub.test.tsx pins the UI wiring; this closes the gap
-// pattern-matched from patientDefenseFocus/stepOfTheWindFocus above — an actual
-// HTTP round trip through the real focus pool, never previously exercised.
 describe("POST /:id/actions/transactions — Deflect Attacks Redirect (#1241)", () => {
   afterAll(async () => {
     await prisma.characterClass.deleteMany({ where: { name: MONK_CATALOG_NAME } });
@@ -233,6 +239,7 @@ describe("POST /:id/actions/transactions — Deflect Attacks Redirect (#1241)", 
       update: {},
     });
     monkClassId = cls.id;
+    await seedFocusActionRows(monkClassId);
     await createMonk();
   });
 
@@ -289,6 +296,7 @@ describe("POST /:id/actions/transactions — Heightened Focus temp HP (monk L10,
       update: {},
     });
     monkClassId = cls.id;
+    await seedFocusActionRows(monkClassId);
     await createHeightenedMonk();
   });
 
@@ -296,9 +304,8 @@ describe("POST /:id/actions/transactions — Heightened Focus temp HP (monk L10,
     await prisma.character.deleteMany({ where: { id: HEIGHTENED_MONK_ID } });
   });
 
-  // Martial Arts die at monk L10 is 1d8 (deriveMartialArtsDie), so two rolls
-  // land in [2, 16] — the server rolls both dice itself (rollDie, no client
-  // input), like Uncanny Metabolism's bonusHeal (#1243).
+  // Martial Arts die is 1d8 at monk L10 (deriveMartialArtsDie); the server
+  // rolls both dice itself, so two rolls land in [2, 16].
   it("patientDefenseFocus grants temp HP = two Martial Arts die rolls (2-16) at monk L10+", async () => {
     const res = await executeAction("patientDefenseFocus", HEIGHTENED_MONK_ID);
     expect(res.status).toBe(200);

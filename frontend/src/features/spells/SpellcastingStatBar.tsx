@@ -1,5 +1,3 @@
-// Boxed arcane stat readouts at the top of the spellcasting block:
-// Save DC · Spell Attack · Prepared X / Y (hidden when there is no prepare mechanic).
 import { formatModifier } from "@/lib/abilities";
 import type { PreparedSummary } from "@/lib/preparedSummary";
 

@@ -50,7 +50,6 @@ describe("rollSpec", () => {
   });
 
   it("drops exactly the lowest die and excludes it from the total (4d6 drop lowest)", () => {
-    // dice rolled in order: 2, 5, 6, 1 — the trailing 1 is the lowest.
     const sequence = [(2 - 1) / 6, (5 - 1) / 6, (6 - 1) / 6, (1 - 1) / 6];
     let call = 0;
     vi.spyOn(Math, "random").mockImplementation(() => sequence[call++]);
@@ -68,7 +67,6 @@ describe("rollSpec", () => {
   });
 
   it("drops exactly `dropLowest` dice when more than one is dropped, ties included", () => {
-    // dice rolled in order: 6, 1, 4, 2 — drop the two lowest (1 and 2).
     const sequence = [(6 - 1) / 6, (1 - 1) / 6, (4 - 1) / 6, (2 - 1) / 6];
     let call = 0;
     vi.spyOn(Math, "random").mockImplementation(() => sequence[call++]);
@@ -77,7 +75,7 @@ describe("rollSpec", () => {
 
     expect(result.dice.filter((die) => die.dropped)).toHaveLength(2);
     expect(result.dice.filter((die) => die.dropped).map((die) => die.value).sort()).toEqual([1, 2]);
-    expect(result.total).toBe(10); // 6 + 4, the two non-dropped dice
+    expect(result.total).toBe(10);
   });
 
   it("adds the modifier to the total without affecting individual dice", () => {
@@ -106,7 +104,6 @@ describe("crit (5e critical hit — double the dice)", () => {
   });
 
   it("doubles the number of dice rolled while leaving the modifier single", () => {
-    // 1d8 + 3 crit → rolls 2d8, both faces 5, modifier stays +3.
     vi.spyOn(Math, "random").mockReturnValue((5 - 1) / 8);
 
     const result = rollSpec({ count: 1, faces: 8, modifier: 3, crit: true });
@@ -116,11 +113,10 @@ describe("crit (5e critical hit — double the dice)", () => {
       { value: 5, dropped: false },
     ]);
     expect(result.modifier).toBe(3);
-    expect(result.total).toBe(13); // 5 + 5 + 3, the modifier is NOT doubled
+    expect(result.total).toBe(13);
   });
 
   it("keeps dropLowest working on a crit spec (drops the lowest of the doubled dice)", () => {
-    // 2d6 crit → rolls 4d6 in order 6, 1, 4, 2; dropLowest 1 drops the single 1.
     const sequence = [(6 - 1) / 6, (1 - 1) / 6, (4 - 1) / 6, (2 - 1) / 6];
     let call = 0;
     vi.spyOn(Math, "random").mockImplementation(() => sequence[call++]);
@@ -129,7 +125,7 @@ describe("crit (5e critical hit — double the dice)", () => {
 
     expect(result.dice).toHaveLength(4);
     expect(result.dice.filter((die) => die.dropped)).toHaveLength(1);
-    expect(result.total).toBe(12); // 6 + 4 + 2, the lowest (1) dropped
+    expect(result.total).toBe(12);
   });
 
   it("reflects the doubled dice count and a (crit) suffix in the label", () => {
@@ -149,7 +145,7 @@ describe("crit (5e critical hit — double the dice)", () => {
       { value: 4, dropped: false },
       { value: 2, dropped: false },
     ]);
-    expect(result.total).toBe(7); // 4 + 2 + 1
+    expect(result.total).toBe(7);
     expect(formatRollSpec(spec)).toBe("2d6 + 1");
   });
 });
@@ -204,7 +200,6 @@ describe("advantage / disadvantage", () => {
   });
 
   it("advantage rolls two d20s and keeps the higher, flagging the lower dropped", () => {
-    // dice rolled in order: 7, 18 — advantage keeps 18.
     const sequence = [(7 - 1) / 20, (18 - 1) / 20];
     let call = 0;
     vi.spyOn(Math, "random").mockImplementation(() => sequence[call++]);
@@ -215,7 +210,7 @@ describe("advantage / disadvantage", () => {
       { value: 7, dropped: true },
       { value: 18, dropped: false },
     ]);
-    expect(result.total).toBe(23); // 18 + 5
+    expect(result.total).toBe(23);
   });
 
   it("disadvantage rolls two d20s and keeps the lower, flagging the higher dropped", () => {
@@ -229,7 +224,7 @@ describe("advantage / disadvantage", () => {
       { value: 7, dropped: false },
       { value: 18, dropped: true },
     ]);
-    expect(result.total).toBe(12); // 7 + 5
+    expect(result.total).toBe(12);
   });
 
   it("keeps exactly one die on a tie (both natural values equal)", () => {

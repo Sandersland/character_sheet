@@ -1,10 +1,3 @@
-/**
- * Unit tests for the shared character-transaction preamble (#507). Locks the
- * plumbing contract the 7 domain handlers rely on: batch id + active-session
- * lookup, atomic $transaction, per-op re-read (each op sees the previous op's
- * write), notFound throw, and whole-batch rollback on any throw.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -92,7 +85,6 @@ describe("runCharacterTransaction", () => {
       },
     );
 
-    // Second op re-reads the first op's committed-in-tx value (100), not the original 0.
     expect(seen).toEqual([0, 100]);
     const final = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
     expect(final.experiencePoints).toBe(105);
@@ -133,7 +125,6 @@ describe("runCharacterTransaction", () => {
       ),
     ).rejects.toThrow("boom");
 
-    // First op's +50 was rolled back with the batch.
     const final = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
     expect(final.experiencePoints).toBe(0);
   });
@@ -226,8 +217,7 @@ describe("runCharacterTransaction", () => {
   });
 
   it("passes an explicit null sessionId verbatim, bypassing the active-session lookup", async () => {
-    // A real active session so getActiveSessionId would return non-null — the
-    // discriminator that proves null is passed verbatim, not looked up.
+    // A real active session so getActiveSessionId would return non-null — proves null is passed verbatim, not looked up.
     const campaign = await prisma.campaign.create({
       data: { name: "Tx Null-Session Campaign", ownerId: OWNER_ID, inviteCode: `tx-null-${characterId}` },
     });

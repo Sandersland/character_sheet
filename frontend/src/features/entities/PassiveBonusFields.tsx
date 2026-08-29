@@ -12,8 +12,6 @@ interface PassiveBonusFieldsProps {
   onChange: (patch: Partial<ItemCapability>) => void;
 }
 
-// DM authoring for a passiveBonus capability (#546): a {target, op, value|dice,
-// condition} row. Damage bonuses can be dice-valued (e.g. +2d6 fire).
 export default function PassiveBonusFields({ cap, index, onChange }: PassiveBonusFieldsProps) {
   const target = cap.target ?? "ac";
   const opts = keyOptions(target);

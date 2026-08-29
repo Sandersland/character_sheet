@@ -1,4 +1,3 @@
-// Inline result banner shown immediately after a cast.
 import type { CastResult } from "@/lib/spellCast";
 
 interface CastResultBannerProps {

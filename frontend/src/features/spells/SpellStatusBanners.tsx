@@ -1,4 +1,3 @@
-// Active concentration + dismissible while-active spell buffs.
 import type { ActiveBuff } from "@/types/character";
 
 interface SpellStatusBannersProps {

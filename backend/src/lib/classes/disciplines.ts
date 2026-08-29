@@ -1,24 +1,5 @@
-/**
- * Way of the Four Elements discipline cast handler (2014-only, PHB'14 pp.
- * 78, 80-81 — not in SRD 5.1, #1503) — the Ki-fuelled analog to
- * shadow-arts.ts's Focus-fuelled Darkness cast, mirroring its shared
- * focus-cast scaffolding (focus-cast.ts). A discipline is a
- * ki-fuelled activated ability catalogued in GrantedAbility (source
- * "discipline"); casting one spends ki via the shared payAbilityCostInTx
- * pool path and rolls its EffectSpec.
- *
- * The 5e rules that live here: the per-cast ki cap (PHB'14 p.80's Elemental
- * Disciplines table), which disciplines require concentration (the spell
- * each one casts), and the ki-scaled EffectSpec build (scaling.mode
- * "poolStep", effects.ts).
- *
- * Unlike maneuvers.ts (a single server-rolled die), a discipline's damage
- * roll follows castSpell/castElementalBurst's convention: the effect is the
- * monk's own supernatural power, so the CLIENT rolls it and the server only
- * validates positivity (ability-cast.ts's own comment, #406) — a discipline
- * can deal many scaled dice (up to 8d6 for Flames of the Phoenix), unlike a
- * maneuver's fixed single die.
- */
+// Way of the Four Elements discipline casting — PHB'14 pp.78, 80-81; not in SRD 5.1 (2014-only).
+// The client rolls a discipline's damage (mirrors castSpell/castElementalBurst); the server only validates positivity.
 
 import { Prisma } from "@/generated/prisma/client.js";
 import type { CastDisciplineOperation } from "@character-sheet/contracts";
@@ -38,25 +19,22 @@ import { FOCUS_CAST_CHARACTER_SELECT, emitFocusCastEvents } from "./focus-cast.j
 
 export class InvalidDisciplineOperationError extends Error {}
 
-/** Max ki spendable on ONE discipline cast, by monk level (PHB'14 p.80's Elemental Disciplines table). */
+// PHB'14 p.80's Elemental Disciplines table.
 export function maxKiPerDiscipline(monkLevel: number): number {
   return Math.min(6, 2 + Math.floor((monkLevel - 1) / 4));
 }
 
-// The 7 disciplines that cast a concentration spell (PHB'14 p.81); the other
-// 9 cast an instantaneous effect or (Fangs of the Fire Snake) carry no spell
-// at all — see disciplines.ts (seed) for the per-discipline citation.
+// The 7 disciplines that cast a concentration spell — PHB'14 p.81.
 const CONCENTRATION_DISCIPLINES = new Set<string>([
-  "Rush of the Gale Spirits", // gust of wind
-  "Clench of the North Wind", // hold person
-  "Mist Stance", // gaseous form
-  "Ride the Wind", // fly
-  "Eternal Mountain Defense", // stoneskin
-  "River of Hungry Flame", // wall of fire
-  "Wave of Rolling Earth", // wall of stone
+  "Rush of the Gale Spirits",
+  "Clench of the North Wind",
+  "Mist Stance",
+  "Ride the Wind",
+  "Eternal Mountain Defense",
+  "River of Hungry Flame",
+  "Wave of Rolling Earth",
 ]);
 
-// Catalog columns needed to build a discipline's ki-scaled EffectSpec.
 export interface DisciplineEffectRow {
   name: string;
   costPerStep?: number | null;
@@ -70,12 +48,6 @@ export interface DisciplineEffectRow {
   saveEffect?: string | null;
 }
 
-/**
- * Build a discipline's EffectSpec via the shared catalogEffectSpec builder:
- * disciplines scale by ki spent above the base cost, so scaling is always
- * mode "poolStep" with dicePerStep = costPerStep (0 for a discipline whose
- * text allows no overspend), and concentration is the name-set check above.
- */
 export function disciplineEffectSpec(row: DisciplineEffectRow): EffectSpec {
   return catalogEffectSpec(row, {
     scaling: { mode: "poolStep", dicePerStep: row.costPerStep ?? 0 },
@@ -83,18 +55,13 @@ export function disciplineEffectSpec(row: DisciplineEffectRow): EffectSpec {
   });
 }
 
-/** One selectable ki amount for a discipline's cast picker, and the roll the
- *  client rolls at that amount (#1505's GET /api/disciplines catalog). */
 export interface DisciplineCastStep {
   ki: number;
   roll: { count: number; faces: number; modifier: number };
 }
 
-// Ki amounts the cast picker offers (base..maxKiPerDiscipline(17) ceiling), each with its
-// resolved roll — client reads a roll verbatim, never computes it (mirrors effectRolls[]).
-// Character-agnostic; the real per-monk cap is enforced at cast time by assertDisciplineKiSpend.
-// One step only for a non-scalable row (no costPerStep) — PHB'14 allows overspend only when
-// the discipline's text says so (#1505).
+// Client reads a roll verbatim, never computes it (mirrors effectRolls[]); the real per-monk cap is enforced at cast time by assertDisciplineKiSpend, not here.
+// PHB'14: overspend is allowed only when a discipline's own text says so — a non-scalable row (no costPerStep) yields one step.
 export function disciplineCastSteps(row: DisciplineEffectRow, cost: AbilityCost): DisciplineCastStep[] {
   if (cost.kind !== "pool") return [];
   const effect = disciplineEffectSpec(row);
@@ -102,9 +69,7 @@ export function disciplineCastSteps(row: DisciplineEffectRow, cost: AbilityCost)
   const base = resolveEffectSpec(effect, 0, { characterLevel: 0 });
   if (!base) return [];
   if (!cost.perStep) return [{ ki: cost.base, roll: base }];
-  // maxKiPerDiscipline is monotonic and flattens at monk L17 (min(6, ...)),
-  // so any level >= 17 reads its asymptote — 17 is not a rules fact copied
-  // in here, just the smallest input that reaches the function's own ceiling.
+  // maxKiPerDiscipline flattens at monk L17 (min(6, …)) — 17 here is just the smallest input reaching that ceiling, not a duplicated rules fact.
   const ceiling = maxKiPerDiscipline(17);
   const steps: DisciplineCastStep[] = [{ ki: cost.base, roll: base }];
   for (let ki = cost.base + 1; ki <= ceiling; ki++) {
@@ -120,13 +85,8 @@ function fourElementsMonkEntry(row: DisciplineRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
-/**
- * Throws unless "castDiscipline" is granted (DERIVED_ACTIONS, actions.ts —
- * the same gate the wire's availableActions[] uses, #1315); returns the Four
- * Elements monk entry's OWN effective level (not necessarily the total
- * character level — a secondary monk's per-cast ki cap scales to its own
- * level, mirrors deriveEntryScopedActions' own entry-scoping).
- */
+// Same gate the wire's availableActions[] uses (DERIVED_ACTIONS) — never a separate check.
+// Returns the Four Elements entry's OWN effective level, not the total character level — a secondary monk's ki cap scales to its own level (mirrors deriveEntryScopedActions).
 function assertFourElementsMonk(row: DisciplineRow): number {
   const monk = fourElementsMonkEntry(row);
   const totalLevel = levelForExperience(row.experiencePoints);
@@ -140,14 +100,7 @@ function assertFourElementsMonk(row: DisciplineRow): number {
   return effectiveEntryLevel(monk.level, row.classEntries.length, totalLevel);
 }
 
-// Resolve + validate a known discipline entry (choicesKnown["fourElementsDisciplines"])
-// against the op's entryId, and load its catalog row. `entry.optionId` is an
-// ALREADY-PERSISTED id (admitted at learn time by resolveChoiceOption's own
-// crossEditionRejection guard, resources.ts) — deliberately unguarded here,
-// the exact loadManeuver exemption shape (maneuvers.ts's own comment; see
-// scripts/check-catalog-id-edition-guard.sh's ALLOWLIST entry for this
-// function). A custom (homebrew) discipline entry has no catalog row and no
-// defined cost/effect, so it is rejected rather than guessed at.
+// entry.optionId is deliberately unguarded here (already validated by resolveChoiceOption's crossEditionRejection at learn time) — same exemption shape as loadManeuver, and allowlisted in the catalog-id edition-guard check.
 async function loadKnownDiscipline(
   tx: Prisma.TransactionClient,
   row: DisciplineRow,
@@ -166,9 +119,7 @@ async function loadKnownDiscipline(
   return { entry, catalog };
 }
 
-// Validate ki spent: [base, per-cast cap] for a scalable row (costPerStep, PHB'14 p.80),
-// exactly base for a non-scaling one, 0 for costless. The !cost.perStep branch (#1505) stops a
-// flat-cost discipline (e.g. Fist of Four Thunders) from accepting overspend for an unchanged roll.
+// PHB'14 p.80: ki spent must be [base, per-cast cap] for a scalable row, exactly base for a non-scaling one (e.g. Fist of Four Thunders), 0 for costless.
 function assertDisciplineKiSpend(
   disciplineName: string,
   cost: ReturnType<typeof readAbilityCost>,
@@ -193,15 +144,6 @@ function assertDisciplineKiSpend(
   }
 }
 
-// Resolve and validate a single discipline cast against the character row:
-// the Four Elements gate, the known-entry + catalog lookup, the discipline's
-// own level prerequisite, the ki-spend bounds, and (for a damage discipline)
-// a positive client roll. Throws InvalidDisciplineOperationError on any
-// failure; returns the pieces castDiscipline needs on success. Split out of
-// castDiscipline so the 5e validation rules read as one unit and the apply
-// function stays a thin resolve/cast/log body (keeps both under the
-// CRAP/cyclomatic bar — mirrors the pre-retirement engine's own
-// resolveDisciplineCast split, 34f5a4cf^:lib/classes/disciplines.ts).
 async function resolveDisciplineCast(
   tx: Prisma.TransactionClient,
   row: DisciplineRow,
@@ -233,7 +175,7 @@ async function castDiscipline(
   const { tx, row, op, characterId, batchId, sessionId } = ctx;
   const { entry, catalog, cost, kiSpent, effect, concentrates, roll } = await resolveDisciplineCast(tx, row, op);
 
-  // fallow-ignore-next-line code-duplication -- the same spellState/beforeSpell/costCtx setup + castAbilityInTx call shape as shadow-arts.ts's applyCastShadowArt (the ".fallowrc.jsonc" clone group this file's own header predicted, #642's original pairing). Not consolidated further here: #1503 is explicitly barred from touching shadow-arts.ts (owned by the parallel #1501/#1502 slices in this epic) — extracting a shared helper would require editing that file too.
+  // fallow-ignore-next-line code-duplication -- the same spellState/beforeSpell/costCtx setup + castAbilityInTx call shape as applyCastShadowArt (the clone group this file's own header predicted, #642's original pairing). Not consolidated further here: #1503 is explicitly barred from touching applyCastShadowArt's module (owned by the parallel #1501/#1502 slices in this epic) — extracting a shared helper would require editing that module too.
   const spellState = normalizeSpellcastingMutable(row.spellcasting);
   const beforeSpell = snapshotSpellcasting(spellState);
 
@@ -252,11 +194,7 @@ async function castDiscipline(
     },
   );
 
-  // Shared focus-cast audit tail (focus-cast.ts): when concentrating, persist
-  // the write-back + log the undoable spellcasting event (restores
-  // concentratingOn on revert). The resources cast record restores nothing
-  // (ki refunded by the pool payer's own spendResource event, concentration
-  // by the event above), so it carries only the roll/ki data.
+  // Concentration reverts via the spellcasting event's own restore of concentratingOn; ki reverts via the pool payer's spendResource event — this resources record carries only the roll/ki data.
   await emitFocusCastEvents(tx, {
     characterId,
     batchId,
@@ -272,14 +210,6 @@ async function castDiscipline(
   });
 }
 
-/**
- * Applies a batch of discipline cast operations atomically. Mirrors
- * applyShadowArtsOperations: one batchId, LIFO-undoable events, state
- * re-read per op. Each cast: the pool payer logs its own spendResource event
- * (refunds ki on revert); a concentrating discipline logs a spellcasting-
- * category event (restores concentratingOn on revert); the resources-
- * category castDiscipline event records the cast.
- */
 export async function applyDisciplineOperations(
   characterId: string,
   operations: CastDisciplineOperation[],

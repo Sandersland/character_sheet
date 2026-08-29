@@ -1,16 +1,5 @@
-// DB-backed proof for #1710's Spell fork: the widened (name, edition)
-// constraint, and BOTH directions of the prune seedSpells gains in the same
-// change. Modelled on action-fork-reseed.test.ts — seed.ts exports nothing
-// and self-invokes main() at module load, so a test cannot import and re-run
-// it; calling upsertEditionRow and staleCatalogRowsWhere with the exact
-// arguments seedSpells passes proves the same properties directly.
-//
-// Fixture rules: every destructive call is scoped with `extraWhere` to this
-// file's own names. staleCatalogRowsWhere means "everything NOT in the
-// seeded list", and seedSpells passes NO extraWhere (it owns every Spell
-// row), so an unscoped call here would eat the whole real spell catalog out
-// from under every other test in the same vitest worker (see
-// prune.test.ts's header).
+// seed.ts self-invokes main() at module load and exports nothing, so this calls upsertEditionRow/staleCatalogRowsWhere directly with the exact args seedSpells passes (#1710).
+// staleCatalogRowsWhere matches everything NOT in the seeded list; every destructive call here is scoped via extraWhere to this file's own names, or it would delete the real catalog.
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -23,11 +12,7 @@ const NAME = "Zzz Spell Fork Probe (#1710)";
 const UNSEEDED_NAME = "Zzz Spell Fork Probe Unrelated (#1710)";
 const ONLY_THIS_FILES_ROWS = { name: { in: [NAME, UNSEEDED_NAME] } };
 
-// catalogEntryId (#1796) is resolved first via makeCatalogEntry (find-then-
-// create, safe to call again across tests sharing a (name, edition) pair
-// only afterEach cleans up) — required, no default. null edition resolves to
-// the entry's own EDITION_2024 default (CatalogEntry.edition is required, no
-// "shared" concept at that layer — out of scope for this slice).
+// null edition here still resolves catalogEntryId to EDITION_2024 — CatalogEntry.edition is required, with no shared/null concept (#1796).
 const row = async (name: string, edition: "EDITION_2014" | "EDITION_2024" | null, description: string) => ({
   name,
   level: 1,
@@ -41,28 +26,17 @@ const row = async (name: string, edition: "EDITION_2014" | "EDITION_2024" | null
 });
 
 afterEach(async () => {
-  // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
-  // #1796) — the reverse cascade doesn't exist, so a plain
-  // `spell.deleteMany` alone would orphan the entry.
+  // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE, #1796); the reverse cascade doesn't exist.
   await prisma.catalogEntry.deleteMany({ where: ONLY_THIS_FILES_ROWS });
 });
 
-// Proves the scoping above held: if any test leaked past its own names, the
-// real catalog is gone and this is what goes red.
+// Fails if any test leaked past its own names and wiped the real catalog.
 afterAll(async () => {
   const fireball = await prisma.spell.findFirst({ where: { name: "Fireball" } });
   expect(fireball, "the real seeded Spell catalog must survive this suite").not.toBeNull();
 });
 
-// #1796 retired Spell's OWN `@@unique([name, edition, ownerId])`: uniqueness
-// now lives on the linked CatalogEntry's business key (kind, scope,
-// ownerUserId, ownerCampaignId, name, edition) — see
-// catalog-entry.integration.test.ts's own "NULLS NOT DISTINCT" describe block
-// for that half. What's left worth pinning at the Spell level is the
-// still-true structural consequence: a genuine 2014/2024 fork is two
-// independent Spell rows (each with its own CatalogEntry), and
-// upsertEditionRow's find-then-write still needs to update the right one in
-// place without touching its sibling.
+// #1796 moved uniqueness off Spell onto the linked CatalogEntry's business key; a genuine 2014/2024 fork is still two independent Spell rows, each with its own CatalogEntry.
 describe("Spell fork rows (#1710) — two independent rows behind two independent CatalogEntry ids (#1796)", () => {
   it("admits one row per edition under the same name", async () => {
     await prisma.spell.create({ data: await row(NAME, "EDITION_2014", "2014 text") });
@@ -74,10 +48,7 @@ describe("Spell fork rows (#1710) — two independent rows behind two independen
     expect(descriptions).toEqual(["2014 text", "2024 text"]);
   });
 
-  // seedSpells' plain `.upsert({ where: { name } })` had to become
-  // upsertEditionRow: the old form matched on `name` alone, so the second
-  // edition's write would have OVERWRITTEN its sibling instead of creating a
-  // twin.
+  // seedSpells' old `.upsert({ where: { name } })` matched on name alone, so the second edition's write would have overwritten its sibling.
   it("upsertEditionRow run twice updates each edition in place and leaves the sibling untouched", async () => {
     const twentyFourteen = await prisma.spell.create({ data: await row(NAME, "EDITION_2014", "2014 text") });
     const data = await row(NAME, "EDITION_2024", "2024 text");
@@ -93,8 +64,7 @@ describe("Spell fork rows (#1710) — two independent rows behind two independen
 });
 
 describe("seedSpells' prune — both directions (#1710)", () => {
-  // Direction A: the shape seedSpells passes. Each row's OWN edition is in
-  // the seeded list, so both forks survive, repeatedly.
+  // Direction A: each row's own edition is in the seeded list, so both forks survive across repeated runs.
   it("per-row editions preserve both forks, stably across repeated (idempotent) runs", async () => {
     await prisma.spell.create({ data: await row(NAME, "EDITION_2014", "2014 text") });
     await prisma.spell.create({ data: await row(NAME, "EDITION_2024", "2024 text") });
@@ -112,12 +82,7 @@ describe("seedSpells' prune — both directions (#1710)", () => {
     expect(surviving.sort()).toEqual([`${NAME}::EDITION_2014`, `${NAME}::EDITION_2024`]);
   });
 
-  // Direction B (the empty-partition `notIn: []` trap): a seeded list that
-  // declares the name as SHARED (edition: null) gives the 2014/2024
-  // partitions `notIn: []`, which matches every row in them — so an
-  // all-2024 seeded spells.ts must NOT be expressed this way, or it would
-  // delete every 2014 row a content slice ever adds. This is exactly what a
-  // forgotten `edition:` in seedSpells' map would reintroduce.
+  // A seeded list with edition: null gives both partitions notIn: [], deleting every row — the trap a forgotten `edition:` in seedSpells' map would reintroduce.
   it("an all-NULL seeded list deletes both forks", async () => {
     await prisma.spell.create({ data: await row(NAME, "EDITION_2014", "2014 text") });
     await prisma.spell.create({ data: await row(NAME, "EDITION_2024", "2024 text") });
@@ -129,14 +94,7 @@ describe("seedSpells' prune — both directions (#1710)", () => {
     expect(await prisma.spell.findMany({ where: { name: NAME } })).toEqual([]);
   });
 
-  // The regression this codebase specifically risks: seedSpells' seeded list
-  // is `[...SPELLS, ...SPELLS_2014]` (#1710) — two arrays concatenated, not
-  // one. If a future refactor forgets the SPELLS_2014 half, the 2014
-  // partition's `notIn` goes empty for every name a spells-2014/*.ts content
-  // slice ever adds, and this is what silently wipes them on the very next
-  // reseed. "per-row editions preserve both forks" above is the converse:
-  // proof that concatenating BOTH arrays (the real seedSpells shape) is what
-  // avoids this.
+  // seedSpells' seeded list is [...SPELLS, ...SPELLS_2014] (#1710); forgetting the SPELLS_2014 half empties the 2014 partition's notIn and wipes those rows on the next reseed.
   it("an all-2024-only seeded list (SPELLS_2014 omitted from the union) deletes an existing 2014 row", async () => {
     await prisma.spell.create({ data: await row(NAME, "EDITION_2014", "2014 text") });
     await prisma.spell.create({ data: await row(UNSEEDED_NAME, "EDITION_2024", "2024 text") });

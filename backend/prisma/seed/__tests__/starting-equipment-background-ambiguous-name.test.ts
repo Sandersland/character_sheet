@@ -1,19 +1,4 @@
-// DB-backed proof for #1565's reviewer fix: Background is @@unique([name,
-// edition]), so a name can legitimately own up to three rows (NULL/2014/2024).
-// resolveBackgroundIdsByName's `findMany` keyed a Map by NAME alone — when
-// two rows shared a name, the later one silently won and the earlier row's
-// package (if any) would misfile onto the wrong background with no error.
-// This is dormant today (every seeded background name resolves to exactly one
-// row — Folk Hero's EDITION_2014 tag was applied by retagging its existing row
-// in place, #1570, precisely so it stayed one), but a background that FORKS
-// into two edition-tagged rows per #1348 would hit it silently the moment the
-// forked name also carries a package.
-//
-// A transient fixture Background (never a real seeded name), cleaned up in
-// afterEach regardless of pass/fail — same isolation shape
-// starting-equipment-fork-reseed.test.ts uses for its real-row Warlock probe,
-// adapted here since this hazard needs a row that does NOT exist in the real
-// catalog at all (a genuine name collision, not a real seeded one).
+// Background is @@unique([name, edition]); a name can legitimately own up to three rows (NULL/2014/2024).
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";

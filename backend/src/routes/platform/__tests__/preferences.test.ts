@@ -1,8 +1,3 @@
-/**
- * PATCH /api/preferences (#1178). Real Postgres, supertest against the shared `app`
- * — same authCookie + ensureTestOwner harness pattern used by other route tests.
- */
-
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -22,7 +17,6 @@ describe("PATCH /api/preferences (#1178)", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER);
     cookie = await authCookie(OWNER);
-    // Reset to "never stored" before each test so cases don't bleed into each other.
     await prisma.user.update({ where: { id: OWNER }, data: { preferences: Prisma.DbNull } });
   });
 
@@ -100,11 +94,7 @@ describe("PATCH /api/preferences (#1178)", () => {
     ]);
     expect([a.status, b.status, c.status]).toEqual([200, 200, 200]);
 
-    // FOR UPDATE serializes the three: each takes the row lock, reads the keys
-    // written so far, merges its own. Drop the lock and they all read the same
-    // "never stored" base and the last writer lands with only its own key.
-    // Asserted on the stored row rather than a response because every response
-    // looks correct in isolation either way — a lost write only shows up here.
+    // FOR UPDATE serializes the three writers on the row lock; asserted on the stored row, not a response, since a lost write only shows up there.
     const row = await prisma.user.findUniqueOrThrow({ where: { id: OWNER } });
     expect(row.preferences).toEqual({
       theme: "dark",

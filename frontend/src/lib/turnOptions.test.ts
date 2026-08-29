@@ -1,8 +1,3 @@
-/**
- * Unit tests for turnOptions — pure option-card render models.
- * Fixture style mirrors attackMath.test.ts (minimal `as unknown as Character`).
- */
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -47,9 +42,8 @@ function weaponItem(
   };
 }
 
-// mainWeaponSummary/offHandSummary read `character.attackRows` (#1434), so
-// `weaponRows` states the weapon rows the server would have served; the two
-// always-present rows are appended.
+// mainWeaponSummary/offHandSummary read `character.attackRows` (#1434); the two
+// always-present rows (unarmed/improvised) are appended to weaponRows here.
 function makeCharacter(overrides: Partial<Character> = {}, weaponRows: AttackRow[] = []): Character {
   const base = {
     id: "char-1",
@@ -94,14 +88,13 @@ function makeSpell(overrides: Partial<Spell> = {}): Spell {
     duration: "Instantaneous",
     description: "",
     effectKind: "heal",
-    // #1381: effectPreview is a lookup into the served effectRolls now, not a
-    // re-derivation from raw columns — the fixture must carry the resolved roll.
+    // effectPreview is a lookup into the served effectRolls (#1381), so the
+    // fixture must carry the resolved roll.
     effectRolls: [{ slotLevel: 1, roll: { count: 1, faces: 4, modifier: 3 } }],
     ...overrides,
   } as Spell;
 }
 
-/** The served row for a weapon fixture, at whatever numbers the test cares about. */
 function weaponRow(over: Partial<AttackRow> & Pick<AttackRow, "id" | "name">): AttackRow {
   return attackRow({ kind: "weapon", grip: "one-handed", damageType: "slashing", ...over });
 }
@@ -136,8 +129,8 @@ describe("offHandSummary", () => {
         damageSpec: { count: 1, faces: 6, modifier: 3 },
       }),
       weaponRow({ ...dagger, damageSpec: { count: 1, faces: 4, modifier: 3 } }),
-      // The server already dropped the +3 ability modifier (no TWF style), and the
-      // off-hand row shares its weapon's id.
+      // The off-hand row shares its weapon's id; the server already dropped the
+      // +3 ability modifier here (no TWF style).
       weaponRow({ ...dagger, offHand: true, damageSpec: { count: 1, faces: 4, modifier: 0 } }),
     ]);
     expect(offHandSummary(c)).toBe("Dagger (off-hand) · +5 to hit · 1d4 piercing");
@@ -222,8 +215,7 @@ describe("classActionOption", () => {
       available({ key: "cunningAction", name: "Cunning Action" }),
       resolverFor("cunningAction"),
       c,
-      // Served rows present but the action regrants nothing — nothing may leak
-      // onto a row that declared no grant (#1431).
+      // Served rows are present but nothing may leak onto a row that declared no grant (#1431).
       SERVED_ACTIONS_2014,
     );
     expect(option).toEqual({ key: "cunningAction", title: "Cunning Action", enabled: true, heal: false });
@@ -323,7 +315,7 @@ describe("classActionOption", () => {
     });
   });
 
-  // #1431. Names, never the served `description`: OptionCard's subtitle is one
+  // Names, never the served `description` (#1431): OptionCard's subtitle is one
   // truncated line and the served paragraphs run 75-278 chars.
   it("resolves regranted keys to the served names for the character's edition", () => {
     const cunning = available({
@@ -349,8 +341,7 @@ describe("classActionOption", () => {
     expect(
       classActionOption(partial, resolverFor("cunningAction"), makeCharacter(), SERVED_ACTIONS_2024).regrantNames,
     ).toEqual(["Dash"]);
-    // The empty case is first paint, before the reference query resolves — the
-    // card must render with no subtitle rather than an empty one.
+    // The empty-array case is first paint, before the reference query resolves.
     expect(
       classActionOption(partial, resolverFor("cunningAction"), makeCharacter(), []),
     ).not.toHaveProperty("regrantNames");
@@ -375,9 +366,7 @@ describe("classActionOption", () => {
 });
 
 describe("bonusSpellOptions", () => {
-  // The server-resolved interlock (#1439). ACTION_SPELL_BLOCKS = SRD 5.1 after a
-  // leveled Action spell (bonus fully blocked); ACTION_SPELL_CANTRIPS_ONLY =
-  // SRD 5.2 (bonus limited to cantrips).
+  // Server-resolved interlock (#1439): ACTION_SPELL_BLOCKS = SRD 5.1 (bonus fully blocked); ACTION_SPELL_CANTRIPS_ONLY = SRD 5.2 (bonus limited to cantrips).
   const UNRESTRICTED = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
   const ACTION_SPELL_BLOCKS = { bonusActionBlockedByActionSpell: true, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
   const ACTION_SPELL_CANTRIPS_ONLY = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: true, actionLimitedToCantrips: false };
@@ -493,8 +482,6 @@ describe("twfHint", () => {
     expect(twfHint(c)).toBe("Off-hand attack needs two light weapons equipped.");
   });
 
-  // The user-visible consequence of #1496: a non-light pair plus the style used to
-  // suppress the hint entirely (TWF read as live); now the requirement is stated.
   it("still hints for a non-light pair held by a character with the Two-Weapon Fighting style", () => {
     const c = makeCharacter({
       inventory: [weaponItem({ id: "a" }), weaponItem({ id: "b" })],
@@ -507,10 +494,9 @@ describe("twfHint", () => {
 });
 
 describe("partitionClassActions", () => {
-  // resolverKind (#1528, optional 4th arg) — a row-driven action (secondWind)
-  // is only reachable through resolverFor's fallback when the served row
-  // actually carries it; every other call site below deliberately omits it
-  // (shadowArts/cloakOfShadows/elementalBurst have none in production either).
+  // resolverKind (#1528, optional 4th arg): a row-driven action (secondWind) is
+  // only reachable through resolverFor's fallback when the served row carries
+  // it; every other call site below omits it, same as production.
   const action = (key: string, cost: AvailableAction["cost"], resolverKind?: string): AvailableAction => ({
     key,
     name: key,
@@ -519,16 +505,10 @@ describe("partitionClassActions", () => {
     ...(resolverKind ? { resolverKind } : {}),
   });
 
-  // #1315: shadowArts/cloakOfShadows/elementalBurst are cost:"action"
-  // DERIVED_ACTIONS rows with NO frontend resolver — they cast through their
-  // own dedicated /abilities/shadow-arts and /abilities/warrior-of-elements
-  // endpoints + Class-tab sections (ShadowArtsSection/CloakOfShadowsSection/
-  // WarriorOfElementsSection), not the generic turn-hub dispatch. Before this
-  // fix they still reached classActions and rendered a clickable card:
-  // planActionClick's no-resolver fallback is {consumeSlot:true, send:"none"}
-  // — clicking it would burn the character's Action and do nothing (no focus
-  // spent, no cast, no invisibility). partitionClassActions must drop any
-  // action with no resolver instead of letting it through.
+  // #1315: shadowArts/cloakOfShadows/elementalBurst are action-cost rows with no
+  // frontend resolver — they cast through dedicated endpoints, not turn-hub
+  // dispatch; before this fix they'd render a clickable card that burned the
+  // Action and did nothing.
   it("drops action-cost rows with no resolver instead of letting them consume the slot", () => {
     const { classActions } = partitionClassActions(
       [action("secondWind", "action", "heal-roll"), action("shadowArts", "action"), action("cloakOfShadows", "action"), action("elementalBurst", "action")],
@@ -554,9 +534,8 @@ describe("partitionClassActions", () => {
   });
 
   it("still swaps rage/endRage by the raging flag (unchanged behavior)", () => {
-    // rage/endRage are row-driven now (#1686) — no ACTION_RESOLVERS entry, so
-    // the served action needs its own resolverKind ("toggle") for
-    // resolverFor's fallback to resolve it, same as secondWind above.
+    // rage/endRage are row-driven (#1686, no ACTION_RESOLVERS entry), so the
+    // served action needs its own resolverKind ("toggle"), same as secondWind above.
     const availableActions = [action("rage", "bonusAction", "toggle"), action("endRage", "bonusAction", "toggle")];
     expect(partitionClassActions(availableActions, false).classBonusActions.map((a) => a.key)).toEqual(["rage"]);
     expect(partitionClassActions(availableActions, true).classBonusActions.map((a) => a.key)).toEqual(["endRage"]);
@@ -572,9 +551,8 @@ describe("partitionClassActions", () => {
 });
 
 describe("more-actions helpers", () => {
-  // Asserted against the SERVED row shape, per edition: the captions are keyed
-  // on the edition-stable `key`, so a 2024-only addition (study/influence) that
-  // never got one would ship a tile with no caption.
+  // Captions are keyed on the edition-stable `key`, so a 2024-only addition
+  // (study/influence) that never got one would ship a tile with no caption.
   it.each([
     ["2014", SERVED_ACTIONS_2014],
     ["2024", SERVED_ACTIONS_2024],
@@ -586,8 +564,8 @@ describe("more-actions helpers", () => {
     }
   });
 
-  // PRIMARY_ACTION_KEYS partitions the served list: each primary key must exist
-  // in BOTH editions, or one edition would silently lose a rich card.
+  // Each primary key must exist in BOTH editions, or one edition would
+  // silently lose a rich card.
   it.each([
     ["2014", SERVED_ACTIONS_2014],
     ["2024", SERVED_ACTIONS_2024],

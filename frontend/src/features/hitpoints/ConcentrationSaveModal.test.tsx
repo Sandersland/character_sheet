@@ -13,7 +13,6 @@ vi.mock("@/api/client", () => ({
   logRollAction: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Stub the 3D roller: fire onResult once on mount with a fixed natural d20 (12).
 const NATURAL = 12;
 vi.mock("@/features/dice/DiceRoller", () => ({
   default: function MockDiceRoller({ onResult }: { onResult?: (r: RollResult) => void }) {
@@ -54,7 +53,6 @@ describe("ConcentrationSaveModal session logging", () => {
   it("emits a saveRoll event when in an active session", async () => {
     renderModal("sess-1");
 
-    // Kick off the roll (die auto-rolls once mounted).
     screen.getByRole("button", { name: /roll save/i }).click();
 
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));

@@ -48,9 +48,6 @@ describe("useCombineCluster", () => {
     getQueryClient().setQueryData(inboxKeys.all, []);
     getQueryClient().setQueryData(campaignKeys.entities("camp-1"), []);
     getQueryClient().setQueryData(campaignKeys.merges("camp-1"), []);
-    // A specific character's detail cache — the mutation only knows
-    // campaignId, so this proves the whole characterKeys family actually
-    // catches it (rewritten mention tokens live on Character.journal).
     getQueryClient().setQueryData(characterKeys.detail("char-1"), { id: "char-1" });
 
     act(() => {

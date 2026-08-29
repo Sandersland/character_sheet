@@ -1,18 +1,4 @@
-/**
- * #1691: ClassFeature.improvements — passive row grants (FeatImprovement[])
- * mapped through the same deriveImprovementBonuses/deriveImprovementProficiencies
- * evaluator a taken feat's improvements already use. Proving case is Life
- * Domain's 2014 "Bonus Proficiency" row (cleric-features.ts): the prose says
- * "You gain proficiency with heavy armor" but nothing granted it — a live bug
- * this issue fixes on the EDITION_2014 row only (SRD 5.1 Life Domain grants
- * heavy armor at L1; SRD 5.2 Life does NOT — heavy armor comes via Divine
- * Order's Protector option instead). Exercised against seeded Cleric/Life
- * Domain data, mirroring subclass-active-edition-1291.test.ts's own pattern
- * (never a fixture class). Also covers the 2014 subclass prose sweep's other
- * fixed grant (Bard College of Valor's "Bonus Proficiencies": medium armor,
- * shield, Martial Weapons) and the no-double-grant AC.
- */
-
+// SRD 5.1: Life Domain grants heavy armor at L1. SRD 5.2: it does not — heavy armor comes via Divine Order's Protector option instead.
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -26,7 +12,7 @@ const OWNER_ID = "owner-1691-classfeature-improvements";
 let COOKIE: string;
 
 const XP_LVL_3 = 900;
-const XP_LVL_4 = 2700; // 1 ASI slot — needed for the no-double-grant custom-feat case
+const XP_LVL_4 = 2700;
 
 const BASE_ABILITY_SCORES = {
   strength: 10, dexterity: 12, constitution: 14, intelligence: 15, wisdom: 14, charisma: 12,
@@ -110,19 +96,18 @@ describe("ClassFeature.improvements (#1691) — Life Domain Bonus Proficiency, b
 
     const res = await get(id);
     expect(res.status).toBe(200);
-    // Sanity: the subclass row itself is active at L1 in 2014 (mirrors #1291).
+    // Sanity: the subclass is active at L1 in 2014 (#1291).
     expect(res.body.classes[0].subclass).toBe("Life Domain");
     expect(armorCategories(res.body)).toContain("heavy");
     const heavy = res.body.armorProficiencies.find((p: { category: string }) => p.category === "heavy");
-    expect(heavy.source).toBe("feat"); // reuses the existing feat-provenance bucket, not a new one (#1691 scope)
+    // Reuses the existing feat-provenance bucket, not a new one.
+    expect(heavy.source).toBe("feat");
   });
 
   it("a level-3 2024 Life cleric does NOT gain heavy armor from this row — no EDITION_2024 successor exists", async () => {
     const id = await createCharacter("1691 ClassFeature Cleric 2024", "EDITION_2024");
     await setSubclass(id, "Life Domain", lifeDomainId);
-    // 2024 Life Domain gates at L3, not L1 (#1291) — level up so the subclass
-    // (and its rows) are active, isolating the assertion to "no 2024 row",
-    // not "subclass not yet active".
+    // Level up so the subclass is active — isolates the assertion to "no 2024 row", not "subclass not yet active".
     await prisma.character.update({ where: { id }, data: { experiencePoints: XP_LVL_3 } });
 
     const res = await get(id);
@@ -136,7 +121,7 @@ describe("ClassFeature.improvements (#1691) — 2014 subclass prose sweep, Colle
   it("a level-3 2014 Valor bard gains medium armor, shield, and Martial Weapons proficiency from the row alone", async () => {
     const id = await createCharacter("1691 ClassFeature Bard 2014", "EDITION_2014", "Bard");
     await setSubclass(id, "College of Valor", collegeOfValorId);
-    await prisma.character.update({ where: { id }, data: { experiencePoints: XP_LVL_3 } }); // Valor gates at L3
+    await prisma.character.update({ where: { id }, data: { experiencePoints: XP_LVL_3 } });
 
     const res = await get(id);
     expect(res.status).toBe(200);
@@ -151,8 +136,7 @@ describe("ClassFeature.improvements (#1691) — no double-grant", () => {
   it("a proficiency granted by BOTH a custom feat and a class feature row appears once in armorProficiencies", async () => {
     const id = await createCharacter("1691 ClassFeature Bard NoDouble", "EDITION_2014", "Bard");
     await setSubclass(id, "College of Valor", collegeOfValorId);
-    // L4: Valor's Bonus Proficiencies (medium armor, L3) is already active AND
-    // an ASI slot is available for the custom feat below.
+    // L4: Valor's medium-armor grant (L3) is already active, and an ASI slot is available for the custom feat below.
     await prisma.character.update({ where: { id }, data: { experiencePoints: XP_LVL_4 } });
 
     const advRes = await supertest(app)
@@ -172,8 +156,7 @@ describe("ClassFeature.improvements (#1691) — no double-grant", () => {
 
     const res = await get(id);
     expect(res.status).toBe(200);
-    // The existing dedup path (deriveImprovementProficiencies' Set) — not a
-    // new one — is what collapses the feat's re-grant against the row's.
+    // The existing dedup (deriveImprovementProficiencies' Set) collapses the feat's re-grant against the row's, not a new one.
     const mediumEntries = res.body.armorProficiencies.filter((p: { category: string }) => p.category === "medium");
     expect(mediumEntries).toHaveLength(1);
   });

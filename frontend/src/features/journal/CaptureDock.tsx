@@ -1,25 +1,14 @@
-// The desktop margin dock (#865): ⌘J slides a 370px journal-edge panel in beside
-// the visible sheet (dashed-gold stitch seam) instead of covering it, so you can
-// jot while watching HP/initiative. NON-modal — the sheet stays scrollable and
-// clickable; there's no scrim and no body scroll-lock. Esc closes while focus is
-// inside the dock, and focus returns to whatever opened it. The feed runs newest
-// at the BOTTOM with the composer docked below it. md+ only; the mobile capture
-// surface stays a BottomSheet (rewritten in #866).
-
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type { Session } from "@/types/character";
 
 interface CaptureDockProps {
-  /** Live session, when one is active: header shows its title + elapsed time. */
   session?: Session | null;
-  /** The editor element, for placing initial focus + scoping Esc/⌘J to the dock. */
   composerRef: React.MutableRefObject<HTMLDivElement | null>;
   onClose: () => void;
   feed: React.ReactNode;
   composer: React.ReactNode;
-  /** Opaque change-detector — any change re-anchors the feed to the bottom. */
   anchorKey: number;
 }
 
@@ -35,8 +24,7 @@ export default function CaptureDock({
   const feedRef = useRef<HTMLDivElement>(null);
   useDockChrome(dockRef, composerRef, onClose);
 
-  // Anchor to the newest note on open and after each save — the feed scrolls
-  // freely in between, so only an anchorKey change may yank it back down.
+  // Only an anchorKey change re-scrolls to bottom; the feed otherwise scrolls freely.
   useEffect(() => {
     const el = feedRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -52,7 +40,7 @@ export default function CaptureDock({
       aria-label="Quick capture"
       className="fixed right-0 top-0 bottom-0 z-40 hidden w-[370px] flex-col border-l border-parchment-200 bg-parchment-50 shadow-[-14px_0_30px_rgba(39,36,29,0.18)] md:flex"
     >
-      {/* Dashed-gold stitch seam running down the page-edge of the dock. */}
+      
       <span
         aria-hidden="true"
         className="pointer-events-none absolute bottom-3 left-[7px] top-3 border-l-2 border-dashed border-gold-600/50"
@@ -78,10 +66,7 @@ export default function CaptureDock({
         </button>
       </header>
 
-      {/* Feed grows to fill. Bottom-pinning a short feed must be mt-auto on the
-          content, NOT justify-end on this scrollport — end-aligning a scrollport
-          clips start-edge overflow with no scroll range, so older notes become
-          unreachable. */}
+      {/* Bottom-pin via mt-auto on the content, not justify-end on this scrollport — justify-end clips start-edge overflow, making older notes unreachable. */}
       <div
         ref={feedRef}
         data-dock-feed=""
@@ -96,10 +81,6 @@ export default function CaptureDock({
   );
 }
 
-// Non-modal chrome: focus the composer on open (deferred past first paint so it
-// lays out first), Esc closes only when focus is inside the dock, and focus
-// returns to the opener on close. Deliberately NO body scroll-lock — the sheet
-// behind stays interactive.
 function useDockChrome(
   dockRef: React.RefObject<HTMLElement | null>,
   composerRef: React.RefObject<HTMLDivElement | null>,
@@ -117,9 +98,7 @@ function useDockChrome(
     });
 
     function handleKeyDown(event: KeyboardEvent) {
-      // Only when focus lives in the dock — an unfocused dock leaves the page's Esc alone.
-      // The mention popover swallows its own Escape first (stopPropagation), so this
-      // fires to close the dock only once no suggestion list is open.
+      // The mention popover stopPropagation's its own Escape first, so this only fires once no suggestion list is open.
       if (event.key === "Escape" && dockRef.current?.contains(document.activeElement)) {
         onCloseRef.current();
       }
@@ -134,7 +113,6 @@ function useDockChrome(
   }, [dockRef, composerRef]);
 }
 
-// A live "1h 24m" elapsed string from an ISO start, re-rendered each minute.
 function useElapsed(startedAt: string | undefined): string {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {

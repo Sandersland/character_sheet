@@ -1,11 +1,3 @@
-/**
- * Pure unit tests for the slot + none branches of payAbilityCostInTx.
- *
- * These branches never touch the transaction client — they mutate the
- * hand-built slot/arcanum maps in place — so no Postgres is needed. The pool
- * branch is covered by the DB-backed ability-cost-pool.test.ts.
- */
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -58,7 +50,6 @@ describe("payAbilityCostInTx — slot branch", () => {
     const paid = await payAbilityCostInTx(c, { kind: "slot", minLevel: 6 }, 6);
     expect(paid).toEqual({ label: "L6 Mystic Arcanum", effectiveStep: 0 });
     expect(c.arcanumUsed!["6"]).toBe(1);
-    // Second cast — arcanum charge already spent.
     await expect(
       payAbilityCostInTx(c, { kind: "slot", minLevel: 6 }, 6)
     ).rejects.toThrow("Mystic Arcanum (level 6) already used — recharges on a long rest");

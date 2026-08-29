@@ -13,19 +13,17 @@ import {
 import { mirrorCapabilityUsedSet, mirrorUsesRemaining } from "@/lib/inventory/inventory-capability-use.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 
-// Runtime-checkable set of every valid CharacterEventCategory, derived from the
-// Prisma-generated enum so it can never drift from the schema.
+// Derived from the Prisma-generated enum so it can never drift from the schema.
 const CATEGORY_VALUES = new Set<string>(Object.values(CharacterEventCategory));
 
+// An unknown filter value is silently ignored (unfiltered), never a 400 — same for asType.
 function asCategory(value: string | undefined): CharacterEventCategory | undefined {
   return value !== undefined && CATEGORY_VALUES.has(value)
     ? (value as CharacterEventCategory)
     : undefined;
 }
 
-// Runtime-checkable set of every valid CharacterEventType, derived from the
-// Prisma-generated enum so it can never drift from the schema. Mirrors
-// asCategory: an unknown type value is silently ignored (unfiltered), not a 400.
+// Derived from the Prisma-generated enum so it can never drift from the schema.
 const TYPE_VALUES = new Set<string>(Object.values(CharacterEventType));
 
 function asType(value: string | undefined): CharacterEventType | undefined {
@@ -34,18 +32,13 @@ function asType(value: string | undefined): CharacterEventType | undefined {
     : undefined;
 }
 
-// Pure query-shaping for the activity read path; no DB access.
 export function buildActivityQuery(
   characterId: string,
   rawQuery: Record<string, unknown>,
 ): Prisma.CharacterEventFindManyArgs {
-  // Only apply the category filter when the query value is a real enum member;
-  // an unknown value is silently ignored (unfiltered), matching prior behavior.
   const category = asCategory(
     typeof rawQuery.category === "string" ? rawQuery.category : undefined,
   );
-  // Same validate-or-ignore contract as category: an unknown event type is
-  // silently dropped (unfiltered) rather than 400-ing.
   const type = asType(
     typeof rawQuery.type === "string" ? rawQuery.type : undefined,
   );
@@ -58,7 +51,7 @@ export function buildActivityQuery(
     ? false
     : rawQuery.reverted === "1"
     ? true
-    : undefined; // undefined = no filter (include all)
+    : undefined;
 
   return {
     where: {
@@ -80,15 +73,7 @@ type ActivityEventRow = CharacterEvent & {
 
 type RevertResult = { ok: true } | { ok: false; status: 404 | 409; error: string };
 
-// Revert context + handler registry.
-// Mirrors the LEVEL_GATED_RECONCILERS pattern in level-reconciliation.ts: each
-// category's before-snapshot restore lives in a named handler, and reverseEvent
-// dispatches through REVERT_HANDLERS instead of an if/else chain.
-//
-// Handlers stay in THIS module (not the domain libs) on purpose: nothing here
-// uses domain-lib internals — they're generic `tx.character.update` writes —
-// and moving them into hitpoints.ts/spellcasting.ts/etc. would close an
-// `activity → domainlib → … → activity` import cycle.
+// Handlers stay here, not in domain libs: moving them would close an activity → domainlib → … → activity import cycle.
 
 interface RevertContext {
   tx: Prisma.TransactionClient;
@@ -100,10 +85,7 @@ interface RevertContext {
 
 type RevertHandler = (ctx: RevertContext) => Promise<void>;
 
-// Restore hitPoints/hitDice/experiencePoints from before snapshot. Long/short
-// rest also snapshot spellcasting + resources — restore them so undoing a
-// rest re-expends the slots/dice that were cleared. A long rest that recovered
-// exhaustion also snapshots conditions (#1136) — restore the cleared level.
+// #1136: long/short rest also snapshot spellcasting/resources/conditions — restore them too, or undo doesn't re-expend what the rest cleared.
 async function restoreHitPointColumns(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -123,7 +105,6 @@ async function restoreHitPointColumns(
   });
 }
 
-// Undo a long-rest consumable recharge (#121): re-expend each charge.
 async function restoreConsumableCharges(
   tx: Prisma.TransactionClient,
   before: Record<string, unknown>,
@@ -137,8 +118,7 @@ async function restoreConsumableCharges(
   }
 }
 
-// Undo a rest's item charge-pool recharge (#555): re-expend each pool.
-// updateMany so a pool whose item was deleted after the rest is a no-op.
+// updateMany inside mirrorCapabilityUsedSet makes a since-deleted item's pool a no-op.
 async function restoreChargePools(
   tx: Prisma.TransactionClient,
   before: Record<string, unknown>,
@@ -152,10 +132,7 @@ async function restoreChargePools(
   }
 }
 
-// Restore class-entry level if the event touched it (levelUp/levelDown), and
-// delete any CharacterClassEntry a multiclass "new class" level-up created
-// (#124) — or a ghost entry survives the revert. deleteMany so a later
-// level-down that already removed it is a no-op.
+// #124: deleteMany so a level-down that already removed the entry is a no-op; otherwise a multiclass level-up's created entry survives as a ghost.
 async function restoreLevelUpClassEntry(
   tx: Prisma.TransactionClient,
   event: CharacterEvent,
@@ -195,13 +172,7 @@ async function revertCurrencyEvent(ctx: RevertContext): Promise<void> {
   }
 }
 
-// #1849: a concentrationDropped event logged mid-cast (ability-cast.ts,
-// handleConcentrationOnCast) snapshots ONLY concentratingOn — its `before` is
-// captured after the displacing cast already spent a slot, and the two events
-// share a batch reverted LIFO (cast's own revert first, this one last), so a
-// full-column replace here would clobber the slot refund the cast's revert
-// just applied. Merge concentratingOn onto whatever the rest of the batch
-// already restored instead of overwriting the whole column.
+// #1849: batch reverts LIFO, so this runs after the cast's own revert already refunded the slot — merge concentratingOn instead of replacing the column, or it clobbers that refund.
 async function mergeConcentrationOnlyRevert(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -229,15 +200,10 @@ async function mergeConcentrationOnlyRevert(
 
 async function revertSpellcastingEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
-  // Restore the full spellcasting JSON from before snapshot. Arcane Recovery
-  // (#904) also snapshots the resources JSON (its once-per-long-rest use
-  // counter lives there) — restore it so undo refunds the use.
+  // #904: Arcane Recovery's once-per-long-rest use counter also lives in resources — restore it so undo refunds the use.
   const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
   const beforeResources = before.resources as Record<string, unknown> | undefined;
-  // A concentrationDropped event's narrowed snapshot has no `slotsUsed` key —
-  // every other spellcasting snapshot in the codebase carries the full
-  // compact-format shape (see normalizeSpellcastingMutable) — so its absence
-  // is the signal to merge instead of replace (see mergeConcentrationOnlyRevert).
+  // Absence of `slotsUsed` (present on every other normalizeSpellcastingMutable snapshot) signals a concentrationDropped snapshot.
   if (beforeSpellcasting !== undefined && !("slotsUsed" in beforeSpellcasting)) {
     await mergeConcentrationOnlyRevert(tx, characterId, beforeSpellcasting, beforeResources);
   } else if (beforeSpellcasting !== undefined || beforeResources !== undefined) {
@@ -249,11 +215,7 @@ async function revertSpellcastingEvent(ctx: RevertContext): Promise<void> {
       },
     });
   }
-  // An item-spell cast (#528/#555) also spent an InventoryCapability.used
-  // counter (per-capability uses or a shared charges pool), persisted outside
-  // the spell blob — restore it so undo refunds the use/charges (#580).
-  // updateMany so a since-deleted item (new capability ids after a
-  // delete/undo-delete cycle) is a no-op, matching the rest-undo pattern.
+  // #528/#555/#580: item-spell cast also spends InventoryCapability.used outside the spell blob — restore it so undo refunds the use/charges.
   const capabilityUsed = before.capabilityUsed as
     | { capabilityId: string; used: number }
     | undefined;
@@ -264,8 +226,6 @@ async function revertSpellcastingEvent(ctx: RevertContext): Promise<void> {
 
 async function revertResourcesEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
-  // Restore the full resources JSON (used counts + maneuversKnown) from
-  // the before snapshot — identical pattern to spellcasting revert.
   const beforeResources = before.resources as Record<string, unknown> | undefined;
   if (beforeResources !== undefined) {
     await tx.character.update({
@@ -277,13 +237,7 @@ async function revertResourcesEvent(ctx: RevertContext): Promise<void> {
 
 async function revertConditionsEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
-  // Restore the full conditions JSON (active list + exhaustion level)
-  // from the before snapshot — identical pattern to resources revert.
-  // #1321: a setExhaustion that raised exhaustion to 4+ also carries a
-  // `before.hitPoints` snapshot (the pre-clamp current, decision 4) — restore
-  // it too when present, guarded exactly like restoreHitPointColumns, so
-  // events without it (applyCondition/removeCondition, or a setExhaustion that
-  // never triggered the clamp) are unaffected.
+  // #1321: a setExhaustion raising exhaustion to 4+ also snapshots before.hitPoints (pre-clamp) — restore it when present; other condition ops never carry it.
   const beforeConditions = before.conditions as Record<string, unknown> | undefined;
   const beforeHitPoints = before.hitPoints as Record<string, unknown> | undefined;
   const updateData: Record<string, unknown> = {};
@@ -298,8 +252,6 @@ async function revertConditionsEvent(ctx: RevertContext): Promise<void> {
 
 async function revertEffectsEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
-  // Restore the full activeEffects JSON (buff list) from the before snapshot
-  // — identical pattern to the conditions revert.
   const beforeEffects = before.activeEffects as Record<string, unknown> | undefined;
   if (beforeEffects !== undefined) {
     await tx.character.update({
@@ -309,8 +261,6 @@ async function revertEffectsEvent(ctx: RevertContext): Promise<void> {
   }
 }
 
-// Multiclass add-class (issue #125): delete the created entry and restore
-// the HP/hit-dice bump that came with the new class's first level.
 async function revertClassAdded(ctx: RevertContext): Promise<void> {
   const { tx, characterId, event, before } = ctx;
   const data = event.data as Record<string, unknown> | null;
@@ -330,8 +280,7 @@ async function revertClassAdded(ctx: RevertContext): Promise<void> {
   }
 }
 
-// Multiclass level-down reconcile (issue #124): restore each entry's level
-// (recreating any that were deleted when they hit level 0).
+// upsert, not update — a level-down may have deleted an entry at level 0; recreate it here.
 async function revertClassLevelsReconciled(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
   const beforeEntries = before.classEntries as
@@ -372,9 +321,7 @@ async function revertClassLevelsReconciled(ctx: RevertContext): Promise<void> {
   }
 }
 
-// Restore subclassId + subclass display name onto the class entry.
-// The before snapshot carries the class entry's data (not the whole
-// character row), so grab classEntryId from event.data.
+// The before snapshot carries the class entry's own fields, not the whole character row — classEntryId comes from event.data instead.
 async function revertSubclassChange(ctx: RevertContext): Promise<void> {
   const { tx, event, before } = ctx;
   const data = event.data as Record<string, unknown> | null;
@@ -396,27 +343,10 @@ async function revertClassEvent(ctx: RevertContext): Promise<void> {
   return revertSubclassChange(ctx);
 }
 
-// Lift the per-turn bonus-action interlock a reverted spell cast recorded
-// (#1439 review) — the SessionParticipant field the resolveAction transaction
-// set (recordTurnSpellCast) is not part of the event's character `before`/
-// `after`, so undo must clear it explicitly or the block reappears on the next
-// poll. No-op for a weapon swing (no entryId), a reaction cast, or a cast
-// outside a session.
-//
-// MIRRORS recordTurnSpellCast's downgrade guard (#1439 review): reverting a
-// CANTRIP cast must only clear a cantrip record — never a `leveled` one that an
-// earlier leveled cast set on the same economy slot this turn (Action Surge:
-// leveled Action spell, then a cantrip; the record correctly kept `leveled`, so
-// undoing the cantrip must NOT lift that block). The reverted event's own
-// `slotLevel` (present ⇒ leveled) distinguishes the two: a leveled revert clears
-// unconditionally (it IS the leveled record being undone); a cantrip revert
-// clears only a null-or-cantrip field.
+// #1439: the SessionParticipant field recordTurnSpellCast sets isn't part of the event's before/after, so undo must clear it explicitly or the block reappears on the next poll.
 type ParticipantScope = { sessionId: string; characterId: string };
 
-// The where for clearing one interlock field: a leveled revert clears
-// unconditionally; a cantrip revert clears only a null-or-cantrip field (mirrors
-// recordTurnSpellCast's downgrade guard). Split out to keep the caller under the
-// complexity gate.
+// Mirrors recordTurnSpellCast's downgrade guard: slotLevel present means a leveled revert (clears unconditionally); absent means a cantrip revert, which must only clear a null-or-cantrip field, never a `leveled` one set by an earlier Action Surge cast this turn.
 function clearWhere(
   scope: ParticipantScope,
   field: "spellCastAsAction" | "spellCastAsBonus",
@@ -445,15 +375,7 @@ async function clearRevertedSpellCastInterlock(
   });
 }
 
-// resolveAction (#1829): the only combat-category event that carries a
-// `before` snapshot — combatStarted/combatEnded/combatRoundAdvanced carry
-// none, so they never reach this handler (reverseEvent's `if (!before)
-// return` guard runs first). A resolution's cost is either a spent spell
-// slot (spellcasting) or, in a future slice, a class resource pool — restore
-// whichever column its before snapshot carries, identical in shape to
-// revertSpellcastingEvent/revertResourcesEvent. A cantrip/weapon resolution
-// snapshots neither column, so this is a no-op for it — the batch is still
-// marked reverted by applyBatchReversal regardless.
+// #1829: resolveAction is the only combat-category event with a `before` snapshot; combatStarted/combatEnded/combatRoundAdvanced carry none and never reach this handler.
 async function revertCombatEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
   const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
@@ -470,8 +392,6 @@ async function revertCombatEvent(ctx: RevertContext): Promise<void> {
 
 async function revertAdvancementEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
-  // Restore ability scores, hit points, initiative, and resources from
-  // before snapshot — all four columns that advancement ops mutate.
   const updateData: Record<string, unknown> = {};
   if (before.abilityScores !== undefined) updateData.abilityScores = before.abilityScores;
   if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
@@ -485,15 +405,7 @@ async function revertAdvancementEvent(ctx: RevertContext): Promise<void> {
   }
 }
 
-/**
- * Per-category revert dispatch. Categories with no handler (roll, session —
- * and inventory, which is dispatched before the `before` guard) are
- * intentionally absent: reverseEvent no-ops for them, matching prior behavior.
- * `hitPoints` and `experience` share one handler. `combat`'s handler
- * (revertCombatEvent, #1829) only ever fires for a resolveAction event —
- * combatStarted/combatEnded/combatRoundAdvanced carry no `before` snapshot,
- * so they never reach it.
- */
+// roll and session have no handler (no-op); inventory is dispatched earlier in reverseEvent, before this map is consulted.
 const REVERT_HANDLERS: Partial<Record<CharacterEventCategory, RevertHandler>> = {
   hitPoints: revertHitPointsEvent,
   experience: revertHitPointsEvent,
@@ -507,44 +419,32 @@ const REVERT_HANDLERS: Partial<Record<CharacterEventCategory, RevertHandler>> = 
   combat: revertCombatEvent,
 };
 
-// Restore one event's `before` sub-state. Inventory is shape-driven and runs
-// before the `if (!before) continue` guard (an acquire carries before==null).
 async function reverseEvent(
   tx: Prisma.TransactionClient,
   characterId: string,
   event: CharacterEvent,
 ) {
-  // Inventory is handled BEFORE the `if (!before) continue` short-circuit:
-  // an acquire event carries before==null (it created the row), and undoing
-  // it means DELETING that row — so it must not be skipped. The reversal is
-  // shape-driven inside revertInventoryEvent (delete created / recreate
-  // deleted / restore scalar + reverse currency).
+  // Inventory runs before the `before` guard: an acquire's before is null (it created the row) but still must be undone by deleting it — revertInventoryEvent handles delete-created/recreate-deleted/restore-scalar by shape.
   if (event.category === "inventory") {
     await revertInventoryEvent(tx, characterId, event);
     return;
   }
 
-  // Undoing a spell cast must also lift the per-turn interlock it recorded
-  // (#1439 review) — BEFORE the `before` guard, because a cantrip cast has no
-  // slot `before` snapshot yet still set the interlock. A leveled cast falls
-  // through to restore its spent slot via revertCombatEvent below.
+  // #1439: interlock clearing must run before the `before` guard — a cantrip cast sets the interlock but has no slot snapshot to trigger it otherwise; a leveled cast still falls through to revertCombatEvent below.
   if (event.category === "combat" && event.type === "resolveAction") {
     await clearRevertedSpellCastInterlock(tx, event);
   }
 
   const before = event.before as Record<string, unknown> | null;
-  if (!before) return; // no before snapshot = nothing to restore
+  // Silent no-ops are deliberate: no before snapshot (or no handler — roll/session/combat) means nothing to restore, never an error.
+  if (!before) return;
 
   const handler = REVERT_HANDLERS[event.category];
-  if (!handler) return; // roll/session/combat etc. — nothing to restore
+  if (!handler) return;
 
   await handler({ tx, characterId, event, before });
 }
 
-// Guard the LIFO-undo invariants before any reversal runs: the batch exists, is
-// not already reverted, is the most-recent non-reverted batch, and doesn't
-// belong to an ended (frozen) session. Returns an error RevertResult to abort,
-// or null to proceed. Error statuses/messages are byte-identical to before.
 async function revertPreflight(
   db: PrismaClient,
   characterId: string,
@@ -559,20 +459,13 @@ async function revertPreflight(
     return { ok: false, status: 409, error: "This batch has already been reverted" };
   }
 
-  // LIFO guard: find the most-recent non-reverted batch and ensure it matches.
-  // Also exclude events belonging to an already-ended session — those are frozen
-  // so the summary/XP that was awarded at session-end stays coherent.
+  // Ended-session events are excluded — they're frozen so the session-end summary/XP award stays coherent.
   const latestEvent = await db.characterEvent.findFirst({
     where: {
       characterId,
       reverted: false,
       type: { not: "revert" },
-      // No category is excluded here: a standalone roll (check/save/initiative/
-      // tally-damage, #1861) is now a real batched roll-category event committed
-      // through the resolve-action resolver, so it IS the most-recent action
-      // when it's the newest — trivially undoable (before/after null → reversing
-      // it restores nothing), never a dead log entry that blocks a real undo.
-      // Don't look through events whose session has been ended.
+      // #1861: roll-category events (before/after null) still count as "the most recent action" here, not skipped as a dead log entry.
       OR: [
         { sessionId: null },
         { session: { status: "active" } },
@@ -588,17 +481,7 @@ async function revertPreflight(
     };
   }
 
-  // Also block if the batch itself belongs to an ended session.
-  //
-  // NOTE: in practice this guard is a redundant second line of defense. The
-  // LIFO scan above excludes events whose session has been ended (the OR on
-  // `session.status === "active"`), so a batch from an ended session can never
-  // be the "most recent non-reverted batch" and the request already 409s with
-  // the "Only the most recent action can be undone" message before reaching
-  // here. We keep this explicit guard intentionally: it documents the
-  // ended-session-is-frozen invariant at the point it matters and stays correct
-  // even if the LIFO query above is ever refactored to stop filtering on
-  // session status.
+  // Redundant with the LIFO scan above but kept intentionally: documents the ended-session-is-frozen invariant even if that scan stops filtering on session status.
   if (batchEvents[0]?.sessionId) {
     const session = await db.session.findUnique({
       where: { id: batchEvents[0].sessionId },
@@ -612,10 +495,7 @@ async function revertPreflight(
   return null;
 }
 
-// Inside one transaction: reverse each event (latest first), mark the whole
-// batch reverted, and append the meta `revert` timeline entry. Throws on an
-// unrevertable event (e.g. sale proceeds already spent) so the caller's catch
-// maps it to a 409 and the $transaction rolls back.
+// Throws on an unrevertable event (e.g. spent sale proceeds) so the caller's catch maps it to a 409 and the transaction rolls back.
 async function applyBatchReversal(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -626,13 +506,11 @@ async function applyBatchReversal(
     await reverseEvent(tx, characterId, event);
   }
 
-  // Mark all events in the batch as reverted.
   await tx.characterEvent.updateMany({
     where: { characterId, batchId },
     data: { reverted: true },
   });
 
-  // Append a meta `revert` event so the timeline shows the undo.
   await tx.characterEvent.create({
     data: {
       characterId,
@@ -647,10 +525,7 @@ async function applyBatchReversal(
   });
 }
 
-// LIFO undo of one batch: validate it is the most-recent non-reverted batch,
-// reverse each event's before-state, mark the batch reverted, and append a
-// meta revert event. Returns a discriminated result so the route keeps HTTP
-// control (no res access here). Throws on unexpected errors.
+// Returns a discriminated RevertResult rather than touching res directly, so the route keeps HTTP control.
 export async function revertBatch(
   db: PrismaClient,
   characterId: string,
@@ -664,17 +539,12 @@ export async function revertBatch(
   const blocked = await revertPreflight(db, characterId, batchId, batchEvents);
   if (blocked) return blocked;
 
-  // Apply reversals in reverse order (latest op in the batch first).
   const reversed = [...batchEvents].reverse();
 
   try {
     await db.$transaction((tx) => applyBatchReversal(tx, characterId, batchId, reversed));
   } catch (error) {
-    // A revert that can't be reversed cleanly (e.g. undoing a sale after the
-    // proceeds were already spent) throws InsufficientCurrencyError from
-    // revertInventoryEvent. The whole $transaction rolls back; deliberately
-    // remap the errors' own 400 to a 409 — an undo blocked by later state is a
-    // conflict, not a bad request, matching this route's other conflict responses.
+    // InsufficientCurrencyError/InvalidInventoryOperationError carry their own 400, remapped to 409 here: an undo blocked by later state (e.g. sale proceeds already spent) is a conflict, not a bad request.
     if (
       error instanceof InsufficientCurrencyError ||
       error instanceof InvalidInventoryOperationError

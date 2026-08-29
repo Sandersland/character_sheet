@@ -4,7 +4,6 @@ import { monogram } from "@/lib/codexLedger";
 import { ENTITY_TYPE_MONOGRAM_CLASS } from "@/lib/mentions";
 import type { EntityType } from "@/types/character";
 
-// Shared portrait tile (#844): the image when set, else the type-tinted monogram.
 export default function EntityPortrait({
   name,
   type,

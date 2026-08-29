@@ -1,7 +1,4 @@
-// Prepared X / Y summary for the spellcasting block (#883). limit is null only
-// for a non-caster — a 2014 known caster's Spells Known number is a non-null
-// limit exactly like a 2024 prepared caster's (#1507); casterModel is what
-// distinguishes the two mechanics, not this null check (#1511 D2).
+// limit is null only for a non-caster — a 2014 known caster's Spells Known number is a non-null limit exactly like a 2024 prepared caster's; casterModel distinguishes the two mechanics, not this null check.
 import type { Character } from "@/types/character";
 
 type Spellcasting = NonNullable<Character["spellcasting"]>;
@@ -9,7 +6,7 @@ type Spellcasting = NonNullable<Character["spellcasting"]>;
 export interface PreparedSummary {
   count: number;
   limit: number | null;
-  /** Served meter noun (#1511 D4), e.g. "Prepared" / "Spells known". */
+  /** Served meter noun, e.g. "Prepared" / "Spells known". */
   label: string;
 }
 

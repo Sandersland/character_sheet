@@ -1,8 +1,3 @@
-// Resolver tests for the entitlement precedence rule (#1797, epic #1795 2/6)
-// — generalizes item-scope-shadowing.test.ts's (#1645/#1646) CAMPAIGN-Item
-// shadow guard to the full GLOBAL/USER/CAMPAIGN/grant/fork lattice. Exercises
-// resolveVisibleEntryIds directly against real CatalogEntry rows rather than
-// through a route: no route consumes the resolver yet (that's slice 3).
 import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -19,12 +14,7 @@ import {
 } from "../entitlement.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 
-// Manual monkeypatch, not vi.spyOn/mockRestore, for the call-counting test
-// below: Prisma's model delegates don't restore cleanly through vi.spyOn's
-// own save/restore bookkeeping (observed leaving the spied method
-// permanently "not a function" for later tests in the same file). Capturing
-// the real bound method up front and reassigning it back in `finally`
-// sidesteps that.
+// Manual monkeypatch, not vi.spyOn: Prisma model delegates don't restore cleanly through vi.spyOn's save/restore, leaving the method permanently broken for later tests.
 function countCalls<T extends object, K extends keyof T>(
   target: T,
   key: K,
@@ -42,11 +32,7 @@ function countCalls<T extends object, K extends keyof T>(
 const OWNER_USER_ID = `entitlement-owner-${randomUUID()}`;
 const MEMBER_USER_ID = `entitlement-member-${randomUUID()}`;
 const OUTSIDER_USER_ID = `entitlement-outsider-${randomUUID()}`;
-// Distinct from OWNER_USER_ID on purpose (#1797 regression pin): the origin's
-// owner and the USER-fork's owner must be two different people, or the
-// origin would ALSO rank as "the viewer's own USER row" and the precedence
-// case would stop exercising the bug (a USER-scope origin outranking a
-// CAMPAIGN fork for a non-owning member).
+// Must differ from OWNER_USER_ID or the origin would also rank as the viewer's own USER row, defeating this precedence case (#1797).
 const ORIGIN_OWNER_USER_ID = `entitlement-origin-owner-${randomUUID()}`;
 
 let campaignId: string;
@@ -83,10 +69,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // CatalogEntry rows first: CatalogGrant cascades off catalogEntry deletion,
-  // but a GLOBAL fixture row has no owner to cascade off, so this file cleans
-  // up its own rows explicitly rather than relying on the user/campaign
-  // deletes below.
+  // CatalogGrant cascades off catalogEntry deletion, but a GLOBAL fixture row has no owner to cascade off — delete CatalogEntry rows explicitly first.
   await prisma.catalogEntry.deleteMany({ where: { id: { in: createdCatalogEntryIds } } });
   await prisma.campaign.deleteMany({ where: { id: { in: [campaignId, otherCampaignId] } } });
   await prisma.user.deleteMany({
@@ -165,19 +148,8 @@ describe("resolveVisibleEntryIds (#1797)", () => {
   });
 
   describe("the full precedence case: origin O, DM CAMPAIGN fork D, player USER fork P", () => {
-    // Parameterized over the origin's OWN scope (#1797 regression pin): a
-    // GLOBAL seed and a shared USER row granted into the campaign must
-    // resolve through the exact same in-campaign precedence. Ranking by
-    // abstract scope (USER > CAMPAIGN > GLOBAL) passed the GLOBAL case by
-    // accident — a USER-scope origin has no reason to outrank a CAMPAIGN
-    // fork of it for a non-owning member, but scope-only ranking did exactly
-    // that (the confirmed bug: the DM's override silently lost to the
-    // player's shared/granted origin). `originAlwaysVisible` captures the one
-    // real behavioral difference between the two origin kinds: GLOBAL is
-    // visible everywhere for its edition, so an outsider entirely outside the
-    // campaign still resolves it; a granted USER origin is only visible
-    // inside the campaign it was granted into, so that same outsider sees
-    // nothing from the lineage at all.
+    // Parameterized over the origin's own scope (#1797): ranking by abstract scope alone passes the GLOBAL case by accident but gets a granted USER origin backwards, so both must be exercised through the same precedence.
+    // originAlwaysVisible: GLOBAL is visible everywhere for its edition; a granted USER origin is visible only inside the campaign it was granted into.
     const originVariants: Array<{
       label: string;
       makeOrigin: () => Promise<string>;
@@ -206,16 +178,11 @@ describe("resolveVisibleEntryIds (#1797)", () => {
         const campaignFork = await fixtureEntry({ scope: "CAMPAIGN", ownerCampaignId: campaignId, forkedFromId: origin });
         const userFork = await fixtureEntry({ scope: "USER", ownerUserId: OWNER_USER_ID, forkedFromId: origin });
 
-        // Owner's own character, in the campaign: their USER fork wins over
-        // both the DM's CAMPAIGN fork and the origin.
         const ownerInCampaign = await resolveVisibleEntryIds("SPELL", viewer({ userId: OWNER_USER_ID, campaignId }));
         expect(ownerInCampaign).toContain(userFork);
         expect(ownerInCampaign).not.toContain(campaignFork);
         expect(ownerInCampaign).not.toContain(origin);
 
-        // A different campaign member sees the DM's CAMPAIGN fork, not the
-        // origin and not the other player's private USER fork — this is the
-        // exact case the scope-only ranking got backwards for a USER origin.
         const otherMemberInCampaign = await resolveVisibleEntryIds(
           "SPELL",
           viewer({ userId: MEMBER_USER_ID, campaignId }),
@@ -224,9 +191,6 @@ describe("resolveVisibleEntryIds (#1797)", () => {
         expect(otherMemberInCampaign).not.toContain(origin);
         expect(otherMemberInCampaign).not.toContain(userFork);
 
-        // Outside the campaign, the fork's own owner still resolves their
-        // USER fork (it travels with them) — the CAMPAIGN fork is invisible
-        // there, and so is a granted (not owned) origin.
         const ownerOutsideCampaign = await resolveVisibleEntryIds(
           "SPELL",
           viewer({ userId: OWNER_USER_ID, campaignId: null }),
@@ -235,10 +199,6 @@ describe("resolveVisibleEntryIds (#1797)", () => {
         expect(ownerOutsideCampaign).not.toContain(campaignFork);
         expect(ownerOutsideCampaign).not.toContain(origin);
 
-        // Outside the campaign, an outsider with no fork of their own either
-        // falls back to the GLOBAL origin (never shadowed away for a viewer
-        // outside the fork's scope) or sees nothing at all when the origin
-        // itself is scoped to the campaign (a granted USER row).
         const outsiderOutsideCampaign = await resolveVisibleEntryIds(
           "SPELL",
           viewer({ userId: OUTSIDER_USER_ID, campaignId: null }),
@@ -255,8 +215,7 @@ describe("resolveVisibleEntryIds (#1797)", () => {
     const origin = await fixtureEntry({ scope: "GLOBAL" });
     const fork = await fixtureEntry({ scope: "USER", ownerUserId: OWNER_USER_ID, forkedFromId: origin });
 
-    // onDelete: SetNull — deleting the origin nulls the fork's forkedFromId
-    // rather than cascading, so the fork survives as its own lineage root.
+    // onDelete: SetNull — deleting the origin nulls the fork's forkedFromId rather than cascading, so the fork survives as its own lineage root.
     await prisma.catalogEntry.delete({ where: { id: origin } });
     createdCatalogEntryIds.splice(createdCatalogEntryIds.indexOf(origin), 1);
 
@@ -264,20 +223,11 @@ describe("resolveVisibleEntryIds (#1797)", () => {
     expect(result).toContain(fork);
   });
 
-  // #1815 review finding 4: forkContent only ever points a NEW entry's
-  // forkedFromId at an EXISTING one, so a cycle can't arise through ordinary
-  // use — but groupLineages' own lineageRoot walk must still degrade
-  // gracefully if the data is ever corrupted into one (a raw update, as
-  // here), rather than silently serving every cycle member as its own
-  // one-entry "lineage" (each becoming a winner). Both nodeA and nodeB are
-  // owned by the SAME viewer (rank 3 each) so the resolver would show both
-  // if it failed to group them — the only way to catch "two winners" here is
-  // to see the raw candidate count collapse to one.
+  // Both nodes share rank 3 for this viewer — collapsing to one winner is the only way this test catches a failure to group them (#1815 finding 4).
   it("a 2-node forkedFromId cycle (data-integrity violation) still resolves to exactly one winner, deterministically", async () => {
     const nodeA = await fixtureEntry({ scope: "USER", ownerUserId: OWNER_USER_ID });
     const nodeB = await fixtureEntry({ scope: "USER", ownerUserId: OWNER_USER_ID, forkedFromId: nodeA });
-    // Forces the cycle directly — the DAG invariant forkContent maintains
-    // would never produce this through the app.
+    // Forces the cycle directly — forkContent's own DAG invariant would never produce this through normal use.
     await prisma.catalogEntry.update({ where: { id: nodeA }, data: { forkedFromId: nodeB } });
 
     const visible = await resolveVisibleEntryIds("SPELL", viewer({ userId: OWNER_USER_ID, campaignId: null }));
@@ -286,15 +236,7 @@ describe("resolveVisibleEntryIds (#1797)", () => {
   });
 });
 
-// #1815 review finding 3: the character-serialize spell-catalog overlay used
-// to resolve META (resolveSpellEntitlementMetaForCharacter) and MECHANICS
-// (resolveSpellMechanicsOverridesForCharacter) as two INDEPENDENT
-// fetchCandidates-backed calls — each its own CatalogEntry read, so a fork
-// committing between them could split-brain the response (fork metadata from
-// one snapshot, mechanics from the other). resolveSpellEntitlementForCharacter
-// replaces both with ONE combined resolution; this pins that it issues
-// exactly one CatalogEntry read for the candidate set, not two, which is what
-// makes a split-brain snapshot impossible rather than merely unlikely.
+// Pins exactly one CatalogEntry read for the candidate set — this is what makes a split-brain response impossible, not merely unlikely (#1815 finding 3).
 describe("resolveSpellEntitlementForCharacter (#1815 review finding 3: single-snapshot resolution)", () => {
   function fakeCharacter(overrides: {
     ownerId: string;

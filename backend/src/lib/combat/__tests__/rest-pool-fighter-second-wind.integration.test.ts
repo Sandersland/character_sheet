@@ -1,10 +1,3 @@
-// #1227: end-to-end proof of the Second Wind / Action Surge recharge fix and
-// the FIRST real (non-synthetic) shortRestRegain consumer. rest-pool-parity.
-// integration.test.ts proved #1221's mechanism left EXISTING pools unchanged;
-// this file is the positive case that mechanism was built for — a 2024
-// Fighter's Second Wind partially regains on a short rest and fully on a
-// long rest, and BOTH editions' Action Surge (previously bugged to
-// "shortRest" only, in both editions) now also recharges on a long rest.
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -58,7 +51,6 @@ describe("Second Wind (2024, #1227) — the first real shortRestRegain consumer"
   });
 
   it("both uses spent -> a short rest regains exactly ONE", async () => {
-    // Level 1: secondWindTotal2024(1) === 2 uses.
     await createFighter(FIGHTER_2024_ID, "EDITION_2024", 0, { secondWind: 2 });
 
     await applyHitPointOperations(FIGHTER_2024_ID, [{ type: "shortRest", rolls: [4] }]);
@@ -108,7 +100,7 @@ describe("Action Surge — recharge bug fix, BOTH editions (#1227: not the #1221
   });
 
   it("2024: a long rest recharges Action Surge (was inert — resourceFn declared 'shortRest' only)", async () => {
-    await createFighter(FIGHTER_2024_ID, "EDITION_2024", 2700, { actionSurge: 1 }); // level 4, actionSurge available from L2
+    await createFighter(FIGHTER_2024_ID, "EDITION_2024", 2700, { actionSurge: 1 });
 
     await applyHitPointOperations(FIGHTER_2024_ID, [{ type: "longRest" }]);
 

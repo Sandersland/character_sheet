@@ -23,8 +23,7 @@ function makeEvent(overrides: Partial<CharacterEvent>): CharacterEvent {
   };
 }
 
-// The API returns events newest-first; every fixture below follows that
-// convention (index 0 = most recent) so ordering assertions mean something.
+// The API returns events newest-first; fixtures below follow that convention (index 0 = most recent).
 
 function rowOf(item: FeedItem): FeedRow {
   if (item.kind !== "row") throw new Error(`expected a row item, got ${item.kind}`);
@@ -42,9 +41,7 @@ function allText(row: FeedRow): string {
   return `${text(row)} ${drill}`;
 }
 
-// Builds a `resolveAction` event — the single consolidated event a resolution
-// writes (#1827 model B, #1829). `data` mirrors the backend's persisted
-// shape exactly (backend/src/lib/combat/resolve-action-ops.ts).
+// `data` mirrors ResolveActionEventData exactly — the single consolidated event a resolution writes.
 function resolveEvent(
   id: string,
   data: Partial<ResolveActionEventData> & { source: string },
@@ -59,8 +56,6 @@ function resolveEvent(
   });
 }
 
-// A missed weapon swing — the run-collapse/round-separator fixtures below
-// need many of these, varying only id/total.
 function miss(id: string, total: number, extra: Partial<CharacterEvent> = {}): CharacterEvent {
   return resolveEvent(
     id,
@@ -96,7 +91,7 @@ describe("feedItemRowCount (#1237 §4 — the CombatLogRow/SessionLog count pari
   it("counts rows hidden inside a collapsed run — a collapse must not shrink the badge", () => {
     const misses = Array.from({ length: 5 }, (_, i) => miss(`m${i}`, 20 - i));
     const items = buildFeedItems(misses);
-    expect(items.filter((i) => i.kind === "rollRun")).toHaveLength(1); // sanity: it did collapse
+    expect(items.filter((i) => i.kind === "rollRun")).toHaveLength(1);
     expect(feedItemRowCount(items)).toBe(5);
   });
 
@@ -108,8 +103,7 @@ describe("feedItemRowCount (#1237 §4 — the CombatLogRow/SessionLog count pari
       makeEvent({ id: "start", category: "combat", type: "combatStarted" }),
     ];
     const items = buildFeedItems(events);
-    expect(items.filter((i) => i.kind === "separator")).toHaveLength(2); // sanity: separators DID render
-    // 3 rows (2 damage + "Combat began.") — the 2 separators must not add to that.
+    expect(items.filter((i) => i.kind === "separator")).toHaveLength(2);
     expect(feedItemRowCount(items)).toBe(3);
   });
 });
@@ -250,13 +244,11 @@ describe("buildFeedItems resolveAction auto-hit / multi-die shape (Magic Missile
     expect(rows).toHaveLength(1);
     expect(text(rows[0])).toBe("Magic Missile — 12 force damage.");
     expect(rows[0].drillIn).toHaveLength(1);
-    // The dice + the floored spec modifier (+3) must reconcile to the total (12).
     expect(rows[0].drillIn![0].formula).toBe("3d4 (2, 3, 4) + 3");
   });
 });
 
-// A drill-in that doesn't sum to its own total reads as a live bug to a
-// player — every effect/to-hit formula below must reconcile.
+// A drill-in that doesn't sum to its own total reads as a live bug to a player — every formula below must reconcile.
 function sumFormula(formula: string | undefined): number {
   if (!formula) return NaN;
   const faceGroups = [...formula.matchAll(/\(([\d,\s]+)(?: — dice doubled)?\)/g)].map((m) =>
@@ -731,10 +723,7 @@ describe("buildFeedItems session/combat lifecycle phrasing", () => {
 });
 
 describe("buildFeedItems check/save/initiative DC rendering", () => {
-  // #1237 regression: the backend normalizes every UNSET optional
-  // RollEventData field to `null` (a JSON column can't store `undefined`),
-  // not just omitting the key — a strict `dc !== undefined` check rendered a
-  // literal "(DC null)" for initiative rolls in the real app.
+  // Regression (#1237): the backend normalizes unset optional fields to `null`, not omission — a strict `!== undefined` check rendered a literal "(DC null)".
   it("omits the DC suffix when dc is null (backend's actual shape for 'not set'), not just when absent", () => {
     const rows = buildFeedItems([
       makeEvent({
@@ -835,13 +824,7 @@ describe("buildFeedItems loot summary (#382, preserved)", () => {
 });
 
 describe("buildFeedItems legacy roll events (#1830 — rendering retired, no dual-read)", () => {
-  // Historical fixture only: useBonusAttackSheet's off-hand/flurry path
-  // (#1845, out of #1827's scope) is the sole remaining attackRoll/damageRoll
-  // writer now that the weapon (#1832) and spell (#1833) adapters both moved
-  // onto resolveAction — this slice removed the feed's special-cased
-  // rendering for the old events, so any that still exist fall back to the
-  // plain summary row like any other unhandled event type. No merged-swing
-  // behavior survives.
+  // useBonusAttackSheet's off-hand/flurry path is the sole remaining attackRoll/damageRoll writer; the feed no longer special-cases these events, so they render as a plain summary row.
   it("falls back to the stored summary for a legacy attackRoll/damageRoll event", () => {
     const rows = buildFeedItems([
       makeEvent({
@@ -889,9 +872,6 @@ describe("buildFeedItems undefined-total guard (#1237 §5 — never render the l
   });
 });
 
-// Every event type in the frontend union renders SOMETHING sane (falls back to
-// event.summary at worst), and NEVER leaks "undefined"/"NaN" into the rendered
-// text (#1237 §5) — a coverage guard so a new type is never silently broken.
 const ALL_EVENT_TYPES = [
   "acquired", "consumed", "sold", "bought", "removed",
   "awarded", "revoked",
@@ -919,9 +899,7 @@ const ALL_EVENT_TYPES = [
   "revert",
 ] as const satisfies readonly CharacterEventType[];
 
-// Compile-time forcing function (#1237 §8): if a new member is added to
-// CharacterEventType without adding it to ALL_EVENT_TYPES above, `_Complete`
-// resolves to `never` and `const complete: _Complete = true` fails to compile.
+// If a new CharacterEventType isn't added to ALL_EVENT_TYPES, `_Complete` resolves to `never` and `const complete: _Complete = true` fails to compile.
 type _Complete =
   Exclude<CharacterEventType, (typeof ALL_EVENT_TYPES)[number]> extends never ? true : never;
 

@@ -1,6 +1,4 @@
-// Shared channel from the ceremony shell to its step bodies (#887–#896): bodies
-// stay registered as ComponentType<{ step }> so sibling steps only ever add a
-// STEP_BODIES map entry — draft access comes from here, never new props.
+// Sibling steps only ever add a STEP_BODIES map entry — draft access comes from here, never new props.
 
 import { createContext, useContext } from "react";
 

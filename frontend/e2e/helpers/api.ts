@@ -1,12 +1,5 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
-// Per-spec fixtures: create throwaway characters and seed their domain state
-// through the same REST endpoints the app uses. Callers pass page.request after
-// login(page), so the cs_session cookie rides along with every call.
-//
-// A unique-name suffix keeps repeat runs from colliding and keeps each spec's
-// character distinct from the shared globalSetup roster.
-
 const ABILITY_SCORES = {
   strength: 10,
   dexterity: 14,
@@ -20,10 +13,6 @@ export function uniqueName(prefix: string): string {
   return `${prefix} ${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
 }
 
-// Navigate to a character sheet, optionally landing on a specific workspace tab.
-// Since #922 the sheet is a tabbed workspace whose active tab lives in the `?tab=`
-// query param (default: overview); a spec that drives a now-tabbed section
-// (combat HP/conditions, inventory, magic/spells, story) must target its tab.
 export async function gotoSheet(
   page: Page,
   id: string,
@@ -32,16 +21,13 @@ export async function gotoSheet(
   await page.goto(`/characters/${id}${tab ? `?tab=${tab}` : ""}`);
 }
 
-// Land on the live Combat tab for a session persona. Not joined yet → click the
-// doorway (Start/Resume/Join). Already joined (a shared roster persona joined by
-// an earlier spec) → mobile keeps its live pill (aria-label "… go to fight"), so
-// click that; desktop dropped its under-tabs "Go to fight" strip (#1085), so fall
-// back to the Combat tab there. Either path lands the workspace on ?tab=combat.
+// If already joined: mobile keeps a live "go to fight" pill, but desktop
+// dropped its own under-tabs strip (#1085) and shows no entry button at all —
+// only the banner's End Session marks that state, so fall back to the tab.
 export async function enterLiveCombat(page: Page): Promise<void> {
   const entry = page
     .getByRole("button", { name: /(Start|Resume|Join) session|go to fight/i })
     .first();
-  // Desktop-joined shows no entry button; the banner's End Session marks the state.
   const joinedDesktop = page.getByRole("button", { name: /End Session/i }).first();
   await expect(entry.or(joinedDesktop)).toBeVisible();
   if (await entry.isVisible()) {
@@ -52,27 +38,20 @@ export async function enterLiveCombat(page: Page): Promise<void> {
   await expect(page).toHaveURL(/[?&]tab=combat/);
 }
 
-// Start combat, then start the turn. A shared roster persona's session may
-// already be mid-encounter from an earlier spec that never ended it — the
-// server-authoritative combat state (#1030) means THIS fresh browser context
-// gets synced into "already in combat" within one poll of mount, racing the
-// click. `{ timeout: 3000 }` treats "Start combat" disappearing/never
-// appearing as "already active" rather than a real failure; "Start my turn"
-// is reachable either way once combat is active.
+// A shared roster persona's session may already be mid-encounter from an
+// earlier spec — the short timeout treats "Start combat" never appearing as
+// already-active rather than a real failure ("Start my turn" works either way).
 export async function startCombatAndTurn(page: Page): Promise<void> {
   try {
     await page.getByRole("button", { name: /Start combat/i }).click({ timeout: 3000 });
   } catch {
-    // Already active — see this function's header comment.
+    // Already active.
   }
   await page.getByRole("button", { name: "Start my turn" }).click();
 }
 
-// The Magic tab is two mutually-exclusive views: the record block (stat bar,
-// slot pips, the Cast door) and the grimoire (full spellbook rows: prepare/
-// swap/forget — view/manage only, #1162). The spellbook rows live only in the
-// grimoire — open it via "Manage spellbook →" before interacting with a spell
-// row, and close it via "Done" to read the record's slot pips again.
+// The Magic tab's record view and grimoire are mutually exclusive — spellbook
+// rows (prepare/swap/forget) live only in the grimoire, behind this button.
 export async function openSpellbook(page: Page): Promise<void> {
   await page.getByRole("button", { name: /manage spellbook/i }).click();
 }
@@ -86,26 +65,15 @@ type AbilityScores = typeof ABILITY_SCORES;
 interface CreateCharacterOpts {
   name: string;
   className: string;
-  // #1684: resolved to a speciesId at creation — the flat `race`-name create
-  // path is gone. Halfling (2024, the default): no #1690 choice trait (unlike
-  // Human's Skillful/Versatile, which would need extra request fields no
-  // caller here declares) and no maxHp-granting trait (unlike Dwarf's
-  // Toughness, which would throw off HP-sensitive specs by species alone).
   speciesName?: string;
   background?: string;
   experiencePoints?: number;
-  // Override the module-level defaults, e.g. Wis 16 for a monk / Con 15 for a barbarian.
   abilityScores?: Partial<AbilityScores>;
-  // #1372: omit for the EDITION_2024 default every other e2e fixture wants;
-  // a 2014 character needs its species resolved against the 2014 catalog too
-  // (a 2024-only species id would 400 cross-edition), so this one field drives
-  // both the species lookup and the create body's own rulesEdition.
   rulesEdition?: "EDITION_2014" | "EDITION_2024";
 }
 
-// #1684: resolve a species name → catalog id via GET /api/reference, scoped to
-// the requesting character's own edition (#1372) — a species id from the wrong
-// edition's catalog 400s at creation (crossEditionRejection).
+// A species id from the wrong edition's catalog 400s at creation
+// (crossEditionRejection), so this must be scoped to the character's own edition.
 async function resolveSpeciesId(
   request: APIRequestContext,
   name: string,
@@ -119,8 +87,6 @@ async function resolveSpeciesId(
   return match.id;
 }
 
-// Create a character and return its id. Sets XP through the transactions
-// endpoint so level/proficiency/slots derive server-side.
 export async function createCharacter(
   request: APIRequestContext,
   opts: CreateCharacterOpts,
@@ -158,9 +124,6 @@ export async function setExperience(
   expect(response.ok(), `set XP: ${response.status()}`).toBeTruthy();
 }
 
-// Create a campaign via the API and return its id — faster and more direct
-// than driving CampaignsPage's form for a spec that only needs the campaign to
-// exist (e.g. to inherit its edition), not to exercise the creation UI itself.
 export async function createCampaign(
   request: APIRequestContext,
   opts: { name: string; rulesEdition?: "EDITION_2014" | "EDITION_2024" },
@@ -173,8 +136,6 @@ export async function createCampaign(
   return id;
 }
 
-// Create a fresh character already attached to its own new campaign, so it can
-// start a live session in-spec without touching the shared roster's campaigns.
 export async function createSessionCharacter(
   request: APIRequestContext,
   opts: CreateCharacterOpts,
@@ -193,7 +154,6 @@ export async function createSessionCharacter(
   return characterId;
 }
 
-// Resolve a shared persona's id by exact name (roster personas are unique).
 export async function findCharacterByName(
   request: APIRequestContext,
   name: string,
@@ -206,8 +166,6 @@ export async function findCharacterByName(
   return match!.id;
 }
 
-// Restore a class resource pool (e.g. superiorityDice) to full so a shared
-// persona's spend flow is deterministic regardless of leftover state.
 export async function restoreResourcePool(
   request: APIRequestContext,
   characterId: string,
@@ -227,9 +185,6 @@ export async function restoreResourcePool(
   expect(restoreResponse.ok(), `restore ${key}: ${restoreResponse.status()}`).toBeTruthy();
 }
 
-// Teach a shared persona a catalog maneuver by name (idempotent — skips if the
-// maneuver is already known), so a spec can drive an attackRoll/damageRoll
-// maneuver the seeded roster doesn't include. Mirrors global-setup's seedManeuver.
 export async function learnManeuver(
   request: APIRequestContext,
   characterId: string,
@@ -242,7 +197,6 @@ export async function learnManeuver(
   };
   if (character.resources?.maneuversKnown?.some((m) => m.name === maneuverName)) return;
 
-  // `?edition=` is required (#1412); every e2e persona is a default-2024 character.
   const catalogResponse = await request.get("/api/maneuvers?edition=EDITION_2024");
   expect(catalogResponse.ok(), `list maneuvers: ${catalogResponse.status()}`).toBeTruthy();
   const catalog = (await catalogResponse.json()) as { id: string; name: string }[];
@@ -255,9 +209,6 @@ export async function learnManeuver(
   expect(learnResponse.ok(), `learn ${maneuverName}: ${learnResponse.status()}`).toBeTruthy();
 }
 
-// Clear a status condition from a shared persona so its apply flow is
-// deterministic regardless of leftover state. No-op when the key isn't active
-// (removeCondition errors on an absent key), mirroring restoreResourcePool.
 export async function removeCondition(
   request: APIRequestContext,
   characterId: string,
@@ -275,14 +226,11 @@ export async function removeCondition(
   expect(removeResponse.ok(), `remove condition ${key}: ${removeResponse.status()}`).toBeTruthy();
 }
 
-// Add the named catalog spells to a character's spellbook, prepared so they read
-// as castable. Returns nothing; the caller reloads the sheet to see them.
 export async function learnSpells(
   request: APIRequestContext,
   characterId: string,
   spellNames: string[],
 ): Promise<void> {
-  // `?edition=` is required (#1712); every e2e persona is a default-2024 character.
   const catalogResponse = await request.get("/api/spells?edition=EDITION_2024");
   expect(catalogResponse.ok(), `list spells: ${catalogResponse.status()}`).toBeTruthy();
   const catalog = (await catalogResponse.json()) as { id: string; name: string; level: number }[];
@@ -294,7 +242,7 @@ export async function learnSpells(
       data: { operations: [{ type: "learnSpell", spellId: spell!.id }] },
     });
     expect(learnResponse.ok(), `learn ${name}: ${learnResponse.status()}`).toBeTruthy();
-    // Prepare leveled spells (cantrips are always ready) so the spellbook row is castable.
+    // Cantrips are always prepared; leveled spells need an explicit prepare to be castable.
     if (spell!.level > 0) {
       const entryId = await spellEntryId(request, characterId, name);
       const prepareResponse = await request.post(`/api/characters/${characterId}/spellcasting/transactions`, {
@@ -305,7 +253,7 @@ export async function learnSpells(
   }
 }
 
-// Look up a spellbook entry's id (the per-character entry, not the catalog id).
+// The per-character spellbook entry id, distinct from the catalog spell id.
 async function spellEntryId(
   request: APIRequestContext,
   characterId: string,

@@ -1,9 +1,3 @@
-/**
- * AddManeuverPanel — inline expand-in-place picker for learning a new maneuver.
- * Not a modal — follows the same "inline panel, collapsed by default" pattern
- * as AddSpellPanel. Catalog is fetched on first expand, then cached in local state.
- */
-
 import { useEffect, useRef, useState } from "react";
 
 import { fetchManeuvers } from "@/api/client";
@@ -37,9 +31,8 @@ export default function AddManeuverPanel({
 
   const atCap = knownCount >= choiceCount;
 
-  // Fetch catalog the first time the panel is opened. The edition is in the deps
-  // for the lint rule's sake only — Character.rulesEdition is write-once, and
-  // hasFetched latches the fetch to the first expand regardless.
+  // character.rulesEdition is write-once; it's in the deps only to satisfy the lint
+  // rule — hasFetched latches this fetch to the first expand regardless.
   useEffect(() => {
     if (!open || hasFetched.current) return;
     hasFetched.current = true;
@@ -80,7 +73,7 @@ export default function AddManeuverPanel({
 
   return (
     <div className="mt-3 rounded-card border border-gold-200 bg-gold-50 p-4">
-      {/* Panel header */}
+      
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gold-900">
           Learn a Maneuver
@@ -98,7 +91,7 @@ export default function AddManeuverPanel({
         </button>
       </div>
 
-      {/* Search */}
+      
       <input
         type="search"
         placeholder="Filter maneuvers…"
@@ -107,7 +100,7 @@ export default function AddManeuverPanel({
         className="mb-3 w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
       />
 
-      {/* Catalog list */}
+      
       {catalogError && (
         <p className="text-xs text-garnet-700">{catalogError}</p>
       )}

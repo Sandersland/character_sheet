@@ -1,26 +1,11 @@
-// #1223 commit 3: Rage's resource pool (uses-per-rest total/recharge) moves
-// off lib/classes/barbarian.ts's retired resourceFn (rageCountForLevel) onto
-// the two Rage ClassFeature rows in barbarian-features.ts, read here through
-// the SAME poolsFromRows a real character's derivation calls (registry.ts's
-// deriveBaseLayer) — never a hand-rolled re-derivation of the tier table.
-//
-// The headline bug (#1223): SRD 5.1 grants unlimited Rages at level 20
-// (encoded as 99, the pre-existing codebase convention); SRD 5.2 caps at 6
-// from level 17 on, with NO L20 tier. Before this commit, both editions'
-// Rage row carried no resourceKey at all, so poolsFromRows returned nothing
-// for either — the bug lived in the retired barbarian.ts resourceFn instead
-// (rageCountForLevel(20) === 99 for BOTH editions, since resourceFn ignored
-// `edition` entirely). This file is red until the two Rage rows' resource
-// columns are populated to the split table below.
+// SRD 5.1 grants unlimited Rages at level 20 (encoded as 99); SRD 5.2 caps at 6 from level 17 on, with no level 20 tier.
 import { describe, expect, it } from "vitest";
 
 import { poolsFromRows } from "@/lib/classes/class-feature-rows.js";
 
 import { BARBARIAN_FEATURES } from "../barbarian-features.js";
 
-// Base-class rows only (subclassSlug null) — mirrors the `classRows` half of
-// the real ClassFeatureRowsCarrier a Barbarian's own class.features relation
-// loads (characterInclude; subclassId: null).
+// Mirrors the classRows half of ClassFeatureRowsCarrier (characterInclude; subclassId: null).
 const BASE_ROWS = BARBARIAN_FEATURES.filter((r) => r.subclassSlug === null);
 
 // abilityScores/profBonus are unused — Rage's tier is a flat number, never a

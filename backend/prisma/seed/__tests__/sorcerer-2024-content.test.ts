@@ -1,9 +1,3 @@
-// #1232 commit 2 of 3: Sorcerer's real SRD 5.2 / PHB'24 (2024) content. Every
-// assertion below is pinned against an actual 2024 VALUE (a spell name, a
-// damage number, a level, an SP cost) — never against "differs from the 2014
-// row", which a garbage 2024 paraphrase would also satisfy. Mirrors
-// warlock-2024-srd.test.ts's row()/hasRow() shape (same file,
-// SORCERER_FEATURES export).
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -18,7 +12,6 @@ function rowsNamed(subclassSlug: string | null, name: string) {
   return SORCERER_FEATURES.filter((r) => r.subclassSlug === subclassSlug && r.name === name);
 }
 
-/** Exactly one row for (subclassSlug, name, edition), or the test fails with a precise locator. */
 function row(subclassSlug: string | null, name: string, edition: Edition) {
   const found = rowsNamed(subclassSlug, name).filter((r) => r.edition === edition);
   expect(found, `${subclassSlug ?? "(base)"}/${name}/${edition}`).toHaveLength(1);
@@ -119,11 +112,7 @@ describe("Draconic Spells (#1232): NEW in 2024, a FIXED table with no dragon typ
     }
   });
 
-  // The row first shipped saying the spells were "keyed to the dragon type you
-  // choose", which is invented — SRD 5.2 grants the same ten spells to every
-  // Draconic Sorcerer. It read plausibly because it is how 2014's Dragon
-  // Ancestor framed things, which is exactly the "2014 text with a coat of
-  // paint" failure this retab exists to prevent, so pin the absence.
+  // SRD 5.2 grants the same ten spells to every Draconic Sorcerer — no dragon-type keying.
   it("names no dragon type — 2024 dropped Dragon Ancestor, so nothing keys off one", () => {
     const r = row(DRACONIC, "Draconic Spells", "EDITION_2024");
     expect(r.description).not.toMatch(/dragon type/i);
@@ -137,11 +126,7 @@ describe("Draconic Spells (#1232): NEW in 2024, a FIXED table with no dragon typ
 });
 
 describe("Elemental Affinity (#1232): 2024 makes the damage type an explicit choice, not an inherited one", () => {
-  // Same fabrication as Draconic Spells above, and the more consequential of
-  // the two: the 2024 row shipped saying "the damage type associated with your
-  // dragon ancestor", but 2024 deleted Dragon Ancestor, so SRD 5.2 has the
-  // player choose from a closed list instead. A player reading the old text had
-  // no way to know which type they had.
+  // SRD 5.2 has the player choose the damage type from a closed list — 2024 deleted Dragon Ancestor entirely.
   it("2024 names the closed list and no ancestor", () => {
     const r = row(DRACONIC, "Elemental Affinity", "EDITION_2024");
     for (const type of ["Acid", "Cold", "Fire", "Lightning", "Poison"]) {
@@ -284,10 +269,6 @@ const ABILITY_SCORES = {
   charisma: 18,
 };
 
-// Integration-level proof (mirrors warlock-2024-srd.test.ts's
-// loadDbFeatureRows pattern): the REAL seeded rows, read through the REAL
-// derivation path, actually reach a serialized character's derived features —
-// not just SORCERER_FEATURES' in-memory shape.
 describe("integration (#1232): a level-20 Draconic Bloodline sorcerer's derived features differ by edition exactly where authored", () => {
   it("2024 has Sorcerer Subclass/Innate Sorcery/Dragon Companion and NOT Sorcerous Origin/Dragon Ancestor/Draconic Presence; 2014 is the reverse", async () => {
     const featureRows = await loadDbFeatureRows("sorcerer", "draconic bloodline");

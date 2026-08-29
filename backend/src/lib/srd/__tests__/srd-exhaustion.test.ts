@@ -8,7 +8,6 @@ import {
 } from "@/lib/srd/condition-data.js";
 import { effectiveMaxHitPoints } from "@/lib/combat/hitpoints.js";
 
-// SRD 5.2: each exhaustion level reduces Speed by 5 ft (−5 ft×level).
 describe("exhaustionSpeedPenalty — 2024 (SRD 5.2, #1136)", () => {
   it("is 0 at level 0", () => {
     expect(exhaustionSpeedPenalty(0, 30, "EDITION_2024")).toBe(0);
@@ -25,10 +24,7 @@ describe("exhaustionSpeedPenalty — 2024 (SRD 5.2, #1136)", () => {
   });
 });
 
-// PHB'14 p. 291 (Appendix A), cumulative tiers: 1 disadvantage on ability
-// checks, 2 +speed halved, 3 +disadvantage on attacks/saves, 4 +HP max halved
-// (enforced via exhaustionMaxHpPenalty/effectiveMaxHitPoints, #1321), 5 +speed
-// 0, 6 death.
+// PHB'14 p. 291 cumulative tiers: 1 checks, 2 +speed halved, 3 +attacks/saves, 4 +HP max halved (#1321), 5 +speed 0, 6 death.
 describe("exhaustionSpeedPenalty — 2014 (PHB'14 p. 291)", () => {
   it("level 0 or 1: no Speed penalty yet", () => {
     expect(exhaustionSpeedPenalty(0, 30, "EDITION_2014")).toBe(0);
@@ -41,8 +37,7 @@ describe("exhaustionSpeedPenalty — 2014 (PHB'14 p. 291)", () => {
     expect(exhaustionSpeedPenalty(4, 25, "EDITION_2014")).toBe(13);
     expect(25 - exhaustionSpeedPenalty(2, 25, "EDITION_2014")).toBe(12);
 
-    // Even current speed (30): ceil and floor agree, pinning the direction
-    // from both sides — the result is still exactly half.
+    // Even current speed: ceil and floor agree, pinning the direction from both sides.
     expect(exhaustionSpeedPenalty(2, 30, "EDITION_2014")).toBe(15);
     expect(30 - exhaustionSpeedPenalty(2, 30, "EDITION_2014")).toBe(15);
   });
@@ -124,9 +119,7 @@ describe("exhaustionRollEffects — 2014 (PHB'14 p. 291)", () => {
   });
 });
 
-// #1322: the display sentence next to the numbers above. Authored in this
-// module (not the frontend) so it can never drift from what
-// exhaustionRollEffects/exhaustionSpeedPenalty actually apply.
+// Authored in this module (not the frontend) so it can't drift from exhaustionRollEffects/exhaustionSpeedPenalty (#1322).
 describe("exhaustionEffectText — 2014 (PHB'14 p. 291, Appendix A)", () => {
   it("level 0: no exhaustion", () => {
     expect(exhaustionEffectText(0, "EDITION_2014")).toBe("No exhaustion.");
@@ -175,13 +168,7 @@ describe("exhaustionEffectText — 2014 (PHB'14 p. 291, Appendix A)", () => {
     expect(exhaustionEffectText(99, "EDITION_2014")).toBe("Death.");
   });
 
-  // Names what this actually verifies: the SET of categories, pinned on each
-  // side separately. Deliberately not their order — the sentence reads
-  // attack/check/save/initiative (summarizeRollModifiers' KIND_ORDER) while the
-  // grant array is check/initiative/attack/save, and nothing here reconciles
-  // the two. A character-by-character diff against the rendered banner is not
-  // available either: summarizeRollModifiers is a frontend presenter, so a
-  // backend test importing it would be a boundary-violation (#1272).
+  // Verifies the SET of categories, not order — summarizeRollModifiers' KIND_ORDER differs from the grant array's order, and importing that frontend presenter here would violate the backend/frontend boundary (#1272).
   it("the disadvantage clause names the same categories that exhaustionRollEffects applies at that level", () => {
     expect(exhaustionEffectText(3, "EDITION_2014")).toContain(
       "Disadvantage on attack rolls, ability checks, saving throws, and initiative",
@@ -218,9 +205,7 @@ describe("exhaustionEffectText — 2024 (SRD 5.2)", () => {
   });
 });
 
-// #1321: PHB'14 p. 291's level-4 tier — "Hit point maximum halved" — a direct
-// structural sibling of exhaustionSpeedPenalty (returns the SUBTRAHEND, not the
-// result). SRD 5.2 has no hit-point-maximum tier at all.
+// PHB'14 p. 291 level-4 tier: HP max halved. Returns the SUBTRAHEND, not the result (like exhaustionSpeedPenalty); SRD 5.2 has no such tier (#1321).
 describe("exhaustionMaxHpPenalty — 2014 (PHB'14 p. 291)", () => {
   it("is 0 below level 4", () => {
     expect(exhaustionMaxHpPenalty(0, 30, "EDITION_2014")).toBe(0);
@@ -246,9 +231,7 @@ describe("exhaustionMaxHpPenalty — 2024 (SRD 5.2)", () => {
   });
 });
 
-// effectiveMaxHitPoints (hp-core.ts) composes the penalty above with the feat
-// layer and the max-HP ≥ 1 floor — the single function every HP-max consumer
-// calls (#1321).
+// effectiveMaxHitPoints composes this penalty with the feat layer and the max-HP >= 1 floor — the single function every HP-max consumer calls (#1321).
 describe("effectiveMaxHitPoints — composition (#1321)", () => {
   it("stored max 30, no feat bonus, 2014 exhaustion 4 → floor(30/2) = 15", () => {
     expect(effectiveMaxHitPoints(30, 0, 4, "EDITION_2014")).toBe(15);

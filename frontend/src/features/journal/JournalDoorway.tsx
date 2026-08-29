@@ -1,15 +1,3 @@
-/**
- * JournalDoorway — the sheet's journal card (#867). The journal now lives on its
- * own page (/characters/:id/journal, #864); the sheet keeps just a doorway: a
- * CSS-drawn closed book (garnet cover + gilt frame) captioned with the current
- * chapter, note/chapter counts, and when it was last written. The whole card is a
- * link to the chronicle page — there is NO add/edit/delete surface on the sheet
- * anymore (⌘J quick capture covers in-the-moment jots).
- *
- * Data comes from the live character.journal + the chronicle sessions (useChronicle),
- * distilled by summarizeJournalDoorway — no new backend.
- */
-
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
@@ -18,9 +6,7 @@ import { useChronicle } from "@/features/journal/useChronicle";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { formatRelativeDay } from "@/lib/formatJournalDate";
 
-// The closed book must read as a dark-red tome in BOTH themes, so its cover, spine
-// and gilt use fixed hex (the garnet-*/gold-* tokens invert in dark mode). Values
-// track the light-mode garnet-800 / garnet-900 / gold-600 tokens.
+// Fixed hex, not garnet-*/gold-* tokens: the book must read as dark-red in both themes, but those tokens invert in dark mode. Tracks the light-mode garnet-800 / garnet-900 / gold-600 values.
 const COVER = "#8a041a";
 const SPINE = "#610316";
 const GILT = "#c99a2e";
@@ -32,14 +18,11 @@ function ClosedBook() {
       className="relative h-[4.75rem] w-14 shrink-0 self-start rounded-l-[3px] rounded-r-md shadow-raised"
       style={{ background: `linear-gradient(135deg, ${COVER}, ${SPINE})` }}
     >
-      {/* Darker spine strip down the binding edge. */}
       <div className="absolute inset-y-0 left-0 w-2 rounded-l-[3px]" style={{ background: SPINE }} />
-      {/* Inset gold hairline frame, clearing the spine on the left. */}
       <div
         className="absolute inset-y-2 left-[0.875rem] right-2 rounded-[2px] border"
         style={{ borderColor: GILT }}
       />
-      {/* Centered gold diamond. */}
       <div
         className="absolute left-[calc(50%+0.25rem)] top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45"
         style={{ backgroundColor: GILT }}
@@ -79,8 +62,6 @@ export default function JournalDoorway() {
   );
 }
 
-// Title/subtitle copy, split out of the component (no JSX) so its branching
-// doesn't count against JournalDoorway's own cognitive budget.
 function doorwayCopy(summary: JournalDoorwaySummary): { title: string; subtitle: string } {
   if (summary.isEmpty) {
     return { title: "Begin your chronicle", subtitle: "Your first note opens the book." };

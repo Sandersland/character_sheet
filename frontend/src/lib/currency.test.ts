@@ -43,7 +43,6 @@ describe("fromCopper", () => {
 
 describe("addCurrency", () => {
   it("adds each denomination independently without carrying up", () => {
-    // three 15 gp sales stay 45 gp — not normalized to 4 pp 5 gp
     expect(
       addCurrency(addCurrency({ cp: 0, sp: 0, gp: 15, pp: 0 }, { cp: 0, sp: 0, gp: 15, pp: 0 }), {
         cp: 0,
@@ -83,12 +82,11 @@ describe("splitLumpSum", () => {
     const lines = splitLumpSum(total, 1);
     expect(lines).toHaveLength(1);
     expect(toCopper(lines[0])).toBe(toCopper(total));
-    // decomposed form is canonical
     expect(lines[0]).toEqual(fromCopper(toCopper(total)));
   });
 
   it("splits so the lines sum EXACTLY to the total (copper invariant)", () => {
-    const total: Currency = { cp: 0, sp: 0, gp: 10, pp: 0 }; // 1000 cp
+    const total: Currency = { cp: 0, sp: 0, gp: 10, pp: 0 };
     for (const n of [2, 3, 4, 7, 9]) {
       const lines = splitLumpSum(total, n);
       expect(lines).toHaveLength(n);
@@ -97,7 +95,6 @@ describe("splitLumpSum", () => {
   });
 
   it("distributes the remainder copper to the earliest lines", () => {
-    // 1000 cp across 3 → base 333, remainder 1 → first line 334, rest 333
     const lines = splitLumpSum({ cp: 0, sp: 0, gp: 10, pp: 0 }, 3);
     expect(toCopper(lines[0])).toBe(334);
     expect(toCopper(lines[1])).toBe(333);
@@ -105,7 +102,6 @@ describe("splitLumpSum", () => {
   });
 
   it("hands every extra copper to the earliest lines, never overflowing the count", () => {
-    // 1003 cp across 4 → base 250, remainder 3 → 251, 251, 251, 250
     const total = fromCopper(1003);
     const lines = splitLumpSum(total, 4);
     expect(lines.map(toCopper)).toEqual([251, 251, 251, 250]);
@@ -113,7 +109,7 @@ describe("splitLumpSum", () => {
   });
 
   it("each line is a canonical greedy decomposition", () => {
-    const lines = splitLumpSum({ cp: 0, sp: 0, gp: 0, pp: 1 }, 3); // 1000 cp
+    const lines = splitLumpSum({ cp: 0, sp: 0, gp: 0, pp: 1 }, 3);
     for (const line of lines) {
       expect(line).toEqual(fromCopper(toCopper(line)));
     }

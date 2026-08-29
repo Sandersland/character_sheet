@@ -4,9 +4,6 @@ import { login } from "./helpers/auth";
 import { createCharacter, gotoSheet, uniqueName } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
-// Resistance auto-halve on the damage-taken flow (#456). A raging Barbarian
-// resists bludgeoning/piercing/slashing — matching damage is halved, other types
-// are unaffected, and the type picker keeps typeless entry working.
 function hpMeter(page: Page) {
   return page.getByRole("meter", { name: /hit points/ });
 }
@@ -24,7 +21,6 @@ test("resistance: raging Barbarian halves matching damage, full for others", asy
     background: "Soldier",
   });
 
-  // Enter rage via the actions endpoint — applies the while-active b/p/s buff.
   const rage = await page.request.post(`/api/characters/${id}/actions/transactions`, {
     data: { operations: [{ type: "executeAction", actionKey: "rage" }] },
   });
@@ -36,7 +32,6 @@ test("resistance: raging Barbarian halves matching damage, full for others", asy
   const errors = collectConsoleErrors(page);
   const start = await hpNow(page);
 
-  // 12 slashing is resisted → preview shows the halve, HP drops by 6.
   await page.getByRole("radio", { name: "Damage" }).click();
   await page.getByRole("spinbutton", { name: "Damage amount" }).fill("12");
   await page.getByRole("combobox", { name: "Damage type" }).selectOption("slashing");
@@ -44,7 +39,6 @@ test("resistance: raging Barbarian halves matching damage, full for others", asy
   await page.getByRole("button", { name: /apply \d+ damage/i }).click();
   await expect.poll(() => hpNow(page)).toBe(start - 6);
 
-  // 8 fire is not resisted (no preview) → HP drops by the full 8.
   const afterSlash = await hpNow(page);
   await page.getByRole("spinbutton", { name: "Damage amount" }).fill("8");
   await page.getByRole("combobox", { name: "Damage type" }).selectOption("fire");

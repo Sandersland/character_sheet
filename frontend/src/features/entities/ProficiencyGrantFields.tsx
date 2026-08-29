@@ -12,8 +12,6 @@ interface ProficiencyGrantFieldsProps {
   onUpdate: (patch: Partial<ItemCapability>) => void;
 }
 
-// The proficiency grant branch (#529): a kind (skill/save/weapon/tool/language)
-// plus its value — chosen from a list for skill/save, free-text otherwise.
 export default function ProficiencyGrantFields({ cap, index, onUpdate }: ProficiencyGrantFieldsProps) {
   return (
     <>

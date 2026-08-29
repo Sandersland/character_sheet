@@ -1,9 +1,3 @@
-/**
- * Active-effects (buff) integration test — drives the real cast seam
- * (castAbilityInTx) against Postgres, then asserts apply → serialize → replace →
- * clear → undo. Requires DATABASE_URL (docker compose up db).
- */
-
 import { randomUUID } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -34,8 +28,6 @@ function buffEffect(target: string, modifier: number): EffectSpec {
   };
 }
 
-// Mirror the dispatcher: load spell state, run the shared caster, persist
-// concentratingOn back. Returns the batchId so the caller can revert it.
 async function castBuff(entryId: string, name: string, target: string, modifier: number): Promise<string> {
   const batchId = randomUUID();
   await prisma.$transaction(async (tx) => {

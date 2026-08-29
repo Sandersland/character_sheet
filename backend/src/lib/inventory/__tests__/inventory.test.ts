@@ -138,8 +138,6 @@ describe("applyInventoryOperations", () => {
   });
 
   it("a multi-op batch sees each prior op's persisted state (per-op re-read)", async () => {
-    // Two buys in one batch: each re-reads currency, so the debits accumulate
-    // only if op 2 sees op 1's write. Starts sp:5 → sp:3 → sp:1.
     await applyInventoryOperations(characterAId, [
       { type: "acquire", itemId, quantity: 1, currencyDelta: { cp: 0, sp: 2, gp: 0, pp: 0 } },
       { type: "acquire", itemId, quantity: 1, currencyDelta: { cp: 0, sp: 2, gp: 0, pp: 0 } },
@@ -181,7 +179,7 @@ describe("applyInventoryOperations", () => {
       orderBy: { createdAt: "asc" },
     });
     expect(events).toHaveLength(2);
-    // entityId is the item ID at event-write time (soft ref — no SetNull cascade)
+    // entityId is the item ID at event-write time (soft ref — no SetNull cascade).
     expect(events[1].type).toBe("consumed");
     expect(events[1].entityId).toBe(created.id);
     expect((events[1].data as Record<string, unknown>).itemName).toBe("Lib Test Club");
@@ -198,16 +196,13 @@ describe("applyInventoryOperations", () => {
 
     const updated = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
     expect(updated.name).toBe("Club +1");
-    // The weapon override patches `snapshot` (#1649) — the detail table it used
-    // to nest-update is gone. This is the "Club +1" divergence path: a homebrew
-    // edit to one weapon field must survive a reload without disturbing its
-    // siblings.
+    // #1649: a weapon override patches the `snapshot` blob, not a separate detail table.
     const weapon = readInventorySnapshot(updated).weapon;
     expect(weapon?.damageModifier).toBe(1);
-    expect(weapon?.damageDiceFaces).toBe(4); // untouched fields survive a partial update
+    expect(weapon?.damageDiceFaces).toBe(4);
 
     const events = await prisma.characterEvent.findMany({ where: { characterId: characterAId, category: "inventory" } });
-    expect(events).toHaveLength(1); // just the original acquire — update is cosmetic, not logged
+    expect(events).toHaveLength(1);
   });
 
   it("remove deletes the row outright and logs 'removed'", async () => {
@@ -253,10 +248,7 @@ describe("applyInventoryOperations", () => {
     expect(items).toHaveLength(0);
   });
 
-  // ── bulk sell: N sold events under one batchId (Issue #104) ──────────────────
-
   it("bulk sell produces N sold events sharing one batchId", async () => {
-    // Two DISTINCT rows: the catalog item + a fully-custom item.
     await applyInventoryOperations(characterAId, [
       { type: "acquire", itemId, quantity: 1 },
       {
@@ -272,7 +264,6 @@ describe("applyInventoryOperations", () => {
     expect(catalogRow).toBeDefined();
     expect(customRow).toBeDefined();
 
-    // ONE transaction, TWO sell ops, each with its own currencyDelta.
     await applyInventoryOperations(characterAId, [
       { type: "sell", inventoryItemId: catalogRow!.id, currencyDelta: { cp: 0, sp: 0, gp: 2, pp: 0 } },
       { type: "sell", inventoryItemId: customRow!.id, currencyDelta: { cp: 0, sp: 0, gp: 3, pp: 0 } },
@@ -282,19 +273,15 @@ describe("applyInventoryOperations", () => {
       where: { characterId: characterAId, type: "sold" },
       orderBy: { createdAt: "asc" },
     });
-    // Exactly two sold events.
     expect(sold).toHaveLength(2);
 
-    // Both share ONE non-null batchId.
     expect(sold[0].batchId).not.toBeNull();
     expect(new Set(sold.map((e) => e.batchId)).size).toBe(1);
 
-    // Each event's entityId == its own inventoryItemId.
     const byEntity = new Map(sold.map((e) => [e.entityId, e.data as Record<string, unknown>]));
     expect(byEntity.has(catalogRow!.id)).toBe(true);
     expect(byEntity.has(customRow!.id)).toBe(true);
 
-    // Correct data.itemName / quantityDelta / currencyDelta per row.
     const catalogData = byEntity.get(catalogRow!.id)!;
     expect(catalogData.itemName).toBe("Lib Test Club");
     expect(catalogData.quantityDelta).toBe(-1);
@@ -304,7 +291,6 @@ describe("applyInventoryOperations", () => {
     expect(customData.quantityDelta).toBe(-1);
     expect(customData.currencyDelta).toEqual({ cp: 0, sp: 0, gp: 3, pp: 0 });
 
-    // Derivable batch total + count: summed currencyDelta = { gp: 5 }, rows = 2.
     const totalGp = sold.reduce(
       (sum, e) => sum + (((e.data as Record<string, unknown>).currencyDelta as { gp: number }).gp ?? 0),
       0
@@ -312,8 +298,6 @@ describe("applyInventoryOperations", () => {
     expect(totalGp).toBe(5);
     expect(sold.length).toBe(2);
   });
-
-  // ── data.deletedItem undo snapshot (Issue #117) ──────────────────────────────
 
   it("removing a custom weapon snapshots the full row + weapon detail under data.deletedItem", async () => {
     await applyInventoryOperations(characterAId, [
@@ -351,8 +335,7 @@ describe("applyInventoryOperations", () => {
     expect(deletedItem.equippedSlot).toBe("MAIN_HAND");
     expect(deletedItem.notes).toBe("keep sharp");
     expect(deletedItem.position).toBe(created.position);
-    // The frozen half is captured as the already-persisted `snapshot` blob
-    // (#1649), not separate weaponDetail/armorDetail/consumableDetail fields.
+    // #1649: the frozen half is the already-persisted `snapshot` blob, not separate weaponDetail/armorDetail/consumableDetail fields.
     const snapshot = deletedItem.snapshot as Record<string, unknown>;
     expect(snapshot.armor).toBeNull();
     expect(snapshot.consumable).toBeNull();
@@ -408,8 +391,6 @@ describe("applyInventoryOperations", () => {
     expect(after.equippedSlot).toBeNull();
   });
 
-  // ── equip op: paper-doll placement (#565) ────────────────────────────────────
-
   async function acquireCustom(custom: Record<string, unknown>) {
     await applyInventoryOperations(characterAId, [{ type: "acquire", custom } as never]);
     const rows = await prisma.inventoryItem.findMany({
@@ -438,7 +419,6 @@ describe("applyInventoryOperations", () => {
     const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
     expect(after.equippedSlot).toBe("MAIN_HAND");
 
-    // The equip event is logged + undoable, mirroring setEquipped.
     const event = await prisma.characterEvent.findFirstOrThrow({
       where: { characterId: characterAId, type: "equipped" },
     });
@@ -520,7 +500,6 @@ describe("applyInventoryOperations", () => {
     await applyInventoryOperations(characterAId, [{ type: "setEquipped", inventoryItemId: gs.id, equipped: false }]);
     expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: gs.id } })).equippedSlot).toBeNull();
 
-    // Undo the unequip event → slot restored to MAIN_HAND.
     const unequipped = await prisma.characterEvent.findFirstOrThrow({
       where: { characterId: characterAId, type: "unequipped" },
       orderBy: { createdAt: "desc" },
@@ -533,7 +512,6 @@ describe("applyInventoryOperations", () => {
     await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 5 }]);
     const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
 
-    // Partial sell: row survives, no deletedItem snapshot.
     await applyInventoryOperations(characterAId, [
       { type: "sell", inventoryItemId: created.id, quantity: 2, currencyDelta: { cp: 0, sp: 2, gp: 0, pp: 0 } },
     ]);
@@ -543,7 +521,6 @@ describe("applyInventoryOperations", () => {
     });
     expect((sold.data as Record<string, unknown>).deletedItem).toBeUndefined();
 
-    // Full sell of the remaining 3: row deleted, deletedItem present.
     await applyInventoryOperations(characterAId, [
       { type: "sell", inventoryItemId: created.id, currencyDelta: { cp: 0, sp: 3, gp: 0, pp: 0 } },
     ]);
@@ -574,7 +551,6 @@ describe("applyInventoryOperations", () => {
     });
     expect((consumed.data as Record<string, unknown>).deletedItem).toBeUndefined();
 
-    // Adjust the remaining 2 to zero: row deleted, snapshot present.
     await applyInventoryOperations(characterAId, [
       { type: "adjustQuantity", inventoryItemId: created.id, delta: -2 },
     ]);
@@ -596,12 +572,9 @@ describe("applyInventoryOperations", () => {
       applyInventoryOperations(characterBId, [{ type: "remove", inventoryItemId: created.id }])
     ).rejects.toThrow(InvalidInventoryOperationError);
 
-    // Untouched — the rejected op never reached character A's row.
     const items = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
     expect(items).toHaveLength(1);
   });
-
-  // ── acquire source resolution + use guards (#597 decomposition) ──────────────
 
   it("acquire rejects when neither itemId nor custom is supplied", async () => {
     await expect(
@@ -650,7 +623,7 @@ describe("applyInventoryOperations", () => {
       orderBy: { createdAt: "desc" },
     });
     expect((event.data as Record<string, unknown>).deletedItem).toBeTruthy();
-    // Depleting the last unit deletes the row, so `after` is null (not a quantity).
+    // Depleting the last unit deletes the row, so `after` is null rather than a quantity.
     expect(event.after).toBeNull();
   });
 
@@ -671,8 +644,6 @@ describe("applyInventoryOperations", () => {
       applyInventoryOperations(characterAId, [{ type: "use", inventoryItemId: wand.id }])
     ).rejects.toThrow(/no uses remaining/i);
   });
-
-  // ── revertInventoryEvent reconstruction (Issue #117) ─────────────────────────
 
   async function latestEventOfType(characterId: string, type: CharacterEventType) {
     return prisma.characterEvent.findFirstOrThrow({
@@ -716,8 +687,7 @@ describe("applyInventoryOperations", () => {
         notes: "sheathed",
         position: created.position,
       });
-      // The recreated row's frozen half comes back from the persisted
-      // `snapshot` blob verbatim (#1649) — its own table is gone.
+      // #1649: the recreated row's frozen half comes back from the persisted `snapshot` blob verbatim.
       expect(readInventorySnapshot(restored).weapon).toMatchObject({
         damageDiceFaces: 4,
         damageType: "piercing",
@@ -776,7 +746,7 @@ describe("applyInventoryOperations", () => {
       await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, bought));
 
       character = await prisma.character.findUniqueOrThrow({ where: { id: characterAId } });
-      expect(character.currency).toEqual({ cp: 0, sp: 5, gp: 10, pp: 0 }); // refunded
+      expect(character.currency).toEqual({ cp: 0, sp: 5, gp: 10, pp: 0 });
     });
 
     it("reverses a sale credit (subtracts the proceeds back)", async () => {
@@ -787,21 +757,18 @@ describe("applyInventoryOperations", () => {
         { type: "sell", inventoryItemId: created.id, currencyDelta: { cp: 0, sp: 3, gp: 0, pp: 0 } },
       ]);
       let character = await prisma.character.findUniqueOrThrow({ where: { id: characterAId } });
-      expect(character.currency).toEqual({ cp: 0, sp: 8, gp: 10, pp: 0 }); // 5 + 3
+      expect(character.currency).toEqual({ cp: 0, sp: 8, gp: 10, pp: 0 });
 
       const sold = await latestEventOfType(characterAId, "sold");
       await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, sold));
 
       character = await prisma.character.findUniqueOrThrow({ where: { id: characterAId } });
-      expect(character.currency).toEqual({ cp: 0, sp: 5, gp: 10, pp: 0 }); // proceeds removed
-      // …and the row is back (full sell deleted it).
+      expect(character.currency).toEqual({ cp: 0, sp: 5, gp: 10, pp: 0 });
       const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
       expect(restored.quantity).toBe(2);
     });
 
-    // A pre-#1646 audit blob names the provenance FK `campaignItemId`. The log is
-    // append-only so those blobs are never rewritten; ids were preserved by the
-    // merge migration, so the legacy key still resolves and undo must honour it.
+    // #1646: the audit log is append-only, so pre-merge blobs still name the provenance FK `campaignItemId`; undo must still honour that legacy key.
     it("recreates a pre-merge awarded item from a legacy campaignItemId snapshot", async () => {
       const campaign = await prisma.campaign.create({
         data: { name: "Legacy Snapshot Campaign", ownerId: OWNER_ID, inviteCode: randomUUID() },

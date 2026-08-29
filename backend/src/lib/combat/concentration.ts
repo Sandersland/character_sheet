@@ -9,35 +9,18 @@ import {
   deriveFeatProficiencies,
 } from "@/lib/srd/srd.js";
 import { rollDie } from "@/lib/core/dice.js";
-// Leaf module (no back-imports), NOT classes/resources.ts (#1243) — that file
-// now also composes applyHealInTx (Uncanny Metabolism's bonus heal), which
-// would close an import cycle back through combat/hitpoints.ts.
+// Imports resources-state's functions, not the resources module that composes applyHealInTx, to avoid an import cycle back into this file.
 import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources-state.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 
-// Concentration-on-damage (issue #41).
-
-/**
- * Outcome of a concentration check triggered by a damage instance. Returned
- * (when non-null) so the route can surface the auto-rolled save to the player.
- * `held: false` with `reason: "death"` means concentration was dropped without
- * a save because the character hit 0 HP (or died).
- */
+// Nullability is status/reason-dependent: held/roll/total/dc are all null while status is "pending";
+// roll/saveBonus/total/dc are null on the reason "death" path (no save rolled).
 export interface ConcentrationCheckResult {
-  /**
-   * "resolved" — the save was rolled (or skipped via the death path); the
-   * outcome in `held` is final. "pending" — a manual save is deferred to the
-   * client (issue #76): `dc`/`saveBonus` are populated, `held`/`roll`/`total`
-   * are null, and the client must follow up with a `concentrationSave` op.
-   */
   status: "resolved" | "pending";
-  /** The concentrating SpellEntry id — needed for the follow-up resolve op. */
   entryId: string;
   spellName: string;
   reason: "damage" | "death";
-  /** null while pending (not yet rolled). */
   held: boolean | null;
-  /** Present only for an actual save (reason "damage"); null on the 0-HP path or while pending. */
   roll: number | null;
   saveBonus: number | null;
   total: number | null;
@@ -45,25 +28,15 @@ export interface ConcentrationCheckResult {
   damage: number;
 }
 
-/**
- * Compute the Constitution-save bonus and DC for a concentration check from a
- * character row and one damage instance. Save bonus = CON modifier + proficiency
- * bonus IF proficient in CON saves (class grant or feat grant). DC = max(10,
- * floor(damage / 2)). Shared by the auto path and the deferred manual-resolve
- * path so the 5e math lives in exactly one place.
- */
+// Shared by the auto path and the deferred manual-resolve path so the 5e math lives in exactly one place.
 function computeConcentrationSave(
   row: {
     abilityScores: Prisma.JsonValue;
     experiencePoints: number;
     savingThrowProficiencies: string[];
     resources: Prisma.JsonValue;
-    // `class` (#1529): characterAdvancementSlots' extraAsiLevels read below —
-    // one of the reconciler/clamp-on-read pair's seven query sites CLAUDE.md
-    // governs, resolving the SAME column as reconcileAdvancements' select.
-    // Non-optional (no `?`) so a select that omits `class` fails `tsc`, not
-    // just at runtime — a structurally-compatible Prisma result missing
-    // `class` would otherwise satisfy an optional property silently.
+    // Non-optional so a select omitting `class` fails tsc — this must resolve the same column as
+    // reconcileAdvancements' clamp-on-read select (#1529).
     classEntries: { name: string; level: number; class: { extraAsiLevels: number[] } | null }[];
   },
   damage: number,
@@ -84,8 +57,6 @@ function computeConcentrationSave(
   return { saveBonus, dc: concentrationSaveDC(damage) };
 }
 
-// Re-read the character + concentration state inside the tx; null when the row
-// is gone or the character is not concentrating.
 async function readConcentratingStateInTx(tx: Prisma.TransactionClient, characterId: string) {
   const row = await tx.character.findUnique({
     where: { id: characterId },
@@ -95,9 +66,7 @@ async function readConcentratingStateInTx(tx: Prisma.TransactionClient, characte
       experiencePoints: true,
       savingThrowProficiencies: true,
       resources: true,
-      // All entries — the feat-slot cap sums entitlement per class level (#1073),
-      // not just the primary (position 0). `class` (#1529): see computeConcentrationSave's
-      // param comment.
+      // All entries: the feat-slot cap sums entitlement per class level (#1073), not just the primary entry.
       classEntries: {
         orderBy: { position: "asc" as const },
         select: { name: true, level: true, class: { select: { extraAsiLevels: true } } },
@@ -112,7 +81,6 @@ async function readConcentratingStateInTx(tx: Prisma.TransactionClient, characte
   return { row, state, prior };
 }
 
-// Clear concentration and persist it; returns the after-snapshot for the event log.
 async function dropConcentrationInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -139,35 +107,11 @@ async function dropConcentrationInTx(
   };
 }
 
-/**
- * If the character is concentrating, resolve the 5e "concentration on damage"
- * rule for one instance of damage and, on a drop, clear `concentratingOn` and
- * log a `concentrationDropped` event.
- *
- * - At 0 HP (or already dead): concentration ends UNCONDITIONALLY, no save —
- *   reason "death". The 0-HP path wins if it also would have triggered a save.
- *   Runs regardless of `autoRoll`.
- * - Otherwise, when `autoRoll` is true: roll a Constitution saving throw
- *   server-side. DC = max(10, floor(damage / 2)). On a failed save (total < DC)
- *   concentration ends — reason "damage". On a success, nothing is logged.
- * - Otherwise, when `autoRoll` is false (issue #76): compute the DC + save bonus
- *   but DO NOT roll, mutate, or log. Return a `status: "pending"` result so the
- *   client can roll the save and follow up with a `concentrationSave` op.
- *
- * NOTE (deferred, issue #41 follow-up): concentration should ALSO end when the
- * incapacitated / stunned / paralyzed / unconscious CONDITIONS are applied. That
- * lives in the conditions feature (lib + conditions transaction path) and is
- * intentionally out of scope here. The 0-HP path below covers the common case
- * (dropping to 0 HP makes a character unconscious), but a directly-applied
- * condition with the character still above 0 HP will not yet drop concentration.
- *
- * The event is logged under category "spellcasting" (not "hitPoints") so the
- * activity revert handler restores the full spellcasting JSON from `before` —
- * sharing the batchId with the damage event means LIFO undo reverses both.
- *
- * Returns the check result for the route to surface, or null when the character
- * was not concentrating.
- */
+// The 0-HP path takes precedence even when a save would also have been triggered.
+// Deferred (#41 follow-up): concentration should also end when incapacitated/stunned/paralyzed/unconscious
+// conditions are applied directly above 0 HP; only the 0-HP path is covered here.
+// Logged under category "spellcasting" (not "hitPoints") so the revert handler restores the full
+// spellcasting JSON; sharing the damage event's batchId means LIFO undo reverses both.
 export async function applyConcentrationCheckInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -188,7 +132,6 @@ export async function applyConcentrationCheckInTx(
     concentratingOn: { ...prior },
   };
 
-  // Decide whether the save is even rolled.
   const droppedByDeath = newCurrentHp <= 0;
   let result: ConcentrationCheckResult;
 
@@ -209,9 +152,6 @@ export async function applyConcentrationCheckInTx(
     const { saveBonus, dc } = computeConcentrationSave(row, damage);
 
     if (!autoRoll) {
-      // Manual path (issue #76): defer the roll to the client. Compute the DC
-      // and bonus for the prompt, but leave concentration untouched — the
-      // follow-up `concentrationSave` op resolves it.
       return {
         status: "pending",
         entryId: prior.entryId,
@@ -244,12 +184,10 @@ export async function applyConcentrationCheckInTx(
     };
 
     if (held) {
-      // Successful save — concentration holds, nothing to persist or log.
       return result;
     }
   }
 
-  // Drop concentration (failed save, or 0-HP/death path).
   const afterSpellcasting = await dropConcentrationInTx(tx, characterId, state);
 
   const summary = droppedByDeath
@@ -284,20 +222,9 @@ export async function applyConcentrationCheckInTx(
   return result;
 }
 
-/**
- * Resolve a deferred concentration CON save with a client-rolled d20 (issue #76),
- * the follow-up to a `damage` op that ran with `autoRollConcentration: false`.
- *
- * The DC is recomputed from `damage` and the save bonus from the live character —
- * the client's only trusted input is `roll` (validated 1..20 at the route). If the
- * character is no longer concentrating on `entryId` (already dropped, a second
- * damage resolved first, or a duplicate submit), this is a no-op and returns null.
- *
- * NOTE: unlike the auto path — which shares the damage op's batchId so a single
- * undo reverses HP + concentration together — a manual save arrives in its own
- * request, so this logs under a fresh batchId and is undone as a separate LIFO
- * entry. The spellcasting revert handler restores `concentratingOn` on undo.
- */
+// Only `roll` is client-trusted (validated 1..20 at the route); DC and save bonus are recomputed server-side.
+// Unlike the auto path (shares the damage op's batchId), a manual save logs under its own fresh
+// batchId and undoes as a separate LIFO entry.
 export async function applyConcentrationSaveInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -331,7 +258,6 @@ export async function applyConcentrationSaveInTx(
   };
 
   if (held) {
-    // Successful save — concentration holds, nothing to persist or log.
     return result;
   }
 

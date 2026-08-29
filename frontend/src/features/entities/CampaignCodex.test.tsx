@@ -272,7 +272,6 @@ function stats(partial: Partial<NonNullable<CampaignEntity["stats"]>>) {
   };
 }
 
-// GOBLIN is most mentioned; THORDAK mentioned most recently; GATE has no stats.
 const STATS_ENTITIES = [
   {
     ...GOBLIN,
@@ -446,7 +445,6 @@ describe("CampaignCodex create flow (#367)", () => {
       CAMPAIGN_ID,
       expect.arrayContaining([expect.objectContaining({ id: "ent-new" })]),
     );
-    // Panel collapses back to the toggle after a successful create.
     expect(screen.queryByRole("button", { name: /create entity/i })).not.toBeInTheDocument();
   });
 

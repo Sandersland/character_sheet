@@ -1,18 +1,8 @@
-/**
- * Improved Shadow Step (Warrior of Shadow L11, PHB'24 p.91, #1246/#1912) —
- * upgrades the SAME Shadow Step bonus action in place (ignore the dim/dark
- * destination requirement for 1 focus) rather than adding a competing
- * catalog row, mirroring Heightened Focus's own in-place-upgrade shape. The
- * base row's reminder (monk-features.ts, Warrior of Shadow's Shadow Step)
- * carries the flat below-L11 text; this descriptor appends the L11 rider —
- * reworded to a standalone trailing sentence rather than the pre-#1912
- * mid-sentence insertion, since an announce-augmentor payload can only ever
- * APPEND (announce-augmentors.ts's `foldPayload`), never splice text
- * mid-string. Registered in ANNOUNCE_AUGMENTORS.
- */
+// PHB'24 p.91, Warrior of Shadow L11 — upgrades Shadow Step's SAME bonus action in place (mirrors Heightened Focus's shape), rather than a competing catalog row.
+// The rider must be a standalone trailing sentence, never a mid-string splice — an announce-augmentor payload can only APPEND (foldPayload).
 import type { AnnounceAugmentor } from "./announce-augmentors.js";
 
-/** PHB'24 p.91 — Improved Shadow Step's own grant level. */
+// PHB'24 p.91 — Improved Shadow Step's own grant level.
 export const IMPROVED_SHADOW_STEP_LEVEL = 11;
 
 export const IMPROVED_SHADOW_STEP_REMINDER =

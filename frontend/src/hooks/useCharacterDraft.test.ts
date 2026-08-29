@@ -39,8 +39,7 @@ describe("useCharacterDraft", () => {
 
     expect(result.current.draft.name).toBe("");
     expect(result.current.draft.speciesId).toBe("");
-    // After clear, the effect re-persists the now-empty draft; the important
-    // guarantee is that no stale values survive.
+    // clear() sets state; the effect below then re-persists the emptied draft.
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
     expect(stored.name).toBe("");
     expect(stored.speciesId).toBe("");

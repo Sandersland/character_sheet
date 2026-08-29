@@ -1,27 +1,3 @@
-/**
- * Second Wind row-driven cast-core route tests (#420, re-mechanized #1528).
- *
- * Second Wind is row-driven now: castSpecFromRow reads its ClassFeature row
- * (resourceKey/costKind/effectKind/effectModifierSource) and the SERVER rolls
- * 1d10 + Fighter level (castManeuver, maneuvers.ts, is the server-roll
- * precedent) — the client no longer sends `roll`. These tests pin the
- * observable behaviour the migration must preserve:
- *   - the pool is spent and the server-rolled heal is applied, atomically
- *   - the roll is reported back via `results[0].roll` (#1528 wire contract)
- *   - the batch logs exactly a spendResource event + a heal event (no new cast
- *     event) — history unchanged
- *   - LIFO revert restores BOTH the pool and the HP together
- *   - Action Surge stays a pure counter (spend, no heal), dispatched via the
- *     same row-driven path but with no effectKind
- *   - unknown action key → 400
- *
- * Real Postgres in beforeEach; supertest against the shared `app`. Uniquely-named
- * catalog fixtures per testing.md so afterAll cleanup never touches seeded
- * rows — fighterResourceRowsData seeds this fixture's OWN ClassFeature rows
- * (#1528: Second Wind/Action Surge are tied to a specific classId now, not
- * derivable from the class NAME alone), cascade-deleted with the class.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -37,13 +13,6 @@ let COOKIE: string;
 const FIGHTER_ID = "test-actions-cast-fighter";
 const FIGHTER_CATALOG_NAME = "Actions Cast Test Fighter";
 
-// Level-5 Fighter (6500 XP), damaged to 20/44 so a Second Wind heal is visible.
-// Pinned to EDITION_2014 (#1227): this suite is about the CAST MECHANISM (pool
-// spend + heal + revert atomicity), not resource counts, and 2014's Second
-// Wind stays a single-use pool (byte-identical to before #1227) — the
-// default EDITION_2024 now grants 3 uses at level 5, which would make
-// "second cast fails once exhausted" require two casts first, entangling an
-// unrelated content change into a mechanism test.
 const FIGHTER_BASE = {
   id: FIGHTER_ID,
   name: "Actions Cast Test Fighter",
@@ -86,9 +55,6 @@ async function latestBatchId(): Promise<string> {
   return batchId!;
 }
 
-// No client-supplied roll (#1528) — the server rolls a row-driven cast-core
-// action itself; a still-client-rolled action (layOnHands, etc.) is out of
-// this suite's scope.
 function execute(actionKey: string) {
   return supertest
     .agent(app)
@@ -145,7 +111,7 @@ describe("POST /:id/actions/transactions — Second Wind, row-driven (#420, #152
     const res = await execute("secondWind");
     expect(res.status).toBe(200);
     const roll = res.body.results[0].roll as number;
-    // 1d10 + Fighter level 5 → 6-15.
+
     expect(roll).toBeGreaterThanOrEqual(6);
     expect(roll).toBeLessThanOrEqual(15);
     expect(res.body.hitPoints.current).toBe(20 + roll);
@@ -178,9 +144,9 @@ describe("POST /:id/actions/transactions — Second Wind, row-driven (#420, #152
       .set("Cookie", COOKIE)
       .post(`/api/characters/${FIGHTER_ID}/events/${batchId}/revert`);
     expect(revert.status).toBe(200);
-    expect(revert.body.hitPoints.current).toBe(20); // heal undone
+    expect(revert.body.hitPoints.current).toBe(20);
     void roll;
-    expect(pool(revert.body, "secondWind")).toMatchObject({ used: 0, remaining: 1 }); // spend undone
+    expect(pool(revert.body, "secondWind")).toMatchObject({ used: 0, remaining: 1 });
   });
 
   it("second Second Wind fails with 400 once the pool is exhausted (whole batch rolls back)", async () => {
@@ -192,7 +158,7 @@ describe("POST /:id/actions/transactions — Second Wind, row-driven (#420, #152
   it("Action Surge stays a pure counter — spends actionSurge, no heal, no roll reported", async () => {
     const res = await execute("actionSurge");
     expect(res.status).toBe(200);
-    expect(res.body.hitPoints.current).toBe(20); // no heal
+    expect(res.body.hitPoints.current).toBe(20);
     expect(pool(res.body, "actionSurge").used).toBe(1);
     expect(res.body.results[0]).toEqual({});
 
@@ -207,17 +173,7 @@ describe("POST /:id/actions/transactions — Second Wind, row-driven (#420, #152
   });
 });
 
-// Second Wind is `1d10 + your Fighter level` (SRD 5.1 p. 23 / SRD 5.2 p. 48) —
-// the FIGHTER entry's level, not the XP-derived character total. The two
-// coincide for a single-class Fighter, which is why every suite above can
-// ignore the distinction; a multiclass Fighter is the only shape that tells
-// them apart, so it is the only shape that can pin the level the cast path
-// feeds `effectModifierSource: "classLevel"`.
-//
-// Fighter 1 / Wizard 19 makes the two readings DISJOINT: the correct heal is
-// 1d10+1 (2-11) and the character-total reading is 1d10+20 (21-30), so no die
-// roll can produce a value both readings allow. Ranges that merely overlap
-// would let a lucky roll pass a broken build.
+// Second Wind is `1d10 + your Fighter level` (SRD 5.1 p. 23 / SRD 5.2 p. 48).
 const MC_ID = "test-actions-cast-mc-fighter";
 const MC_FIGHTER_CATALOG_NAME = "Actions Cast MC Test Fighter";
 const MC_WIZARD_CATALOG_NAME = "Actions Cast MC Test Wizard";
@@ -245,9 +201,6 @@ describe("POST /:id/actions/transactions — Second Wind on a MULTICLASS Fighter
       },
       update: {},
     });
-    // No ClassFeature rows of its own — this entry exists only to make the
-    // character multiclass, so `effectiveEntryLevel` stops falling back to the
-    // XP-derived total and reads each entry's own `level`.
     const wizard = await prisma.characterClass.upsert({
       where: { name: MC_WIZARD_CATALOG_NAME },
       create: {
@@ -270,7 +223,7 @@ describe("POST /:id/actions/transactions — Second Wind on a MULTICLASS Fighter
         id: MC_ID,
         name: "Actions Cast MC Test Fighter",
         ownerId: OWNER_ID,
-        experiencePoints: 355000, // level 20
+        experiencePoints: 355000,
         hitPoints: { current: 20, max: 140, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: 20, die: "d10", spent: 0 },
         classEntries: {
@@ -296,7 +249,7 @@ describe("POST /:id/actions/transactions — Second Wind on a MULTICLASS Fighter
     expect(res.status).toBe(200);
 
     const roll = res.body.results[0].roll as number;
-    expect(roll).toBeGreaterThanOrEqual(2); // 1d10 + 1
+    expect(roll).toBeGreaterThanOrEqual(2);
     expect(roll).toBeLessThanOrEqual(11);
     expect(res.body.hitPoints.current).toBe(20 + roll);
   });

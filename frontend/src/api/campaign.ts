@@ -3,15 +3,12 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import type { Campaign, CampaignItem, CampaignItemHolder, CampaignItemInput, Character } from "@/types/character";
 import { jsonBody, request, send } from "@/api/http";
 
-// Campaigns (#246). Plain REST: list/create/join/attach. The attach call returns
-// the full updated Character (same shape as every character-mutating endpoint).
-
 export async function fetchCampaigns(): Promise<Campaign[]> {
   return request<Campaign[]>("/campaigns", undefined, "Failed to fetch campaigns");
 }
 
-// rulesEdition is the DM's picker at creation (#1286) — the default new
-// characters inherit; never authoritative for an existing sheet afterward.
+// rulesEdition is the DM's picker at creation — the default new characters
+// inherit; never authoritative for an existing sheet afterward.
 export async function createCampaign(name: string, rulesEdition: RulesEdition): Promise<Campaign> {
   return request<Campaign>("/campaigns", jsonBody({ name, rulesEdition }), "Failed to create campaign");
 }
@@ -41,15 +38,13 @@ export async function addCharacterToCampaign(
   );
 }
 
-// Campaign items (#380). Owner-only CRUD (list/create/update/delete).
-// fetchCampaignItemByEntity is the member-readable Codex read, keyed by the fronting
-// entity — non-owners get it only when that entity is revealed, and never see
-// dmNotes (scrubbed server-side).
-
 export async function fetchCampaignItems(campaignId: string): Promise<CampaignItem[]> {
   return request<CampaignItem[]>(`/campaigns/${campaignId}/items`, undefined, "Failed to fetch campaign items");
 }
 
+// The member-readable Codex read, keyed by the fronting entity — non-owners
+// get it only when the entity is revealed, and never see dmNotes (scrubbed
+// server-side).
 export async function fetchCampaignItemByEntity(
   campaignId: string,
   entityId: string,
@@ -88,9 +83,9 @@ export async function deleteCampaignItem(campaignId: string, itemId: string): Pr
   await send(`/campaigns/${campaignId}/items/${itemId}`, { method: "DELETE" }, "Failed to delete campaign item");
 }
 
-// Award/revoke (#381): owner-only. Grants a campaign item into a member
-// character's inventory (reveals the entity, audits on the target) or removes
-// the provenance-matched row. Both return the item's updated holder list.
+// Owner-only: grants a campaign item into a member's inventory (reveals the
+// entity, audits on the target) or removes the provenance-matched row. Both
+// return the item's updated holder list.
 export async function awardCampaignItem(
   campaignId: string,
   itemId: string,

@@ -1,12 +1,3 @@
-/**
- * ActionSheetBody — the option-card list inside the Action picker sheet.
- *
- * Primary rich cards (Attack / Cast a spell / Use an item), class actions,
- * a compact Dash+Dodge pair, and the "More actions" disclosure that expands
- * in place to a tile grid of the remaining universal actions. Presentational:
- * all data arrives via the ActionSheetModel built in useTurnActions.
- */
-
 import { useState } from "react";
 
 import {
@@ -36,21 +27,17 @@ import type { ActionSheetModel, ClassActionOption } from "@/lib/turnOptions";
 
 const NO_ACTION_LEFT_REASON = "No action left this turn";
 
-/** disabled+reason for a card gated on `available` — spread onto OptionCard so
- *  the free-only-mode branching (#1165) lives here once, not per card. */
 function actionGate(available: boolean, reason = NO_ACTION_LEFT_REASON) {
   return { disabled: !available, disabledReason: available ? undefined : reason };
 }
 
-/** The free-only-mode gate for a class-action card — disables it once the
- *  Action is spent, preserving any pool-driven disabledReason it already had. */
 function gateClassAction(option: ClassActionOption, actionAvailable: boolean): ClassActionOption {
   if (actionAvailable) return option;
   return { ...option, enabled: false, disabledReason: option.disabledReason ?? NO_ACTION_LEFT_REASON };
 }
 
-// Keyed on the edition-stable `key`, never the served `name` — the 2024 renames
-// (Magic / Utilize) must not cost a tile its glyph. Unknown keys fall back to Zap.
+// Keyed on the edition-stable `key`, never the served `name` — 2024 renames
+// (Magic / Utilize) must not cost a tile its glyph.
 const TILE_ICONS: Record<string, OptionIcon> = {
   disengage: GiSprint,
   help: GiThreeFriends,
@@ -63,7 +50,7 @@ const TILE_ICONS: Record<string, OptionIcon> = {
   influence: GiPublicSpeaker,
 };
 
-/** Shared row card for a class action (also used by the Bonus/Reaction sheets). */
+// Shared with BonusActionSheetBody and ReactionSlot — keep behavior in sync.
 export function ClassActionCard({
   option,
   busy,
@@ -73,9 +60,8 @@ export function ClassActionCard({
   busy: boolean;
   onClick: () => void;
 }) {
-  // Regranted action names win the subtitle unconditionally (#1431/#1505) — safe today
-  // only because no action carries both regrantNames and a heal-roll/resolver subtitle;
-  // that's not enforced by this code.
+  // regrantNames wins the subtitle unconditionally — safe only because no action
+  // carries both regrantNames and a heal-roll/resolver subtitle; not enforced here.
   const subtitle = option.regrantNames?.join(" · ") ?? option.subtitle;
   return (
     <OptionCard
@@ -100,19 +86,12 @@ export default function ActionSheetBody({
 }: {
   model: ActionSheetModel;
   busy: boolean;
-  /** False once the Action is spent (#1165) — the sheet still opens, but only
-   *  Change weapons (gated by its own interaction budget) stays enabled;
-   *  everything else that spends the Action shows disabled with the reason. */
   actionAvailable: boolean;
   handleAttackAction: () => void;
   handleActionClick: (key: string, cost: "action") => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // Same exclusion rule as the old pill list: universal actions the class
-  // doesn't already provide; the primary five render as dedicated cards. Empty
-  // until the reference query resolves, which collapses the whole disclosure —
-  // deliberate: a missing card degrades, a wrong-edition card lies.
   const classKeys = new Set(model.classActionOptions.map((o) => o.key));
   const moreActions = model.universalActions.filter(
     (u) => u.cost === "action" && !PRIMARY_ACTION_KEYS.has(u.key) && !classKeys.has(u.key),

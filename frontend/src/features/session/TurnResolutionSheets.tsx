@@ -292,8 +292,7 @@ function SpellResolutionSheet({
     if (slot === "action") turnState.commitActionSpell();
     else if (slot === "bonusAction") turnState.commitBonusActionSpell();
     else turnState.commitReactionSpell();
-    // Tag the history entry the commit above just pushed with the cast's batch
-    // so turn undo reverts the server cast (#758), not just the local economy.
+    // Tags the just-pushed history entry with the cast's batch so undo reverts the server cast, not just the local economy.
     if (batchId) turnState.attachBatchId(batchId);
     void refreshCombat?.();
   };

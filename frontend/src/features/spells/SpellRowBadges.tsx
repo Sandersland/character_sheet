@@ -1,4 +1,3 @@
-// Level/school/concentration/ritual + item-provenance badges for a spellbook row.
 import Badge from "@/components/ui/Badge";
 import SpellItemBadges from "@/features/spells/SpellItemBadges";
 import type { SpellRowDerived } from "@/lib/spellRow";

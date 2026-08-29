@@ -1,12 +1,6 @@
 import { useEffect } from "react";
 
-// A *real* iOS body scroll-lock for the mobile quick-capture surface (#877):
-// pin the body with `position: fixed; top: -{scrollY}` so the layout viewport
-// can't scroll under the keyboard, restoring styles + scroll on unmount.
-// `useDialogChrome`'s `overflow: hidden` is a no-op on WebKit (it scrolls the
-// whole layout viewport up to lift a focused input above the keyboard), which
-// desyncs the pinned panel from the page behind and bleeds sheet content through
-// the gap. Capture-specific, so Modal/BottomSheet keep their overflow lock.
+// Real iOS scroll lock (#877): pins the body with position:fixed since useDialogChrome's overflow:hidden is a no-op on WebKit.
 export function useMobileScrollLock(): void {
   useEffect(() => {
     const body = document.body;

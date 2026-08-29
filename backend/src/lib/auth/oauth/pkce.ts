@@ -1,11 +1,6 @@
 import crypto from "node:crypto";
 
-// OAuth-only PKCE + state primitives and the short-lived transaction cookie that
-// carries {provider, state, verifier} across the redirect to the provider and
-// back. Distinct from the session cookie/lifecycle (../session.js) — a
-// password/magic-link method would never touch any of this.
-
-// Short-lived transaction cookie name. `cs_` = character-sheet namespace.
+// The transaction cookie carries {provider, state, verifier} across the redirect to the provider and back — distinct from the SESSION_COOKIE lifecycle.
 export const OAUTH_TX_COOKIE = "cs_oauth_tx";
 
 // 10 minutes is ample for a consent screen.

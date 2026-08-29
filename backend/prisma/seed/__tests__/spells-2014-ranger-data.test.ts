@@ -1,12 +1,3 @@
-// #1721 (content slice of epic #1517, the LAST per-class content slice —
-// #1722 closes the epic): shape + cross-check invariants for the Ranger
-// by-class spell bucket. Pure data tests on the array itself — same pattern
-// as spells-2014-shared-data.test.ts (#1713) through spells-2014-paladin-
-// data.test.ts (#1720) — because the DB round-trip (one Spell row per name,
-// SpellClass fan-out, `?class=` resolution) is already proven generically by
-// spell-fork-reseed.test.ts (#1710) and spells.test.ts's SpellClass-join
-// describe blocks (#1711); this file's only job is to prove THIS SLICE'S
-// DATA is correct, not re-prove the plumbing.
 import { describe, expect, it } from "vitest";
 
 import type { CatalogSpell } from "../spells.js";
@@ -98,13 +89,6 @@ describe("RANGER_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
 });
 
 describe("RANGER_SPELLS_2014 — full PHB'14 Ranger membership is complete across all authoring slices", () => {
-  // The full PHB'14 Ranger spell list (46 spells, levels 1-5 only — Ranger has
-  // no cantrips and caps at 5th-level spells as a half-caster) partitioned by
-  // which slice authors the row. Every name below must carry "ranger" in its
-  // classes[] wherever it's actually authored — this test is the permanent
-  // guard that the "already fanned" claim in ranger.ts's header holds, and
-  // that the two gap rows this slice added to druid.ts (Beast Sense, Grasping
-  // Vine) stay present.
   const DRUID_OWNED_RANGER_SPELLS = [
     "Goodberry",
     "Barkskin",
@@ -247,11 +231,7 @@ describe("RANGER_SPELLS_2014 — structured-field invariants (mirrors wizard.ts/
   });
 });
 
-// The critical lesson from a prior content slice (CLAUDE.md): a row's
-// STRUCTURED saveEffect must match its own DESCRIPTION prose, or the frontend
-// shows "half on success" text that contradicts (or omits) what the spell
-// actually does. Every damage spell in this file is checked against its own
-// text, not spot-checked.
+// A row's structured saveEffect must match its own description prose, or the frontend shows contradicting "half on success" text.
 describe("RANGER_SPELLS_2014 — saveEffect matches its own description text (field/text mismatch guard)", () => {
   const HALF_ON_SUCCESS = /half as much damage|half damage|half the damage/i;
 
@@ -267,15 +247,6 @@ describe("RANGER_SPELLS_2014 — saveEffect matches its own description text (fi
   });
 });
 
-// This slice owns zero direct-cast damage/save rows with a fixed single
-// damageType (every rider/trap/variable-type spell is a documented
-// conditional/multi-effect exception, matching Hex/Armor of Agathys/Hunger of
-// Hadar's precedent in warlock.ts and the smite spells' precedent in
-// paladin.ts) — so, like the Paladin slice, the prose-vs-structured-field
-// audit here is almost all exceptions. Every exception's rationale is
-// spelled out per-row in ranger.ts's own comments; this describe block is the
-// permanent regression guard that the exception set doesn't silently grow or
-// shrink out from under those comments.
 describe("RANGER_SPELLS_2014 — prose-vs-structured-field audit (catches what dnd5eapi's own JSON gaps hid)", () => {
   const CONDITIONAL_OR_MULTI_EFFECT = new Set([
     "Ensnaring Strike", // rider precondition (next hit) gates a Str save; damage is a RECURRING per-turn tick, not a single instance
@@ -322,8 +293,6 @@ describe("RANGER_SPELLS_2014 — prose-vs-structured-field audit (catches what d
   it("every one of this slice's 8 rows is accounted for by either the exception set or a clean pass — no row silently escapes both", () => {
     const exceptionCount = RANGER_SPELLS_2014.filter((s) => CONDITIONAL_OR_MULTI_EFFECT.has(s.name)).length;
     const cleanCount = RANGER_SPELLS_2014.length - exceptionCount;
-    // Swift Quiver (pure action-economy utility, no damage/save at all) is
-    // this slice's only non-exception row.
     expect(cleanCount).toBe(1);
     expect(exceptionCount).toBe(7);
   });
@@ -376,8 +345,6 @@ function find(name: string): CatalogSpell {
   return s;
 }
 
-// Spot-checks on every one of this slice's 8 rows — small enough to be
-// exhaustive rather than a sample.
 describe("RANGER_SPELLS_2014 — value spot-checks", () => {
   it("Ensnaring Strike: ranger-only, non-SRD (PHB'14 p. 237), Str save gates a recurring 1d6 piercing tick while restrained, carries the +1d6-per-upcast-level clause", () => {
     const s = find("Ensnaring Strike");
@@ -416,8 +383,6 @@ describe("RANGER_SPELLS_2014 — value spot-checks", () => {
     expect(s.description).toMatch(/mark a new creature/);
     expect(s.description).toMatch(/maintain your concentration on the spell for up to 8 hours/);
     expect(s.description).toMatch(/up to 24 hours/);
-    // 2014's damage is untyped "damage," never "Force damage" (the 2024
-    // SPELLS row's rewrite) — see this row's own comment in ranger.ts.
     expect(s.description).not.toMatch(/Force damage/);
   });
 

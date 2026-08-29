@@ -95,11 +95,6 @@ describe("ForkSpellSheet", () => {
     expect(onForked).toHaveBeenCalledTimes(1);
   });
 
-  // claude-review finding: `disabled` only checked `userForkState !== "idle"`,
-  // so a spell served with no catalog metadata (`catalog` undefined) showed a
-  // fully-enabled "Make my version" button whose click was a silent no-op
-  // (handleMakeMyVersion's own `if (!entryId) return;` fires with no spinner,
-  // no error, nothing). The button must be disabled up front instead.
   it("disables 'Make my version' when the spell carries no catalog metadata (no entryId to fork)", async () => {
     vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
     const withoutCatalog: CatalogSpell = { ...SEEDED_SPELL, catalog: undefined };

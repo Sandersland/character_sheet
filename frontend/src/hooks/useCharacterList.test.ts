@@ -18,7 +18,6 @@ describe("useCharacterList", () => {
     fetchCharacters.mockReset();
   });
 
-  // Pin (green-first): the three states.
   it("is pending -> {null,false}", () => {
     fetchCharacters.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(() => useCharacterList());
@@ -39,9 +38,8 @@ describe("useCharacterList", () => {
     expect(result.current.characters).toBeNull();
   });
 
-  // RED: fails today (each mount fetches independently). The cache is the
-  // point — two consumers (CharacterSwitcherSheet + CharacterListPage) can
-  // mount at once and share one request.
+  // Two consumers (CharacterSwitcherSheet, CharacterListPage) can mount at
+  // once and share one request — the cache is the point.
   it("shares one request across two mounted consumers", async () => {
     fetchCharacters.mockResolvedValue(SUMMARIES);
     const first = renderHook(() => useCharacterList());

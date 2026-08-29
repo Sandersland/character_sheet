@@ -1,17 +1,3 @@
-/**
- * TurnHub — turn-economy orchestrator for the SessionPage. The primary turn
- * panel. Thin orchestrator: destructures turnState, delegates all dispatch to
- * useTurnActions, and renders the header + slots + surge + inline-tool area +
- * effect strip + messages.
- *
- * Gating:
- *   - Idle phase: only "Start Turn" prompt + the Reaction slot (reactions
- *     fire on other creatures' turns, so they stay available when idle).
- *   - Active phase: all three slots with their menus and inline tools.
- *
- * ⚑ Movement tracking is intentionally excluded (flagged for a future phase).
- */
-
 import Card from "@/components/ui/Card";
 import { ChevronRight, ScrollText, Zap } from "@/components/ui/icons";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
@@ -37,27 +23,13 @@ import type { TurnStateView } from "@/features/session/useTurnState";
 interface TurnHubProps {
   sessionId: string;
   turnState: TurnStateView;
-  /** Called after a combat log event so the Log tab refreshes. */
   onLogChanged: () => void;
-  /** Opted-in party members a healing cast can target on their sheet (#462). */
   allies: AllyOption[];
-  /**
-   * Whether the hub's overlay pickers (BottomSheet, portaled to document.body)
-   * may render (#960). Defaults true. In the sheet workspace the live-Combat
-   * panel stays mounted while you swipe to another tab; passing `false` unmounts
-   * an open picker so it can't float over Overview, while the picker STATE
-   * (activeResolution) survives so it reopens on return.
-   */
+  /** Passing false unmounts an open overlay picker (portaled to document.body) so it can't float over another tab, while `activeResolution` state survives to reopen it. */
   overlaysActive?: boolean;
-  /** Opens the session log (mobile only, #1028). The turn bar shows a log icon
-   *  only when a host wires this; the `/session`-less sheet Combat tab does. */
   onOpenLog?: () => void;
 }
 
-// Idle-phase presentation: the Start-Combat gate (not in combat) or the
-// between-turns card (round header, death saves, concentration, Reaction —
-// which fires on other creatures' turns — and Start-my-turn). Takes the whole
-// hook bags rather than ~18 loose props; TurnHub stays the orchestrator.
 function TurnHubIdle({
   onLogChanged,
   turnState,
@@ -78,8 +50,6 @@ function TurnHubIdle({
     handleStartCombat, handleEndCombat, handleStartTurn,
   } = turn;
 
-  // Deflect Attacks (#1241) — a sibling hook (see its file header for why it
-  // isn't nested inside useTurnActions), composed here alongside turn.
   const deflect = useDeflectAttacksReaction({
     character,
     availableActions: character.availableActions ?? [],
@@ -89,8 +59,6 @@ function TurnHubIdle({
     setReactionMessage,
     attachBatchId: turnState.attachBatchId,
   });
-  // Only the Reaction slot needs the Deflect Attacks interception — the
-  // Action/Bonus slots keep the plain handleActionClick from useTurnActions.
   function handleReactionActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
     if (key === "deflectAttacks" || key === "deflectMissiles") {
       deflect.handleDeflectAttacks();
@@ -99,7 +67,6 @@ function TurnHubIdle({
     handleActionClick(key, cost);
   }
 
-  // Not in combat — show only the Start Combat gate.
   if (!inCombat) {
     return (
       <Card className="p-4">
@@ -121,7 +88,6 @@ function TurnHubIdle({
     );
   }
 
-  // In combat but between turns — round indicator, Start Turn, End Combat, Reaction.
   return (
     <Card className="p-4">
       <div className="flex flex-col gap-4">
@@ -138,9 +104,6 @@ function TurnHubIdle({
           </button>
         </div>
 
-        {/* Combat-start resource regen (#1239/#1243, e.g. Uncanny Metabolism/
-            Perfect Focus) — set once by handleStartCombat, so it's visible
-            immediately here rather than waiting for the active-turn TurnMessages. */}
         {effectMessage && (
           <p className="rounded-control border border-gold-200 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800">
             {effectMessage}
@@ -151,7 +114,6 @@ function TurnHubIdle({
 
         <TurnConcentrationBanner onLogChanged={onLogChanged} />
 
-        {/* Reaction is available between turns — render it in idle mode. */}
         <ReactionSlot
           reactionUsed={reactionUsed}
           showReactionMenu={showReactionMenu}
@@ -185,7 +147,6 @@ function TurnHubIdle({
   );
 }
 
-// Active-turn header: title, round chip, Undo (only once history exists), End turn.
 function TurnHubHeader({
   inCombat,
   round,
@@ -231,10 +192,6 @@ function TurnHubHeader({
   );
 }
 
-// Mobile turn bar (#1028): replaces the "Your turn" card header + the Turn/Log
-// segmented control. Serif title + Round · Move {speed} ft, a pinned End turn at
-// a fixed spot, a log icon (when a host wires onOpenLog), and Undo once history
-// exists. Full-bleed; the desktop card keeps TurnHubHeader.
 function MobileTurnBar({
   round,
   speed,
@@ -293,9 +250,6 @@ function MobileTurnBar({
   );
 }
 
-// Initiative strip (#1023 Phase B–D): the turn-order scroller. Behind the
-// showInitiative flag — the app doesn't model enemies/turn-order yet, so it
-// renders nothing for users today. Markup kept minimal until the data exists.
 function InitiativeStrip() {
   if (!showInitiative) return null;
   return (
@@ -307,8 +261,6 @@ function InitiativeStrip() {
   );
 }
 
-// Action Surge (Fighter) — self-gating: renders nothing when unavailable.
-// Desktop keeps the compact gold pill; mobile (#1028) is a full-bleed gold row.
 function ActionSurgeButton({
   available,
   pool,
@@ -352,8 +304,6 @@ function ActionSurgeButton({
   );
 }
 
-// Trailing message strips: send() errors, effect-maneuver info, durable-buff
-// end reminders (e.g. Rage), and the movement-not-tracked note.
 function TurnMessages({
   error,
   effectMessage,
@@ -412,10 +362,8 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
   } = turnState;
 
   const turn = useTurnActions({ character, sessionId, turnState, onLogChanged });
-  // Grouped for readability; also keeps this destructure from cloning
-  // useTurnActions' flat return block (a benign hook-bag mirror).
   const { busy, error, reactionMessage, effectMessage, send } = turn;
-  // Undo, wrapped to re-read the interlock a reverted cast cleared (#1439 review).
+  // Re-reads the interlock a reverted cast clears, rather than a stale closed-over value.
   const handleUndo = useUndoWithCombatRefresh(turn.handleUndo);
   const {
     showActionMenu, setShowActionMenu, showBonusMenu, setShowBonusMenu,
@@ -433,8 +381,6 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
     handleActionSurge, handleEndTurn, handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
   } = turn;
 
-  // Deflect Attacks (#1241) — a sibling hook (see its file header for why it
-  // isn't nested inside useTurnActions), composed here alongside turn.
   const deflect = useDeflectAttacksReaction({
     character,
     availableActions: character.availableActions ?? [],
@@ -444,8 +390,6 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
     setReactionMessage,
     attachBatchId: turnState.attachBatchId,
   });
-  // Only the Reaction slot needs the Deflect Attacks interception — the
-  // Action/Bonus slots keep the plain handleActionClick from useTurnActions.
   function handleReactionActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
     if (key === "deflectAttacks" || key === "deflectMissiles") {
       deflect.handleDeflectAttacks();
@@ -454,8 +398,6 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
     handleActionClick(key, cost);
   }
 
-  // Inline banner resolve (#811): verdict writes + on-line damage rolls for
-  // skipped attacks, shared-shaped with the in-sheet strip's rule.
   const tallyResolve = useTallyResolve({
     character,
     setTallyVerdict: turnState.setTallyVerdict,
@@ -473,8 +415,6 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
     );
   }
 
-  // Shared surfaces — identical on both breakpoints; only the slot rows and the
-  // wrapper/header differ (TurnSlotCard self-adapts to a full-bleed mobile row).
   const deathSaves = <TurnDeathSaves />;
   const concentration = <TurnConcentrationBanner onLogChanged={onLogChanged} />;
   const actionSlot = (
@@ -491,9 +431,6 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
       handleActionClick={handleActionClick}
     />
   );
-  // The pending-swing counter is shared by TWF and Bonus Unarmed Strike
-  // (#1218, same bonusAttack state) — label it from whichever resolution is
-  // actually open rather than hardcoding "Off-hand attack".
   const bonusAttackLabel =
     activeResolution?.resolver.key === "bonusUnarmedStrike" ? "Bonus Unarmed Strike" : "Off-hand attack";
   const bonusSlot = (
@@ -544,9 +481,6 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
       onSurge={handleActionSurge}
     />
   );
-  // Overlay pickers render only when the panel is the active tab (#960): a
-  // portaled BottomSheet would otherwise float over another tab while this panel
-  // is mounted-but-hidden. `activeResolution` survives, so the sheet reopens.
   const resolutionSheets = overlaysActive && (
     <TurnResolutionSheets
       sessionId={sessionId}
@@ -561,26 +495,18 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
       loadoutSwap={loadoutSwap}
     />
   );
-  // Split around Action Surge so the desktop order stays byte-identical (surge sat
-  // between the Turn-summary banner and the resolution sheets).
   const trailingBeforeSurge = (
     <>
-      {/* Weapon-change Refund — persists until refunded or turn end (#815). */}
       <LoadoutRefundStrip loadout={loadoutSwap} />
-      {/* "Turn summary" banner — attack tally once the sheet is closed; unresolved
-          lines resolve inline, resolved lines offer a quiet Change (#811). */}
       {!activeResolution && (
         <TurnSummaryBanner rows={attackTally} onDismiss={clearAttackTally} resolve={tallyResolve} />
       )}
-      {/* "Spells cast" tally (#1164) — the cast sheet's post-cast receipts,
-          same shelf as the attack summary, once the sheet is closed. */}
       {!activeResolution && <CastTallyBanner rows={castTally} onDismiss={clearCastTally} />}
     </>
   );
   const trailingAfterSurge = (
     <>
       {resolutionSheets}
-      {/* Effect maneuvers (no slot consumed) — e.g. Evasive Footwork. */}
       <EffectManeuverStrip
         effectManeuvers={effectManeuvers}
         superiorityRemaining={superiorityRemaining}
@@ -592,7 +518,6 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
     </>
   );
 
-  // Mobile (#1028): full-bleed turn bar + edge-to-edge slot rows, no card gutter.
   if (isBelowMd) {
     return (
       <div className="overflow-hidden bg-parchment-50">
@@ -606,8 +531,7 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
           onOpenLog={onOpenLog}
         />
         <InitiativeStrip />
-        {/* Death saves / concentration surface above the slots when active; the
-            wrapper hides itself when both render nothing (empty:hidden). */}
+        {/* Wrapper hides itself via empty:hidden when both children render nothing. */}
         <div className="flex flex-col gap-3 px-4 py-3 empty:hidden">
           {deathSaves}
           {concentration}
@@ -624,7 +548,6 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
     );
   }
 
-  // Desktop: the original bordered card + header, pixel-identical.
   return (
     <Card className="p-4">
       <TurnHubHeader

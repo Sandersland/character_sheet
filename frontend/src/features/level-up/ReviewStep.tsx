@@ -1,8 +1,4 @@
-// The ceremony's final "review" step (#891): renders the staged draft as a
-// before→after change ledger. The Confirm/submit/error surface belongs to the
-// shell (CeremonyFooter + useLevelUpSubmit) — this body is read-only. Catalog
-// name lookups are fetched here (only when a matching draft list is non-empty)
-// and injected into the pure buildLevelUpLedger.
+// Confirm/submit/error surface belongs to CeremonyFooter + useLevelUpSubmit; this body is read-only, feeding the pure buildLevelUpLedger.
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -16,11 +12,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 type CatalogFetcher = (() => Promise<{ id: string; name: string }[]>) | undefined;
 
-// A pending fetch leaves `map` null so `pending` can gate the resolving affordance;
-// a failed fetch resolves to {} so lookups fall back to id/custom names, never block.
-// `fetcher` is undefined when its draft list is empty — the caller must resolve it
-// only then, so a sibling step's partial API mock is never read for a skipped
-// catalog (a plain named import throws on a missing mock export even uncalled).
+// `fetcher` is undefined when its draft list is empty so a sibling step's unmocked catalog import is never called — a named import throws on a missing mock export even when unused.
 function useCatalogNames(fetcher: CatalogFetcher): { lookup: (id: string) => string | undefined; pending: boolean } {
   const [map, setMap] = useState<Record<string, string> | null>(null);
   useEffect(() => {
@@ -36,39 +28,24 @@ function useCatalogNames(fetcher: CatalogFetcher): { lookup: (id: string) => str
   return { lookup: (id) => map?.[id], pending: !!fetcher && map === null };
 }
 
-// fallow-ignore-next-line complexity -- one thin useCatalogNames hook per ledger domain (maneuvers/spells/feats); flat fan-out, not branchy logic (#1137 added the feat resolver)
+// fallow-ignore-next-line complexity -- one thin useCatalogNames hook per ledger domain (maneuvers/spells/feats); flat fan-out, not branchy logic
 function useLedgerResolvers(draft: LevelUpDraft, edition: RulesEdition): { resolvers: LedgerResolvers; resolving: boolean } {
-  // Keyed on the BOOLEAN, never on draft.maneuvers' array identity — see the
-  // [fetcher]-identity hazard spelled out at featFetcher below (#1412).
+  // Keyed on the boolean, never draft.maneuvers' array identity — see the [fetcher]-identity hazard at featFetcher below (#1412).
   const needsManeuvers = !!draft.maneuvers?.length;
   const maneuverFetcher = useMemo(
     () => (needsManeuvers ? () => fetchManeuvers(edition) : undefined),
     [needsManeuvers, edition],
   );
   const maneuvers = useCatalogNames(maneuverFetcher);
-  // Cantrips share the spell catalog, so either list gates the same fetch (#1157).
-  //
-  // The edition is threaded here for the wire contract, not as an admission gate:
-  // this site resolves an id→name for an ALREADY-COMMITTED pick, so no
-  // cross-edition row can be introduced through it (#1411) — same reasoning
-  // as the feat fetcher below. `?edition=` became REQUIRED on GET /api/spells
-  // in #1712, so fetchSpells joined maneuvers/feats on the memoised-fetcher
-  // side of the line below (it could no longer get away with a bare module ref).
+  // Edition here is for the wire contract, not an admission gate — this resolves id→name for an already-committed pick, so no cross-edition row can enter through it (#1411).
   const needsSpells = !!(draft.spellsLearned?.length || draft.cantripsLearned?.length);
   const spellFetcher = useMemo(
     () => (needsSpells ? () => fetchSpells(edition) : undefined),
     [needsSpells, edition],
   );
   const spells = useCatalogNames(spellFetcher);
-  // Any taken feat fetches the catalog — a custom feat resolves by its own name,
-  // so this needs no second (featId) guard. A Fighting Style feat (#1137) resolves
-  // through the same catalog.
-  //
-  // Keyed on the BOOLEAN, never on draft.fightingStyleFeat's object identity, and
-  // never an inline arrow: useCatalogNames's effect depends on [fetcher], so a
-  // fresh identity every render means fetch → setMap → re-render → fetch, forever.
-  // Every edition-scoped fetcher must be memoised — #1412 moved maneuvers across
-  // that line, #1712 moved spells.
+  // A custom feat resolves by its own name, so no second featId guard is needed here.
+  // Never an inline arrow — useCatalogNames's effect depends on [fetcher], so a fresh identity each render means fetch → setMap → re-render → fetch, forever.
   const needsFeats = draft.advancement?.type === "takeFeat" || !!draft.fightingStyleFeat;
   const featFetcher = useMemo(
     () => (needsFeats ? () => fetchFeats(edition) : undefined),
@@ -119,17 +96,7 @@ function ListRow({ row, resolving }: { row: LedgerRow; resolving: boolean }) {
   );
 }
 
-// The subclass-granted-spells "unlock card" (#1159): gold celebratory framing,
-// distinguishing it from the plain before→after ledger rows since a free spell
-// grant is a bigger deal than a delta. One line per spell (school-tinted name +
-// "Level N · School"), never a run-together name list.
-// #1509 D5: the granted-spell footnote's noun follows the target's served
-// casterModel, not a hardcoded "prepared" — a 2014 known caster's granted
-// spell (e.g. a Pact Boon spell) is analogous to Pact of the Chain/Tome's
-// "doesn't count against your number of spells known" (PHB'14 p. 107), not
-// SRD 5.2's Always-Prepared Spells glossary text. `casterModel` here is the
-// PLAN's top-level echo (`plan.target.casterModel`), not the newSpells step's
-// meta — this card renders whether or not that step exists this level-up.
+// casterModel is plan.target.casterModel, not the newSpells step's meta — this card renders regardless of whether that step exists (#1509; PHB'14 p. 107 Pact Boon parallel).
 function grantedSpellsFootnote(casterModel: "known" | "prepared" | null | undefined): string {
   return casterModel === "known"
     ? "Doesn't count against your number of spells known."
@@ -168,10 +135,7 @@ function LedgerRowView({ row, resolving, casterModel }: { row: LedgerRow; resolv
 export default function ReviewStep() {
   const { character, draft, plan } = useLevelUpStepContext();
   const { resolvers, resolving } = useLedgerResolvers(draft, character.rulesEdition);
-  // The HP row's numbers come out of `plan` itself (#1380) — the very meta
-  // HitPointsStep renders — so the two screens agree because they read one
-  // served value, a stronger guarantee than the matching client-side
-  // resolutions that used to stand in for it (#1441).
+  // HP row numbers come from `plan` (#1380), the same meta HitPointsStep renders, so the two screens necessarily agree (#1441).
   const rows = buildLevelUpLedger(character, draft, plan, resolvers);
 
   return (

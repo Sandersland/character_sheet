@@ -7,16 +7,11 @@ import { authCookie } from "@/test-support/auth.js";
 import { createTestCharacter } from "@/test-support/character.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 
-// POST /api/catalog/entries/:entryId/fork (#1800, epic #1795 5/6): a viewer
-// forks visible content into their own USER stash, or a campaign's DM forks
-// it into that campaign's CAMPAIGN scope. Real Postgres via supertest against
-// the shared `app`.
-
-const OWNER = "owner-fork-route-owner"; // owns a private USER-scope spell, later grants one into the campaign
-const VIEWER = "owner-fork-route-viewer"; // forks a GLOBAL entry
-const OUTSIDER = "owner-fork-route-outsider"; // can't see OWNER's private spell, not a campaign member
+const OWNER = "owner-fork-route-owner";
+const VIEWER = "owner-fork-route-viewer";
+const OUTSIDER = "owner-fork-route-outsider";
 const DM = "owner-fork-route-dm";
-const PLAYER = "owner-fork-route-player"; // campaign member, not DM
+const PLAYER = "owner-fork-route-player";
 
 let cookieOwner: string;
 let cookieViewer: string;
@@ -26,8 +21,6 @@ let cookiePlayer: string;
 let campaignId: string;
 let globalEntryId: string;
 let privateEntryId: string;
-// #1819: OWNER's authoring character — the create endpoint derives a homebrew
-// spell's edition from it. 2014 so these fixtures stay EDITION_2014.
 let ownerCharId: string;
 
 const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
@@ -75,10 +68,7 @@ beforeAll(async () => {
   const campaign = await agent(cookieDm).post("/api/campaigns").send({ name: "Fork Route Campaign" });
   campaignId = campaign.body.id;
   await agent(cookiePlayer).post("/api/campaigns/join").send({ inviteCode: campaign.body.inviteCode });
-  // OWNER also joins (grants.ts's own POST requires the entry's owner be a
-  // member of the target campaign to grant into it — see that route's own
-  // comment) so the grant-visibility tests below can have OWNER grant their
-  // own homebrew into this campaign for PLAYER (a DIFFERENT member) to fork.
+  // Granting requires the entry owner be a campaign member, so OWNER joins too (enables the grant-visibility tests below).
   await agent(cookieOwner).post("/api/campaigns/join").send({ inviteCode: campaign.body.inviteCode });
 });
 
@@ -142,12 +132,6 @@ describe("POST /api/catalog/entries/:entryId/fork", () => {
     expect(res.status).toBe(403);
   });
 
-  // #1815 review finding 1 (the confirmed bug this epic exists to fix): the
-  // resolver (lib/catalog/entitlement.ts) already shows a shared spell in a
-  // campaign member's picker, but the fork route's OWN visibility check had
-  // no grants arm at all, so forking it 403'd regardless. A USER-scope entry
-  // GRANTED into the DM's campaign, forked by PLAYER (a member, not the
-  // owner) — must now succeed.
   it("lets a campaign member fork a USER-scope entry granted into their campaign", async () => {
     const created = await agent(cookieOwner)
       .post(`/api/spells/custom?characterId=${ownerCharId}`)
@@ -172,9 +156,6 @@ describe("POST /api/catalog/entries/:entryId/fork", () => {
     expect(entry.ownerUserId).toBe(PLAYER);
   });
 
-  // The same grant, from a caller who is NOT a member of the campaign it was
-  // granted into — the grants arm must not admit visibility from a DIFFERENT
-  // campaign's membership.
   it("still 403s a non-member forking a USER-scope entry granted into a campaign they're not in", async () => {
     const created = await agent(cookieOwner)
       .post(`/api/spells/custom?characterId=${ownerCharId}`)

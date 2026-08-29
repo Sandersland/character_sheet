@@ -27,12 +27,7 @@ import { requireCharacterId } from "./session-route-helpers.js";
 
 export const sessionsRouter = Router();
 
-// Campaign-level sessions (#245): one shared session per play night that party
-// members join/leave. Campaign-scoped routes are gated by assertCampaignMembership;
-// the character-scoped reads the SessionPage polls stay for back-compat.
-
-// Confirms the character is attached to the campaign (so a session only ever
-// gathers that campaign's characters). Assumes existence already checked.
+// Assumes the character's existence has already been checked.
 async function assertCharacterInCampaign(characterId: string, campaignId: string): Promise<void> {
   const character = await prisma.character.findUnique({
     where: { id: characterId },
@@ -43,7 +38,6 @@ async function assertCharacterInCampaign(characterId: string, campaignId: string
   }
 }
 
-// Verifies a session exists and belongs to the campaign; throws 404 otherwise.
 async function assertSessionInCampaign(sessionId: string, campaignId: string): Promise<void> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
@@ -54,9 +48,7 @@ async function assertSessionInCampaign(sessionId: string, campaignId: string): P
   }
 }
 
-// Verifies a solo (campaignId-null) session that the character participates in;
-// throws 404 otherwise (#1081). A campaign session — even one the character is in
-// — is invisible to the solo routes, so it 404s here.
+// A campaign session — even one the character is in — is invisible to the solo routes, so it 404s here too.
 async function assertSoloSessionForCharacter(sessionId: string, characterId: string): Promise<void> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
@@ -67,11 +59,7 @@ async function assertSoloSessionForCharacter(sessionId: string, characterId: str
   }
 }
 
-/**
- * POST /api/campaigns/:campaignId/sessions
- * Start a shared session with the given character as first participant. 409 if a
- * session is already active for the campaign. Returns { session, character }.
- */
+/** POST /api/campaigns/:campaignId/sessions — starts a shared session with the given character as first participant; 409 if one is already active. Returns { session, character }. */
 sessionsRouter.post(
   "/campaigns/:campaignId/sessions",
   async (req, res) => {
@@ -91,10 +79,7 @@ sessionsRouter.post(
   },
 );
 
-/**
- * POST /api/campaigns/:campaignId/sessions/:sessionId/join
- * Add (or re-add) the caller's character to the active session.
- */
+/** POST /api/campaigns/:campaignId/sessions/:sessionId/join — adds (or re-adds) the caller's character to the active session. */
 sessionsRouter.post(
   "/campaigns/:campaignId/sessions/:sessionId/join",
   async (req, res) => {
@@ -115,10 +100,7 @@ sessionsRouter.post(
   },
 );
 
-/**
- * POST /api/campaigns/:campaignId/sessions/:sessionId/leave
- * Record that the caller's character left; the session stays open for others.
- */
+/** POST /api/campaigns/:campaignId/sessions/:sessionId/leave — records that the caller's character left; the session stays open for others. */
 sessionsRouter.post(
   "/campaigns/:campaignId/sessions/:sessionId/leave",
   async (req, res) => {
@@ -133,11 +115,7 @@ sessionsRouter.post(
   },
 );
 
-/**
- * POST /api/campaigns/:campaignId/sessions/:sessionId/end
- * End the shared session. Any campaign member may end it (an OWNER can do so even
- * without a character in the session — the role is surfaced for that force-end).
- */
+/** POST /api/campaigns/:campaignId/sessions/:sessionId/end — ends the shared session; any campaign member may end it, including an OWNER with no character in the session (force-end). */
 sessionsRouter.post(
   "/campaigns/:campaignId/sessions/:sessionId/end",
   async (req, res) => {
@@ -149,16 +127,7 @@ sessionsRouter.post(
   },
 );
 
-/**
- * GET /api/campaigns/:campaignId/sessions
- * Session history for the campaign, newest first, with participants. This is the
- * journal "chronicle" read surface (#863): every row also carries a DERIVED
- * `sessionNumber` (1-based by startedAt ASCENDING within the campaign — never a
- * persisted column) and its `arcId`. Pass `?characterId=<id>` (one of the
- * caller's own characters) to also get that character's `noteCount` per session;
- * without it `noteCount` is 0. Membership gates the list (a member sees every
- * session of their campaign); a characterId that isn't the caller's own 403s.
- */
+/** GET /api/campaigns/:campaignId/sessions — session history newest-first, with a derived (non-persisted) sessionNumber and arcId. `?characterId=` (must be the caller's own) adds that character's noteCount per session; a foreign characterId 403s. */
 sessionsRouter.get("/campaigns/:campaignId/sessions", async (req, res) => {
   await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
 
@@ -185,12 +154,7 @@ sessionsRouter.get("/campaigns/:campaignId/sessions", async (req, res) => {
     }
   }
 
-  // Derive the 1-based chapter number by startedAt ASCENDING. `sessions` is
-  // already ordered DESCENDING, so the ascending rank of the row at descending
-  // index `i` (0 = newest) is `total - i` — a single-pass arithmetic read (no
-  // map lookup, so the value is provably defined). One active session per
-  // campaign means startedAt values are strictly increasing, so the reverse
-  // index is exact with no tie ambiguity.
+  // sessionNumber is 1-based by startedAt ascending; since `sessions` is ordered descending, the ascending rank at descending index i (0 = newest) is `total - i`.
   const total = sessions.length;
   res.json(
     sessions.map((s, i) => ({
@@ -201,20 +165,13 @@ sessionsRouter.get("/campaigns/:campaignId/sessions", async (req, res) => {
   );
 });
 
-// patchSessionSchema lives in @character-sheet/contracts (#1394); its
-// exported type is z.input (this package's locked policy, #1395) — the
-// whole-object `.refine()` here doesn't itself diverge input from output.
+// patchSessionSchema's exported type is z.input — the whole-object `.refine()` doesn't diverge input from output.
 type PatchSessionData = PatchSessionInput;
 
 // A status + message a helper hands back for the route to send, or null to proceed.
 type PatchDenial = { status: number; error: string };
 
-// The caller is a participant iff they own a character joined to the session.
-// NOTE: deliberately NOT filtered to `leftAt: null` (present participants only).
-// Chapter titles are edited from the journal page AFTER the session has ended,
-// when every participant's `leftAt` is set — restricting to still-present players
-// would break the primary use case (naming a chapter after the fact). So a former
-// participant of a closed session may still title it; that is intended.
+// Deliberately NOT filtered to `leftAt: null`: chapter titles are edited after the session has ended, when every participant's `leftAt` is set.
 async function callerOwnsParticipant(userId: string, sessionId: string): Promise<boolean> {
   const participant = await prisma.sessionParticipant.findFirst({
     where: { sessionId, character: { ownerId: userId } },
@@ -231,7 +188,6 @@ async function sessionBelongsToCampaign(sessionId: string, campaignId: string): 
   return session !== null && session.campaignId === campaignId;
 }
 
-// A non-null arcId must resolve to an arc in the same campaign.
 async function arcIsInCampaign(campaignId: string, arcId: string): Promise<boolean> {
   const arc = await prisma.campaignArc.findUnique({
     where: { id: arcId },
@@ -240,10 +196,7 @@ async function arcIsInCampaign(campaignId: string, arcId: string): Promise<boole
   return arc !== null && arc.campaignId === campaignId;
 }
 
-// Per-field authorization for the session PATCH: arcId is owner-only (and the arc
-// must be in the campaign); title needs the caller to be a participant. Returns a
-// denial uniformly for every failure — the caller has already asserted membership
-// and passes the resolved `role` in, so this never throws — or null to proceed.
+// Assumes the caller has already asserted membership and passes the resolved `role` in, so this never throws — only returns a denial or null to proceed.
 async function authorizeSessionPatch(
   role: CampaignRole,
   userId: string,
@@ -273,16 +226,7 @@ function sessionPatchUpdate(data: PatchSessionData) {
   };
 }
 
-/**
- * PATCH /api/campaigns/:campaignId/sessions/:sessionId
- * Two distinct edits share this path, each with its own authorization (#863):
- *   • `{ title }`  — any session PARTICIPANT (a caller who owns a character in
- *     the session) may set/rename the chapter title after the fact. Historically
- *     title was only settable at session start (startCampaignSession).
- *   • `{ arcId }`  — OWNER-only: file the session under an arc (or null to
- *     un-file). The arc must belong to the same campaign.
- * Sending both requires satisfying both gates. Membership is the floor.
- */
+/** PATCH /api/campaigns/:campaignId/sessions/:sessionId — `{ title }` needs the caller to own a participant character; `{ arcId }` is OWNER-only and the arc must belong to the campaign. Sending both requires satisfying both gates. */
 sessionsRouter.patch("/campaigns/:campaignId/sessions/:sessionId", async (req, res) => {
   const { campaignId, sessionId } = req.params;
   const { role } = await assertCampaignMembership(prisma, req.user!.id, campaignId, "view");
@@ -309,11 +253,7 @@ sessionsRouter.patch("/campaigns/:campaignId/sessions/:sessionId", async (req, r
   res.json(updated);
 });
 
-/**
- * GET /api/campaigns/:campaignId/sessions/:sessionId
- * Session detail with participants, events (newest first), and journal entries.
- * Runs maybeAutoClose so a stale active session settles before the read.
- */
+/** GET /api/campaigns/:campaignId/sessions/:sessionId — session detail with participants, events (newest first), and journal entries; runs autoCloseIfStale first. */
 sessionsRouter.get("/campaigns/:campaignId/sessions/:sessionId", async (req, res) => {
   await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
   try {
@@ -341,11 +281,7 @@ sessionsRouter.get("/campaigns/:campaignId/sessions/:sessionId", async (req, res
   res.json({ ...session, journalEntries, events: events.map(serializeActivityEvent) });
 });
 
-/**
- * GET /api/characters/:id/sessions
- * Sessions this character participated in, newest first — powers the activity
- * log's session filter. Character-scoped (gated by assertCharacterAccess).
- */
+/** GET /api/characters/:id/sessions — sessions this character participated in, newest first; powers the activity log's session filter. */
 sessionsRouter.get("/characters/:id/sessions", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
@@ -357,13 +293,7 @@ sessionsRouter.get("/characters/:id/sessions", async (req, res) => {
   res.json(sessions);
 });
 
-/**
- * POST /api/characters/:id/sessions
- * Start a solo (campaignId-null) session for the character as sole participant
- * (#1081). 409 if the character is in a campaign or already has an active solo
- * session; 404 unknown character; 403 not the caller's. Returns { session,
- * character } to mirror the campaign start's one-assignment swap.
- */
+/** POST /api/characters/:id/sessions — starts a solo (campaignId-null) session; 409 if the character is in a campaign or already has an active solo session. Returns { session, character }. */
 sessionsRouter.post("/characters/:id/sessions", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
   const { title } = req.body as { title?: string };
@@ -375,12 +305,7 @@ sessionsRouter.post("/characters/:id/sessions", async (req, res) => {
   res.status(201).json({ session, character: await serializeCharacter(updated) });
 });
 
-/**
- * POST /api/characters/:id/sessions/:sessionId/end
- * End the character's solo session (#1081). End-only semantics — no solo
- * join/leave. 404 unless it's a campaignId-null session the character is in; 409
- * if already ended (endSession). Returns { session }.
- */
+/** POST /api/characters/:id/sessions/:sessionId/end — ends the character's solo session (end-only, no solo join/leave); 404 unless it's a campaignId-null session the character is in, 409 if already ended. */
 sessionsRouter.post("/characters/:id/sessions/:sessionId/end", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
   await assertSoloSessionForCharacter(req.params.sessionId, req.params.id);
@@ -388,35 +313,21 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/end", async (req, res) 
   res.json({ session });
 });
 
-/**
- * GET /api/characters/:id/sessions/active
- * The active session for the character's campaign, or null (200) when there's no
- * campaign / no active session. 404 only for an unknown character id.
- */
+/** GET /api/characters/:id/sessions/active — the active session for the character's campaign, or null (200) when there's no campaign or no active session. */
 sessionsRouter.get("/characters/:id/sessions/active", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
   const session = await getActiveSession(req.params.id);
   res.json(session ?? null);
 });
 
-/**
- * GET /api/characters/:id/sessions/doorway
- * The sheet's session-doorway read model (#942): one state-aware fact set the
- * SessionDoorway bar renders (live/join/start now; scheduled kinds after #951).
- * Settles a stale session on read (getSessionDoorway → getActiveSession →
- * autoCloseIfStale). Character-scoped read; solo characters get campaignId: null.
- * NOTE: must precede the `:sessionId` route so "doorway" isn't captured as an id.
- */
+// Must precede the `:sessionId` route so "doorway" isn't captured as an id.
+/** GET /api/characters/:id/sessions/doorway — the live/join/start state the SessionDoorway bar renders; solo characters get campaignId: null. */
 sessionsRouter.get("/characters/:id/sessions/doorway", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
   res.json(await getSessionDoorway(req.params.id, req.user!.id));
 });
 
-/**
- * GET /api/characters/:id/sessions/:sessionId
- * Single-session detail the SessionPage loads. The character must participate in
- * the session (so it stays a character-owned read).
- */
+/** GET /api/characters/:id/sessions/:sessionId — single-session detail; the character must participate in the session. */
 sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
@@ -443,18 +354,7 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
   res.json({ ...session, journalEntries, events: events.map(serializeActivityEvent) });
 });
 
-/**
- * Combat lifecycle routes (character-scoped): server-authoritative mutations
- * of `Session.combatActive`/`round` (#1030) — the lib validates the caller is
- * an active participant of an active session, applies the change atomically,
- * and still appends the existing combatStarted/combatEnded/combatRoundAdvanced
- * `CharacterEvent` audit rows. Every response is the resulting `CombatState`
- * so the caller can sync its own tracker without waiting for the next poll.
- *
- * `combat/round` takes NO round number in the request: the client sends
- * intent only ("my turn ended") and the server decides the next round — any
- * `round` field in the body is ignored, never trusted (see advanceCombatRound).
- */
+// Combat lifecycle routes: server-authoritative mutations of Session.combatActive/round. combat/round ignores any client-sent round field — the server always decides the next round.
 sessionsRouter.post(
   "/characters/:id/sessions/:sessionId/combat/start",
   async (req, res) => {
@@ -479,17 +379,7 @@ sessionsRouter.post(
   },
 );
 
-/**
- * GET /api/characters/:id/sessions/:sessionId/combat
- * Cheap combat-state poll (#1030): round/combatActive/updatedAt only, no
- * participants/events include — this is the endpoint the live client polls
- * every ~5s while joined. 404 unless the character ever participated in the
- * session (mirrors the single-session GET's gating); 409 once the session has
- * ended or this participant has left — mirroring the mutating combat routes'
- * assertActiveParticipant gate, so an ended session (or a character who left
- * a still-active one) stops serving live combat state instead of replaying
- * its last-known round forever (#1030 finding #5).
- */
+/** GET /api/characters/:id/sessions/:sessionId/combat — cheap combat-state poll (round/combatActive/updatedAt only); 404 unless the character ever participated, 409 once the session has ended or this participant has left. */
 sessionsRouter.get("/characters/:id/sessions/:sessionId/combat", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 

@@ -1,11 +1,4 @@
-/**
- * Guards the @/types/character barrel's surface for the wire types that now live
- * in shared-types (#1273). Every migrated name must stay reachable from the
- * barrel: hundreds of call sites import from there, and a dropped re-export in a
- * types/character/*.ts module would otherwise only surface as scattered errors.
- * The import list below IS the assertion — tsc fails if a name stops resolving.
- */
-
+// The import list below IS the assertion — tsc fails if a name stops resolving.
 import { describe, expectTypeOf, it } from "vitest";
 
 import type * as Shared from "@character-sheet/shared-types";

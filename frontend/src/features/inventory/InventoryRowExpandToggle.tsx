@@ -5,10 +5,8 @@ interface InventoryRowExpandToggleProps {
   onToggle: () => void;
 }
 
-// The prose-disclosure chevron shown on a row that has description text —
-// kept as its own component, not inlined into InventoryRow, so InventoryRow's
-// own cyclomatic/cognitive score stays under the fallow complexity gate
-// (.fallowrc.jsonc).
+// Kept as its own component, not inlined into InventoryRow, so InventoryRow's
+// own cyclomatic/cognitive score stays under the fallow complexity gate.
 export default function InventoryRowExpandToggle({ expanded, onToggle }: InventoryRowExpandToggleProps) {
   return (
     <button

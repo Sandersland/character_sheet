@@ -1,10 +1,3 @@
-/**
- * Locks the exact `buffCleared` event payload (summary + data keys + before/after
- * snapshots) each clear* wrapper writes — the contract batch revert in activity.ts
- * depends on. Guards the clearBuffsMatchingInTx unification (#593). Requires
- * DATABASE_URL (docker compose up db).
- */
-
 import { randomUUID } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -92,7 +85,7 @@ describe("clear* wrappers — buffCleared event payloads (#593)", () => {
     expect(ev.data).toEqual({ sourceEntryId: "e1", reason: "damage", clearedKeys: ["bless", "guidance"] });
     expect((ev.before as { activeEffects: { buffs: unknown[] } }).activeEffects.buffs).toHaveLength(3);
     expect((ev.after as { activeEffects: { buffs: unknown[] } }).activeEffects.buffs).toHaveLength(1);
-    expect(await readKeys()).toEqual(["rage"]); // durable Rage survives
+    expect(await readKeys()).toEqual(["rage"]);
   });
 
   it("clearBuffsForSourceInTx: no-op + no event when nothing matches", async () => {
@@ -109,7 +102,7 @@ describe("clear* wrappers — buffCleared event payloads (#593)", () => {
     const ev = await lastClearEvent();
     expect(ev.summary).toBe("Cleared rage (endRage)");
     expect(ev.data).toEqual({ key: "rage", reason: "endRage", clearedKeys: ["rage"] });
-    expect(await readKeys()).toEqual(["rage"]); // the concentration one survives
+    expect(await readKeys()).toEqual(["rage"]);
   });
 
   it("clearWhileActiveBuffsInTx: count summary + { reason, clearedKeys } data; only while-active", async () => {

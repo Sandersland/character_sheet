@@ -8,15 +8,9 @@ interface StartingEquipmentSectionProps {
   value: EquipmentDraft | null;
   catalog: Item[];
   onChange: (value: EquipmentDraft) => void;
-  /** The character's own chosen tool proficiencies (creation toolChoices
-   *  step) — threaded down to a boundToToolChoice open pick (#1564 PR #1567
-   *  fix 2), never re-derived here. */
+  // Threaded down to a boundToToolChoice open pick; never re-derived here.
   selectedToolChoices: string[];
-  /** #1565: the card's own title, defaulting to "Starting Equipment" — the
-   *  background reuse of this section passes "Background Equipment" so two
-   *  cards on the same step read distinctly. */
   title?: string;
-  /** #1565: forwarded to StartingEquipmentEditor's own `kind` (default "class"). */
   kind?: "class" | "background";
 }
 

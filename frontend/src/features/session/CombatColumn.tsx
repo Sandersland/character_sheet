@@ -5,24 +5,12 @@ import ItemGrantsCard from "@/features/character-meta/ItemGrantsCard";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface CombatColumnProps {
-  /** Idle: the session doorway card. Live: the turn tracker. */
   turnSlot: ReactNode;
-  /** Idle: the full HitPointTracker. Live: the compact HP card (desktop only). */
   hpSlot: ReactNode;
-  /** Idle: ConditionsStrip. Live: CombatUtilityStrip (conditions · exhaustion · rest). */
   conditionsSlot: ReactNode;
-  /** The one-line session-log row (self-hides when there's nothing to show). */
   logRow: ReactNode;
 }
 
-/**
- * The shared Combat-tab column (#1086) — one centered stack that idle and live
- * both fill, so switching between them moves only the turn + HP slots and nothing
- * else shifts. Order: roll-modifier banner → turn → HP → conditions → item grants
- * → log row. The ConditionRollBanner rides the top in both modes (decided) and
- * ItemGrantsCard both self-hide when empty; their slots carry test ids so the
- * idle↔live parity contract can assert the layout stays fixed.
- */
 export default function CombatColumn({
   turnSlot,
   hpSlot,

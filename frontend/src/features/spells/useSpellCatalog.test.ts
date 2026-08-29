@@ -28,8 +28,6 @@ beforeEach(() => {
   vi.mocked(client.fetchSpells).mockReset();
 });
 
-// #1840: catalog and error must never both hold stale values across a
-// refreshKey re-fetch.
 describe("useSpellCatalog re-fetch state (#1840)", () => {
   it("clears a stale error once a refreshKey re-fetch succeeds", async () => {
     vi.mocked(client.fetchSpells).mockRejectedValueOnce(new Error("network down"));

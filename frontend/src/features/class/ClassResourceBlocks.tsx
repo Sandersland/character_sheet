@@ -32,8 +32,6 @@ interface Props {
   run: (send: () => Promise<Character>) => void;
 }
 
-// The entitlement-gated resource/subclass feature blocks, split out of the
-// orchestrator to keep each render function under the complexity budget.
 export default function ClassResourceBlocks({ view, busy, run }: Props) {
   const { character } = useCurrentCharacter();
   const resources = character.resources;
@@ -67,9 +65,8 @@ export default function ClassResourceBlocks({ view, busy, run }: Props) {
           onOperations={(ops: WarriorOfElementsOperation[]) =>
             run(() => applyWarriorOfElementsTransactions(character.id, ops).then((r) => r.character))
           }
-          // Elemental Attunement's own toggle is row-driven now (#1686) — a
-          // plain executeAction op on the generic actions endpoint, not a
-          // WarriorOfElementsOperation on this subclass's own endpoint.
+          // Elemental Attunement's toggle is a plain executeAction op on the generic
+          // actions endpoint, not a WarriorOfElementsOperation on this subclass's own endpoint.
           onToggleAttunement={(activate) =>
             run(() =>
               applyActionTransactions(character.id, [

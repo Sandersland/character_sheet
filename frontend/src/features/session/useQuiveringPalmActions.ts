@@ -1,9 +1,3 @@
-// Quivering Palm's Set/Trigger state + the two server round-trips (#1245),
-// split into its own module (not a same-file local function) — a fallow
-// cognitive-complexity finding attributes a same-file helper's branches to its
-// sole caller regardless of extraction, so the fix is a separate file, mirroring
-// useDeflectAttacksReaction.ts's own-file shape.
-
 import { useState } from "react";
 
 import { setQuiveringPalmTransaction, triggerQuiveringPalmTransaction } from "@/api/client";
@@ -22,9 +16,7 @@ export function useQuiveringPalmActions(
 ) {
   const [message, setMessage] = useState<string | null>(null);
 
-  // Two mutations (not one) — set/trigger keep distinct fallback copy; both
-  // share one `character-${id}` scope so they (and every other character
-  // mutation) can never race each other.
+  // Two mutations (distinct fallback copy each) sharing one `character-${id}` scope so they never race each other.
   const setMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: () => setQuiveringPalmTransaction(character.id),

@@ -10,8 +10,7 @@ const TABS: SheetTab[] = [
   { id: "inventory", label: "Inventory" },
 ];
 
-// A minimal element that reports no horizontal overflow (jsdom defaults to 0),
-// used as both target and currentTarget so the scroller-guard walk is a no-op.
+// jsdom elements report no horizontal overflow by default, so this used as target/currentTarget makes the scroller-guard walk a no-op.
 function makeEl() {
   return document.createElement("div");
 }
@@ -78,7 +77,6 @@ describe("useSwipeTabs", () => {
     const { result } = renderHook(() => useSwipeTabs(TABS, "overview", onTabChange));
     result.current.onTouchStart(touchStart(200, 100));
     result.current.onTouchCancel();
-    // A subsequent end with a big leftward delta must not fire off the stale start.
     result.current.onTouchEnd(touchEnd(80, 100));
     expect(onTabChange).not.toHaveBeenCalled();
   });

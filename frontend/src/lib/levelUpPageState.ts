@@ -1,6 +1,4 @@
-// Pure guard discriminator for LevelUpPage (#886). Load *errors* aren't derived
-// from the character value, so the page maps its error flag separately.
-
+// Load *errors* aren't derived from the character value, so the page maps its error flag separately — this never returns { kind: "error" }.
 import type { Character } from "@/types/character";
 
 export type LevelUpPageState =

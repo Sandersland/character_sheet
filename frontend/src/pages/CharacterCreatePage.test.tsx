@@ -8,9 +8,6 @@ import { createCharacter, fetchCampaigns, fetchItems, fetchReference, fetchSpell
 import { seedEditions } from "@/test/editions";
 import type { Campaign, ReferenceData } from "@/types/character";
 
-// Real: useCharacterDraft, useReferenceData, the ability/skill/tool DOM. Mock the
-// router navigate and the API client.
-
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -35,7 +32,6 @@ const mockFetchSpells = vi.mocked(fetchSpells);
 const mockFetchCampaigns = vi.mocked(fetchCampaigns);
 const mockCreateCharacter = vi.mocked(createCharacter);
 
-// A tiny Bard catalog for the creation spell picker (#1131): one cantrip + one L1.
 const SPELL_CATALOG = [
   { id: "sp-mockery", name: "Vicious Mockery", level: 0, school: "enchantment", castingTime: "1 action", range: "60 ft", duration: "Instantaneous", description: "", classes: ["bard"] },
   { id: "sp-charm", name: "Charm Person", level: 1, school: "enchantment", castingTime: "1 action", range: "30 ft", duration: "1 hour", description: "", classes: ["bard"] },
@@ -124,8 +120,6 @@ beforeEach(() => {
   mockFetchReference.mockResolvedValue(referenceFixture);
   mockFetchItems.mockResolvedValue([]);
   mockFetchSpells.mockResolvedValue(SPELL_CATALOG as never);
-  // Solo world by default (#1286): no campaigns to choose from, so the entry
-  // gate goes straight to the edition picker.
   mockFetchCampaigns.mockResolvedValue([]);
   mockCreateCharacter.mockResolvedValue({ id: "new-1" } as never);
   // The entry gate waits on /api/editions too (#1436); seeding the cache resolves
@@ -151,11 +145,6 @@ async function passEntryGate(u: ReturnType<typeof userEvent.setup>) {
   await u.click(screen.getByRole("button", { name: /continue/i }));
 }
 
-// #1325's 2014 half of the entry gate, reached via campaign inheritance (both
-// this path and direct picker selection are available since #1372 — this
-// helper exercises inheritance specifically, mirroring how e2e/helpers/
-// creation.ts joins a 2014 campaign): the caller mocks fetchCampaigns to
-// return a 2014 campaign and this helper picks it.
 async function passEntryGate2014(u: ReturnType<typeof userEvent.setup>, campaignName: string) {
   await u.click(await screen.findByRole("radio", { name: campaignName }));
   await u.click(screen.getByRole("button", { name: /continue/i }));
@@ -188,31 +177,27 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     renderPage();
     await passEntryGate(u);
 
-    // Identity: Continue is disabled until the five fields are set.
     await screen.findByLabelText(/name/i);
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
 
     await fillIdentity(u, { className: "Bard", background: "Sage" });
     expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
 
-    await continueStep(u); // → Abilities
-    await continueStep(u); // → Skills & Tools
+    await continueStep(u);
+    await continueStep(u);
 
     await u.click(screen.getByRole("checkbox", { name: "Acrobatics" }));
     await u.click(screen.getByRole("checkbox", { name: "Arcana" }));
     await u.click(screen.getByRole("checkbox", { name: "Lute" }));
     await u.click(screen.getByRole("checkbox", { name: "Drum" }));
-    await continueStep(u); // → Spells
+    await continueStep(u);
 
-    // Spells step (#1160/#1778): Cantrips and Spells are separate tabs now —
-    // add from the default (Cantrips) tab, then switch to Spells for the rest.
     await u.click(await screen.findByRole("button", { name: "Add Vicious Mockery" }));
     await u.click(screen.getByRole("radio", { name: /Spells/ }));
     await u.click(screen.getByRole("button", { name: "Add Charm Person" }));
-    await continueStep(u); // → Equipment
-    await continueStep(u); // → Review
+    await continueStep(u);
+    await continueStep(u);
 
-    // Nothing is created until Review's confirm.
     expect(mockCreateCharacter).not.toHaveBeenCalled();
 
     await u.click(screen.getByRole("button", { name: /create character/i }));
@@ -263,15 +248,14 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     renderPage();
     await passEntryGate(u);
     await fillIdentity(u, { background: "Criminal" });
-    await continueStep(u); // → Abilities
+    await continueStep(u);
 
     expect(screen.getByRole("button", { name: "+2 / +1" })).toBeInTheDocument();
     expect(screen.getByText(/Origin feat: Alert/i)).toBeInTheDocument();
 
-    // Back to Identity, switch to a spec-less background — the spread is gone.
     await u.click(screen.getByRole("button", { name: /back/i }));
     await u.selectOptions(screen.getByLabelText("Background"), "Sage");
-    await continueStep(u); // → Abilities
+    await continueStep(u);
     expect(screen.queryByRole("button", { name: "+2 / +1" })).not.toBeInTheDocument();
   });
 
@@ -280,14 +264,14 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     renderPage();
     await passEntryGate(u);
     await fillIdentity(u, { background: "Criminal" });
-    await continueStep(u); // → Abilities
+    await continueStep(u);
 
     await u.click(screen.getByRole("button", { name: "+1 / +1 / +1" }));
     expect(screen.getByRole("button", { name: "+1 / +1 / +1" })).toHaveAttribute("aria-pressed", "true");
 
     await u.click(screen.getByRole("button", { name: /back/i }));
     await u.selectOptions(screen.getByLabelText("Background"), "Soldier");
-    await continueStep(u); // → Abilities
+    await continueStep(u);
 
     expect(screen.getByText("Origin feat: Savage Attacker")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "+2 / +1" })).toHaveAttribute("aria-pressed", "true");
@@ -299,7 +283,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     renderPage();
     await passEntryGate(u);
     await fillIdentity(u, { background: "Criminal" });
-    await continueStep(u); // → Abilities
+    await continueStep(u);
 
     await u.click(screen.getByRole("radio", { name: "+2 to Dexterity" }));
     await u.click(screen.getByRole("radio", { name: "+1 to Intelligence" }));
@@ -310,12 +294,8 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
   });
 });
 
-// #1325: the subclass picker's shape must follow the REQUESTED edition's
-// subclassGateLevel, not a value the frontend derives itself — a raw catalog
-// column read directly would be a frontend-originated rule (CLAUDE.md,
-// post-#1272 no exception). Two hand-authored fixtures, one per edition — the
-// gate numbers below (1 vs 3) are LITERALS, never computed from `edition`,
-// so this test can't re-derive the rule it's asserting against.
+// #1325: the gate numbers below (1 vs 3) are LITERALS, never computed from
+// `edition`, so this test can't re-derive the rule it's asserting against.
 const cleric = (subclassGateLevel: number): ReferenceData["classes"][number] => ({
   id: "class-cleric",
   name: "Cleric",

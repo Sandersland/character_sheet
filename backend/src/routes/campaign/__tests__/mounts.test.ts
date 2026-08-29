@@ -1,14 +1,3 @@
-/**
- * Router mount map (#501). Pins the owned-path + mergeParams refactor: external
- * URLs are unchanged, so every documented route must still resolve to its
- * handler. Two invariants:
- *   1. Catalog routers (maneuvers/shadow-arts) still serve their
- *      catalog GET at the top level (/api/<name>), not under /characters/:id.
- *   2. Every character-scoped route reaches its handler with `:id` merged in —
- *      proven by a bogus id yielding the domain 404 ("Character not found",
- *      from assertCharacterAccess) rather than the catch-all ("Not found").
- */
-
 import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -28,8 +17,7 @@ function agent() {
 }
 
 describe("catalog routers stay top-level", () => {
-  // `?edition=` is required on both (#1412) — a bare GET is a 400 by design, so
-  // this mount probe carries one. What it pins is the MOUNT, not the filtering.
+  // `?edition=` is required on both (#1412; a bare GET 400s by design) — this pins the MOUNT, not the filtering.
   it.each(["/api/maneuvers", "/api/shadow-arts"])(
     "GET %s returns a catalog array",
     async (url) => {
@@ -40,6 +28,7 @@ describe("catalog routers stay top-level", () => {
   );
 });
 
+// A character-scoped route reaching its handler is proven by a bogus id yielding the domain 404 ("Character not found") rather than the catch-all ("Not found").
 describe("character-scoped routes resolve to their handler with :id merged", () => {
   const post = (path: string) => agent().post(`/api/characters/${MISSING_ID}${path}`).send({ operations: [] });
   const get = (path: string) => agent().get(`/api/characters/${MISSING_ID}${path}`);
@@ -54,8 +43,6 @@ describe("character-scoped routes resolve to their handler with :id merged", () 
     ["POST /class/transactions", () => post("/class/transactions")],
     ["POST /experience", () => post("/experience")],
     ["POST /actions/transactions", () => post("/actions/transactions")],
-    // One representative ability key; the full per-key matrix is registry-driven
-    // in the abilities route tests.
     ["POST /abilities/:key/transactions", () => post("/abilities/stunning-strike/transactions")],
     ["GET /channel-divinity", () => get("/channel-divinity")],
     ["GET /activity", () => get("/activity")],

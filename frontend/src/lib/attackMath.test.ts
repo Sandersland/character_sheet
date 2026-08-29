@@ -1,9 +1,3 @@
-// attackMath is a formatter over the served `character.attackRows` (#1434): these
-// tests feed it rows in the exact shape serializeCharacter emits and assert the
-// label strings and row selection. There is deliberately no attack arithmetic to
-// test here any more — the specs are inputs, and the rules that produce them are
-// covered by backend off-hand-damage.test.ts / character-serialize-attack-rows.test.ts.
-
 import { describe, it, expect } from "vitest";
 
 import {
@@ -66,7 +60,6 @@ const IMPROVISED_ROW: AttackRow = {
   damageRiders: [],
 };
 
-/** A Flame Tongue rider exactly as the serializer emits it. */
 const FIRE_RIDER = {
   id: "inv-1:rider:0",
   spec: { count: 2, faces: 6, modifier: 0 },
@@ -77,8 +70,6 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
     name: "Tester",
-    // classEntryLevel's single-class fallback needs a class to match against
-    // (#1441) — inert for every other test in this file.
     class: "Monk",
     inventory: [],
     unarmedStrike: {
@@ -97,7 +88,6 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as unknown as Character;
 }
 
-/** A character whose served rows are `weapons` followed by unarmed + improvised. */
 function withWeapons(weapons: AttackRow[], overrides: Partial<Character> = {}): Character {
   return makeCharacter({ attackRows: [...weapons, UNARMED_ROW, IMPROVISED_ROW], ...overrides });
 }
@@ -107,7 +97,6 @@ describe("weaponGripLabel", () => {
     expect(weaponGripLabel("versatile-two-handed")).toBe(" (two-handed)");
     expect(weaponGripLabel("two-handed")).toBe(" (two-handed)");
     expect(weaponGripLabel("one-handed")).toBe("");
-    // Unarmed/improvised rows carry no grip.
     expect(weaponGripLabel(undefined)).toBe("");
   });
 });
@@ -294,7 +283,6 @@ describe("buildAttackForms (#786)", () => {
       withWeapons([weaponRow({ id: "inv-1", name: "Dagger" }), weaponRow({ id: "inv-2", name: "Dagger" })]),
     );
     expect(forms.map((f) => f.name)).toEqual(["Dagger", "Unarmed Strike", "Improvised Weapon"]);
-    // First occurrence wins, so its snapshot drives the card.
     expect(forms[0].id).toBe("inv-1");
   });
 
@@ -315,8 +303,6 @@ describe("buildAttackForms (#786)", () => {
     expect(buildAttackForms(withWeapons([weaponRow()]))[0].name).toBe("Longsword");
   });
 
-  // The off-hand row shares its weapon's id, so leaking it into the forms list
-  // would give the segmented selector two options with the same id (#1434).
   it("never offers the off-hand row as a form", () => {
     const forms = buildAttackForms(
       withWeapons([
@@ -340,16 +326,12 @@ describe("buildUnarmedOnlyForms (#1217)", () => {
     expect(buildUnarmedOnlyForms(makeCharacter()).some((f) => f.id === "improvised")).toBe(false);
   });
 
-  // Guards the fixture trap: a payload without its unarmed row must fail loudly
-  // rather than render an empty picker.
   it("throws rather than returning nothing when the unarmed row is missing", () => {
     expect(() => buildUnarmedOnlyForms(makeCharacter({ attackRows: [] }))).toThrow(/no unarmed attack row/);
   });
 });
 
-// The strike count is resolved server-side now (#1505) onto the served
-// flurryOfBlows row's `count` — these pin that the function reads the wire
-// value verbatim rather than re-deriving Heightened Focus from a level.
+// flurryOfBlows.count is resolved server-side; the client must read it verbatim, never re-derive Heightened Focus from level (#1505).
 function flurryOfBlowsAction(count: number) {
   return [{ key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", enabled: true, count }];
 }
@@ -373,16 +355,11 @@ describe("flurryStrikeCount (#1217, Heightened Focus upgrade #1244)", () => {
       classes: [{ name: "Monk", level: 20 }],
       availableActions: flurryOfBlowsAction(2),
     } as unknown as Partial<Character>);
-    // A 2014 monk at L20 has no three-strike upgrade at all — the server
-    // would serve 2 here regardless of level, and the client must not
-    // second-guess it with its own >= 10 threshold.
     expect(flurryStrikeCount(character)).toBe(2);
   });
 });
 
 describe("buildOffHandEntry (#732)", () => {
-  // The served pair: a main-hand Shortsword at +3 damage and the off-hand row the
-  // server already reduced to +0 (its ability mod dropped).
   function twoWeaponRows(offHandOverrides: Partial<AttackRow> = {}): AttackRow[] {
     return [
       weaponRow({ id: "main", name: "Shortsword", damageSpec: { count: 1, faces: 6, modifier: 3 }, damageType: "piercing" }),

@@ -30,10 +30,8 @@ function makeCharacter(over?: {
   } as unknown as Character;
 }
 
-// WarriorOfElementsSection reads useCurrentCharacter(), so every render seeds
-// the cache and mounts CurrentCharacterProvider via renderWithCharacter.
-// onToggleAttunement (#1686) is the separate prop the Attunement toggle now
-// fires — a plain executeAction op, not a WarriorOfElementsOperation.
+// onToggleAttunement is the separate prop the Attunement toggle fires — a
+// plain executeAction op, not a WarriorOfElementsOperation.
 function render(
   character: Character,
   onOperations: (ops: WarriorOfElementsOperation[]) => void,

@@ -1,14 +1,4 @@
-// DB-backed proof for #1625's granted-spell seeder: the edition-aware subclass
-// resolve that replaced upsertGrantedSpell's findFirst+orderBy latch, and the
-// id-scoped prune that makes a grant retag (NULL -> per-edition fork) drop its
-// stale shared row on reseed — upsertEditionRow's `where` includes `edition`,
-// so a retag finds no match and CREATES a new row instead of updating in
-// place (the same shape subclass-fork-reseed.test.ts proves for Subclass).
-//
-// Unlike that file, seedSubclassGrantedSpells IS importable (split into
-// seed-granted-spells.ts) and parameterized on its grants, so this drives the
-// real seeder against fixture rows rather than re-implementing its call
-// shapes.
+// upsertEditionRow's where includes edition — a retag finds no match and creates a new row instead of updating in place.
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -66,8 +56,7 @@ afterEach(async () => {
 afterAll(async () => {
   await prisma.characterClass.deleteMany({ where: { name: FIXTURE_CLASS_NAME } });
 
-  // Proves the prune's slug scoping held: if a test's seeded set leaked, the
-  // real seeded grants are gone and this goes red.
+  // Proves the prune's slug scoping held — if a test's seeded set leaked, the real seeded grants would be gone.
   const lifeDomainGrants = await prisma.subclassGrantedSpell.count({
     where: { subclass: { slug: "cleric-life-domain" } },
   });
@@ -84,8 +73,7 @@ describe("seedSubclassGrantedSpells — retag and prune (#1625)", () => {
     expect(shared).toHaveLength(1);
     expect(shared[0].edition).toBeNull();
 
-    // The retag: the one shared row forks into a per-edition pair (the #1626
-    // shape — same spell, different gateLevel per edition, ONE Subclass row).
+    // The retag: the one shared row forks into a per-edition pair — same spell, different gateLevel per edition, one Subclass row.
     await seedSubclassGrantedSpells(prisma, classIds, [
       grant({ edition: "EDITION_2014", gateLevel: 3 }),
       grant({ edition: "EDITION_2024", gateLevel: 5 }),
@@ -151,9 +139,7 @@ describe("upsertGrantedSpell — the edition-aware subclass resolve that replace
 
     const on2024Fork = await prisma.subclassGrantedSpell.findMany({ where: { subclassId: forkedSubclassId } });
     expect(on2024Fork.map((r) => r.edition)).toEqual(["EDITION_2024"]);
-    // No EDITION_2014 Subclass fork exists, so the 2014 grant falls back to
-    // the shared row — the same exact-else-NULL ordering resolveEditionRow
-    // gives a character of that edition.
+    // No EDITION_2014 fork exists, so the 2014 grant falls back to the shared row — the same exact-else-NULL ordering resolveEditionRow uses.
     const onShared = await prisma.subclassGrantedSpell.findMany({ where: { subclassId: sharedSubclassId } });
     expect(onShared.map((r) => r.edition)).toEqual(["EDITION_2014"]);
   });

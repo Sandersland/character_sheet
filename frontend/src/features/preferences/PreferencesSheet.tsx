@@ -10,20 +10,12 @@ import { THEME_OPTIONS, DICE_OPTIONS, type PreferenceOption } from "@/features/p
 
 interface PreferencesSheetProps {
   onClose: () => void;
-  /** Present only when opened with a character in view (#1167) — gates the
-   *  contextual Campaign settings link. Omitted from the account-global entry
-   *  point (AccountMenu), which has no character to read a campaign off of. */
+  // Omitted from the account-global entry point (AccountMenu), which has no character to read a campaign off of.
   campaignId?: string;
   onOpenCampaignSettings?: () => void;
 }
 
-// One labeled radio option, styled as a chip rather than a bare native radio so
-// it reads consistently with ToggleRow's row weight. Native <input type=radio>
-// (not a custom widget) for free keyboard/label semantics; the input stays
-// sr-only and the label carries `has-[:focus-visible]:` so a keyboard focus still
-// paints visibly (WCAG 2.4.7) — mirrors AccountMenu's focus-visible treatment.
-// `peer` doesn't apply here: Tailwind's peer-* variant needs true siblings, and
-// this input is the label's CHILD, not a sibling — has-[] targets a descendant.
+// The radio stays sr-only inside the label, with has-[:focus-visible]: (not peer-*, since the input is a descendant, not a sibling) so keyboard focus still paints visibly (WCAG 2.4.7).
 function RadioChip<T extends string>({
   name,
   option,
@@ -68,11 +60,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-// Shaped like CampaignPreferencesFields' ToggleRow but standalone — one boolean
-// toggle today isn't worth sharing a component for. It differs deliberately in
-// one way: the row is a <label>, so clicking the text toggles. The retired
-// AutoRollConcentrationToggle behaved that way and losing it here would be a
-// regression for the same control (#1166); the campaign twin still needs it.
+// Shaped like CampaignPreferencesFields' ToggleRow but standalone; the row is deliberately a <label> so clicking the text also toggles it.
 function ToggleRow({
   label,
   hint,
@@ -101,18 +89,7 @@ function ToggleRow({
   );
 }
 
-/**
- * The dedicated player-preferences surface (#1167): Appearance, Dice, and Play
- * automation, all backed by the account-synced store (#1178) so every control
- * takes effect immediately and follows the player across devices. Reachable
- * with or without a campaign — `campaignId`/`onOpenCampaignSettings` are
- * threaded through by every caller that has a character in view (both
- * CharacterSheetHeader kebabs, mobile and desktop); the account-global entry
- * point (AccountMenu) has no character in view at all, so it omits them, and
- * the link simply doesn't render. Campaign-scoped toggles (shareWithDm,
- * autoFriendlyHealing) are deliberately NOT here — they stay in
- * CampaignSettingsSheet; this surface only links to them.
- */
+// Campaign-scoped toggles (shareWithDm, autoFriendlyHealing) stay in CampaignSettingsSheet; this surface only links to them.
 export default function PreferencesSheet({
   onClose,
   campaignId,
@@ -171,8 +148,7 @@ export default function PreferencesSheet({
               type="button"
               onClick={() => {
                 onOpenCampaignSettings();
-                // Same slide-out as every other close path (#782), not an
-                // instant unmount — requestClose is BottomSheet's own close path.
+                // requestClose is BottomSheet's own slide-out close path, not an instant unmount.
                 requestClose();
               }}
               className="self-start text-xs font-semibold text-garnet-700 hover:underline"

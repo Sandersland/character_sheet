@@ -1,6 +1,3 @@
-// DB-backed proof for #1631's read path — over the REAL seeded
-// SubclassSpellListExpansion rows (The Fiend/The Archfey/The Great Old One),
-// same "link against live seed content" style as granted-spells-domains.test.ts.
 import { describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";

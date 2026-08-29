@@ -1,16 +1,4 @@
-// PR #1650 review follow-up (#1645): a CAMPAIGN-scoped Item must never shadow
-// the GLOBAL catalog row of the same name. Names are unique only WITHIN a
-// scope, so the moment #1646 merges DM-authored rows into Item, every unscoped
-// read over the table can see two rows called "Dagger".
-//
-// Two production reads are covered here because they fail in different ways:
-// resolveFixedItems collapses its result into a Map keyed by name, so a
-// duplicate silently OVERWRITES the catalog row and the package grants the
-// wrong item; GET /api/items returns the whole table, so a duplicate LEAKS one
-// campaign's homebrew to every client loading the inventory editor.
-//
-// Written against a campaign row inserted by hand rather than waiting for
-// #1646: the guard has to exist BEFORE the rows do, or the bug ships first.
+// resolveFixedItems collapses items into a Map keyed by name — a CAMPAIGN-scoped Item sharing a GLOBAL item's name silently overwrites it (wrong item granted); GET /api/items would also leak it to every client (#1645, #1650).
 import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -23,8 +11,6 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { seededSpeciesId } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-item-scope-shadowing";
-// A real seeded catalog item, so the shadow is over content that genuinely
-// exists rather than a fixture pair that only this file knows about.
 const SHADOWED_NAME = "Dagger";
 
 const FIXTURE_CLASS = {
@@ -121,8 +107,7 @@ beforeAll(async () => {
     })
   ).id;
 
-  // The impostor. Created AFTER the catalog row so an unscoped findMany returns
-  // it last — which is precisely what makes it win the Map insertion race.
+  // Created after the catalog row so an unscoped findMany returns it last — that's what wins the Map insertion race in resolveFixedItems.
   campaignDaggerId = (
     await prisma.item.create({
       data: {
@@ -140,7 +125,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
-  // Cascades to the package's groups/options/items (schema onDelete: Cascade).
+  // Cascades to the package's groups/options/items.
   await prisma.characterClass.deleteMany({ where: { name: FIXTURE_CLASS.name } });
   // Cascades to the campaign-scoped Item row.
   await prisma.campaign.deleteMany({ where: { id: campaignId } });

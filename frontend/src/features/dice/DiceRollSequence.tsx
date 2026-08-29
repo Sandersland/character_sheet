@@ -5,44 +5,19 @@ import type { RollResult, RollSpec } from "@/lib/dice";
 import DiceRoller from "@/features/dice/DiceRoller";
 import type { DiceRollerProps } from "@/features/dice/diceRollerTypes";
 
-// Beat between one set settling and the next tumble starting, so results
-// don't blur together. Long enough to register a total, short enough that a
-// full unskipped sequence of 6 stays around 6 * (750ms tumble + 400ms) ~ 6.9s.
 const STEP_PAUSE_MS = 400;
 
 interface DiceRollSequenceProps {
-  /** What each step rolls, e.g. `{ count: 4, faces: 6, dropLowest: 1 }`. */
   spec: RollSpec;
-  /** How many times to roll `spec`, one step at a time. */
   count: number;
-  /** Bump this (e.g. a counter) to start a fresh sequence. Leave undefined to
-   *  stay idle on mount — e.g. while only showing a previously-restored roll. */
   triggerKey?: number | string;
-  /** Totals to paint into the result boxes while idle (`stepIndex === -1`) —
-   *  e.g. a pool restored from a saved draft on page load. Ignored once a
-   *  real roll starts or has results of its own; never feeds `onComplete`. */
   restoredTotals?: number[];
-  /** Called once all `count` steps have settled, with their results in order. */
   onComplete: (results: RollResult[]) => void;
-  /** Which roller component drives each step — `DiceRoller` (a predetermined
-   *  result animating into place) or `PhysicsDiceRoller` (a genuine physics
-   *  throw the result is read from). Defaults to `DiceRoller`. The two share
-   *  an identical prop contract (`diceRollerTypes.ts`), so this orchestrator
-   *  doesn't otherwise need to know or care which one it's driving. */
+  /** DiceRoller and PhysicsDiceRoller both implement DiceRollerProps (diceRollerTypes.ts); defaults to DiceRoller. */
   roller?: ComponentType<DiceRollerProps>;
   className?: string;
 }
 
-/**
- * Rolls `count` repeats of the same `RollSpec` one at a time instead of all
- * at once — six simultaneous 4d6 sets (character creation's original take)
- * read as "a lot" in practice, and revealing each total in turn is calmer to
- * follow. Reuses whichever `roller` component actually rolls (it + the
- * dice-result logic it's built on stay the sole source of randomness/
- * results) — this is purely an orchestrator: which step is live, what's been
- * collected, and a one-click "Skip" that resolves the current and all
- * remaining steps instantly.
- */
 export default function DiceRollSequence({
   spec,
   count,
@@ -63,15 +38,9 @@ export default function DiceRollSequence({
   const pauseTimerRef = useRef<number | undefined>(undefined);
   const completedRef = useRef(false);
 
-  // Same StrictMode-safe shape as DiceRoller's own trigger effect: owns its
-  // cleanup here rather than in a separate effect, so a dev-only double
-  // mount/unmount/remount can't leave a stale pause timer or a dedupe ref
-  // that skips the real re-trigger. Deliberately depends on [triggerKey]
-  // only — `stepIndex` is read once per trigger to guard the very first
-  // run, not to react to the step-by-step advances the effect below drives
-  // directly; subscribing to it here would re-run this effect (and its
-  // cleanup, which rewinds `lastTriggerRef`) on every step and the sequence
-  // would never progress past step 0.
+  // StrictMode-safe: owns its own cleanup so a dev double-invoke re-triggers
+  // correctly. Deps are [triggerKey] only — including stepIndex would re-run
+  // this on every step and stall the sequence at step 0.
   useEffect(() => {
     if (triggerKey === undefined) return undefined;
     if (lastTriggerRef.current === triggerKey && stepIndex !== -1) return undefined;
@@ -88,19 +57,14 @@ export default function DiceRollSequence({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- StrictMode-safe sequence reset keyed on triggerKey; stepIndex is read only to guard the reset, so adding it would re-run this (and its rewinding cleanup) every step and stall the sequence at step 0; useEffectEvent (the sanctioned extraction) isn't in React 18.3.1 (#1056)
   }, [triggerKey]);
 
-  // Advancing the sequence is a side effect of a step settling (notify the
-  // parent, or move to the next step after a pause) — it has to live in an
-  // effect, not in the `setResults` updater passed to handleStepResult.
-  // Calling onComplete (which triggers the parent's own setState) from
-  // inside a setState updater fires while React is still processing this
-  // component's render, which is exactly what trips "Cannot update a
-  // component while rendering a different component."
+  // Must live in an effect, not in the setResults updater passed to
+  // handleStepResult: calling onComplete from inside a state updater trips
+  // React's "Cannot update a component while rendering a different component."
   useEffect(() => {
     if (results.length === 0) return undefined;
 
     if (results.length >= count) {
-      // Guard against StrictMode's double-invoke calling onComplete twice
-      // for the same finished sequence.
+      // Guards against StrictMode calling onComplete twice for one finished sequence.
       if (!completedRef.current) {
         completedRef.current = true;
         onCompleteRef.current(results);
@@ -110,7 +74,7 @@ export default function DiceRollSequence({
     }
 
     if (skip) {
-      setStepIndex(results.length); // cascade instantly, no pause
+      setStepIndex(results.length);
       return undefined;
     }
 
@@ -125,35 +89,19 @@ export default function DiceRollSequence({
   }
 
   const inProgress = stepIndex >= 0 && stepIndex < count;
-  // Once done, keep showing the last step's Roller frozen on its
-  // settled result instead of unmounting it — same key as it had while
-  // live, so React reuses that instance rather than remounting (and
-  // re-rolling) it. This, plus reserving the Skip line below even when
-  // it's not clickable, means nothing about this panel's height changes
-  // between "just finished" and "fully idle again" — the only previous
-  // residual shift left after the rolling-phase fix above.
+  // Keeps the last step's Roller mounted (same key) after finishing instead
+  // of unmounting it, so React reuses the instance rather than re-rolling it.
   const displayStepIndex = stepIndex < 0 ? -1 : Math.min(stepIndex, count - 1);
 
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
-      {/* Fixed-size slots, all rendered from the first render — filling one
-          in only swaps its content, so this row's size never changes as
-          results arrive (no layout shift below it). aria-hidden because each
-          step's own Roller already announces its result via its aria-live
-          region; six of those used to fire at once and race, one per step in
-          order is already an improvement on its own. */}
+      {/* Fixed-size slots keep this row's height stable as results arrive.
+          aria-hidden: each step's Roller already announces via its own aria-live region. */}
       <div aria-hidden="true" className="flex flex-wrap gap-2">
         {Array.from({ length: count }, (_, index) => {
-          // Idle with nothing rolled yet this mount: paint from a restored
-          // pool (e.g. the draft reloaded from localStorage) instead of "–",
-          // so the boxes read correctly before the player ever re-rolls.
           const showRestored = stepIndex === -1 && results.length === 0 && restoredTotals;
           const filled = showRestored ? index < restoredTotals.length : Boolean(results[index]);
           const total = showRestored ? restoredTotals[index] : results[index]?.total;
-          // The most-recently-settled total: each chip flips into this state
-          // exactly once as its result lands, retriggering the pop animation.
-          // Restored totals appear all at once on mount, not one at a time,
-          // so they never get the pop treatment.
           const justAdded = !showRestored && filled && index === results.length - 1;
           return (
             <span
@@ -170,11 +118,9 @@ export default function DiceRollSequence({
         })}
       </div>
 
-      {/* Reserve the die-stage slot even when idle so the panel's height
-          doesn't change as the sequence starts. A single Roller instance is
-          kept mounted across all steps (no per-step `key` remount) so the dice
-          stay on screen and re-roll in place — `rollKey` changing per step is
-          what triggers each fresh roll. */}
+      {/* Reserves this slot's height even when idle. The Roller has no
+          per-step `key`, so React reuses one instance across steps —
+          `rollKey` changing is what re-triggers each roll. */}
       <div className="h-44 w-full">
         {displayStepIndex >= 0 && (
           <Roller

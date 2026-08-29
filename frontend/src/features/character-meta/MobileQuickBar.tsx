@@ -2,18 +2,10 @@ import RollButton from "@/features/dice/RollButton";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { formatModifier } from "@/lib/abilities";
 
-// Flat quick-bar cell: centered value-over-label column, no tile chrome — the
-// wrapper's divide-x supplies the only separation (#1084).
 const CELL = "flex flex-1 flex-col items-center px-1 py-1";
 const VALUE = "font-display text-base font-semibold leading-none text-garnet-800";
 const LABEL = "mt-1 text-[9px] font-semibold uppercase tracking-wide text-parchment-600";
 
-/**
- * Mobile-only Prof/Speed/Init strip (#1026, reworked #1084). These left the
- * compact header (which keeps the reactive HP + AC); on phones they sit at the
- * top of Overview as a slim divided quick-bar. Desktop keeps them in the banner
- * (`md:hidden`).
- */
 export default function MobileQuickBar() {
   const { character } = useCurrentCharacter();
   return (

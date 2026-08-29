@@ -9,17 +9,9 @@ import { useRestActions } from "@/features/hitpoints/useRestActions";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface RestButtonProps {
-  /** "compact" (default) — the campfire chip. "row" — a full-bleed mobile
-   *  utility row with the hit-dice count inline (#1028). */
   variant?: "compact" | "row";
 }
 
-/**
- * Always-visible BG3-style session rest control (#814): a compact campfire button
- * folded into CombatUtilityStrip (desktop) or beside the mobile sheet-header HP
- * chip (ManageHpButton), opening a "Rest" sheet with the short/long rest controls
- * and hit-dice readout — the session home for rests now the Rest & HP tab is gone.
- */
 export default function RestButton({ variant = "compact" }: RestButtonProps) {
   const { character } = useCurrentCharacter();
   const [sheetOpen, setSheetOpen] = useState(false);

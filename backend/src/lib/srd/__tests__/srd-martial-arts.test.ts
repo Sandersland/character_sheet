@@ -31,9 +31,7 @@ describe("deriveMartialArtsDie — EDITION_2024 (SRD 5.2 / PHB'24 p.88)", () => 
   });
 });
 
-// SRD 5.1 / PHB'14 p.78: 1d4 (L1-4), 1d6 (L5-10), 1d8 (L11-16), 1d10 (L17-20).
-// The level-band thresholds (L5/L11/L17) are IDENTICAL to the 2024 table above
-// — only the die faces fork (#1499).
+// SRD 5.1 / PHB'14 p.78: 1d4 (L1-4), 1d6 (L5-10), 1d8 (L11-16), 1d10 (L17-20) — same level bands as 2024, only the die faces fork (#1499).
 describe("deriveMartialArtsDie — EDITION_2014 (SRD 5.1 / PHB'14 p.78)", () => {
   it("returns 0 below monk level 1", () => {
     expect(deriveMartialArtsDie(0, "EDITION_2014")).toBe(0);
@@ -70,7 +68,7 @@ describe("deriveUnarmedStrike — Monk Martial Arts (EDITION_2024)", () => {
 
   it("L1 monk, unarmored, Dex 16 / Str 10 uses Dex for attack + damage", () => {
     const s = deriveUnarmedStrike(scores(10, 16), 2, 1, monk(1), "EDITION_2024");
-    expect(s.attackBonus).toBe(3 + 2); // dexMod 3 + prof 2
+    expect(s.attackBonus).toBe(3 + 2);
     expect(s.damage).toMatchObject({ count: 1, faces: 6, modifier: 3, damageType: "bludgeoning" });
   });
 
@@ -85,15 +83,15 @@ describe("deriveUnarmedStrike — Monk Martial Arts (EDITION_2024)", () => {
 
   it("uses Str when Str exceeds Dex — never worse than STR-only", () => {
     const s = deriveUnarmedStrike(scores(16, 10), 2, 1, monk(1), "EDITION_2024");
-    expect(s.attackBonus).toBe(3 + 2); // strMod 3
+    expect(s.attackBonus).toBe(3 + 2);
     expect(s.damage.modifier).toBe(3);
     expect(s.damage.faces).toBe(6);
   });
 
   it("falls back to STR + feat die when wearing armor", () => {
     const s = deriveUnarmedStrike(scores(10, 16), 2, 1, monk(5, false, false), "EDITION_2024");
-    expect(s.attackBonus).toBe(0 + 2); // strMod 0
-    expect(s.damage.faces).toBe(1); // no martial-arts die while armored
+    expect(s.attackBonus).toBe(0 + 2);
+    expect(s.damage.faces).toBe(1);
     expect(s.damage.modifier).toBe(0);
   });
 
@@ -104,22 +102,20 @@ describe("deriveUnarmedStrike — Monk Martial Arts (EDITION_2024)", () => {
   });
 
   it("Tavern Brawler: Monk die wins once it exceeds the feat die", () => {
-    // L1 monk with Tavern Brawler (feat die 4): max(4, 6) = 6 — the 2024 martial-arts
-    // floor (1d6) already exceeds the feat die, unlike the 2014 1d4 floor.
+    // The 2024 1d6 floor already exceeds the Tavern Brawler feat die, unlike 2014's 1d4 floor.
     expect(deriveUnarmedStrike(scores(10, 16), 2, 4, monk(1), "EDITION_2024").damage.faces).toBe(6);
-    // L5 monk with Tavern Brawler: max(4, 8) = 8
     expect(deriveUnarmedStrike(scores(10, 16), 2, 4, monk(5), "EDITION_2024").damage.faces).toBe(8);
   });
 
   it("non-monk (no context) keeps STR-based flat-1 unarmed strike", () => {
     const s = deriveUnarmedStrike(scores(10, 16), 3, 1, undefined, "EDITION_2024");
-    expect(s.attackBonus).toBe(0 + 3); // strMod 0 + prof
+    expect(s.attackBonus).toBe(0 + 3);
     expect(s.damage).toMatchObject({ count: 1, faces: 1, modifier: 0 });
   });
 
   it("non-monk with Tavern Brawler is unchanged (STR + d4)", () => {
     const s = deriveUnarmedStrike(scores(14, 18), 2, 4, undefined, "EDITION_2024");
-    expect(s.attackBonus).toBe(2 + 2); // strMod 2
+    expect(s.attackBonus).toBe(2 + 2);
     expect(s.damage).toMatchObject({ faces: 4, modifier: 2 });
   });
 
@@ -130,8 +126,6 @@ describe("deriveUnarmedStrike — Monk Martial Arts (EDITION_2024)", () => {
   });
 });
 
-// A serialized EDITION_2014 Monk's unarmedStrike.damage.faces must be 4 at monk
-// level 1 and 10 at level 17 (#1499's acceptance criteria).
 describe("deriveUnarmedStrike — Monk Martial Arts (EDITION_2014)", () => {
   const monk = (level: number, isUnarmored = true, hasShield = false) => ({
     level,
@@ -141,7 +135,7 @@ describe("deriveUnarmedStrike — Monk Martial Arts (EDITION_2014)", () => {
 
   it("L1 monk, unarmored, Dex 16 / Str 10 uses the 2014 1d4 floor", () => {
     const s = deriveUnarmedStrike(scores(10, 16), 2, 1, monk(1), "EDITION_2014");
-    expect(s.attackBonus).toBe(3 + 2); // dexMod 3 + prof 2
+    expect(s.attackBonus).toBe(3 + 2);
     expect(s.damage).toMatchObject({ count: 1, faces: 4, modifier: 3, damageType: "bludgeoning" });
   });
 
@@ -155,11 +149,8 @@ describe("deriveUnarmedStrike — Monk Martial Arts (EDITION_2014)", () => {
   });
 
   it("Tavern Brawler: the feat die (4) wins over the 2014 L1-4 floor of 1d4 (tie, feat die kept)", () => {
-    // max(4, 4) = 4 — unlike 2024's 1d6 floor, the 2014 1d4 floor never exceeds
-    // the feat die at L1-4, so this is the one place the two editions' Tavern
-    // Brawler interaction differs in RESULT, not just in which table is read.
+    // The 2014 1d4 floor never exceeds the feat die at L1-4, unlike 2024's 1d6 floor: the one place Tavern Brawler differs in RESULT, not just table.
     expect(deriveUnarmedStrike(scores(10, 16), 2, 4, monk(1), "EDITION_2014").damage.faces).toBe(4);
-    // L5 monk with Tavern Brawler: max(4, 6) = 6
     expect(deriveUnarmedStrike(scores(10, 16), 2, 4, monk(5), "EDITION_2014").damage.faces).toBe(6);
   });
 
@@ -199,9 +190,7 @@ describe("deriveUnarmedStrike — Empowered Strikes (magical at monk L6+, editio
   });
 
   it("multiclass gates off the monk class-entry level, not total level", () => {
-    // Fighter 10 / Monk 6 → magical; the caller passes only the monk level.
     expect(deriveUnarmedStrike(scores(16, 10), 4, 1, monk(6), "EDITION_2024").magical).toBe(true);
-    // Fighter 6 / Monk 5 → not magical.
     expect(deriveUnarmedStrike(scores(16, 10), 3, 1, monk(5), "EDITION_2024").magical).toBe(false);
   });
 

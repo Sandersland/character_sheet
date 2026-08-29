@@ -22,7 +22,6 @@ describe("ErrorBoundary", () => {
   });
 
   it("catches a throwing child and shows the fallback", () => {
-    // React still logs the caught error; silence it to keep test output clean.
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     render(
@@ -38,7 +37,6 @@ describe("ErrorBoundary", () => {
     expect(
       screen.getByRole("link", { name: "Back to characters" })
     ).toBeInTheDocument();
-    // componentDidCatch logged the crash.
     expect(errorSpy).toHaveBeenCalled();
   });
 

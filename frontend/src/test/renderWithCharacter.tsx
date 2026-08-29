@@ -1,11 +1,7 @@
-// Test helper for anything reading useCurrentCharacter() (#1284). Imports
-// render/renderHook from "@testing-library/react" — the module setup.ts mocks
-// to already nest a QueryClientProvider — so composing CurrentCharacterProvider
-// here lands inside that provider rather than duplicating it.
-//
-// Exports are added incrementally, one per commit alongside their first
-// consumer (mirrors queryKeys.ts) — an export with no importer yet fails
-// fallow's unused-exports gate.
+// Imports render/renderHook from @testing-library/react, which the global
+// test setup already mocks to nest a QueryClientProvider — composing
+// CurrentCharacterProvider here lands inside that provider instead of
+// duplicating it.
 import { render, renderHook, type RenderHookOptions, type RenderOptions } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 
@@ -14,9 +10,6 @@ import { characterKeys } from "@/api/queryKeys";
 import { CurrentCharacterProvider } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 
-/** Reads the character straight back out of the query cache — the assertion
- *  target for "the write reached the cache", once a callback-forwarding
- *  onUpdate is no longer around to spy on. */
 export function cachedCharacter(id: string): Character | undefined {
   return getQueryClient().getQueryData<Character>(characterKeys.detail(id));
 }

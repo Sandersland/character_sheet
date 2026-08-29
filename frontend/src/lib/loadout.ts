@@ -1,10 +1,3 @@
-/**
- * Loadout-list model (#925) — the grouped-rows replacement for the rejected
- * tile-grid paper doll. Pure logic (no JSX): walks `SLOT_GROUPS` into ordered
- * Weapons / Armor / Accessories groups of filled, empty, or locked rows. Every
- * rule it reports (`notProficient`, the off-hand lock) is a served flag, not a
- * local derivation; the server owns placement validation too.
- */
 import type { Character, EquipSlot, InventoryItem } from "@/types/character";
 import {
   equipSlotLabel,
@@ -17,7 +10,6 @@ import {
   type VersatileGrip,
 } from "@/lib/paperDoll";
 
-// Loadout section headings — the grouped-list rename of the doll's slot groups.
 const LOADOUT_GROUP_LABELS: Record<SlotGroup, string> = {
   hands: "Weapons",
   armor: "Armor",
@@ -62,8 +54,6 @@ function filledRow(slot: EquipSlot, key: string, label: string, item: InventoryI
   return { kind: "filled", key, slot, label, item, notProficient: !item.proficient, grip };
 }
 
-// The rows a single slot contributes: RING expands to RING_CAPACITY numbered
-// rows; a two-handed main-hand locks the off-hand into a static held-by row.
 function rowsForSlot(
   inventory: InventoryItem[],
   slot: EquipSlot,
@@ -93,7 +83,6 @@ function rowsForSlot(
   ];
 }
 
-// The full loadout, grouped Weapons / Armor / Accessories in slot-taxonomy order.
 export function buildLoadoutGroups(character: Character): LoadoutGroup[] {
   const inventory = character.inventory;
   const offHandLocked = character.offHandLocked;
@@ -113,9 +102,7 @@ export interface AttunementSummary {
   atCap: boolean;
 }
 
-// Attunement counter for the loadout header. The cap is served (#1377) — the
-// number the backend's attune path rejects past — so this only counts and
-// compares; it never re-encodes the 5e limit.
+// The cap is server-supplied (#1377); this only counts and compares, never re-derives the 5e limit.
 export function attunementSummary(inventory: InventoryItem[], cap: number): AttunementSummary {
   const count = inventory.filter((item) => item.attuned).length;
   return { count, cap, atCap: count >= cap };

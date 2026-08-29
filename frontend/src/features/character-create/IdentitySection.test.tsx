@@ -58,9 +58,6 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
   };
 }
 
-// A variant-bearing species (2014 Dwarf-shaped: Hill/Mountain) alongside a
-// variantless one (2014 Human-shaped) — the two shapes #1680's picker must
-// tell apart.
 const reference: ReferenceData = {
   species: [
     {
@@ -87,8 +84,6 @@ const reference: ReferenceData = {
       id: "sp-human", name: "Human", slug: "human", speed: 30, abilityIncreases: [],
       needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false, variants: [],
     },
-    // #1683: a 2024 Elf-shaped species with a spell-granting lineage (Drow)
-    // and a non-spell-granting one (Wood Elf), for the casting-ability picker.
     {
       id: "sp-elf-2024",
       name: "Elf",
@@ -110,9 +105,6 @@ const reference: ReferenceData = {
         },
       ],
     },
-    // #1756: a 2014 Elf-shaped species whose Astral Elf variant opens the
-    // casting-ability choice (chooseCantrip with no fixed ability →
-    // needsCastingAbility:true) while High Elf fixes it (needsCastingAbility:false).
     {
       id: "sp-elf-2014",
       name: "Elf (2014)",
@@ -198,8 +190,6 @@ describe("IdentitySection — two-step species/variant picker (#1680)", () => {
   });
 });
 
-// #1683: the casting-ability picker (Int/Wis/Cha), rendered only for a
-// spell-granting lineage/legacy (SpeciesVariantOption.needsCastingAbility).
 describe("IdentitySection — casting-ability picker (#1683)", () => {
   it("renders no picker before a species is chosen", () => {
     renderSection(makeDraft());

@@ -158,20 +158,17 @@ describe("campaign items (#380)", () => {
     const itemId = created.body.id as string;
     const entityId = created.body.entity.id as string;
 
-    // Owner sees the full payload incl dmNotes.
     const ownerView = await supertest(app)
       .get(`/api/campaigns/${campaignId}/items/by-entity/${entityId}`)
       .set("Cookie", cookieOwner);
     expect(ownerView.status).toBe(200);
     expect(ownerView.body.dmNotes).toBe(weaponItem.dmNotes);
 
-    // Player can't see it while the entity is HIDDEN.
     const hiddenView = await supertest(app)
       .get(`/api/campaigns/${campaignId}/items/by-entity/${entityId}`)
       .set("Cookie", cookiePlayer);
     expect(hiddenView.status).toBe(404);
 
-    // Owner reveals the entity via the existing #379 machinery.
     await supertest(app)
       .patch(`/api/campaigns/${campaignId}/entities/${entityId}`)
       .set("Cookie", cookieOwner)
@@ -183,10 +180,8 @@ describe("campaign items (#380)", () => {
     expect(playerView.status).toBe(200);
     expect(playerView.body.name).toBe("Secret Blade");
     expect(playerView.body.weapon).toBeDefined();
-    // dmNotes must NEVER appear in a player-facing payload.
     expect("dmNotes" in playerView.body).toBe(false);
 
-    // Cleanup so the delete test starts clean.
     await supertest(app).delete(`/api/campaigns/${campaignId}/items/${itemId}`).set("Cookie", cookieOwner);
   });
 
@@ -208,7 +203,6 @@ describe("campaign items (#380)", () => {
       .set("Cookie", cookieOwner);
     expect(ok.status).toBe(204);
 
-    // The documented cleanup rule: deleting the item removes its fronting entity.
     expect(await prisma.item.findUnique({ where: { id: itemId } })).toBeNull();
     expect(await prisma.campaignEntity.findUnique({ where: { id: entityId } })).toBeNull();
   });
@@ -221,7 +215,6 @@ describe("campaign items (#380)", () => {
     expect(res.status).toBe(404);
   });
 
-  // Boots of Speed: bonus action, +30 speed, once per long rest, until a long rest.
   const bootsCapability = {
     kind: "activatedEffect" as const,
     activation: "bonus" as const,
@@ -279,13 +272,11 @@ describe("campaign items (#380)", () => {
     expect(res.body.capabilities).toHaveLength(1);
     expect(res.body.capabilities[0]).toMatchObject({ kind: "passiveBonus", target: "skill", value: 2, targetKey: "stealth" });
 
-    // The old activatedEffect row is gone — replace, not merge.
     const persisted = await prisma.itemCapability.findMany({ where: { itemId: itemId } });
     expect(persisted).toHaveLength(1);
     expect(persisted[0].kind).toBe("passiveBonus");
   });
 
-  // Wand of Magic Missiles' pool + a charges-costed cast (#555).
   const wandPool = {
     kind: "charges" as const,
     maxCharges: 7,
@@ -310,7 +301,6 @@ describe("campaign items (#380)", () => {
       .send({ name: "Wand of Magic Missiles", category: "gear", rarity: "UNCOMMON", capabilities: [wandPool, chargesCast] });
     expect(res.status).toBe(201);
     expect(res.body.capabilities).toHaveLength(2);
-    // The serialized pool matches the input shape 1:1 (round-trips the DM editor).
     expect(res.body.capabilities[0]).toEqual({
       kind: "charges",
       maxCharges: 7,
@@ -388,8 +378,6 @@ describe("campaign items (#380)", () => {
     expect(JSON.stringify(res.body)).toContain("op");
   });
 
-  // ── Worn-slot authoring (#571) ──────────────────────────────────────────────
-
   it("DM-1: a gear item with a worn slot round-trips through create + PATCH", async () => {
     const created = await supertest(app)
       .post(`/api/campaigns/${campaignId}/items`)
@@ -460,8 +448,6 @@ describe("campaign items (#380)", () => {
         weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "slashing" },
       });
     const itemId = created.body.id as string;
-    // The schema-level refine can't see the existing category on a category-less PATCH;
-    // the handler's effective-category guard must still reject the slot.
     const res = await supertest(app)
       .patch(`/api/campaigns/${campaignId}/items/${itemId}`)
       .set("Cookie", cookieOwner)
@@ -499,9 +485,6 @@ describe("campaign items (#380)", () => {
       value: 0,
       dice: { count: 1, faces: 6 },
     };
-    // Distinct name from the file's `weaponItem` fixture: since #1646 campaign
-    // items share Item's @@unique([scopeKey, name]), so two items named
-    // "Flametongue" in this same campaign would collide.
     const created = await supertest(app)
       .post(`/api/campaigns/${campaignId}/items`)
       .set("Cookie", cookieOwner)
@@ -520,11 +503,7 @@ describe("campaign items (#380)", () => {
     expect(persisted[0].valueDiceFaces).toBe(6);
   });
 
-  // #686 gap pins: the CRUD branches the created/updated/serializeCampaignItem
-  // decomposition most endangers, unpinned above — consumables (zero coverage),
-  // the PATCH detail-upsert branches, capabilities:[] clearing, the entity
-  // name-sync negative, and category-change detail retention. Characterization:
-  // these pin CURRENT behavior. Green before the refactor; unedited through it.
+  // Characterization pins (#686): green before a refactor, not endorsement — don't "fix" these based on the assertions.
   describe("create/update/serialize gap pins (#686)", () => {
     async function createItem(body: object) {
       return supertest(app).post(`/api/campaigns/${campaignId}/items`).set("Cookie", cookieOwner).send(body);
@@ -631,8 +610,6 @@ describe("campaign items (#380)", () => {
     });
 
     it("PATCH with a detail block on an item created without one exercises upsert-create", async () => {
-      // detailCreate only nests a detail when the CREATE carries the block;
-      // patching one in later must hit the upsert's create arm.
       const created = await createItem({ name: "Blank Blade (686)", category: "weapon" });
       const itemId = created.body.id as string;
       expect(created.body.weapon).toBeUndefined();
@@ -674,10 +651,7 @@ describe("campaign items (#380)", () => {
     });
 
     it("category change away from weapon KEEPS the stale weapon detail (current behavior)", async () => {
-      // Characterization, not endorsement: the PATCH clears `slot` on
-      // category change but leaves the old detail row in place, and the
-      // serializer keeps emitting it. If the refactor is ever meant to fix
-      // this, do it deliberately — not as a silent side-effect.
+      // Characterization, not endorsement: category change leaves the stale weapon detail in place. Fix deliberately, not as a silent side-effect.
       const created = await createItem({
         name: "Sword-turned-Trinket (686)",
         category: "weapon",
@@ -695,7 +669,6 @@ describe("campaign items (#380)", () => {
     });
   });
 
-  // Pin the grant/castSpell column-mapper defaults ahead of the lib extraction.
   describe("column-mapper pins (#1002)", () => {
     it("persists two grant capabilities with null/false column defaults and serializes both", async () => {
       const res = await supertest(app)

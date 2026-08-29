@@ -1,18 +1,4 @@
-/**
- * Cleric/Paladin multiclass — the sheet must SERIALIZE, not throw (#1340).
- *
- * Before the fix, `collectEntryScopedPools` threw on the duplicate
- * `channelDivinity` pool key both classes' resourceFn emit, so
- * GET /api/characters/:id 500'd for any Cleric 2+/Paladin 3+ character (the
- * throw is reached through buildResourcesView with no try/catch on the path).
- *
- * PHB'14 p.164 (multiclassing): gaining Channel Divinity again from a second
- * class grants that class's effects but no additional use — one shared pool,
- * total = the MAX any single class grants, never the sum. This file is the
- * route-level proof (not just the pure derivation) that a Cleric/Paladin
- * character reads correctly, including through rest and a level-down.
- */
-
+// PHB'14 p.164: gaining Channel Divinity from a second class grants no additional use — one shared pool, total = the MAX any class grants, never the sum.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -62,10 +48,7 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
     COOKIE = await authCookie(OWNER_ID);
     clericId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Cleric" } })).id;
     paladinId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Paladin" } })).id;
-    // #1524: production always sets subclassId alongside the subclass string
-    // (routes/character/class.ts, level-up.ts) — resolved here so these
-    // fixtures match that shape even though channelDivinity's pool merge
-    // itself is driven by the "cleric"/"paladin" name strings, not these ids.
+    // Production always sets subclassId alongside the subclass string — resolved here to match that shape, though the pool merge itself keys off the class name strings, not these ids.
     lifeDomainId = (await prisma.subclass.findFirstOrThrow({ where: { classId: clericId, name: "Life Domain" } })).id;
     oathOfDevotionId = (await prisma.subclass.findFirstOrThrow({ where: { classId: paladinId, name: "Oath of Devotion" } })).id;
   });
@@ -80,7 +63,7 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
           id: CHAR_ID,
           name: "MC Low",
           ownerId: OWNER_ID,
-          experiencePoints: 6500, // level 5 (cleric 2 + paladin 3), no pending level-up
+          experiencePoints: 6500,
           hitDice: { total: 5, die: "d8", spent: 0 },
           abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 16, charisma: 14 },
           spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
@@ -104,10 +87,6 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       expect(res.status).toBe(200);
     });
 
-    // #1225: Cleric's 2024 pool is the real SRD 5.2 progression (2 at L2, not
-    // the pre-retab edition-blind 1). #1229: Paladin's own pool is now ALSO
-    // its real SRD 5.2 progression (2 at L3, not the pre-retab flat 1) — the
-    // two now tie at 2, so the merged max is unchanged.
     it("has exactly one channelDivinity pool with total 2 (max(cleric@2→2, paladin@3→2))", async () => {
       const res = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(res.status).toBe(200);
@@ -127,7 +106,7 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
           id: CHAR_ID,
           name: "MC High",
           ownerId: OWNER_ID,
-          experiencePoints: 64000, // level 10 (cleric 6 + paladin 4), no pending level-up
+          experiencePoints: 64000,
           hitDice: { total: 10, die: "d8", spent: 0 },
           abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 16, charisma: 14 },
           spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
@@ -146,10 +125,6 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       await prisma.character.deleteMany({ where: { id: CHAR_ID } });
     });
 
-    // #1225: Cleric's 2024 pool is 3 at L6 (not the pre-retab 2). #1229:
-    // Paladin's own pool at L4 is now 2 (not the pre-retab flat 1), so the
-    // sum this guards against is 5 (3+2), not the old 4 (3+1) — the max (3)
-    // is unaffected either way.
     it("has exactly one channelDivinity pool with total 3 — the max (cleric@6→3), NOT the sum 5", async () => {
       const res = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(res.status).toBe(200);
@@ -158,9 +133,6 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       expect(pools[0].total).toBe(3);
     });
 
-    // #1340 Chunk 2: the merged DERIVED_ACTIONS row must surface as exactly one
-    // card on the wire, not the two duplicate channelDivinityCleric/
-    // channelDivinityPaladin cards a Cleric/Paladin multiclass used to get.
     it("availableActions has exactly one enabled Channel Divinity card", async () => {
       const res = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(res.status).toBe(200);
@@ -171,12 +143,8 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       expect(cards[0]).toMatchObject({ key: "channelDivinity", cost: "action", enabled: true });
     });
 
-    // #1225: cleric@6's pool is 3 (not the pre-retab 2), and cleric@2's is 2
-    // (not 1) — the level-down still crosses a real total change (3 -> 2,
-    // since paladin@4's own 2, #1229, still doesn't beat cleric@2's 2), so
-    // the clamp itself stays a meaningful assertion, just at new numbers.
+    // The level-down crosses a real total change (3 → 2) — paladin@4's own 2 doesn't beat cleric@2's 2, so the clamp is a meaningful assertion.
     it("persisted used clamps to the current total after a level-down (cleric 6→2, no reconciler needed)", async () => {
-      // Spend all uses at the current (total 3) state.
       await prisma.character.update({
         where: { id: CHAR_ID },
         data: {
@@ -192,9 +160,7 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       const before = await agent().get(`/api/characters/${CHAR_ID}`);
       expect(cdPools(before.body)[0]).toMatchObject({ total: 3, used: 3, remaining: 0 });
 
-      // Drop the cleric entry to level 2 and the XP to match (max(cleric@2→2, paladin@4→1) = 2,
-      // down from 3). Clamp-on-read (buildResourcesPayload) must cap `used` to the
-      // new total without any LEVEL_GATED_RECONCILERS entry (CLAUDE.md: derive, don't persist).
+      // Clamp-on-read (buildResourcesPayload) must cap `used` to the new total without any LEVEL_GATED_RECONCILERS entry (derive, don't persist).
       await prisma.characterClassEntry.updateMany({
         where: { characterId: CHAR_ID, name: "cleric" },
         data: { level: 2 },
@@ -223,7 +189,6 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
       expect(res.status).toBe(200);
       const pools = cdPools(res.body);
       expect(pools).toHaveLength(1);
-      // #1225: full is now 3 (cleric@6's real 2024 total), not the pre-retab 2.
       expect(pools[0].remaining).toBe(3);
     });
   });
@@ -238,7 +203,7 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
           id: CHAR_ID,
           name: "MC High Paladin Primary",
           ownerId: OWNER_ID,
-          experiencePoints: 64000, // level 10 (paladin 4 + cleric 6), no pending level-up
+          experiencePoints: 64000,
           hitDice: { total: 10, die: "d10", spent: 0 },
           abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 16, charisma: 14 },
           spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
@@ -276,7 +241,7 @@ describe("Cleric/Paladin multiclass — channelDivinity pool merge (#1340, PHB'1
           id: CHAR_ID,
           name: "Control Cleric 6",
           ownerId: OWNER_ID,
-          experiencePoints: 14000, // level 6
+          experiencePoints: 14000,
           hitDice: { total: 6, die: "d8", spent: 0 },
           abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 16, charisma: 10 },
           spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },

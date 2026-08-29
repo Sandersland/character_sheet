@@ -34,8 +34,7 @@ beforeEach(() => {
   vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign());
 });
 
-// CampaignSettingsSheet reads useCurrentCharacter() directly (#1284), so every
-// render seeds the cache and mounts CurrentCharacterProvider via renderWithCharacter.
+// CampaignSettingsSheet reads useCurrentCharacter() directly, so renderWithCharacter must seed the cache.
 function render(character: Character, onClose: () => void = vi.fn()) {
   return renderWithCharacter(<CampaignSettingsSheet onClose={onClose} />, character);
 }
@@ -56,7 +55,6 @@ describe("CampaignSettingsSheet (#1087)", () => {
   it("omits the campaign line gracefully when the fetch fails", async () => {
     vi.mocked(client.fetchCampaign).mockRejectedValue(new Error("boom"));
     render(makeCharacter());
-    // The toggles still render; no error UI for the header line.
     expect(await screen.findByRole("checkbox", { name: /share sheet with dm/i })).toBeInTheDocument();
     expect(screen.queryByText(/Curse of Strahd/)).not.toBeInTheDocument();
   });

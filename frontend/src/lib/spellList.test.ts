@@ -61,7 +61,7 @@ describe("deriveSpellList", () => {
       spellcasting: {
         ability: "intelligence", spellSaveDC: 13, spellAttackBonus: 5,
         slots: [
-          { level: 3, total: 2, used: 2 }, // fully used → excluded
+          { level: 3, total: 2, used: 2 },
           { level: 2, total: 2, used: 1 },
           { level: 1, total: 2, used: 0 },
         ],
@@ -78,7 +78,7 @@ describe("deriveSpellList", () => {
         ability: "charisma", spellSaveDC: 13, spellAttackBonus: 5, slots: [],
         arcana: [
           { level: 6, total: 1, used: 0 },
-          { level: 7, total: 1, used: 1 }, // spent → excluded
+          { level: 7, total: 1, used: 1 },
         ],
         spells: [], concentratingOn: null,
       },
@@ -95,7 +95,7 @@ describe("deriveSpellList — spellbook grouping", () => {
         ability: "intelligence", spellSaveDC: 13, spellAttackBonus: 5, slots: [], arcana: [],
         spells: [
           spell({ id: "e1", name: "Fireball", level: 3, spellId: "cat-fireball" }),
-          spell({ id: "e2", name: "Homebrew", level: 1 }), // no spellId
+          spell({ id: "e2", name: "Homebrew", level: 1 }),
         ],
         concentratingOn: null,
       },
@@ -198,8 +198,6 @@ describe("preparedBudget", () => {
     expect(b.count).toBe(1);
   });
 
-  // #1511 D2/D4: carries the served model + labels through so SpellRow/
-  // SpellbookList need not re-read the character payload.
   it("carries the served casterModel and labels through", () => {
     const b = preparedBudget(sc({
       preparedSpellCount: 8,
@@ -229,8 +227,6 @@ describe("canPrepare", () => {
     expect(canPrepare(spell({ id: "x", name: "X", level: 1 }), { count: 3, limit: 12, atLimit: false })).toBe(true);
   });
 
-  // #1511 D3: a known caster's leveled spell is "locked", not "unprepared" —
-  // canPrepare's own locked-rune early-return already covers it.
   it("never blocks a known caster's leveled spell (it's locked, not toggleable)", () => {
     const knownBudget = { count: 8, limit: 8, atLimit: true, casterModel: "known" as const };
     expect(canPrepare(spell({ id: "x", name: "X", level: 1, prepared: false }), knownBudget)).toBe(true);
@@ -263,9 +259,6 @@ describe("swapCandidates", () => {
     ).toEqual([]);
   });
 
-  // #1511 D3/AC: every leveled spell is "locked" (not "prepared") for a known
-  // caster, so there is nothing to swap out — the at-cap swap bar becomes
-  // unreachable for one.
   it("is empty for a known caster even with prepared-flagged spells", () => {
     const spells = [
       spell({ id: "bless", name: "Bless", level: 1, prepared: true }),
@@ -300,8 +293,6 @@ describe("filterSpellbook", () => {
     expect(filterSpellbook(spells, { ...base, ritual: true }).map((s) => s.id)).toEqual(["ff"]);
   });
 
-  // #1511 D6: the predicate itself is unchanged — the chip driving it is
-  // hidden client-side for a known caster, not this function.
   it("prepared filter keeps everything for a known caster (every leveled row is locked)", () => {
     expect(filterSpellbook(spells, { ...base, prepared: true }, "known").map((s) => s.id)).toEqual([
       "c", "mm", "ff", "fb",

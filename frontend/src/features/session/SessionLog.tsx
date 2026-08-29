@@ -1,19 +1,4 @@
-/**
- * SessionLog — BG3-style chat feed for a single play session (#1237).
- *
- * Fetches all CharacterEvents whose sessionId matches the current session and
- * renders them as one sentence per event, newest at the BOTTOM (chat
- * convention), opening scrolled to the latest. Re-fetches on every mount; a
- * caller that keeps the log mounted across live mutations can pass the
- * optional `refreshKey` prop (the character object or a version counter) to
- * trigger additional re-fetches.
- *
- * All the event → sentence/tone/drill-in logic is pure and lives in
- * `lib/sessionLogFeed.ts` — this component only maps that data onto markup.
- *
- * Intentionally read-only — no undo here. Use ActivityModal on the character
- * sheet for the full undo-capable history.
- */
+// Intentionally read-only — no undo here; ActivityModal covers the full undo-capable history.
 
 import { Fragment, useEffect, useRef, useState } from "react";
 
@@ -34,12 +19,7 @@ import type { CharacterEvent } from "@/types/character";
 interface SessionLogProps {
   characterId: string;
   sessionId: string;
-  /**
-   * Changing this value re-fetches the event list. Both live-Combat call sites
-   * (the desktop right rail and the mobile Turn/Log panel, #964) stay mounted, so
-   * they pass the shared `logRefresh` counter to pick up new events. Optional —
-   * a caller that fully unmounts/remounts per view refetches on mount anyway.
-   */
+  /** Optional — a caller that fully unmounts/remounts per view refetches on mount anyway. */
   refreshKey?: unknown;
 }
 
@@ -67,7 +47,6 @@ function Sentence({ row }: { row: FeedRow }) {
 
 function DrillInLine({ d }: { d: DrillInRow }) {
   if (d.formula === undefined) {
-    // Standalone italic aside (e.g. "Called a miss — no damage rolled.").
     return d.note ? <p className="text-[12.5px] italic text-parchment-500">{d.note}</p> : null;
   }
   return (
@@ -83,7 +62,6 @@ function DrillInLine({ d }: { d: DrillInRow }) {
   );
 }
 
-// A plain event line — no drill-in, e.g. "Session started.", "Healed 6 HP."
 function PlainRow({ row }: { row: FeedRow }) {
   return (
     <li className="rounded-control px-3 py-1.5 text-sm leading-relaxed">
@@ -92,9 +70,7 @@ function PlainRow({ row }: { row: FeedRow }) {
   );
 }
 
-// A roll-category line — `<details>` so the summary hover/tap reveals the
-// decomposed breakdown (#1235). Chevron stays dimly visible at rest so touch
-// users see the affordance without relying on hover.
+// Chevron stays dimly visible at rest so touch users see the affordance without relying on hover.
 function RollRow({ row }: { row: FeedRow }) {
   return (
     <li>
@@ -122,8 +98,6 @@ function FeedRowView({ row }: { row: FeedRow }) {
   return row.drillIn ? <RollRow row={row} /> : <PlainRow row={row} />;
 }
 
-// Round separator: centered uppercase label flanked by hairlines (#1237),
-// replacing the old per-row R{n} badge.
 function RoundSeparator({ round }: { round: number }) {
   return (
     <li aria-hidden="true" className="flex items-center gap-2 px-1 py-1">
@@ -136,10 +110,7 @@ function RoundSeparator({ round }: { round: number }) {
   );
 }
 
-// A collapsed run of same-kind roll rows (#983) — the threshold and how many
-// stay visible are RUN_COLLAPSE_THRESHOLD / RUN_VISIBLE_COUNT, not restated
-// here. The newest stay visible in place; the disclosure sits above them and
-// reveals the rest (oldest-first) when expanded.
+// Collapse threshold and visible-count live in RUN_COLLAPSE_THRESHOLD / RUN_VISIBLE_COUNT, not restated here.
 function RollRunView({
   item,
   expanded,
@@ -185,15 +156,12 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
       return next;
     });
 
-  // Reset to the loading state only on a genuine session switch — a live
-  // refreshKey bump re-fetches WITHOUT clearing `events` first, or every open
-  // <details> (a drill-in) would unmount and re-collapse on every roll (the
-  // log bumps its refreshKey on every character write).
+  // Reset to loading only on a genuine session switch — a refreshKey bump
+  // re-fetches WITHOUT clearing `events` first, or every open <details>
+  // drill-in would unmount and re-collapse on every character write.
   useEffect(() => {
     setEvents(null);
     setError(null);
-    // Run ids are event ids, so stale entries never match the new session's
-    // feed — cleared so the set can't grow unboundedly across switches.
     setExpandedRuns(new Set());
   }, [characterId, sessionId]);
 
@@ -206,8 +174,7 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
       .catch(() => setError("Couldn't load session log — try again."));
   }, [characterId, sessionId, refreshKey]);
 
-  // Open already scrolled to the latest event (chat convention) — instant, not
-  // animated, since this fires on load/refresh, not on a user-driven append.
+  // Instant, not animated — this fires on load/refresh, not a user-driven append.
   useEffect(() => {
     if (events) bottomRef.current?.scrollIntoView({ block: "end" });
   }, [events]);

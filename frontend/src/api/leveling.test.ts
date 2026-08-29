@@ -8,8 +8,6 @@ import {
 } from "@/api/leveling";
 import type { LevelUpSubmission } from "@/types/character";
 
-// Verbatim regression pins from client.test.ts (#1270) — assertions unchanged,
-// only the import specifier retargeted.
 describe("fetchLevelUpPlan", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -102,7 +100,6 @@ describe("submitLevelUp", () => {
   });
 });
 
-// New direct coverage (#1270) — previously only exercised transitively.
 describe("applyClassTransactions", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

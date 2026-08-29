@@ -1,5 +1,4 @@
-// One of the HP step's two choice cards (average / roll) (#887). Presentational —
-// selection state and the values it shows are computed by HitPointsStep.
+// Presentational; selection state and the values it shows are computed by HitPointsStep.
 
 const CHOICE_BASE =
   "relative rounded-card border border-parchment-300 bg-parchment-50 px-4 py-5 text-center transition-colors hover:bg-parchment-100";

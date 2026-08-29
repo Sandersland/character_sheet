@@ -5,8 +5,6 @@ import ProficienciesCard from "@/features/abilities/ProficienciesCard";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
-// Level-7 Battle Master fixture matching the 0719 playtest bug report
-// (#1168): long weapon/armor category names + a subclass-granted tool.
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "c1",
@@ -53,14 +51,12 @@ describe("ProficienciesCard", () => {
   it("sizes columns off the card's own container, not the viewport", () => {
     renderCard();
 
-    // Every proficiency-row grid must be inside a @container ancestor and use
-    // the @sm: container-query variant — never viewport (sm:/xl:) breakpoints,
-    // which forced 3-wide density in a narrow Overview sub-column (#1168).
+    // Grids must use @container queries (@sm:), not viewport breakpoints —
+    // a narrow Overview sub-column got the wide-viewport column count (#1168).
     const grids = document.querySelectorAll(".grid");
     expect(grids.length).toBeGreaterThan(0);
     for (const grid of grids) {
       expect(grid.className).toMatch(/@sm:grid-cols-2/);
-      // Viewport breakpoint form (no leading "@") must be gone entirely.
       expect(grid.className.split(/\s+/)).not.toContain("sm:grid-cols-2");
       expect(grid.className.split(/\s+/)).not.toContain("xl:grid-cols-3");
       expect(grid.closest(".\\@container")).not.toBeNull();
@@ -70,26 +66,21 @@ describe("ProficienciesCard", () => {
   it("weapon/armor rows drop the bonus/forget spacer slots; tool rows keep them", () => {
     renderCard();
 
-    // Tool row: bonus text + a forget affordance (subclass-granted).
     expect(screen.getByText("+3")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /remove proficiency: woodcarver's tools/i }),
     ).toBeInTheDocument();
 
-    // Weapon/armor rows render no forget button at all.
     expect(screen.queryAllByRole("button", { name: /remove proficiency/i })).toHaveLength(1);
   });
 
   it("abbreviates a long source label in the pill but keeps the full name reachable via title", () => {
     renderCard();
 
-    // "subclass" source label is "Battle Master" — too wide for the pill;
-    // it should abbreviate (BM) while a tooltip keeps the full name.
     const pill = screen.getByText("BM");
     expect(pill).toBeInTheDocument();
     expect(pill.getAttribute("title")).toBe("Battle Master");
 
-    // Short single-word sources (Class) are unaffected.
     expect(screen.getAllByText("Class").length).toBeGreaterThan(0);
   });
 });

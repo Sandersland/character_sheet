@@ -4,8 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 import BottomSheet from "@/components/ui/BottomSheet";
 
-// jsdom's matchMedia stub reports matches:false for every query, so useIsBelowMd
-// resolves to mobile — the default here. Desktop cases stub a matching min-width.
+// jsdom's matchMedia stub always reports matches:false, so useIsBelowMd defaults to mobile; desktop cases stub a matching min-width.
 function stubDesktop() {
   vi.stubGlobal("matchMedia", (query: string) => ({
     matches: query.includes("min-width"),
@@ -83,7 +82,6 @@ describe("BottomSheet", () => {
     const scrim = baseElement.querySelector('[role="presentation"]') as HTMLElement;
     await userEvent.pointer({ target: scrim, keys: "[MouseLeft]" });
     expect(onClose).not.toHaveBeenCalled();
-    // Scrim fades out on a matching ~500ms opacity transition.
     expect(scrim.className).toContain("opacity-0");
     expect(scrim.className).toContain("transition-opacity");
     fireTransitionEnd(panelOf(baseElement));

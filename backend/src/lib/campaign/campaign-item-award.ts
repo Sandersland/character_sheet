@@ -10,14 +10,6 @@ import { buildInventorySnapshot } from "@/lib/inventory/inventory-snapshot-build
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";
 
-// DM item award/revoke (#381). A campaign owner grants a CAMPAIGN-scoped Item
-// (#1646; DM-authored, formerly a separate CampaignItem table) into a member
-// character's inventory: the mechanical fields + matching detail row are
-// snapshotted into a new InventoryItem tagged with an itemId provenance FK,
-// the fronting entity is revealed, and an audit event is written on the
-// TARGET character so the grant is LIFO-undoable via the shared inventory
-// revert (category "inventory", shape-driven).
-
 class CampaignItemAwardError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -46,21 +38,12 @@ function toJsonInput(value: Prisma.JsonValue | null): Prisma.InputJsonValue | Pr
   return value === null ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
 }
 
-// Typed capability rows snapshotted 1:1 onto the awarded item (#545) — a
-// straight column copy via capabilityColumnFields (`used` NOT copied: an
-// awarded pool/per-capability counter starts full, remaining = max − 0).
-// Each gets an explicit id (#1648) rather than the column default, generated
-// client-side so the SAME id can key both this InventoryCapability row and
-// its InventoryCapabilityUse mirror, and feed buildInventorySnapshot's
-// capabilities[].key, all from one create() call.
+// `used` is not copied: an awarded capability always starts full (remaining = max).
+// id is generated client-side so this InventoryCapability row, its InventoryCapabilityUse mirror, and buildInventorySnapshot's capabilities[].key can share one id from a single create() call.
 function snapshotCampaignItemCapabilityCreates(item: CampaignItemWithDetails) {
   return item.capabilities.map((c) => ({ id: randomUUID(), ...capabilityColumnFields(c) }));
 }
 
-// Resolves the sessionId a loot event threads onto (#382). With no explicit
-// request, keeps #381 behaviour: auto-thread the campaign's active session (null
-// out of session). An explicit id must belong to this campaign (else 400) and be
-// active (else 400) before it can carry the event.
 async function resolveAwardSessionId(
   campaignId: string,
   characterId: string,
@@ -82,10 +65,7 @@ async function resolveAwardSessionId(
   return requestedSessionId;
 }
 
-// Loads the item + target character and enforces the shared guards: item lives
-// in this campaign (404), character is a member of it (400). findFirst with the
-// full predicate, not findUnique(id) + an in-code campaign check — the latter
-// leaks existence through timing (#1646).
+// findFirst with the full predicate, not findUnique(id) + an in-code campaign check — the latter leaks item existence through timing.
 async function loadAwardContext(campaignId: string, campaignItemId: string, characterId: string) {
   const item = await prisma.item.findFirst({
     where: { id: campaignItemId, scope: "CAMPAIGN", campaignId },
@@ -104,7 +84,6 @@ async function loadAwardContext(campaignId: string, campaignItemId: string, char
   return { item, character };
 }
 
-// Grant `quantity` of a campaign item into the target character's inventory.
 export async function awardCampaignItem(params: {
   campaignId: string;
   campaignItemId: string;
@@ -123,9 +102,7 @@ export async function awardCampaignItem(params: {
   const sessionId = await resolveAwardSessionId(params.campaignId, character.id, params.sessionId);
 
   await prisma.$transaction(async (tx) => {
-    // Unique guard: a unique item may exist on only one sheet in the campaign.
-    // Read the holder inside the transaction (alongside the create below) so a
-    // concurrent award can't slip between an outside-the-tx check and the write.
+    // Unique-item check happens inside the tx (not before it) so a concurrent award can't slip in between check and write.
     if (item.isUnique) {
       const held = await tx.inventoryItem.findFirst({
         where: { itemId: item.id },
@@ -140,10 +117,6 @@ export async function awardCampaignItem(params: {
     }
 
     const position = await tx.inventoryItem.count({ where: { characterId: character.id } });
-    // Ids generated up front (#1648) so the same create() call can nest both
-    // `capabilities` and their `capabilityUses` mirror rows, and so
-    // buildInventorySnapshot's capabilities[].key matches the row id that
-    // actually lands — no follow-up read-then-update round trip.
     const capabilityCreates = snapshotCampaignItemCapabilityCreates(item);
     const capabilityUseCreates = capabilityCreates.map((c) => ({ capabilityKey: c.id, used: 0 }));
     const created = await tx.inventoryItem.create({
@@ -156,18 +129,14 @@ export async function awardCampaignItem(params: {
         cost: toJsonInput(item.cost),
         description: item.description ?? undefined,
         quantity,
-        // Snapshot placement metadata (#565): gear slot + rarity for the Worn view.
         slot: item.slot,
         rarity: item.rarity,
-        // Snapshot the attunement metadata so the attune check runs against
-        // the frozen copy, not the mutable source (#545).
+        // Attunement fields are snapshotted so later attune checks read this frozen copy, not the mutable catalog item.
         requiresAttunement: item.requiresAttunement,
         attunementPrereqKind: item.attunementPrereqKind,
         attunementPrereqValue: item.attunementPrereqValue,
         position,
-        // Promoted out of InventoryConsumableDetail (#1648) — same freshCopy
-        // rule as the nested consumableDetail create below (a charged
-        // consumable is awarded full).
+        // Same consumableDetailFields({ freshCopy: true }) rule as the nested consumableDetail create below: a charged consumable is awarded full.
         usesRemaining: item.consumableDetail
           ? consumableDetailFields(item.consumableDetail, { freshCopy: true }).usesRemaining
           : null,
@@ -192,8 +161,7 @@ export async function awardCampaignItem(params: {
     });
 
     if (item.link) {
-      // Reveal only if still hidden; updateMany's compound where makes an
-      // already-revealed entity a no-op (count 0).
+      // updateMany's WHERE only matches HIDDEN, so revealing an already-revealed entity is a no-op.
       await tx.campaignEntity.updateMany({
         where: { id: item.link.campaignEntityId, visibility: "HIDDEN" },
         data: { visibility: "REVEALED" },
@@ -212,12 +180,7 @@ export async function awardCampaignItem(params: {
       data: {
         itemName: created.name,
         quantityDelta: quantity,
-        // `itemId`, not the pre-#1646 `campaignItemId`: this is NEW blob content
-        // and the column it names is now itemId. Award events written before the
-        // merge keep the old key — the log is append-only — but nothing reads
-        // this field, so the two spellings never need reconciling.
-        // resolveSnapshotRefs reads the legacy key off the DELETED-item
-        // snapshot, which is a different blob and does still need its fallback.
+        // itemId (not the legacy campaignItemId key): the audit log is append-only, older events keep the old spelling, and nothing reads this field, so no migration is needed.
         itemId: item.id,
         recipientName: character.name,
       },
@@ -228,7 +191,6 @@ export async function awardCampaignItem(params: {
   });
 }
 
-// Remove the provenance-matched inventory row from the target character.
 export async function revokeCampaignItem(params: {
   campaignId: string;
   campaignItemId: string;
@@ -277,11 +239,7 @@ export async function revokeCampaignItem(params: {
   });
 }
 
-// Current holders of each campaign item, derived from live InventoryItem rows.
-// Returns a map keyed by itemId; items with no holders are absent. Matching on
-// itemId is exact even though catalog acquisitions also populate it (#1646):
-// the caller only ever passes CAMPAIGN-scoped Item ids, and a catalog-acquired
-// row's itemId is a GLOBAL id, so the two sets cannot overlap.
+// itemId matching is safe even though catalog acquisitions also set it: CAMPAIGN-scoped ids and GLOBAL catalog ids never overlap.
 export async function campaignItemHolders(
   campaignItemIds: string[],
 ): Promise<Map<string, CampaignItemHolder[]>> {
@@ -299,9 +257,7 @@ export async function campaignItemHolders(
   });
 
   for (const row of rows) {
-    // Unreachable at runtime — the query above filters itemId to the given ids.
-    // Present because Prisma types the column `string | null`, and narrowing is
-    // cheaper to read than a non-null assertion.
+    // Unreachable (query already filters itemId to non-null ids) — kept because Prisma types the column nullable and narrowing reads better than a non-null assertion.
     if (!row.itemId) continue;
     const list = map.get(row.itemId) ?? [];
     list.push({

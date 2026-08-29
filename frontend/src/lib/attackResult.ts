@@ -1,6 +1,3 @@
-// Pure result-line derivation for AttackResultLine: crit/miss cues, kept dice,
-// effective total, and tone — so the row component renders only (#778).
-
 import { isNaturalOne, isNaturalTwenty } from "@/lib/dice";
 import type { DieRoll, RollResult } from "@/lib/dice";
 
@@ -16,19 +13,14 @@ export interface ResultLineView {
   faces: number;
   modifier: number;
   total: number;
-  /** Nat-20 kept d20 on a to-hit roll — drives the "Critical hit!" cue. */
   critHit: boolean;
-  /** Nat-1 kept d20 on a to-hit roll — drives the "Miss" cue. */
   miss: boolean;
-  /** The roll itself was a doubled-dice crit (spec.crit). */
   critSpec: boolean;
-  /** A maneuver-summed override replaced the raw total. */
   hasOverride: boolean;
   tone: ResultLineTone;
 }
 
-// Arcane (magic-neutral) for the to-hit d20, garnet for weapon damage — box and
-// total share one tone so a roll doesn't mix arcane boxes with a garnet total.
+// box and total share one tone (arcane for to-hit, garnet for damage) so a roll never mixes tones.
 const ATTACK_TONE: ResultLineTone = {
   box: "border-arcane-400 bg-arcane-50 text-arcane-800",
   total: "text-arcane-800",
@@ -38,8 +30,6 @@ const DAMAGE_TONE: ResultLineTone = {
   total: "text-garnet-800",
 };
 
-// Everything AttackResultLine renders, derived once. Crit/miss cues are to-hit
-// only; a maneuver-summed override wins over the raw total when present.
 export function resultLineView(
   result: RollResult,
   kind: ResultKind,
