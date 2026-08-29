@@ -228,7 +228,17 @@ export interface DerivedSubclassChoice {
  * catalogSource is unreachable end to end.
  */
 export function subclassChoiceSwapCadence(catalogSource: string, edition: RulesEdition): "onLevelUp" | "never" {
-  return catalogSource === "discipline" && edition === "EDITION_2014" ? "onLevelUp" : "never";
+  if (catalogSource !== "discipline") return "never";
+  switch (edition) {
+    case "EDITION_2014":
+      return "onLevelUp";
+    case "EDITION_2024":
+      return "never";
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`subclassChoiceSwapCadence: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 export interface SubclassDefinition {

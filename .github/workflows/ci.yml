@@ -36,6 +36,14 @@ jobs:
       - name: subclass identity resolved via slug, not substring
         run: sh scripts/check-subclass-substring.sh
 
+      # An edition rule must branch as a total mapping over RulesEdition,
+      # never a binary `edition === "EDITION_…"` comparison (#1978,
+      # generalizing #1527's subclassGateLevel pattern to every rule fn).
+      # Needs no node, so it runs alongside the other grep gates above. Twin
+      # of the lefthook pre-commit job.
+      - name: edition rules branch as a total mapping, not ===/!==
+        run: sh scripts/check-edition-branching.sh
+
       # Boot-contract gate (#1277 defect 3): needs no node, runs alongside
       # the other grep gates above.
       - name: every migrate-deploy boot command also seeds

@@ -222,8 +222,17 @@ export function spellcastingStartLevel(
   edition: RulesEdition,
 ): number {
   if (thirdCasterAbilityOf(subclassRef)) return 3;
-  if (edition === "EDITION_2014" && HALF_CASTER_CLASSES.has(className.toLowerCase())) return 2;
-  return 1;
+  if (!HALF_CASTER_CLASSES.has(className.toLowerCase())) return 1;
+  switch (edition) {
+    case "EDITION_2014":
+      return 2;
+    case "EDITION_2024":
+      return 1;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`spellcastingStartLevel: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 // SRD 5.1 known-caster count. `key` is already lowercased and confirmed present in SPELLS_KNOWN_BY_CLASS_2014 by the caller.
@@ -262,13 +271,19 @@ export function preparedSpellCountAt(
   }
 
   const key = className.toLowerCase();
-  if (edition === "EDITION_2014") {
-    return preparedSpellCount2014(key, level, abilityScores);
+  switch (edition) {
+    case "EDITION_2014":
+      return preparedSpellCount2014(key, level, abilityScores);
+    case "EDITION_2024": {
+      const table = PREPARED_SPELLS_BY_CLASS[key];
+      if (!table) return null;
+      return table[Math.min(20, Math.max(1, level)) - 1] ?? null;
+    }
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`preparedSpellCountAt: unhandled edition ${String(exhaustive)}`);
+    }
   }
-
-  const table = PREPARED_SPELLS_BY_CLASS[key];
-  if (!table) return null;
-  return table[Math.min(20, Math.max(1, level)) - 1] ?? null;
 }
 
 // Deliberate-coupling latch (#1507 D2): the one function both reconcilePreparedSpells and buildSpellcastingView call — never two inline copies of the cap.
@@ -299,8 +314,16 @@ export function casterModelFor(
   const isThirdCaster = Boolean(thirdCasterAbilityOf(subclassRef));
   const key = className.toLowerCase();
   if (!isThirdCaster && CASTER_FRACTION_BY_CLASS[key] === undefined) return null;
-  if (edition !== "EDITION_2014") return "prepared";
-  return isThirdCaster || KNOWN_CASTER_CLASSES_2014.has(key) ? "known" : "prepared";
+  switch (edition) {
+    case "EDITION_2014":
+      return isThirdCaster || KNOWN_CASTER_CLASSES_2014.has(key) ? "known" : "prepared";
+    case "EDITION_2024":
+      return "prepared";
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`casterModelFor: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 // The one combiner both buildSpellcastingView and applyLearnSpellOp call — never two inline copies.
@@ -374,11 +397,18 @@ export function swapCadenceFor(
 ): SwapCadence | null {
   if (thirdCasterAbilityOf(subclassRef)) return "onLevelUp";
   const key = className.toLowerCase();
-  if (edition === "EDITION_2014") {
-    if (key === "ranger") return "onLevelUp";
-    if (key === "paladin") return "anyOnLongRest";
+  switch (edition) {
+    case "EDITION_2014":
+      if (key === "ranger") return "onLevelUp";
+      if (key === "paladin") return "anyOnLongRest";
+      return SWAP_CADENCE_BY_CLASS[key] ?? null;
+    case "EDITION_2024":
+      return SWAP_CADENCE_BY_CLASS[key] ?? null;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`swapCadenceFor: unhandled edition ${String(exhaustive)}`);
+    }
   }
-  return SWAP_CADENCE_BY_CLASS[key] ?? null;
 }
 
 export interface MulticlassCasterClass {
@@ -670,11 +700,23 @@ export function level1SpellPicksFor(
   if (spellcastingStartLevel(className, subclassRef, edition) > 1) return null;
 
   const isWizard = className.toLowerCase() === "wizard";
-  const spells = isWizard
-    ? WIZARD_LEVEL1_SPELLBOOK_SIZE
-    : edition === "EDITION_2014"
-      ? (LEVEL1_CREATION_SPELLS_2014[className.toLowerCase()] ?? null)
-      : preparedSpellCountAt(className, 1, subclassRef, {}, edition);
+  let spells: number | null;
+  if (isWizard) {
+    spells = WIZARD_LEVEL1_SPELLBOOK_SIZE;
+  } else {
+    switch (edition) {
+      case "EDITION_2014":
+        spells = LEVEL1_CREATION_SPELLS_2014[className.toLowerCase()] ?? null;
+        break;
+      case "EDITION_2024":
+        spells = preparedSpellCountAt(className, 1, subclassRef, {}, edition);
+        break;
+      default: {
+        const exhaustive: never = edition;
+        throw new Error(`level1SpellPicksFor: unhandled edition ${String(exhaustive)}`);
+      }
+    }
+  }
   if (spells == null) return null;
 
   const cantrips = cantripsKnownAtLevel(className, 1, subclassRef);

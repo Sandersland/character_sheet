@@ -108,7 +108,14 @@ export async function migrateKnownCastersPrepared(prisma: PrismaClient = default
   for (const character of characters) {
     if (!hasKnownCasterEntry(character.classEntries)) continue;
 
-    const limit = derivePreparedSpellLimit(limitEntriesFor(character.experiencePoints, character.classEntries));
+    // Hardcoded EDITION_2024 (never the character's own rulesEdition): this migration exists
+    // ONLY to backfill the prepared flag onto pre-2024 known-caster data for the 2024 prepared
+    // model this file's header describes — its cap is always the 2024 table, not a per-character
+    // rule choice. abilityScores is {} because the 2024 branch of preparedSpellCountAt is a flat
+    // per-class-level table lookup that never reads ability scores (only the retired 2014 formula
+    // branch did) — surfaced by #1978's exhaustive switch, which no longer silently defaults an
+    // omitted edition onto the 2024 branch the way the old `if (edition === "EDITION_2014")` did.
+    const limit = derivePreparedSpellLimit(limitEntriesFor(character.experiencePoints, character.classEntries), {}, "EDITION_2024");
     if (limit == null) continue;
 
     const state = normalizeSpellcastingMutable(character.spellcasting);

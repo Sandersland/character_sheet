@@ -57,9 +57,16 @@ const RIDER_EFFECT: Record<OpenHandRider, string> = {
 // SRD 5.2 / PHB'24 p.90 vs SRD 5.1 / PHB'14 p.78 — the reaction scope and
 // whose next turn the clock runs to differ materially, not just wording.
 function addleClause(edition: RulesEdition): string {
-  return edition === "EDITION_2014"
-    ? "the target can't take reactions until the end of your next turn"
-    : "the target can't make Opportunity Attacks until the start of its next turn";
+  switch (edition) {
+    case "EDITION_2014":
+      return "the target can't take reactions until the end of your next turn";
+    case "EDITION_2024":
+      return "the target can't make Opportunity Attacks until the start of its next turn";
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`addleClause: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 export function openHandRiderSummary(

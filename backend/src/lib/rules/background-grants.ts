@@ -4,16 +4,43 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 // These grant checks are called from both the creation path and the reference preview, so one function per grant keeps the two from disagreeing.
 
 export function backgroundGrantsOriginFeat(edition: RulesEdition): boolean {
-  return edition === "EDITION_2024";
+  switch (edition) {
+    case "EDITION_2024":
+      return true;
+    case "EDITION_2014":
+      return false;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`backgroundGrantsOriginFeat: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 export function backgroundGrantsAbilitySpread(edition: RulesEdition): boolean {
-  return edition === "EDITION_2024";
+  switch (edition) {
+    case "EDITION_2024":
+      return true;
+    case "EDITION_2014":
+      return false;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`backgroundGrantsAbilitySpread: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 // The opposite verdict of backgroundGrantsAbilitySpread — the two mechanisms are edition-complementary, never both-on or both-off.
 export function speciesGrantsAbilityIncreases(edition: RulesEdition): boolean {
-  return edition === "EDITION_2014";
+  switch (edition) {
+    case "EDITION_2014":
+      return true;
+    case "EDITION_2024":
+      return false;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`speciesGrantsAbilityIncreases: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 // A legal floating spread is +2/+1 or +1/+1/+1, always summing to 3.

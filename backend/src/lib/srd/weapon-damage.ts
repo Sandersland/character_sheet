@@ -120,16 +120,22 @@ export function deriveUnarmedDamageDie(advancements: AdvancementEntry[]): number
 // Level bands are identical across editions — only the die faces fork (#1499). Returns 0 below monk level 1 in both editions.
 export function deriveMartialArtsDie(monkLevel: number, edition: RulesEdition): number {
   if (monkLevel < 1) return 0;
-  if (edition === "EDITION_2014") {
-    if (monkLevel >= 17) return 10;
-    if (monkLevel >= 11) return 8;
-    if (monkLevel >= 5) return 6;
-    return 4;
+  switch (edition) {
+    case "EDITION_2014":
+      if (monkLevel >= 17) return 10;
+      if (monkLevel >= 11) return 8;
+      if (monkLevel >= 5) return 6;
+      return 4;
+    case "EDITION_2024":
+      if (monkLevel >= 17) return 12;
+      if (monkLevel >= 11) return 10;
+      if (monkLevel >= 5) return 8;
+      return 6;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`deriveMartialArtsDie: unhandled edition ${String(exhaustive)}`);
+    }
   }
-  if (monkLevel >= 17) return 12;
-  if (monkLevel >= 11) return 10;
-  if (monkLevel >= 5) return 8;
-  return 6;
 }
 
 // Unarmed strikes are always proficient and default to STR (5e PHB). A Monk who is unarmored & unshielded uses max(Dex, Str) and the larger of the feat die and the Martial Arts die. Empowered Strikes (monk L6+) marks the strike magical.

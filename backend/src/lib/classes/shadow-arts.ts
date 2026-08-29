@@ -42,6 +42,21 @@ const CLOAK_OF_SHADOWS_EFFECT: EffectSpec = {
   concentration: false,
 };
 
+function cloakOfShadowsCost(
+  edition: RulesEdition,
+): Extract<AbilityCost, { kind: "pool" }> | Extract<AbilityCost, { kind: "none" }> {
+  switch (edition) {
+    case "EDITION_2014":
+      return CLOAK_OF_SHADOWS_2014_COST;
+    case "EDITION_2024":
+      return CLOAK_OF_SHADOWS_2024_COST;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`cloakOfShadowsCost: unhandled edition ${String(exhaustive)}`);
+    }
+  }
+}
+
 export interface ShadowArtEffectRow {
   name: string;
   effectKind?: string | null;
@@ -51,6 +66,20 @@ export interface ShadowArtEffectRow {
 
 // Darkvision is the one 2014 Shadow Art that does NOT concentrate (PHB'14: "Duration: 8 hours", no Concentration prefix) — name-keyed rather than edition-keyed since it's the only exempt name in the whole catalog.
 const SHADOW_ARTS_NO_CONCENTRATION = new Set(["Shadow Arts: Darkvision"]);
+
+// 2014's Way of Shadow gates Cloak of Shadows at L11 (PHB'14 p.80), 2024's Warrior of Shadow at L17 (PHB'24 p.91).
+function shadowSubclassGate(edition: RulesEdition): { subclassLabel: string; cloakOfShadowsGateLevel: number } {
+  switch (edition) {
+    case "EDITION_2014":
+      return { subclassLabel: "Way of Shadow", cloakOfShadowsGateLevel: 11 };
+    case "EDITION_2024":
+      return { subclassLabel: "Warrior of Shadow", cloakOfShadowsGateLevel: 17 };
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`shadowSubclassGate: unhandled edition ${String(exhaustive)}`);
+    }
+  }
+}
 
 export function shadowArtEffectSpec(row: ShadowArtEffectRow): EffectSpec {
   return catalogEffectSpec(row, {
@@ -127,7 +156,7 @@ async function applyActivateCloakOfShadows(
   sessionId: string | null,
   row: { spellcasting: Prisma.JsonValue; rulesEdition: RulesEdition },
 ): Promise<void> {
-  const cost = editionOf(row) === "EDITION_2014" ? CLOAK_OF_SHADOWS_2014_COST : CLOAK_OF_SHADOWS_2024_COST;
+  const cost = cloakOfShadowsCost(editionOf(row));
   const spellState = normalizeSpellcastingMutable(row.spellcasting);
   const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
   const outcome = await castAbilityInTx(
@@ -171,14 +200,13 @@ export async function applyShadowArtsOperations(
       const level = levelForExperience(row.experiencePoints);
       const edition = editionOf(row);
       const actions = deriveEntryScopedActions(row.classEntries, level, [], true, edition, featureRowsOf);
-      // 2014's Way of Shadow gates Cloak of Shadows at L11 (PHB'14 p.80), 2024's Warrior of Shadow at L17 (PHB'24 p.91); Shadow Arts gates at L3 in both.
-      const subclassLabel = edition === "EDITION_2014" ? "Way of Shadow" : "Warrior of Shadow";
+      // Shadow Arts itself gates at L3 in both editions — only Cloak of Shadows' level forks (shadowSubclassGate).
+      const { subclassLabel, cloakOfShadowsGateLevel } = shadowSubclassGate(edition);
 
       if (op.type === "activateCloakOfShadows") {
         if (!actions.some((a) => a.key === "cloakOfShadows")) {
-          const gateLevel = edition === "EDITION_2014" ? 11 : 17;
           throw new InvalidShadowArtOperationError(
-            `Only a ${subclassLabel} monk (level ${gateLevel}+) can use Cloak of Shadows`,
+            `Only a ${subclassLabel} monk (level ${cloakOfShadowsGateLevel}+) can use Cloak of Shadows`,
           );
         }
         await applyActivateCloakOfShadows(tx, characterId, batchId, sessionId, row);
