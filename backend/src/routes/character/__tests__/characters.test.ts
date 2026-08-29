@@ -519,6 +519,15 @@ describe("characters routes", () => {
       expect(response.status).toBe(400);
     });
 
+    it("rejects a duplicate skill in skillProficiencies with 400 (#1980)", async () => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .post("/api/characters")
+        .send({ ...createBody(), skillProficiencies: ["athletics", "athletics"] });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(/must be distinct/i);
+    });
+
     it("allows a homebrew background with no catalog match", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")

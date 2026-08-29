@@ -79,7 +79,11 @@ fi
 # below runs on the extracted head text, where `^`/`$` correctly anchor to
 # that substring instead of the whole line. A bare substring match here would
 # false-fire on `switch (expeditionPhase)` (#1980).
-SWITCH_HEAD_PATTERN='switch[[:space:]]*\([^)]*\)'
+# Double-backslashed: awk's -v assignment runs one pass of string-escape processing before the
+# value becomes a regexp, collapsing a single \( to a bare ( (a GROUP, not a literal paren) — the
+# exact bug #1980 hit in subclassGateLevel's own comment, where the resulting "any characters"
+# regexp matched a plain-English "switch" mention and threw off the brace-depth count downstream.
+SWITCH_HEAD_PATTERN='switch[[:space:]]*\\([^)]*\\)'
 
 # One shared awk program for both the self-test probes (fed via stdin) and
 # the real multi-file scan below — FNR==1 resets state per file so a switch
@@ -95,7 +99,10 @@ switch_default_scan() {
     {
       if (!in_sw && is_edition_switch($0)) { in_sw = 1; depth = 0; has_default = 0; start = FNR }
       if (in_sw) {
-        if ($0 ~ /^[[:space:]]*default:/) has_default = 1
+        # depth == 1 means this default: belongs to the switch(edition) body itself, not to a
+        # nested switch inside one of its case bodies (#1980) — a nested switch with its own
+        # default would otherwise satisfy this scan while the outer edition switch stays inexhaustive.
+        if (depth == 1 && $0 ~ /^[[:space:]]*default:/) has_default = 1
         n = length($0)
         for (i = 1; i <= n; i++) {
           c = substr($0, i, 1)
@@ -131,6 +138,19 @@ fi
 non_edition_switch_probe=$(printf '%s\n' 'switch (expeditionPhase) {' '  case "FIRST": return 1;' '}' | switch_default_scan)
 if [ -n "$non_edition_switch_probe" ]; then
   echo "error: check-edition-branching.sh's switch-default scan fired on switch (expeditionPhase) — substring match on 'edition' instead of a word boundary (anti-vacuity)" >&2
+  exit 1
+fi
+nested_switch_default_probe=$(printf '%s\n' \
+  'switch (edition) {' \
+  '  case "EDITION_2014": {' \
+  '    switch (x) {' \
+  '      default: break;' \
+  '    }' \
+  '    return 1;' \
+  '  }' \
+  '}' | switch_default_scan)
+if [ -z "$nested_switch_default_probe" ]; then
+  echo "error: check-edition-branching.sh's switch-default scan did not fire on an edition switch whose only default: belongs to a NESTED switch inside a case body — depth tracking is broken (anti-vacuity)" >&2
   exit 1
 fi
 

@@ -26,6 +26,18 @@ async function patchCharacter(id: string, body: object) {
   return supertest(app).patch(`/api/characters/${id}`).set("Cookie", COOKIE).send(body);
 }
 
+async function latestBatchId(id: string): Promise<string> {
+  const res = await supertest(app).get(`/api/characters/${id}/activity`).set("Cookie", COOKIE);
+  const events = res.body as Array<{ batchId?: string; type: string }>;
+  const ev = events.find((e) => e.type !== "revert" && e.batchId);
+  if (!ev?.batchId) throw new Error("no batchId found on the activity timeline");
+  return ev.batchId;
+}
+
+async function revertBatch(id: string, batchId: string) {
+  return supertest(app).post(`/api/characters/${id}/events/${batchId}/revert`).set("Cookie", COOKIE).send();
+}
+
 describe("Character transactions — concurrent requests serialize on the character row", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
@@ -110,5 +122,31 @@ describe("Character transactions — concurrent requests serialize on the charac
 
     const final = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
     expect({ currency: final.currency }).toEqual(events[1]!.after);
+  });
+
+  // #1980 TOCTOU: revertPreflight's already-reverted check ran OUTSIDE revertBatch's
+  // $transaction, so two concurrent reverts of the same batch both passed preflight and both
+  // applied reverseEvent — a silent double-revert (the reverted:true updateMany is idempotent,
+  // so neither request errored). Fixed by re-verifying under lockCharacterRow's lock.
+  it("two concurrent reverts of the same batch: exactly one 200, one domain error, state reversed once", async () => {
+    const dmg = await postHp(characterId, { operations: [{ type: "damage", amount: 5 }] });
+    expect(dmg.status).toBe(200);
+    const batchId = await latestBatchId(characterId);
+
+    const [a, b] = await Promise.all([revertBatch(characterId, batchId), revertBatch(characterId, batchId)]);
+    const statuses = [a.status, b.status].sort();
+    expect(statuses).toEqual([200, 409]);
+    const [okRes, errRes] = a.status === 200 ? [a, b] : [b, a];
+    expect(okRes.body.hitPoints.current).toBe(START_HP);
+    expect(errRes.body.error).toMatch(/already been reverted/i);
+
+    const final = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
+    expect((final.hitPoints as { current: number }).current).toBe(START_HP);
+
+    const originalBatchEvents = await prisma.characterEvent.findMany({ where: { characterId, batchId } });
+    expect(originalBatchEvents.every((e) => e.reverted)).toBe(true);
+
+    const metas = await prisma.characterEvent.findMany({ where: { characterId, type: "revert" } });
+    expect(metas).toHaveLength(1);
   });
 });

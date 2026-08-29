@@ -52,9 +52,10 @@ export const createCharacterSchema = z
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,
     // How the player produced abilityScores below — validateAbilityScores checks
-    // the scores against the matching rule (standardArray/pointBuy: the exact
-    // PHB rule; roll: the 3-18 dice-math bound); an omitted or "manual" method
-    // gets only the wider 1-30 sanity bound, never zero validation.
+    // the scores against the matching rule (standardArray/pointBuy: PHB'14 p.13 /
+    // SRD 5.2's standard array and point-buy rules; roll: the 3-18 dice-math bound);
+    // an omitted or "manual" method gets only the wider 1-30 sanity bound, never
+    // zero validation.
     abilityGenerationMethod: z.enum(ALL_ABILITY_GENERATION_METHODS).optional(),
     backgroundAbilities: z.record(z.string(), z.number().int().positive()).optional(),
     skillProficiencies: z.array(z.string()).optional(),

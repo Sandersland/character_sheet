@@ -93,52 +93,46 @@ function outOfIntegerRange(values: readonly number[], floor: number, ceiling: nu
  * see postBonusAbilityCap. `roll` gets its own 3-18 dice-math bound. PATCH
  * also runs this, landing in the omitted-method branch below.
  */
-export function validateAbilityScores(
-  method: AbilityGenerationMethod | undefined,
-  scores: Record<string, number>,
-): AbilityScoreValidation {
-  const values = Object.values(scores);
-
-  if (method === "standardArray") {
-    if (!isPermutationOfStandardArray(values)) {
-      return {
-        ok: false,
-        error: `abilityScores must be an assignment of the standard array (${STANDARD_ARRAY.join(", ")})`,
-      };
-    }
-    return { ok: true };
+function validateStandardArray(values: readonly number[]): AbilityScoreValidation {
+  if (!isPermutationOfStandardArray(values)) {
+    return {
+      ok: false,
+      error: `abilityScores must be an assignment of the standard array (${STANDARD_ARRAY.join(", ")})`,
+    };
   }
+  return { ok: true };
+}
 
-  if (method === "pointBuy") {
-    const outOfRange = outOfIntegerRange(values, POINT_BUY_FLOOR, POINT_BUY_CEILING);
-    if (outOfRange.length > 0) {
-      return {
-        ok: false,
-        error: `abilityScores: point buy scores must be between ${POINT_BUY_FLOOR} and ${POINT_BUY_CEILING} (got ${outOfRange.join(", ")})`,
-      };
-    }
-    const total = totalPointBuyCost(values);
-    if (total === undefined || total > POINT_BUY_BUDGET) {
-      return {
-        ok: false,
-        error: `abilityScores: point buy total cost exceeds the ${POINT_BUY_BUDGET}-point budget`,
-      };
-    }
-    return { ok: true };
+function validatePointBuy(values: readonly number[]): AbilityScoreValidation {
+  const outOfRange = outOfIntegerRange(values, POINT_BUY_FLOOR, POINT_BUY_CEILING);
+  if (outOfRange.length > 0) {
+    return {
+      ok: false,
+      error: `abilityScores: point buy scores must be between ${POINT_BUY_FLOOR} and ${POINT_BUY_CEILING} (got ${outOfRange.join(", ")})`,
+    };
   }
-
-  if (method === "roll") {
-    const outOfRange = outOfIntegerRange(values, ROLL_SCORE_FLOOR, ROLL_SCORE_CEILING);
-    if (outOfRange.length > 0) {
-      return {
-        ok: false,
-        error: `abilityScores: a rolled score must be between ${ROLL_SCORE_FLOOR} and ${ROLL_SCORE_CEILING} (4d6-drop-lowest's range)`,
-      };
-    }
-    return { ok: true };
+  const total = totalPointBuyCost(values);
+  if (total === undefined || total > POINT_BUY_BUDGET) {
+    return {
+      ok: false,
+      error: `abilityScores: point buy total cost exceeds the ${POINT_BUY_BUDGET}-point budget`,
+    };
   }
+  return { ok: true };
+}
 
-  // manual or an omitted method (including PATCH, which declares none).
+function validateRoll(values: readonly number[]): AbilityScoreValidation {
+  const outOfRange = outOfIntegerRange(values, ROLL_SCORE_FLOOR, ROLL_SCORE_CEILING);
+  if (outOfRange.length > 0) {
+    return {
+      ok: false,
+      error: `abilityScores: a rolled score must be between ${ROLL_SCORE_FLOOR} and ${ROLL_SCORE_CEILING} (4d6-drop-lowest's range)`,
+    };
+  }
+  return { ok: true };
+}
+
+function validateManual(values: readonly number[]): AbilityScoreValidation {
   const outOfRange = outOfIntegerRange(values, MANUAL_SCORE_FLOOR, MANUAL_SCORE_CEILING);
   if (outOfRange.length > 0) {
     return {
@@ -147,4 +141,29 @@ export function validateAbilityScores(
     };
   }
   return { ok: true };
+}
+
+export function validateAbilityScores(
+  method: AbilityGenerationMethod | undefined,
+  scores: Record<string, number>,
+): AbilityScoreValidation {
+  const values = Object.values(scores);
+
+  // An omitted method (including PATCH, which declares none) falls through to manual's wider bound.
+  if (method === undefined) return validateManual(values);
+
+  switch (method) {
+    case "standardArray":
+      return validateStandardArray(values);
+    case "pointBuy":
+      return validatePointBuy(values);
+    case "roll":
+      return validateRoll(values);
+    case "manual":
+      return validateManual(values);
+    default: {
+      const exhaustive: never = method;
+      throw new Error(`validateAbilityScores: unhandled method ${String(exhaustive)}`);
+    }
+  }
 }

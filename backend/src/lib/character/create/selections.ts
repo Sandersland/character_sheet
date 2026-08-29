@@ -223,6 +223,10 @@ function validateSkillChoices(
     return { ok: false, status: 400, error: `Invalid skill proficiencies: ${invalidSkills.join(", ")}` };
   }
 
+  if (new Set(skillProficiencies).size !== skillProficiencies.length) {
+    return { ok: false, status: 400, error: "Skill proficiencies must be distinct" };
+  }
+
   const maxSkillChoices = characterClass.skillChoiceCount + (background?.skillProficiencies.length ?? 0);
   if (skillProficiencies.length > maxSkillChoices) {
     return {

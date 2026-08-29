@@ -73,6 +73,11 @@ type ActivityEventRow = CharacterEvent & {
 
 type RevertResult = { ok: true } | { ok: false; status: 404 | 409; error: string };
 
+// revertPreflight's already-reverted check runs OUTSIDE the transaction (it's a cheap early
+// exit); applyBatchReversal must re-verify under lockCharacterRow's lock, or two concurrent
+// reverts of the same batch both pass preflight and both apply reverseEvent (#1980 TOCTOU).
+class BatchAlreadyRevertedError extends Error {}
+
 // Handlers stay here, not in domain libs: moving them would create an activity → domainlib → … → activity import cycle.
 
 interface RevertContext {
@@ -507,6 +512,16 @@ async function applyBatchReversal(
   // would deadlock (Postgres 40P01) against a concurrent locked transaction on the same rows.
   await lockCharacterRow(tx, characterId);
 
+  // Re-check reverted status under the lock: revertPreflight's scan (outside the transaction)
+  // can't see a sibling revert that committed while this one was waiting on the lock.
+  const freshBatchEvents = await tx.characterEvent.findMany({
+    where: { characterId, batchId },
+    select: { reverted: true },
+  });
+  if (freshBatchEvents.some((e) => e.reverted)) {
+    throw new BatchAlreadyRevertedError("This batch has already been reverted");
+  }
+
   for (const event of reversed) {
     await reverseEvent(tx, characterId, event);
   }
@@ -555,7 +570,8 @@ export async function revertBatch(
     // InsufficientCurrencyError/InvalidInventoryOperationError carry their own 400, remapped to 409 here: an undo blocked by later state (e.g. sale proceeds already spent) is a conflict, not a bad request.
     if (
       error instanceof InsufficientCurrencyError ||
-      error instanceof InvalidInventoryOperationError
+      error instanceof InvalidInventoryOperationError ||
+      error instanceof BatchAlreadyRevertedError
     ) {
       return { ok: false, status: 409, error: error.message };
     }
