@@ -5,8 +5,8 @@ import { classesOf, rejectCrossEditionSpellForks, SPELL_CLASS_MEMBERSHIP_SELECT 
 import { type ChooseCantrip } from "@/lib/srd/species-trait-choices.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "@/lib/character/character-schemas.js";
-import type { Fail, PhaseResult } from "./shared.js";
-import { creationPickError, type CreationSpellRow } from "./spells.js";
+import type { Fail, PhaseResult, ResolvedSelections } from "./shared.js";
+import { creationPickError, resolveCreationSpells, type CreationSpellRow } from "./spells.js";
 
 async function speciesCantripListError(
   row: CreationSpellRow | undefined,
@@ -23,7 +23,7 @@ async function speciesCantripListError(
   return forkError ? { ok: false, status: 400, error: forkError } : null;
 }
 
-export async function resolveSpeciesCantripGrant(
+async function resolveSpeciesCantripGrant(
   input: CreateCharacterBody,
   spec: ChooseCantrip | null,
   existingEntries: SpellEntry[],
@@ -51,6 +51,31 @@ export async function resolveSpeciesCantripGrant(
   if (error) return error;
   const entry: SpellEntry = { ...creationSpellEntry(row!), source: "species", castingAbility: spec.castingAbility ?? input.castingAbility };
   return { ok: true, entry };
+}
+
+// Groups the three spell-related creation phases — class/background picks (resolveCreationSpells),
+// the species cantrip choice (resolveSpeciesCantripGrant), and folding the two into one entry list —
+// behind a single PhaseResult so createCharacter's own branch count doesn't carry all three (#1980,
+// fallow's cyclomatic gate).
+export async function resolveSpellPhase(
+  input: CreateCharacterBody,
+  selections: ResolvedSelections,
+): Promise<PhaseResult<{ spellEntries: SpellEntry[] | null }>> {
+  const spells = await resolveCreationSpells(input, selections);
+  if (!spells.ok) return spells;
+
+  const speciesCantrip = await resolveSpeciesCantripGrant(
+    input,
+    selections.speciesChoiceSpecs.chooseCantrip,
+    spells.spellEntries ?? [],
+    selections.edition,
+  );
+  if (!speciesCantrip.ok) return speciesCantrip;
+
+  const spellEntries = speciesCantrip.entry
+    ? [...(spells.spellEntries ?? []), speciesCantrip.entry]
+    : spells.spellEntries;
+  return { ok: true, spellEntries };
 }
 
 async function speciesCantripPickError(

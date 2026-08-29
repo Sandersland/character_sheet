@@ -13,7 +13,7 @@
 // seeded surface.
 import { describe, it, expect } from "vitest";
 
-import { assertSeedContentValid, assertCatalogNamesResolve, assertNoDuplicatePoolDeclaringRows, assertNoDuplicateChoiceDeclaringRows } from "../validate.js";
+import { assertSeedContentValid, assertCatalogNamesResolve, assertNoDuplicatePoolDeclaringRows, assertNoDuplicateChoiceDeclaringRows, rowIdentity } from "../validate.js";
 import { subclassSeedSchema } from "../subclasses.js";
 
 describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
@@ -176,5 +176,52 @@ describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
       },
     ];
     expect(() => assertCatalogNamesResolve(fixture)).not.toThrow();
+  });
+});
+
+describe("rowIdentity — the error-message identity tag (#1980)", () => {
+  it("returns empty string for a non-object row", () => {
+    expect(rowIdentity("not-a-row")).toBe("");
+    expect(rowIdentity(42)).toBe("");
+    expect(rowIdentity(undefined)).toBe("");
+  });
+
+  it("returns empty string for null", () => {
+    expect(rowIdentity(null)).toBe("");
+  });
+
+  it("returns empty string when neither a label nor an edition field is present", () => {
+    expect(rowIdentity({ someOtherField: 1 })).toBe("");
+  });
+
+  it("tags (name, edition) when both are present", () => {
+    expect(rowIdentity({ name: "Fireball", edition: "EDITION_2014" })).toBe(" (Fireball, EDITION_2014)");
+  });
+
+  it("falls back to className when name is absent", () => {
+    expect(rowIdentity({ className: "Fighter", edition: "EDITION_2024" })).toBe(" (Fighter, EDITION_2024)");
+  });
+
+  it("falls back to backgroundName when neither name nor className is present", () => {
+    expect(rowIdentity({ backgroundName: "Soldier", edition: "EDITION_2014" })).toBe(" (Soldier, EDITION_2014)");
+  });
+
+  it("prefers name over className over backgroundName when more than one is present", () => {
+    expect(rowIdentity({ name: "Fireball", className: "Wizard", backgroundName: "Sage", edition: "EDITION_2014" })).toBe(
+      " (Fireball, EDITION_2014)",
+    );
+  });
+
+  it("omits the edition segment when a label is present but edition is absent", () => {
+    expect(rowIdentity({ name: "Fireball" })).toBe(" (Fireball)");
+  });
+
+  it("tags just the edition when no label field is present", () => {
+    expect(rowIdentity({ edition: "EDITION_2024" })).toBe(" (EDITION_2024)");
+  });
+
+  it("ignores a non-string label or edition value", () => {
+    expect(rowIdentity({ name: 123, edition: "EDITION_2014" })).toBe(" (EDITION_2014)");
+    expect(rowIdentity({ name: "Fireball", edition: 2014 })).toBe(" (Fireball)");
   });
 });

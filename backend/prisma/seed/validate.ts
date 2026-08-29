@@ -272,7 +272,7 @@ export function assertNoDuplicateChoiceDeclaringRows(rows: readonly ChoiceDeclar
 // A short "(name, edition)" tag for the error message below — every family's rows carry `name`
 // EXCEPT StartingEquipmentPackage's two families, which key on `className`/`backgroundName`
 // instead; falls back to those so the message still identifies the row rather than just its index.
-function rowIdentity(row: unknown): string {
+export function rowIdentity(row: unknown): string {
   if (typeof row !== "object" || row === null) return "";
   const r = row as Record<string, unknown>;
   const label = [r.name, r.className, r.backgroundName].find((v) => typeof v === "string");

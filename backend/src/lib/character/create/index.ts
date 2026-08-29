@@ -6,8 +6,7 @@ import { resolveBackgroundGrants } from "./background-grants.js";
 import { resolveSpeciesGrants } from "./species-grants.js";
 import { resolveCastingAbility } from "./casting-ability.js";
 import { materializeStartingEquipment } from "./equipment.js";
-import { resolveCreationSpells } from "./spells.js";
-import { resolveSpeciesCantripGrant } from "./species-cantrip.js";
+import { resolveSpellPhase } from "./species-cantrip.js";
 import { resolveSpeciesOriginFeatGrant } from "./species-origin-feat.js";
 import { persistCreatedCharacter } from "./persist.js";
 
@@ -59,12 +58,9 @@ export async function createCharacter(
   );
   if (!equipment.ok) return equipment;
 
-  const spells = await resolveCreationSpells(input, selections);
-  if (!spells.ok) return spells;
-
-  const speciesCantrip = await resolveSpeciesCantripGrant(input, selections.speciesChoiceSpecs.chooseCantrip, spells.spellEntries ?? [], selections.edition);
-  if (!speciesCantrip.ok) return speciesCantrip;
-  const spellEntries = speciesCantrip.entry ? [...(spells.spellEntries ?? []), speciesCantrip.entry] : spells.spellEntries;
+  const spellPhase = await resolveSpellPhase(input, selections);
+  if (!spellPhase.ok) return spellPhase;
+  const { spellEntries } = spellPhase;
 
   const speciesOriginFeat = await resolveSpeciesOriginFeatGrant(
     input,
