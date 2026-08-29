@@ -83,6 +83,35 @@ describe("POST /api/characters — background tool choices (#1779)", () => {
     if (response.status === 201) createdCharacterIds.push(response.body.id);
   });
 
+  it("rejects duplicate class tool picks within toolChoiceCount (#1980)", async () => {
+    const response = await supertest
+      .agent(app)
+      .set("Cookie", COOKIE)
+      .post("/api/characters")
+      .send(
+        await baseBody({
+          classes: [{ name: "Bard" }],
+          toolChoices: ["Lute", "Lute", "Lute"],
+        }),
+      );
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/must be distinct/i);
+    if (response.status === 201) createdCharacterIds.push(response.body.id);
+  });
+
+  it("rejects duplicate background tool picks within toolChoiceCount (#1980)", async () => {
+    const response = await supertest
+      .agent(app)
+      .set("Cookie", COOKIE)
+      .post("/api/characters")
+      .send(await baseBody({ backgroundToolChoices: ["Dice Set", "Dice Set"] }));
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/must be distinct/i);
+    if (response.status === 201) createdCharacterIds.push(response.body.id);
+  });
+
   it("omitting backgroundToolChoices grants nothing extra (no auto Dice Set, no error)", async () => {
     const response = await supertest.agent(app).set("Cookie", COOKIE).post("/api/characters").send(await baseBody());
 

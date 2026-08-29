@@ -254,6 +254,9 @@ function validateToolChoicePicks(
   if (!playerPicks.every((t) => isKnownTool(t))) {
     return { ok: false, status: 400, error: `Unknown tool name in ${poolLabel} toolChoices` };
   }
+  if (new Set(playerPicks).size !== playerPicks.length) {
+    return { ok: false, status: 400, error: `${poolLabel} tool choices must be distinct` };
+  }
   if (playerPicks.length > cap) {
     return {
       ok: false,
