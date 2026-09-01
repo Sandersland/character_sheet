@@ -332,7 +332,9 @@ describe("a custom instanced spell round-trips through learn onto a character's 
         damageType: "force",
         attackType: "attack",
         instanceCount: 2,
-        instanceRoll: "once",
+        // "each", never "once": attack+once is the rail-deadlock combination the coherence
+        // check rejects (#1987 round-5 review) — this fixture predated the rule.
+        instanceRoll: "each",
       });
     expect(created.status).toBe(201);
 
@@ -351,9 +353,9 @@ describe("a custom instanced spell round-trips through learn onto a character's 
     ).find((s) => s.spellId === created.body.id)!;
     expect(entry).toBeDefined();
     expect(entry.instanceCount).toBe(2);
-    expect(entry.instanceRoll).toBe("once");
+    expect(entry.instanceRoll).toBe("each");
     expect(entry.effectRolls).toEqual([
-      { slotLevel: 0, roll: { count: 1, faces: 6, modifier: 0 }, instanceCount: 2, instanceRoll: "once" },
+      { slotLevel: 0, roll: { count: 1, faces: 6, modifier: 0 }, instanceCount: 2, instanceRoll: "each" },
     ]);
   });
 });

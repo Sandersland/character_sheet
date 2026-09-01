@@ -75,8 +75,10 @@ export function doubleRollForOnceModeCrit(result: RollResult): RollResult {
 // never the top-level roll, per ResolutionRolls' own comment) — without this, Scorching Ray/Eldritch
 // Blast/Magic Missile silently dropped their damage from the banner. undefined (not 0) when nothing
 // landed, matching the un-instanced miss convention: "no roll happened" reads as no total, not "0 damage".
-// Twin of the backend sumInstanceEffectTotals — same landed-filter/sum/undefined-when-none semantics
-// on either side of the wire; change the all-miss convention in both or neither.
+// Twin of the backend sumInstanceEffectTotals — same sum/undefined-when-none semantics on either
+// side of the wire; change the all-miss convention in both or neither. Neither filters by verdict:
+// both rely on a missed instance carrying effect null (onRollToHitInstance voids a pre-rolled
+// effect), unlike sessionLogFeed's instancesEffectTotal, which re-checks the verdict as defence.
 export function sumInstanceEffects(instances: { effect?: ResolveActionEventEffect | null }[]): number | undefined {
   const landed = instances.filter((i): i is { effect: ResolveActionEventEffect } => i.effect != null);
   if (landed.length === 0) return undefined;

@@ -491,7 +491,11 @@ function buildInstancedResolutionRow(
 
   const { total, type, kind } = instancesEffectTotal(instances);
   const isHeal = kind === "heal";
-  const isCrit = instances.some((i) => i.toHit?.verdict === "crit" || i.effect?.crit === true);
+  // Same miss filter as instancesEffectTotal — a missed instance's stale crit flag must not
+  // label the whole row a critical hit.
+  const isCrit = instances.some(
+    (i) => i.toHit?.verdict !== "miss" && (i.toHit?.verdict === "crit" || i.effect?.crit === true),
+  );
   const combined: ResolveActionEventEffect = { spec: "", faces: [], total, type, kind, crit: false };
   // Assassinate (#1526): the same "critical hit — Assassinate!" cause buildAttackResolutionRow surfaces
   // for a single-instance crit, since an instanced Assassinate crit is just as target-surprised-caused.
