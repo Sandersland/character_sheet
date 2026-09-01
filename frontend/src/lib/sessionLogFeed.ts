@@ -423,6 +423,10 @@ function buildInstanceDrillRow(instance: ResolveActionEventInstance, index: numb
   return { ...buildEffectDrillRow(instance.effect, isCrit), label, note };
 }
 
+// Every seeded multi-instance effect is one damage type per cast (Scorching Ray's rays all fire, Eldritch
+// Blast's beams all force, Magic Missile's darts all force) — taking type/kind from the first present
+// effect is safe today. A hypothetical mixed-type instanced effect would collapse to the first type in
+// this summary line; the per-instance drill-in still shows each instance's own real type regardless.
 function instancesEffectTotal(instances: ResolveActionEventInstance[]): { total: number; type: string; kind: "damage" | "heal" } {
   const effects = instances
     .map((i) => i.effect)
@@ -431,6 +435,26 @@ function instancesEffectTotal(instances: ResolveActionEventInstance[]): { total:
     total: effects.reduce((sum, eff) => sum + eff.total, 0),
     type: effects[0]?.type ?? "",
     kind: effects[0]?.kind ?? "damage",
+  };
+}
+
+// Every instance missed (Scorching Ray-style, each carrying its own toHit) — same muted/italic treatment
+// buildMissResolutionRow gives a single-instance miss, plural wording, one drill-in line per instance
+// (each already reads "Missed" via buildInstanceDrillRow). No riders: a total miss lands no damage.
+function buildAllMissedInstancedRow(
+  e: CharacterEvent,
+  instances: ResolveActionEventInstance[],
+  source: string,
+  round: number | undefined,
+): FeedRow {
+  return {
+    id: e.id,
+    round,
+    tone: "muted",
+    italic: true,
+    runKind: "resolveAction",
+    segments: [{ text: source, bold: true, italic: false }, { text: " — all missed." }],
+    drillIn: instances.map(buildInstanceDrillRow),
   };
 }
 
@@ -448,15 +472,32 @@ function buildInstancedResolutionRow(
   round: number | undefined,
 ): FeedRow {
   const instances = data.instances!;
+  if (instances.every((i) => i.toHit?.verdict === "miss")) {
+    return buildAllMissedInstancedRow(e, instances, source, round);
+  }
+
   const { total, type, kind } = instancesEffectTotal(instances);
   const isHeal = kind === "heal";
+  const isCrit = instances.some((i) => i.toHit?.verdict === "crit" || i.effect?.crit === true);
   const combined: ResolveActionEventEffect = { spec: "", faces: [], total, type, kind, crit: false };
-  const segments: LogSegment[] = [
-    { text: source, bold: true },
-    { text: isHeal ? " — healed " : " — " },
-    { text: `${total}`, bold: true },
-    ...effectTailSegments(combined, riders, !isHeal),
-  ];
+  // Assassinate (#1526): the same "critical hit — Assassinate!" cause buildAttackResolutionRow surfaces
+  // for a single-instance crit, since an instanced Assassinate crit is just as target-surprised-caused.
+  const critLabel = data.assassinate ? "critical hit — Assassinate!" : "critical hit!";
+  const segments: LogSegment[] = isCrit
+    ? [
+        { text: source, bold: true },
+        { text: " — " },
+        { text: critLabel, tone: "harm" },
+        { text: " " },
+        { text: `${total}`, bold: true },
+        ...effectTailSegments(combined, riders, true),
+      ]
+    : [
+        { text: source, bold: true },
+        { text: isHeal ? " — healed " : " — " },
+        { text: `${total}`, bold: true },
+        ...effectTailSegments(combined, riders, !isHeal),
+      ];
 
   const drillIn: DrillInRow[] = [];
   if (data.save) drillIn.push(buildSaveDrillRow(data.save));

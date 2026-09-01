@@ -513,6 +513,62 @@ describe("buildFeedItems resolveAction instances[] shape (#1981/#1982 — Magic 
     expect(rows[0].drillIn![1]).toMatchObject({ label: "Frost Rune" });
   });
 
+  it("renders every-instance-missed as a muted italic miss row, not '0  damage.'", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Scorching Ray",
+        instances: [
+          { toHit: { faces: [4], kept: 4, nat20: false, bonus: 5, total: 9, verdict: "miss" } },
+          { toHit: { faces: [7], kept: 7, nat20: false, bonus: 5, total: 12, verdict: "miss" } },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Test Scorching Ray — all missed.");
+    expect(rows[0].tone).toBe("muted");
+    expect(rows[0].italic).toBe(true);
+    expect(rows[0].drillIn).toHaveLength(2);
+    expect(rows[0].drillIn![0]).toMatchObject({ label: "Instance 1", note: "Missed" });
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Instance 2", note: "Missed" });
+  });
+
+  it("leads with 'critical hit!' in the collapsed sentence when any instance crit", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Scorching Ray",
+        instances: [
+          {
+            toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+            effect: { spec: "2d6", faces: [3, 4], total: 7, type: "fire", kind: "damage", crit: false },
+          },
+          {
+            toHit: { faces: [20], kept: 20, nat20: true, bonus: 5, total: 25, verdict: "crit" },
+            effect: { spec: "4d6", faces: [1, 2, 3, 4], total: 10, type: "fire", kind: "damage", crit: true },
+          },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Test Scorching Ray — critical hit! 17 fire damage.");
+  });
+
+  it("labels an instanced crit as Assassinate when the event carries it", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Scorching Ray",
+        assassinate: true,
+        instances: [
+          {
+            toHit: { faces: [20], kept: 20, nat20: true, bonus: 5, total: 25, verdict: "crit" },
+            effect: { spec: "4d6", faces: [1, 2, 3, 4], total: 10, type: "fire", kind: "damage", crit: true },
+          },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toContain("critical hit — Assassinate!");
+  });
+
   it("renders a shared save DC ahead of the per-instance lines when the op carries one", () => {
     const events = [
       resolveEvent("cast", {
@@ -541,7 +597,12 @@ describe("buildFeedItems resolveAction instances[] shape (#1981/#1982 — Magic 
       toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
       effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
     });
-    const [absentRow, emptyRow] = buildFeedItems([withEmpty, withoutKey]).map(rowOf);
+    // Looked up by id rather than destructured positionally — buildFeedItems renders oldest-first
+    // (reversing the newest-first input), so a positional destructure of this array doesn't match
+    // the fixtures' declaration order and invites exactly this mix-up.
+    const rows = buildFeedItems([withEmpty, withoutKey]).map(rowOf);
+    const emptyRow = rows.find((r) => r.id === "cast-empty")!;
+    const absentRow = rows.find((r) => r.id === "cast-absent")!;
     expect(text(emptyRow)).toBe("Shortsword — hit for 8 piercing.");
     expect(emptyRow.drillIn).toHaveLength(2);
     expect(emptyRow).toEqual({ ...absentRow, id: emptyRow.id });

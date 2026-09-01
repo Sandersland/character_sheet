@@ -32,7 +32,7 @@ import {
   type ResolveActionRequestOperation,
 } from "./resolve-action-ops.js";
 import { writeStandaloneRollEvent } from "./standalone-roll-op.js";
-import type { CastSpellOperation } from "@character-sheet/shared-types";
+import type { CastSpellOperation, ResolveActionEventData } from "@character-sheet/shared-types";
 
 const RESOLVE_ACTION_SELECT = {
   id: true,
@@ -187,8 +187,9 @@ function summaryFor(op: ResolveActionOperation): string {
 
 // Pulled out of applyOp below so its own field-by-field null-coalescing doesn't inflate the
 // transaction closure's complexity — every field here mirrors the op verbatim except for the
-// always-an-array/always-a-boolean normalizations noted per field.
-function resolveActionEventData(op: ResolveActionOperation): Record<string, unknown> {
+// always-an-array/always-a-boolean normalizations noted per field. Typed as the shared wire
+// contract (not Record<string, unknown>) so a field renamed/dropped on either side breaks the build.
+function resolveActionEventData(op: ResolveActionOperation): ResolveActionEventData {
   return {
     actionId: op.actionId,
     source: op.source,
@@ -256,7 +257,9 @@ export async function applyResolveActionOperations(
         summary: summaryFor(op),
         before,
         after,
-        data: resolveActionEventData(op),
+        // logEvent's data param is the untyped Record<string, unknown> JSON-storage boundary every
+        // event category shares; resolveActionEventData stays typed up to here for drift protection.
+        data: resolveActionEventData(op) as unknown as Record<string, unknown>,
         batchId,
         sessionId,
       });

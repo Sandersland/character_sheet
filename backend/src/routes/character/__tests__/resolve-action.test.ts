@@ -868,6 +868,29 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(res.status).toBe(400);
   });
 
+  // A shared save DC across every instance (e.g. a hypothetical multi-target save spell) is NOT
+  // mutually exclusive with instances — only top-level toHit/effect are.
+  it("accepts a top-level save alongside instances[]", async () => {
+    const res = await post([
+      {
+        type: "resolveAction",
+        actionId: "a-save-instances",
+        source: "Test AoE",
+        cost: { kind: "action" as const },
+        save: { dc: 15, ability: "dexterity" },
+        instances: [
+          { effect: { spec: "2d6", faces: [4, 5], total: 9, type: "fire", kind: "damage" as const, crit: false } },
+        ],
+      },
+    ]);
+    expect(res.status).toBe(200);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; data: Record<string, unknown> }>;
+    const resolveEvent = events.find((e) => e.type === "resolveAction");
+    expect(resolveEvent?.data.save).toEqual({ dc: 15, ability: "dexterity" });
+    expect((resolveEvent?.data.instances as unknown[]).length).toBe(1);
+  });
+
   it("a 3-instance leveled-spell op writes ONE resolveAction event, pays the slot once, and records one interlock cast", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     await combatStart(sid);

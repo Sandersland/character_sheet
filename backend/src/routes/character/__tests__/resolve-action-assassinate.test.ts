@@ -47,6 +47,28 @@ function assassinateOp(actionId = "action-1") {
   };
 }
 
+// Scorching Ray-style instanced attack (#1981/#1982): one hit, one crit — a mixed instance set exercises
+// the "at least one instance crits" superRefine branch rather than the top-level toHit one.
+function instancedAssassinateOp(actionId = "action-instanced", assassinate = true) {
+  return {
+    type: "resolveAction" as const,
+    actionId,
+    source: "Test Scorching Ray",
+    cost: { kind: "action" as const },
+    instances: [
+      {
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" as const },
+        effect: { spec: "2d6", faces: [3, 4], total: 7, type: "fire", kind: "damage" as const, crit: false },
+      },
+      {
+        toHit: { faces: [20], kept: 20, nat20: true, bonus: 5, total: 25, verdict: "crit" as const },
+        effect: { spec: "2d6", faces: [5, 6], total: 11, type: "fire", kind: "damage" as const, crit: true },
+      },
+    ],
+    assassinate,
+  };
+}
+
 function plainOp(actionId = "action-2") {
   return {
     type: "resolveAction" as const,
@@ -169,5 +191,51 @@ describe("POST /api/characters/:id/resolve-action/transactions — Assassinate (
     const res = await post([assassinateOp()]);
     expect(res.status).toBe(200);
     expect(res.body.critRange).toBe(20);
+  });
+
+  // PHB'14 Assassinate describes the TARGET's surprised state, not one beam/ray — one op-level flag
+  // still covers an instanced spell attack, as long as at least one instance crits (#1982).
+  it("a 2014 Assassin L3 may declare Assassinate on an instanced resolution when at least one instance crits", async () => {
+    await createFixture(3, "Assassin", "EDITION_2014", rogueClassId);
+
+    const res = await post([instancedAssassinateOp()]);
+    expect(res.status).toBe(200);
+
+    const act = await activity();
+    const event = act.body.find((e: { data?: { actionId?: string } }) => e.data?.actionId === "action-instanced");
+    expect(event.data.assassinate).toBe(true);
+    expect(event.data.instances).toHaveLength(2);
+  });
+
+  it("400s an instanced Assassinate declaration when no instance crits", async () => {
+    await createFixture(3, "Assassin", "EDITION_2014", rogueClassId);
+
+    const res = await post([
+      {
+        type: "resolveAction",
+        actionId: "action-no-crit",
+        source: "Test Scorching Ray",
+        cost: { kind: "action" as const },
+        instances: [
+          {
+            toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" as const },
+            effect: { spec: "2d6", faces: [3, 4], total: 7, type: "fire", kind: "damage" as const, crit: false },
+          },
+          {
+            toHit: { faces: [14], kept: 14, nat20: false, bonus: 5, total: 19, verdict: "hit" as const },
+            effect: { spec: "2d6", faces: [2, 3], total: 5, type: "fire", kind: "damage" as const, crit: false },
+          },
+        ],
+        assassinate: true,
+      },
+    ]);
+    expect(res.status).toBe(400);
+  });
+
+  it("400s Assassinate on an instanced resolution from a 2014 rogue below L3 — the eligibility gate is unchanged", async () => {
+    await createFixture(2, "Assassin", "EDITION_2014", rogueClassId);
+
+    const res = await post([instancedAssassinateOp()]);
+    expect(res.status).toBe(400);
   });
 });

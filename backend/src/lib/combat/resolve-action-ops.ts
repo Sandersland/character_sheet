@@ -145,17 +145,24 @@ const resolveActionOperationSchema = z
       })
       .optional(),
     // 2014 Assassin Assassinate (#1526) — see ResolveActionEventData.assassinate for the full contract.
-    // Wire-shape consistency only here (assassinate ⇒ verdict crit); ELIGIBILITY (is this character
-    // even a 2014 Assassin L3+) needs the character row, so that check lives in
-    // applyResolveActionOperations' applyOp, not this schema.
+    // Op-level, not per-instance: PHB'14 Assassinate ("any hit you score against a creature that
+    // is surprised is a critical hit") describes the TARGET's surprised state, not one beam/ray, so
+    // one flag covers the whole resolution even when it's instanced (Scorching Ray, Eldritch Blast).
+    // Wire-shape consistency only here (assassinate ⇒ at least one crit, top-level or per-instance);
+    // ELIGIBILITY (is this character even a 2014 Assassin L3+) needs the character row, so that
+    // check lives in applyResolveActionOperations' applyOp, not this schema.
     assassinate: z.boolean().optional(),
   })
   .superRefine((val, ctx) => {
-    if (val.assassinate && val.toHit?.verdict !== "crit") {
+    // Every hitting instance against a surprised target is its own crit (the client marks each one);
+    // the server only gates WHO may assert the flag at all, never re-derives which instances hit
+    // (self-or-announce) — so ONE crit, top-level or among instances, is enough to accept the wire shape.
+    const hasCrit = val.toHit?.verdict === "crit" || (val.instances?.some((i) => i.toHit?.verdict === "crit") ?? false);
+    if (val.assassinate && !hasCrit) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["assassinate"],
-        message: "assassinate requires toHit.verdict to be crit",
+        message: "assassinate requires toHit.verdict to be crit on the top-level roll or at least one instance",
       });
     }
     if (val.instances && (val.toHit != null || val.effect != null)) {

@@ -15,8 +15,8 @@ export interface ResolveActionEventCost {
 /**
  * Trusted-roll contract: the frontend rolls this d20, the server validates
  * ranges and records it, never re-rolls. `faces` holds every die actually
- * rolled (2 entries under advantage/disadvantage); `components` is optional —
- * a renderer without it falls back to the flat `bonus` line.
+ * rolled (2 entries under advantage/disadvantage); `components` is optional/nullable —
+ * a renderer without one falls back to the flat `bonus` line.
  */
 export interface ResolveActionEventToHit {
   faces: number[];
@@ -25,7 +25,7 @@ export interface ResolveActionEventToHit {
   bonus: number;
   total: number;
   verdict: "hit" | "miss" | "crit";
-  components?: RollEventAttackComponents;
+  components?: RollEventAttackComponents | null;
 }
 
 /** A saving throw announced to the DM — no target model, so no roll of the caster's own (self-or-announce). */
@@ -37,8 +37,8 @@ export interface ResolveActionEventSave {
 /**
  * `spec` is the served dice spec text (e.g. "3d4+3"); `faces` is every die
  * rolled — length >= 1 covers a multi-die spec without a separate instances
- * array. `components` is optional — absent, a renderer floors to `spec`'s
- * trailing modifier so the drill-in still reconciles to `total`.
+ * array. `components` is optional/nullable — absent or null, a renderer floors
+ * to `spec`'s trailing modifier so the drill-in still reconciles to `total`.
  */
 export interface ResolveActionEventEffect {
   spec: string;
@@ -47,7 +47,7 @@ export interface ResolveActionEventEffect {
   type: string;
   kind: "damage" | "heal";
   crit: boolean;
-  components?: RollEventDamageComponents;
+  components?: RollEventDamageComponents | null;
   /** Display label for a riders[] term (e.g. "Sneak Attack") shown instead of the bare damage type; absent on the primary effect and on riders persisted before this field existed. */
   source?: string;
 }
@@ -72,8 +72,8 @@ export interface ResolveActionEventData {
   instances?: ResolveActionEventInstance[];
   /** Present only for a leveled spell cast/upcast — absent for a cantrip or weapon swing. */
   slotLevel?: number | null;
-  /** Presence (not `slotLevel`'s) is what `castAbilityInTx` keys off to run a spell's full side-effect sequence (concentration, self-buff, slot/arcanum spend) — a cantrip cast has no `slotLevel` but still needs `entryId`. */
-  entryId?: string;
+  /** Always present (never omitted), null for a non-spell resolution — same always-a-value convention as `riders`/`instances`/`assassinate`. On the op, its presence (not `slotLevel`'s) is what `castAbilityInTx` keys off to run a spell's full side-effect sequence (concentration, self-buff, slot/arcanum spend) — a cantrip cast has no `slotLevel` but still needs `entryId`. */
+  entryId?: string | null;
   /**
    * Mirrors `CastSpellOperation.apply` exactly — the backend forwards it there
    * unchanged. Never set for a damage resolution: there is no target/enemy
@@ -82,10 +82,10 @@ export interface ResolveActionEventData {
   apply?: { target: "self" | { characterId: string }; kind: "heal" | "damage"; amount: number };
   /**
    * 2014-only (PHB'24/SRD 5.2 deleted Assassinate): declares the target
-   * surprised, converting this swing's hit into a crit. The server doesn't
-   * compute the crit itself (no target/AC model); `applyResolveActionOperations`
-   * rejects it when `assassinateEligible` says no, and the schema requires
-   * `toHit.verdict === "crit"`.
+   * surprised, converting a hit into a crit. The server doesn't compute the
+   * crit itself (no target/AC model); `applyResolveActionOperations` rejects
+   * it when `assassinateEligible` says no, and the schema requires a crit
+   * verdict on the top-level `toHit` or on at least one `instances[]` entry.
    */
   assassinate?: boolean;
 }
