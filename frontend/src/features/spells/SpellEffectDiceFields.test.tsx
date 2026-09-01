@@ -31,12 +31,19 @@ describe("SpellEffectDiceFields — instance count (#1984)", () => {
     expect(screen.getByRole("option", { name: /roll once, apply to every instance/i })).toBeInTheDocument();
   });
 
-  it("calls update with the parsed instance count", async () => {
+  it("calls update with the parsed instance count and writes the displayed 'each' default", async () => {
     const update = vi.fn();
     const user = userEvent.setup();
     render(<SpellEffectDiceFields draft={{}} update={update} />);
     await user.type(screen.getByLabelText(/instance count/i), "3");
-    expect(update).toHaveBeenLastCalledWith({ instanceCount: 3 });
+    expect(update).toHaveBeenLastCalledWith({ instanceCount: 3, instanceRoll: "each" });
+  });
+
+  it("raising the count keeps an already-chosen roll mode instead of resetting it to 'each'", () => {
+    const update = vi.fn();
+    render(<SpellEffectDiceFields draft={{ instanceCount: 3, instanceRoll: "once" }} update={update} />);
+    fireEvent.change(screen.getByLabelText(/instance count/i), { target: { value: "4" } });
+    expect(update).toHaveBeenLastCalledWith({ instanceCount: 4, instanceRoll: "once" });
   });
 
   it("clearing instance count also clears the hidden dependents so validation can't strand them", async () => {

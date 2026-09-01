@@ -51,6 +51,8 @@ export class InvalidResolveActionOperationError extends Error {
   status = 400;
 }
 
+// Twin of the frontend sumInstanceEffects — same landed-filter/sum/undefined-when-none semantics on
+// either side of the wire; change the all-miss convention in both or neither.
 function sumInstanceEffectTotals(instances: ResolveActionOperation["instances"]): number | undefined {
   const totals = (instances ?? []).flatMap((i) => (i.effect ? [i.effect.total] : []));
   return totals.length > 0 ? totals.reduce((sum, t) => sum + t, 0) : undefined;

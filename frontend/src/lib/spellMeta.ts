@@ -85,7 +85,8 @@ export function slotOrdinal(n: number): string {
 export function effectPreview(spell: Spell, chosenSlotLevel?: number): string | null {
   const slotLevel = chosenSlotLevel ?? spell.level;
   const entry = spell.effectRolls?.find((e) => e.slotLevel === slotLevel);
-  if (!entry) return null;
+  // effectRolls is a JSON column — a row can carry roll: null despite the non-nullable wire type.
+  if (!entry?.roll) return null;
   const { roll, instanceCount } = entry;
   const prefix = instanceCount && instanceCount > 1 ? `${instanceCount} × ` : "";
 

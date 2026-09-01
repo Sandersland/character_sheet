@@ -77,10 +77,11 @@ export default function SpellEffectDiceFields({ draft, update }: SpellEffectDice
             const instanceCount = e.target.value === "" ? undefined : Number(e.target.value);
             // Dropping the count below 2 hides the dependent fields, so clear them in the same
             // patch — a stranded instanceRoll/upcastInstancesPerLevel fails validation against
-            // inputs the form no longer renders.
+            // inputs the form no longer renders. Above 1, write the select's displayed "each"
+            // default into the draft too, so the stored value matches what the author saw.
             update(
               (instanceCount ?? 1) > 1
-                ? { instanceCount }
+                ? { instanceCount, instanceRoll: draft.instanceRoll ?? "each" }
                 : { instanceCount, instanceRoll: undefined, upcastInstancesPerLevel: undefined },
             );
           }}
