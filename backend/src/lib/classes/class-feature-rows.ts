@@ -193,9 +193,11 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns, Cho
   effectDieSource?: string | null;
   effectModifier?: number | null;
   effectModifierSource?: string | null; // "classLevel" | "abilityMod:<ability>" — see EffectSpec.modifierSource. Seed validation rejects "abilityMod:<ability>" until a reader resolves it.
-  // Multi-instance columns (#1981), schema-parity with Spell — inert today: castSpecFromRow's
-  // forced `level: 0` pins every ClassFeature row's scaling to "none", so instanceCount here
-  // never scales; it would only ever serve as a flat, unscaled instance count.
+  // Multi-instance columns (#1981), schema-parity with Spell only — unreachable end to end today.
+  // Two things both have to change before a ClassFeature row can use them: classFeatureSeedSchema
+  // (prisma/seed/class-features.ts) has no fields for them, so no row can author instanceCount; and
+  // castSpecFromRow's roll-summing loop reads resolved.count only, never resolved.instanceCount, so
+  // even a hypothetical seeded value would be silently dropped. Update both together or neither.
   instanceCount?: number | null;
   instanceRoll?: "each" | "once" | null;
   upcastInstancesPerLevel?: number | null;

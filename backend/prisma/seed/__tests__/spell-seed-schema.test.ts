@@ -91,6 +91,26 @@ describe("spellSeedSchema — multi-instance fields (#1981)", () => {
   it("rejects a non-positive instanceCount", () => {
     expect(spellSeedSchema.safeParse({ ...baseSpell, instanceCount: 0 }).success).toBe(false);
   });
+
+  it("rejects instanceRoll without instanceCount — this is THE cross-catalog guard SPELLS_2014 needs too (#1981 review)", () => {
+    expect(spellSeedSchema.safeParse({ ...baseSpell, instanceRoll: "once" }).success).toBe(false);
+  });
+
+  it("rejects upcastInstancesPerLevel without instanceCount", () => {
+    expect(spellSeedSchema.safeParse({ ...baseSpell, upcastInstancesPerLevel: 1 }).success).toBe(false);
+  });
+
+  it("rejects upcastInstancesPerLevel on a cantrip (level 0)", () => {
+    expect(
+      spellSeedSchema.safeParse({ ...baseSpell, level: 0, instanceCount: 1, upcastInstancesPerLevel: 1 }).success,
+    ).toBe(false);
+  });
+
+  it("accepts upcastInstancesPerLevel on a leveled spell with instanceCount", () => {
+    expect(
+      spellSeedSchema.safeParse({ ...baseSpell, level: 1, instanceCount: 3, upcastInstancesPerLevel: 1 }).success,
+    ).toBe(true);
+  });
 });
 
 describe("spellSeedSchema — buffTarget (narrower than ClassFeature's: AC family only)", () => {

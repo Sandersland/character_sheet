@@ -577,10 +577,10 @@ model ClassFeature {
   buffTarget           String?
   buffModifier         Int?
 
-  // Multi-instance effect columns (#1981) — schema parity with Spell for a future row-driven feature
-  // (e.g. a class feature with its own darts/rays/beams); castSpecFromRow's forced `level: 0` still
-  // pins every ClassFeature row's scaling to "none", so instanceCount here never scales — it would
-  // just be a flat instance count until a caller needs otherwise.
+  // Multi-instance effect columns (#1981) — schema parity with Spell for a future row-driven
+  // darts/rays/beams feature. Unreachable today: no seeded row can set them (classFeatureSeedSchema
+  // has no fields for them) and castSpecFromRow doesn't consume a resolved instanceCount even if one
+  // existed — see ClassFeatureRow's own comment (class-feature-rows.ts) before wiring either half.
   instanceCount           Int?
   instanceRoll            EffectInstanceRoll?
   upcastInstancesPerLevel Int?
@@ -930,10 +930,9 @@ enum SpellSchool {
   transmutation
 }
 
-// "each" rolls one instance's dice per instance (Scorching Ray, Eldritch Blast); "once" rolls the
-// dice a single time and applies the result to every instance (2014 Magic Missile — Sage Advice
-// Compendium: the darts' damage is rolled once, not per dart). Null instanceRoll on a row that sets
-// instanceCount reads as "each" — resolveEffectSpec's default, not this enum's.
+// Mirrors packages/shared-types/src/effects.ts's EffectInstanceRoll — see its own doc comment for
+// the each/once mechanic and citation. Null instanceRoll on a row that sets instanceCount reads as
+// "each" — resolveEffectSpec's default, not this enum's.
 enum EffectInstanceRoll {
   each
   once
@@ -1154,9 +1153,8 @@ model Spell {
   // instanceCount by the level tier instead of dice; upcastInstancesPerLevel adds instances per slot
   // step (upcastDicePerLevel, if it were ever combined, would still scale per-instance dice).
   instanceCount           Int?
-  // instanceRoll is per-edition CONTENT (a rules-text ruling on roll granularity), not a rule fork —
-  // null reads as "each" (resolveEffectSpec's default). 2014 Magic Missile is "once" per the Sage
-  // Advice Compendium ruling that its damage is rolled a single time, not per dart.
+  // See EffectInstanceRoll's own doc comment for the each/once mechanic; see the seeded Magic
+  // Missile rows (prisma/seed/spells.ts, spells-2014/wizard.ts) for a worked per-edition citation.
   instanceRoll            EffectInstanceRoll?
   upcastInstancesPerLevel Int?
 

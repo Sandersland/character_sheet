@@ -515,18 +515,6 @@ describe("SPELLS — structured-field invariants (#1132)", () => {
     expect(bad, "cantrip with upcastDicePerLevel").toEqual([]);
   });
 
-  it("instanceRoll/upcastInstancesPerLevel only alongside instanceCount (#1981)", () => {
-    const bad = SPELLS.filter(
-      (s) => s.instanceCount == null && (s.instanceRoll != null || s.upcastInstancesPerLevel != null),
-    ).map((s) => s.name);
-    expect(bad, "instance fields without instanceCount").toEqual([]);
-  });
-
-  it("upcastInstancesPerLevel only on leveled spells (level ≥ 1)", () => {
-    const bad = SPELLS.filter((s) => s.upcastInstancesPerLevel != null && s.level < 1).map((s) => s.name);
-    expect(bad, "cantrip with upcastInstancesPerLevel").toEqual([]);
-  });
-
   it("every SUBCLASS_GRANTED_SPELLS.spellName exists in SPELLS", () => {
     const names = new Set(SPELLS.map((s) => s.name));
     const dangling = SUBCLASS_GRANTED_SPELLS.filter((g) => !names.has(g.spellName)).map((g) => g.spellName);

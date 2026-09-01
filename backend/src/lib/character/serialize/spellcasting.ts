@@ -214,11 +214,13 @@ function decorateSpellEffects(
       const resolved = resolveEffectSpec(effect, effectiveStep, { characterLevel, abilityMod });
       if (resolved) {
         const { instanceCount, ...roll } = resolved;
+        // resolved.instanceCount is defined iff effect.instances is (resolveEffectSpec only ever
+        // scales an existing instances.count, never invents one) — instanceRoll rides the spec, not
+        // the resolved roll, since the granularity ruling itself never scales.
         effectRolls.push({
           slotLevel,
           roll,
-          // instanceRoll rides the spec, not the resolved roll — the granularity ruling never scales.
-          ...(instanceCount !== undefined ? { instanceCount, instanceRoll: effect.instances?.roll ?? "each" } : {}),
+          ...(effect.instances ? { instanceCount, instanceRoll: effect.instances.roll } : {}),
         });
       }
     }

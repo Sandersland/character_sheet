@@ -1,7 +1,7 @@
 /** "utility" carries no roll; "buff" applies a passive stat modifier while the granting concentration holds. */
 export type EffectType = "damage" | "heal" | "utility" | "buff";
 
-/** "each" rolls one instance's dice per instance (Scorching Ray, Eldritch Blast); "once" rolls the dice a single time and applies the result to every instance (2014 Magic Missile — Sage Advice Compendium). */
+/** "each" rolls one instance's dice per instance (Scorching Ray, Eldritch Blast); "once" rolls the dice a single time and applies the result to every instance (2014 Magic Missile — Sage Advice Compendium: the darts strike simultaneously, so their damage is rolled once, not per dart). Per-edition seed CONTENT, not a rule fork — a row's own comment (e.g. the seeded Magic Missile rows) carries the actual citation; this is the one place the mechanic itself is documented. */
 export type EffectInstanceRoll = "each" | "once";
 
 /** cantripLevel scales by character level, slotUpcast by slot steps, poolStep by spend above base cost (`readAbilityCost`'s `effectiveStep`). */

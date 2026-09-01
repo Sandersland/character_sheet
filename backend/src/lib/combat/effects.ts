@@ -57,7 +57,9 @@ function resolveEffectType(effectKind: string | null | undefined): EffectType {
 type EffectRowWithModifierSource = EffectRow & { effectModifierSource?: string | null };
 
 // An adapter over the existing flat columns, no schema migration — resolveDie's faces supersede the
-// fixed effectDiceFaces when present.
+// fixed effectDiceFaces when present. readEffectSpec and catalogEffectSpec are the two EffectSpec
+// builders (Spell/ClassFeature rows vs GrantedAbility/maneuver rows) — a new EffectSpec field needs
+// both updated together or one row family silently stops serving it.
 export function readEffectSpec(row: EffectRowWithModifierSource, resolveDie?: ClassDieResolver): EffectSpec {
   const instances = resolveInstances(row);
   return {
@@ -100,6 +102,7 @@ export interface CatalogEffectConfig {
 }
 
 // Deliberately thin: the declarative subclass engine (#416) will subsume this row→spec mapping.
+// Sibling of readEffectSpec (see its own comment) — the other EffectSpec builder to update together.
 export function catalogEffectSpec(row: CatalogEffectRow, config: CatalogEffectConfig): EffectSpec {
   const hasDice = Boolean(row.effectKind && row.effectDiceCount && row.effectDiceFaces);
   const dice = hasDice
@@ -131,9 +134,9 @@ export function resolveBuffSpec(spec: EffectSpec): BuffDescriptor | null {
   return { target: spec.buffTarget, modifier: spec.buffModifier ?? 0 };
 }
 
-// effectiveStep is the scaling step count (upcast levels above base, or focus/ki above base cost; 0 for cantrips).
-// characterLevel 1-4 -> tier 1 (no scaling); 5-10 -> 2; 11-16 -> 3; 17+ -> 4. SRD 5.2 p.? / PHB'14
-// p.? cantrip damage-scaling breakpoints, shared by every scaling cantrip regardless of edition.
+// characterLevel 1-4 -> tier 1 (no scaling); 5-10 -> 2; 11-16 -> 3; 17+ -> 4. No single rules-glossary
+// page states this breakpoint table in either edition — each scaling cantrip's own text restates it
+// (e.g. Fire Bolt, Eldritch Blast), so there is no page number to cite for the mechanic itself.
 function cantripTierMultiplier(characterLevel: number): number {
   if (characterLevel >= 17) return 4;
   if (characterLevel >= 11) return 3;
@@ -141,8 +144,6 @@ function cantripTierMultiplier(characterLevel: number): number {
   return 1;
 }
 
-// Splits the count/instanceCount scaling out of resolveEffectSpec so that function's own
-// cyclomatic/cognitive score stays under the fallow guardrail (#1981 added the instanceCount arm).
 function scaleCountAndInstances(
   spec: EffectSpec,
   effectiveStep: number,
@@ -186,6 +187,7 @@ function resolveModifier(spec: EffectSpec, ctx: { characterLevel: number; classL
   return modifier;
 }
 
+// effectiveStep is the scaling step count (upcast levels above base, or focus/ki above base cost; 0 for cantrips).
 export function resolveEffectSpec(
   spec: EffectSpec,
   effectiveStep: number,

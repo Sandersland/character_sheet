@@ -22,6 +22,12 @@ interface Entry {
   duration: string;
   description: string;
   effectDiceCount?: number | null;
+  effectDiceFaces?: number | null;
+  effectModifier?: number | null;
+  instanceCount?: number | null;
+  instanceRoll?: "each" | "once" | null;
+  upcastInstancesPerLevel?: number | null;
+  upcastDicePerLevel?: number | null;
 }
 
 const BASE = {
@@ -49,12 +55,18 @@ async function readSpells(id: string): Promise<Entry[]> {
 
 let fireballId: string;
 let fireballDesc: string;
+let magicMissile2024Id: string;
+let magicMissile2014Id: string;
 
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   const fb = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" } });
   fireballId = fb.id;
   fireballDesc = fb.description;
+  const mm2024 = await prisma.spell.findFirstOrThrow({ where: { name: "Magic Missile", edition: "EDITION_2024" } });
+  magicMissile2024Id = mm2024.id;
+  const mm2014 = await prisma.spell.findFirstOrThrow({ where: { name: "Magic Missile", edition: "EDITION_2014" } });
+  magicMissile2014Id = mm2014.id;
 });
 
 afterEach(async () => {
@@ -114,5 +126,48 @@ describe("resyncSpellSnapshots (#1132)", () => {
     await resyncSpellSnapshots(prisma);
     const second = await resyncSpellSnapshots(prisma);
     expect(second.changedCharacters).not.toContain("res-idem");
+  });
+
+  // #1981 review: a character who learned Magic Missile BEFORE the multi-instance rewrite has a
+  // snapshot frozen in the old combined-dice shape (3d4+3, no instanceCount) — the seed rewrite alone
+  // never reaches it. This resync is how the upcast-modifier fix actually lands on existing sheets.
+  it("corrects an OLD-shape 2024 Magic Missile snapshot to the per-instance shape (#1981)", async () => {
+    await makeCaster("res-mm-2024", [{
+      id: "entry-mm24", spellId: magicMissile2024Id, name: "Magic Missile", level: 1, school: "evocation",
+      prepared: true, castingTime: "1 action", range: "120 ft", duration: "Instantaneous",
+      description: "stale pre-#1981 text", effectDiceCount: 3, effectDiceFaces: 4, effectModifier: 3,
+      upcastDicePerLevel: 1,
+    }]);
+
+    const result = await resyncSpellSnapshots(prisma);
+    expect(result.changedCharacters).toContain("res-mm-2024");
+
+    const [entry] = await readSpells("res-mm-2024");
+    expect(entry.effectDiceCount).toBe(1);
+    expect(entry.effectDiceFaces).toBe(4);
+    expect(entry.effectModifier).toBe(1);
+    expect(entry.instanceCount).toBe(3);
+    expect(entry.upcastInstancesPerLevel).toBe(1);
+    expect(entry.instanceRoll).toBe("each");
+    // catalogSnapshotFields spreads the catalog row's own nulls verbatim (pre-existing behavior,
+    // unrelated to #1981) — the row no longer sets upcastDicePerLevel, so this clears to null.
+    expect(entry.upcastDicePerLevel).toBeNull();
+  });
+
+  it("corrects an OLD-shape 2014 Magic Missile snapshot too — instanceRoll 'once' for that edition (#1981)", async () => {
+    await makeCaster("res-mm-2014", [{
+      id: "entry-mm14", spellId: magicMissile2014Id, name: "Magic Missile", level: 1, school: "evocation",
+      prepared: true, castingTime: "1 action", range: "120 feet", duration: "Instantaneous",
+      description: "stale pre-#1981 text", effectDiceCount: 3, effectDiceFaces: 4, effectModifier: 3,
+      upcastDicePerLevel: 1,
+    }]);
+
+    await resyncSpellSnapshots(prisma);
+
+    const [entry] = await readSpells("res-mm-2014");
+    expect(entry.effectDiceCount).toBe(1);
+    expect(entry.effectModifier).toBe(1);
+    expect(entry.instanceCount).toBe(3);
+    expect(entry.instanceRoll).toBe("once");
   });
 });

@@ -102,7 +102,22 @@ export const spellSeedSchema = z.object({
   buffTarget: z.enum(BUFF_TARGET_VALUES).optional(),
   buffModifier: z.number().int().nonnegative().optional(),
   edition: z.enum(["EDITION_2014", "EDITION_2024"]).optional(),
-});
+})
+  // instanceRoll/upcastInstancesPerLevel are instanceCount's own dependents (#1981) — this schema
+  // is the ONE surface validate.ts runs over BOTH SPELLS and every spells-2014/*.ts file, so this
+  // is the only place that catches a 2014-fork row violating the invariant.
+  .refine((s) => s.instanceCount != null || s.instanceRoll == null, {
+    message: "instanceRoll requires instanceCount",
+    path: ["instanceRoll"],
+  })
+  .refine((s) => s.instanceCount != null || s.upcastInstancesPerLevel == null, {
+    message: "upcastInstancesPerLevel requires instanceCount",
+    path: ["upcastInstancesPerLevel"],
+  })
+  .refine((s) => s.upcastInstancesPerLevel == null || s.level >= 1, {
+    message: "upcastInstancesPerLevel is a slot-upcast axis — never legal on a cantrip (level 0)",
+    path: ["upcastInstancesPerLevel"],
+  });
 
 // Renames the catalog row in place at seed time (applySpellRenames), preserving its id so SubclassGrantedSpell/InventoryCapability.spellId FKs survive. `to` must be a live SPELLS name; `from` must not be.
 export interface SpellRename {

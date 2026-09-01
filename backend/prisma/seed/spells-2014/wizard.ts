@@ -470,7 +470,7 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     effectDiceCount: 2,
     effectDiceFaces: 6,
     damageType: "fire",
-    // PHB'14 p.271: three rays, each its OWN attack roll and its own 2d6 damage roll, +1 ray per
+    // PHB'14 p.273: three rays, each its OWN attack roll and its own 2d6 damage roll, +1 ray per
     // slot level above 2nd (this row had no upcast scaling at all before #1981 — a pre-existing gap).
     instanceCount: 3,
     upcastInstancesPerLevel: 1,

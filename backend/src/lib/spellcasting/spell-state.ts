@@ -35,8 +35,7 @@ export interface SpellEntry {
   saveAbility?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
-  // Multi-instance columns (#1981) — Magic Missile's darts, Scorching Ray's rays, Eldritch Blast's
-  // beams. Null instanceCount = today's single-roll shape.
+  // Multi-instance columns (#1981) — see shared-types' EffectColumns for the mechanic.
   instanceCount?: number | null;
   instanceRoll?: "each" | "once" | null;
   upcastInstancesPerLevel?: number | null;

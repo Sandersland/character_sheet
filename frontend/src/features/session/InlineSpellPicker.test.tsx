@@ -73,7 +73,8 @@ const MAGIC_MISSILE: Spell = {
   effectKind: "damage",
   damageType: "force",
   castCost: "action",
-  effectRolls: [{ slotLevel: 1, roll: { count: 3, faces: 4, modifier: 3 } }],
+  // Per-instance shape (#1981): 3 darts of 1d4+1 each, not the pre-#1981 combined 3d4+3.
+  effectRolls: [{ slotLevel: 1, roll: { count: 1, faces: 4, modifier: 1 }, instanceCount: 3, instanceRoll: "each" }],
 };
 
 const CURE_WOUNDS: Spell = {

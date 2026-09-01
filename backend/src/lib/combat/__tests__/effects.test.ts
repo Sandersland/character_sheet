@@ -42,8 +42,8 @@ const cureWounds: EffectRow = {
 
 const detectMagic: EffectRow = { level: 1 };
 
-// Eldritch Blast (SRD 5.2 p.? / PHB'14 p.110): one beam, 1d10 force, scaling the BEAM COUNT (not
-// the dice) at character level 5/11/17 — instanceCount is the cantripLevel scaling target here.
+// Eldritch Blast (PHB'14 p.237 / SRD 5.2): one beam, 1d10 force, scaling the BEAM COUNT (not the
+// dice) at character level 5/11/17 — instanceCount is the cantripLevel scaling target here.
 const eldritchBlast: EffectRow = {
   level: 0,
   effectKind: "damage",
@@ -145,6 +145,15 @@ describe("resolveEffectSpec — golden byte-parity", () => {
     expect(resolveEffectSpec(spec, 0, { characterLevel: 17 })).toEqual({ count: 4, faces: 10, modifier: 0 });
   });
 
+  // Non-boundary levels one below each threshold — a `>` typo in cantripTierMultiplier (instead of
+  // `>=`) would pass the boundary-only test above but fail these.
+  it("scaling cantrip stays at the PRIOR tier one level below each threshold (4/10/16)", () => {
+    const spec = readEffectSpec(fireBolt);
+    expect(resolveEffectSpec(spec, 0, { characterLevel: 4 })).toEqual({ count: 1, faces: 10, modifier: 0 });
+    expect(resolveEffectSpec(spec, 0, { characterLevel: 10 })).toEqual({ count: 2, faces: 10, modifier: 0 });
+    expect(resolveEffectSpec(spec, 0, { characterLevel: 16 })).toEqual({ count: 3, faces: 10, modifier: 0 });
+  });
+
   it("heal adds the ability modifier; damage does not", () => {
     expect(resolveEffectSpec(readEffectSpec(cureWounds), 0, { characterLevel: 1, abilityMod: 3 })).toEqual({
       count: 2,
@@ -170,6 +179,13 @@ describe("resolveEffectSpec — golden byte-parity", () => {
     expect(resolveEffectSpec(spec, 0, { characterLevel: 17 })).toEqual({ count: 1, faces: 10, modifier: 0, instanceCount: 4 });
   });
 
+  it("Eldritch Blast: instance count stays at the PRIOR tier one level below each threshold (4/10/16)", () => {
+    const spec = readEffectSpec(eldritchBlast);
+    expect(resolveEffectSpec(spec, 0, { characterLevel: 4 })).toEqual({ count: 1, faces: 10, modifier: 0, instanceCount: 1 });
+    expect(resolveEffectSpec(spec, 0, { characterLevel: 10 })).toEqual({ count: 1, faces: 10, modifier: 0, instanceCount: 2 });
+    expect(resolveEffectSpec(spec, 0, { characterLevel: 16 })).toEqual({ count: 1, faces: 10, modifier: 0, instanceCount: 3 });
+  });
+
   it("Magic Missile: instance count 3/4/5 at slot levels 1/2/3, dice fixed at 1d4+1", () => {
     const spec = readEffectSpec(magicMissile);
     expect(resolveEffectSpec(spec, 0, { characterLevel: 1 })).toEqual({ count: 1, faces: 4, modifier: 1, instanceCount: 3 });
@@ -188,6 +204,8 @@ describe("resolveEffectSpec — golden byte-parity", () => {
     const resolved = resolveEffectSpec(spec, 0, { characterLevel: 5 })!;
     expect(resolved).toEqual({ count: 2, faces: 10, modifier: 0 });
     expect(resolved.instanceCount).toBeUndefined();
+    // Key ABSENCE, not merely undefined — matches readEffectSpec's own "instances" omission (#1981 review).
+    expect("instanceCount" in resolved).toBe(false);
   });
 
   it("poolStep scales by the pool overspend step, identically to slotUpcast", () => {
