@@ -5,6 +5,7 @@ import type { CharacterEvent } from "@/types/character";
 import type {
   ResolveActionEventData,
   ResolveActionEventEffect,
+  ResolveActionEventInstance,
   ResolveActionEventToHit,
   ResolveActionEventSave,
   RollEventAttackComponents,
@@ -405,6 +406,65 @@ function buildEffectOnlyResolutionRow(
   };
 }
 
+function instanceVerdictNote(toHit: ResolveActionEventToHit | null | undefined): string | undefined {
+  if (!toHit) return undefined;
+  if (toHit.verdict === "miss") return "Missed";
+  if (toHit.verdict === "crit") return "Critical hit!";
+  return "Hit";
+}
+
+// One drillIn row per instance — verdict (when the instance carries its own toHit) plus its damage
+// breakdown, reusing buildEffectDrillRow so the dice token/addends render identically to a single-roll effect.
+function buildInstanceDrillRow(instance: ResolveActionEventInstance, index: number): DrillInRow {
+  const label = `Instance ${index + 1}`;
+  const note = instanceVerdictNote(instance.toHit);
+  if (!instance.effect) return { label, note: note ?? "No damage rolled." };
+  const isCrit = instance.toHit?.verdict === "crit" || instance.effect.crit === true;
+  return { ...buildEffectDrillRow(instance.effect, isCrit), label, note };
+}
+
+function instancesEffectTotal(instances: ResolveActionEventInstance[]): { total: number; type: string; kind: "damage" | "heal" } {
+  const effects = instances
+    .map((i) => i.effect)
+    .filter((eff): eff is ResolveActionEventEffect => eff != null);
+  return {
+    total: effects.reduce((sum, eff) => sum + eff.total, 0),
+    type: effects[0]?.type ?? "",
+    kind: effects[0]?.kind ?? "damage",
+  };
+}
+
+// A multi-instance cast (Magic Missile's darts, Scorching Ray's rays, Eldritch Blast's beams, #1981/#1982)
+// stays one row: the sentence sums every instance's total the same way buildAttackResolutionRow sums
+// effect+riders (via effectTailSegments, fed a synthetic effect standing in for the summed instances),
+// and the drill-in lists one row per instance (verdict + damage) followed by any cast-level riders.
+// `data.instances` is mutually exclusive with top-level toHit/effect at the op schema, but a top-level
+// `save` can still ride alongside it (a shared DC across every instance), so it renders first when present.
+function buildInstancedResolutionRow(
+  e: CharacterEvent,
+  data: ResolveActionEventData,
+  source: string,
+  riders: ResolveActionEventEffect[],
+  round: number | undefined,
+): FeedRow {
+  const instances = data.instances!;
+  const { total, type, kind } = instancesEffectTotal(instances);
+  const isHeal = kind === "heal";
+  const combined: ResolveActionEventEffect = { spec: "", faces: [], total, type, kind, crit: false };
+  const segments: LogSegment[] = [
+    { text: source, bold: true },
+    { text: isHeal ? " — healed " : " — " },
+    { text: `${total}`, bold: true },
+    ...effectTailSegments(combined, riders, !isHeal),
+  ];
+
+  const drillIn: DrillInRow[] = [];
+  if (data.save) drillIn.push(buildSaveDrillRow(data.save));
+  drillIn.push(...instances.map(buildInstanceDrillRow), ...riders.map(buildRiderDrillRow));
+
+  return { id: e.id, round, tone: isHeal ? "heal" : "default", runKind: "resolveAction", segments, drillIn };
+}
+
 function buildNoRollResolutionRow(e: CharacterEvent, source: string, round: number | undefined): FeedRow {
   return {
     id: e.id,
@@ -416,11 +476,15 @@ function buildNoRollResolutionRow(e: CharacterEvent, source: string, round: numb
 }
 
 // toHit/save/effect are mutually exclusive-ish by design (see ResolveActionEventData); `riders` rides along regardless of shape, summed the same way by every builder.
+// `instances` is checked first: mutually exclusive with top-level toHit/effect at the op schema, so an
+// instanced event never also matches the toHit/effect branches below. Absent/empty falls straight through
+// to the pre-#1982 dispatch, unchanged.
 function buildResolveActionRow(e: CharacterEvent, round: number | undefined): FeedRow {
   const data = (e.data ?? {}) as ResolveActionEventData;
   const source = data.source || e.summary;
   const riders = data.riders ?? [];
 
+  if (data.instances && data.instances.length > 0) return buildInstancedResolutionRow(e, data, source, riders, round);
   if (data.toHit) return buildAttackResolutionRow(e, data, source, riders, round);
   if (data.save) return buildSaveResolutionRow(e, data, source, riders, round);
   if (data.effect) return buildEffectOnlyResolutionRow(e, data, source, riders, round);

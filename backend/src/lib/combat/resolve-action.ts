@@ -181,7 +181,42 @@ async function recordSpellCastForOp(
 
 function summaryFor(op: ResolveActionOperation): string {
   const costWord = op.cost.attacks && op.cost.attacks > 1 ? `${op.cost.attacks} attacks` : op.cost.kind;
-  return `Resolved ${op.source} (${costWord})`;
+  const instanceWord = op.instances && op.instances.length > 1 ? `, ${op.instances.length} instances` : "";
+  return `Resolved ${op.source} (${costWord}${instanceWord})`;
+}
+
+// Pulled out of applyOp below so its own field-by-field null-coalescing doesn't inflate the
+// transaction closure's complexity — every field here mirrors the op verbatim except for the
+// always-an-array/always-a-boolean normalizations noted per field.
+function resolveActionEventData(op: ResolveActionOperation): Record<string, unknown> {
+  return {
+    actionId: op.actionId,
+    source: op.source,
+    cost: op.cost,
+    toHit: op.toHit ?? null,
+    save: op.save ?? null,
+    effect: op.effect ?? null,
+    // Always an array (never undefined) so the feed never has to
+    // distinguish "no riders" from "old event predates riders" (#1843).
+    riders: op.riders ?? [],
+    // Multi-instance roll set (#1981/#1982) — always an array (never
+    // undefined), same convention as riders above. Mutually exclusive
+    // with toHit/effect at the op schema, so this is empty whenever
+    // those are set and vice versa.
+    instances: op.instances ?? [],
+    slotLevel: op.slotLevel ?? null,
+    // The spellcasting entry this resolution cast, when it's a spell
+    // (#1833) — audit-trail provenance only; the feed doesn't need it
+    // to render (source/toHit/save/effect/riders already say what
+    // happened), and undo doesn't read it either (the concentration/
+    // buff/apply side effects it triggered already logged their own
+    // events with their own before/after under this same batch).
+    entryId: op.entryId ?? null,
+    // 2014 Assassinate attribution (#1526) — always a boolean (never
+    // undefined) so the feed can distinguish "not Assassinate" from
+    // "old event predates this field", same convention as `riders`.
+    assassinate: op.assassinate ?? false,
+  };
 }
 
 /**
@@ -221,29 +256,7 @@ export async function applyResolveActionOperations(
         summary: summaryFor(op),
         before,
         after,
-        data: {
-          actionId: op.actionId,
-          source: op.source,
-          cost: op.cost,
-          toHit: op.toHit ?? null,
-          save: op.save ?? null,
-          effect: op.effect ?? null,
-          // Always an array (never undefined) so the feed never has to
-          // distinguish "no riders" from "old event predates riders" (#1843).
-          riders: op.riders ?? [],
-          slotLevel: op.slotLevel ?? null,
-          // The spellcasting entry this resolution cast, when it's a spell
-          // (#1833) — audit-trail provenance only; the feed doesn't need it
-          // to render (source/toHit/save/effect/riders already say what
-          // happened), and undo doesn't read it either (the concentration/
-          // buff/apply side effects it triggered already logged their own
-          // events with their own before/after under this same batch).
-          entryId: op.entryId ?? null,
-          // 2014 Assassinate attribution (#1526) — always a boolean (never
-          // undefined) so the feed can distinguish "not Assassinate" from
-          // "old event predates this field", same convention as `riders`.
-          assassinate: op.assassinate ?? false,
-        },
+        data: resolveActionEventData(op),
         batchId,
         sessionId,
       });

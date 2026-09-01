@@ -81,6 +81,21 @@ const HEAL_SPELL = {
   effectModifier: 0,
 };
 
+// A dedicated leveled, non-concentration entry for instances[] tests (#1982) — reusing a concentration
+// fixture would tangle slot-spend/interlock assertions with concentration side effects.
+const MULTI_INSTANCE_SPELL = {
+  id: "entry-multi-instance",
+  name: "Test Magic Missile",
+  level: 1,
+  school: "evocation",
+  prepared: true,
+  castingTime: "1 action",
+  range: "120 feet",
+  duration: "Instantaneous",
+  description: "",
+  concentration: false,
+};
+
 // Casting a cantrip spends no slot, so the interlock records it as cantrip — it must not downgrade a leveled block (#1439).
 const CANTRIP_SPELL = {
   id: "entry-cantrip",
@@ -98,7 +113,7 @@ const CANTRIP_SPELL = {
 const FIXTURE_SPELLCASTING_JSON = {
   slotsUsed: {},
   arcanumUsed: {},
-  spells: [CONCENTRATION_SPELL_A, CONCENTRATION_SPELL_B, HEAL_SPELL, CANTRIP_SPELL],
+  spells: [CONCENTRATION_SPELL_A, CONCENTRATION_SPELL_B, HEAL_SPELL, CANTRIP_SPELL, MULTI_INSTANCE_SPELL],
   concentratingOn: null,
 };
 
@@ -134,6 +149,37 @@ function riderSwingOp(actionId = "action-4") {
     toHit: { faces: [15], kept: 15, nat20: false, bonus: 5, total: 20, verdict: "hit" as const },
     effect: { spec: "1d8+3", faces: [6], total: 9, type: "slashing", kind: "damage" as const, crit: false },
     riders: [{ spec: "2d6", faces: [4, 5], total: 9, type: "fire", kind: "damage" as const, crit: false }],
+  };
+}
+
+// Magic Missile's three darts (#1981/#1982): instances[] instead of a single top-level effect.
+function instancedLeveledCastOp(actionId = "action-mm") {
+  return {
+    type: "resolveAction" as const,
+    actionId,
+    source: "Test Magic Missile",
+    cost: { kind: "action" as const },
+    instances: [
+      { effect: { spec: "1d4+1", faces: [2], total: 3, type: "force", kind: "damage" as const, crit: false } },
+      { effect: { spec: "1d4+1", faces: [3], total: 4, type: "force", kind: "damage" as const, crit: false } },
+      { effect: { spec: "1d4+1", faces: [4], total: 5, type: "force", kind: "damage" as const, crit: false } },
+    ],
+    slotLevel: 1,
+    entryId: MULTI_INSTANCE_SPELL.id,
+  };
+}
+
+// A cantrip's instances[] form: entryId present (routes through castSpellForResolutionInTx), no slotLevel.
+function instancedCantripCastOp(actionId = "action-eb") {
+  return {
+    type: "resolveAction" as const,
+    actionId,
+    source: "Test Fire Bolt",
+    cost: { kind: "action" as const },
+    instances: [
+      { effect: { spec: "1d10", faces: [6], total: 6, type: "fire", kind: "damage" as const, crit: false } },
+    ],
+    entryId: CANTRIP_SPELL.id,
   };
 }
 
@@ -772,6 +818,109 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     await combatStart(sid);
     const res = await post([{ ...weaponOp(), entryId: "not-a-real-spell-entry" }]);
     expect(res.status).toBe(400);
+    expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
+  });
+
+  it("accepts a 3-instance op and stores instances[] verbatim, with the top-level effect null", async () => {
+    const res = await post([instancedLeveledCastOp()]);
+    expect(res.status).toBe(200);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; data: Record<string, unknown> }>;
+    const resolveEvent = events.find((e) => e.type === "resolveAction");
+    expect(resolveEvent?.data.instances).toEqual(instancedLeveledCastOp().instances);
+    expect(resolveEvent?.data.effect ?? null).toBeNull();
+  });
+
+  it("mentions the instance count in the event summary when instances.length > 1", async () => {
+    await post([instancedLeveledCastOp()]);
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; summary: string }>;
+    expect(events.find((e) => e.type === "resolveAction")?.summary).toBe("Resolved Test Magic Missile (action, 3 instances)");
+  });
+
+  it("400s when instances is provided alongside a top-level effect", async () => {
+    const op = instancedLeveledCastOp();
+    const res = await post([
+      { ...op, effect: { spec: "1d4+1", faces: [2], total: 3, type: "force", kind: "damage" as const, crit: false } },
+    ]);
+    expect(res.status).toBe(400);
+  });
+
+  it("400s when instances is provided alongside a top-level toHit", async () => {
+    const op = weaponOp();
+    const res = await post([{ ...op, instances: [{ effect: op.effect }] }]);
+    expect(res.status).toBe(400);
+  });
+
+  it("400s on a per-instance cross-check violation (kept die not among instance 2's faces)", async () => {
+    const op = weaponOp();
+    const goodInstance = { toHit: op.toHit };
+    const badInstance = { toHit: { ...op.toHit, faces: [3, 8], kept: 15 } };
+    const res = await post([
+      { type: "resolveAction", actionId: "a-cross-check", source: "Scorching Ray", cost: { kind: "action" as const }, instances: [goodInstance, badInstance] },
+    ]);
+    expect(res.status).toBe(400);
+  });
+
+  it("400s on an empty instances array", async () => {
+    const res = await post([
+      { type: "resolveAction", actionId: "a-empty", source: "Test Spell", cost: { kind: "action" as const }, instances: [] },
+    ]);
+    expect(res.status).toBe(400);
+  });
+
+  it("a 3-instance leveled-spell op writes ONE resolveAction event, pays the slot once, and records one interlock cast", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+
+    const res = await post([instancedLeveledCastOp()]);
+    expect(res.status).toBe(200);
+
+    const slots = res.body.spellcasting.slots as Array<{ level: number; used: number }>;
+    expect(slots.find((s) => s.level === 1)?.used).toBe(1);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{
+      type: string; batchId?: string; data: Record<string, unknown>;
+    }>;
+    const resolveEvents = events.filter((e) => e.type === "resolveAction");
+    expect(resolveEvents).toHaveLength(1);
+    expect((resolveEvents[0].data.instances as unknown[]).length).toBe(3);
+    const sameBatch = events.filter((e) => e.batchId === resolveEvents[0].batchId);
+    expect(sameBatch).toHaveLength(1);
+
+    expect((await combatGet(sid)).body.spellEconomy).toEqual({
+      bonusActionBlockedByActionSpell: false,
+      bonusActionLimitedToCantrips: true,
+      actionLimitedToCantrips: false,
+    });
+  });
+
+  it("LIFO undo of an instanced cast batch restores the spent slot", async () => {
+    await post([instancedLeveledCastOp()]);
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; batchId?: string }>;
+    const batchId = events.find((e) => e.type === "resolveAction")?.batchId;
+    expect(batchId).toBeTruthy();
+
+    const revertRes = await revert(FIXTURE_ID, batchId as string);
+    expect(revertRes.status).toBe(200);
+    const slots = revertRes.body.spellcasting.slots as Array<{ level: number; used: number }>;
+    expect(slots.find((s) => s.level === 1)?.used).toBe(0);
+
+    const afterUndo = (await activity(FIXTURE_ID)).body as Array<{ type: string; reverted: boolean }>;
+    expect(afterUndo.find((e) => e.type === "resolveAction")?.reverted).toBe(true);
+  });
+
+  it("a cantrip instanced op (entryId, no slotLevel) works and records no interlock restriction", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+
+    const res = await post([instancedCantripCastOp()]);
+    expect(res.status).toBe(200);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; data: Record<string, unknown> }>;
+    const resolveEvent = events.find((e) => e.type === "resolveAction");
+    expect(resolveEvent?.data.slotLevel ?? null).toBeNull();
+    expect((resolveEvent?.data.instances as unknown[]).length).toBe(1);
+
     expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
   });
 });

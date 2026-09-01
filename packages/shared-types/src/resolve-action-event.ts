@@ -1,5 +1,8 @@
-// One `effect` roll per resolution, no `instances[]` — e.g. Magic Missile's three darts are one `count: 3` spec, with `effect.faces` holding every die actually rolled.
-// `riders` is the additive exception: a second, differently-typed damage source (Flame Tongue's fire, Divine Smite, Hunter's Mark, sneak attack) stacked on the primary `effect`, not another same-type instance.
+// A single-instance resolution carries its roll at the top level (`toHit`/`effect`); a multi-instance one
+// (Magic Missile's darts, Scorching Ray's rays, Eldritch Blast's beams, #1981/#1982) carries them in
+// `instances[]` instead — the two are mutually exclusive at the op schema (resolveActionOperationSchema's
+// superRefine). Either way it's still one op, one event, one slot spend.
+// `riders` is the additive exception to both shapes: a second, differently-typed damage source (Flame Tongue's fire, Divine Smite, Hunter's Mark, sneak attack) stacked on top, cast-level and rolled once — never per-instance.
 
 import type { RollEventAttackComponents, RollEventDamageComponents } from "./roll-event.js";
 
@@ -49,6 +52,12 @@ export interface ResolveActionEventEffect {
   source?: string;
 }
 
+/** One instance's rolls within a multi-instance cast's `instances[]` — same per-roll shape as the op's own top-level `toHit`/`effect`, just scoped to one dart/ray/beam instead of the whole resolution. */
+export interface ResolveActionEventInstance {
+  toHit?: ResolveActionEventToHit | null;
+  effect?: ResolveActionEventEffect | null;
+}
+
 /** `data` on a `resolveAction` CharacterEvent (category "combat"). */
 export interface ResolveActionEventData {
   actionId: string;
@@ -59,6 +68,8 @@ export interface ResolveActionEventData {
   effect?: ResolveActionEventEffect | null;
   /** Absent/empty for the common no-rider swing; a renderer sums `effect` + every rider into one sentence, each with its own drill-in line. */
   riders?: ResolveActionEventEffect[];
+  /** Multi-instance cast rolls (#1981/#1982) — always an array (never undefined), same convention as `riders`. Absent/empty is the common single-instance case, rendered exactly as before; present only when the op carried `instances[]` instead of top-level `toHit`/`effect`. */
+  instances?: ResolveActionEventInstance[];
   /** Present only for a leveled spell cast/upcast — absent for a cantrip or weapon swing. */
   slotLevel?: number | null;
   /** Presence (not `slotLevel`'s) is what `castAbilityInTx` keys off to run a spell's full side-effect sequence (concentration, self-buff, slot/arcanum spend) — a cantrip cast has no `slotLevel` but still needs `entryId`. */
