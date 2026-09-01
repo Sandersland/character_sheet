@@ -26,6 +26,21 @@ export default function HomebrewSpellEffectFields({ draft, update }: HomebrewSpe
           placeholder="0"
         />
       </label>
+      {(draft.instanceCount ?? 1) > 1 && (
+        <label className="block">
+          <span className={LABEL_CLS}>Upcast instances/level</span>
+          <input
+            type="number"
+            min={0}
+            className={INPUT_CLS}
+            value={draft.upcastInstancesPerLevel ?? ""}
+            onChange={(e) =>
+              update({ upcastInstancesPerLevel: e.target.value === "" ? undefined : Number(e.target.value) })
+            }
+            placeholder="0"
+          />
+        </label>
+      )}
       {draft.effectKind === "damage" && <HomebrewSpellDamageFields draft={draft} update={update} />}
     </div>
   );

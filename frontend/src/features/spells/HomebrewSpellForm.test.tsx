@@ -172,6 +172,51 @@ describe("HomebrewSpellForm", () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   });
 
+  it("submits instanceCount/instanceRoll/upcastInstancesPerLevel once instance count is set (#1984)", async () => {
+    vi.mocked(client.createCustomSpell).mockResolvedValue({
+      id: "s1",
+      ownerId: "u1",
+      edition: "EDITION_2014",
+      name: "Split Bolt",
+      level: 1,
+      school: "evocation",
+      castingTime: "1 action",
+      range: "60 feet",
+      duration: "Instantaneous",
+      description: "Splits.",
+      concentration: false,
+      ritual: false,
+      classes: [],
+    });
+    const user = userEvent.setup();
+    render(<HomebrewSpellForm edition="EDITION_2014" characterId="char-1" onSaved={noop} onClose={noop} />);
+
+    await user.type(screen.getByLabelText(/spell name/i), "Split Bolt");
+    await user.type(screen.getByLabelText(/description/i), "Splits.");
+    await user.selectOptions(screen.getByLabelText(/^level$/i), "1");
+
+    await user.click(screen.getByLabelText(/enable auto-rolling on cast/i));
+    await user.selectOptions(screen.getByLabelText(/effect type/i), "damage");
+    await user.type(screen.getByLabelText(/dice count/i), "1");
+    await user.type(screen.getByLabelText(/dice faces/i), "4");
+
+    expect(screen.queryByLabelText(/roll damage/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/upcast instances.level/i)).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/instance count/i), "3");
+    expect(screen.getByLabelText(/roll damage/i)).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText(/roll damage/i), "once");
+    await user.type(screen.getByLabelText(/upcast instances.level/i), "1");
+
+    await user.click(screen.getByRole("button", { name: /create homebrew spell/i }));
+
+    await waitFor(() => expect(client.createCustomSpell).toHaveBeenCalledTimes(1));
+    expect(client.createCustomSpell).toHaveBeenCalledWith(
+      expect.objectContaining({ instanceCount: 3, instanceRoll: "once", upcastInstancesPerLevel: 1 }),
+      "char-1",
+    );
+  });
+
   it("omits upcastDicePerLevel from the payload when left blank", async () => {
     vi.mocked(client.createCustomSpell).mockResolvedValue({
       id: "s1",

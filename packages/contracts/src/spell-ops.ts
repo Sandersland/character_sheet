@@ -55,6 +55,13 @@ export const customSpellSchema = z
     saveAbility: z.enum(SAVE_ABILITIES).optional(),
     saveEffect: z.enum(["half", "none"]).optional(),
     upcastDicePerLevel: z.number().int().positive().optional(),
+    // Multi-instance fields (#1981/#1984) — see EffectColumns. Cross-field coherence
+    // (instanceRoll/upcastInstancesPerLevel require instanceCount, no upcastInstancesPerLevel on
+    // a cantrip) lives in validateCustomSpellCoherence, not here — same split as the rest of this
+    // schema's cross-field rules (see the file header comment).
+    instanceCount: z.number().int().positive().optional(),
+    instanceRoll: z.enum(["each", "once"]).optional(),
+    upcastInstancesPerLevel: z.number().int().positive().optional(),
   })
   .strict();
 export type CustomSpellInput = z.input<typeof customSpellSchema>;

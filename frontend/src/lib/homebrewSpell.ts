@@ -37,6 +37,11 @@ export function buildHomebrewSpellPayload(draft: HomebrewSpellInput, hasEffect: 
     payload.effectDiceFaces = draft.effectDiceFaces;
     payload.effectModifier = draft.effectModifier;
     payload.upcastDicePerLevel = draft.upcastDicePerLevel;
+    payload.instanceCount = draft.instanceCount;
+    if (draft.instanceCount !== undefined && draft.instanceCount > 1) {
+      payload.instanceRoll = draft.instanceRoll;
+      payload.upcastInstancesPerLevel = draft.upcastInstancesPerLevel;
+    }
 
     if (draft.effectKind === "damage") {
       payload.damageType = draft.damageType;
@@ -50,6 +55,36 @@ export function buildHomebrewSpellPayload(draft: HomebrewSpellInput, hasEffect: 
   }
 
   return payload;
+}
+
+function validateHomebrewDiceFields(draft: HomebrewSpellInput): string | null {
+  if (draft.effectDiceCount === undefined || draft.effectDiceFaces === undefined) {
+    return "Dice count and dice faces are required when an effect is enabled.";
+  }
+  if (draft.effectKind === "damage" && draft.attackType === "save" && !draft.saveAbility) {
+    return 'Save ability is required when attack type is "save".';
+  }
+  return null;
+}
+
+// Mirrors validateCustomSpellCoherence's multi-instance refines (#1981/#1984).
+function validateHomebrewInstanceFields(draft: HomebrewSpellInput): string | null {
+  if (draft.instanceCount === undefined && draft.instanceRoll !== undefined) {
+    return "Roll mode requires an instance count.";
+  }
+  if (draft.instanceCount === undefined && draft.upcastInstancesPerLevel !== undefined) {
+    return "Upcast instances/level requires an instance count.";
+  }
+  if (draft.upcastInstancesPerLevel !== undefined && draft.level < 1) {
+    return "Upcast instances/level is never legal on a cantrip (level 0).";
+  }
+  return null;
+}
+
+// Split out of validateHomebrewSpellDraft to keep that function under fallow's complexity
+// guardrail (#1984) — mirrors validateCustomSpellCoherence's own dice/save/multi-instance checks.
+function validateHomebrewEffectFields(draft: HomebrewSpellInput): string | null {
+  return validateHomebrewDiceFields(draft) ?? validateHomebrewInstanceFields(draft);
 }
 
 // Mirrors validateCustomSpellCoherence; validateCustomSpellClasses is not mirrored since the class picker only ever offers catalog class names.
@@ -67,12 +102,7 @@ export function validateHomebrewSpellDraft(draft: HomebrewSpellInput, hasEffect:
     return "Description is required.";
   }
   if (hasEffect && draft.effectKind) {
-    if (draft.effectDiceCount === undefined || draft.effectDiceFaces === undefined) {
-      return "Dice count and dice faces are required when an effect is enabled.";
-    }
-    if (draft.effectKind === "damage" && draft.attackType === "save" && !draft.saveAbility) {
-      return 'Save ability is required when attack type is "save".';
-    }
+    return validateHomebrewEffectFields(draft);
   }
   return null;
 }
@@ -106,5 +136,8 @@ export function toHomebrewSpellInput(spell: CatalogSpell): HomebrewSpellInput {
     saveAbility: spell.saveAbility as HomebrewSpellInput["saveAbility"],
     saveEffect: spell.saveEffect ?? undefined,
     upcastDicePerLevel: spell.upcastDicePerLevel,
+    instanceCount: spell.instanceCount,
+    instanceRoll: spell.instanceRoll,
+    upcastInstancesPerLevel: spell.upcastInstancesPerLevel,
   };
 }

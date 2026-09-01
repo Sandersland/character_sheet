@@ -53,9 +53,14 @@ export function catalogEffectLine(spell: {
   effectDiceFaces?: number | null;
   damageType?: string | null;
   effectModifier?: number | null;
+  instanceCount?: number | null;
 }): string | null {
   if (!spell.effectKind || !spell.effectDiceCount || !spell.effectDiceFaces) return null;
   const noun = spell.effectKind === "heal" ? "Healing" : `${spell.damageType ?? ""} damage`;
   const mod = spell.effectModifier ? ` + ${spell.effectModifier}` : "";
-  return `${noun} — ${spell.effectDiceCount}d${spell.effectDiceFaces}${mod}`;
+  // instanceCount 1 (Eldritch Blast's base beam) reads identically to an un-instanced spell — the
+  // "N × " prefix earns its place only once there's more than one instance to distinguish (Magic
+  // Missile's darts, Scorching Ray's rays).
+  const instancePrefix = spell.instanceCount && spell.instanceCount > 1 ? `${spell.instanceCount} × ` : "";
+  return `${noun} — ${instancePrefix}${spell.effectDiceCount}d${spell.effectDiceFaces}${mod}`;
 }

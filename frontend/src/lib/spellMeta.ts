@@ -117,9 +117,20 @@ export function saveDcLabel(spell: Spell, spellSaveDC: number): string | null {
   return `DC ${spellSaveDC} ${abilityLabel(spell.saveAbility)} save`;
 }
 
+// Multi-instance rows (#1981/#1984) can set upcastDicePerLevel and upcastInstancesPerLevel
+// independently (readEffectSpec's resolveEffectScaling — either alone selects slotUpcast), so this
+// composes whichever clauses are present rather than picking one.
 export function upcastHint(
-  spell: Pick<Spell, "level" | "upcastDicePerLevel" | "effectDiceFaces">,
+  spell: Pick<Spell, "level" | "upcastDicePerLevel" | "effectDiceFaces" | "upcastInstancesPerLevel">,
 ): string | null {
-  if (spell.level === 0 || !spell.upcastDicePerLevel || !spell.effectDiceFaces) return null;
-  return `Upcast: +${spell.upcastDicePerLevel}d${spell.effectDiceFaces} per slot level above ${spell.level}`;
+  if (spell.level === 0) return null;
+  const clauses: string[] = [];
+  if (spell.upcastDicePerLevel && spell.effectDiceFaces) {
+    clauses.push(`+${spell.upcastDicePerLevel}d${spell.effectDiceFaces}`);
+  }
+  if (spell.upcastInstancesPerLevel) {
+    clauses.push(`+${spell.upcastInstancesPerLevel} instance${spell.upcastInstancesPerLevel === 1 ? "" : "s"}`);
+  }
+  if (clauses.length === 0) return null;
+  return `Upcast: ${clauses.join(" and ")} per slot level above ${spell.level}`;
 }

@@ -59,6 +59,7 @@ export function effectPillLabel(spell: {
   effectDiceFaces?: number | null;
   damageType?: string | null;
   effectModifier?: number | null;
+  instanceCount?: number | null;
 }): string | null {
   return catalogEffectLine(spell);
 }

@@ -6,6 +6,10 @@ interface EffectDiceDraft {
   effectDiceCount?: number;
   effectDiceFaces?: number;
   effectModifier?: number;
+  // Multi-instance authoring (#1981/#1984) — count > 1 is what gates the roll-mode select on;
+  // upcastInstancesPerLevel lives on the parent (HomebrewSpellEffectFields), alongside upcastDicePerLevel.
+  instanceCount?: number;
+  instanceRoll?: "each" | "once";
 }
 
 interface SpellEffectDiceFieldsProps {
@@ -60,6 +64,30 @@ export default function SpellEffectDiceFields({ draft, update }: SpellEffectDice
           placeholder="0"
         />
       </label>
+      <label className="block">
+        <span className={LABEL_CLS}>Instance count</span>
+        <input
+          type="number"
+          min={1}
+          className={INPUT_CLS}
+          value={draft.instanceCount ?? ""}
+          onChange={(e) => update({ instanceCount: e.target.value === "" ? undefined : Number(e.target.value) })}
+          placeholder="1"
+        />
+      </label>
+      {(draft.instanceCount ?? 1) > 1 && (
+        <label className="block">
+          <span className={LABEL_CLS}>Roll damage</span>
+          <select
+            className={INPUT_CLS}
+            value={draft.instanceRoll ?? "each"}
+            onChange={(e) => update({ instanceRoll: e.target.value as "each" | "once" })}
+          >
+            <option value="each">Roll damage per instance</option>
+            <option value="once">Roll once, apply to every instance</option>
+          </select>
+        </label>
+      )}
     </>
   );
 }
