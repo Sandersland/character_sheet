@@ -291,7 +291,7 @@ function find(name: string): CatalogSpell {
 }
 
 describe("WARLOCK_SPELLS_2014 — value spot-checks", () => {
-  it("Eldritch Blast: warlock-only cantrip, ranged spell attack, 1d10 force, no cantripScaling flag (the beam-count increase is prose, not a dice-scaling field)", () => {
+  it("Eldritch Blast: warlock-only cantrip, ranged spell attack, 1d10 force, cantripScaling scales the beam COUNT (#1981)", () => {
     const s = find("Eldritch Blast");
     expect(s.classes).toEqual(["warlock"]);
     expect(s.level).toBe(0);
@@ -300,7 +300,9 @@ describe("WARLOCK_SPELLS_2014 — value spot-checks", () => {
     expect(s.effectDiceCount).toBe(1);
     expect(s.effectDiceFaces).toBe(10);
     expect(s.damageType).toBe("force");
-    expect(s.cantripScaling).toBeUndefined();
+    expect(s.cantripScaling).toBe(true);
+    expect(s.instanceCount).toBe(1);
+    expect(s.instanceRoll).toBe("each");
   });
 
   it("Hellish Rebuke: warlock-only reaction, DEX save, half on success, 2d10 fire, +1d10 per upcast level", () => {

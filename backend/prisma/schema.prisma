@@ -577,6 +577,14 @@ model ClassFeature {
   buffTarget           String?
   buffModifier         Int?
 
+  // Multi-instance effect columns (#1981) — schema parity with Spell for a future row-driven feature
+  // (e.g. a class feature with its own darts/rays/beams); castSpecFromRow's forced `level: 0` still
+  // pins every ClassFeature row's scaling to "none", so instanceCount here never scales — it would
+  // just be a flat instance count until a caller needs otherwise.
+  instanceCount           Int?
+  instanceRoll            EffectInstanceRoll?
+  upcastInstancesPerLevel Int?
+
   // Permanent, level-gated derived-stat modifier (Extra Attack, crit range) — not a duration-bound buff.
   derivedStat      String?
   derivedStatTiers Json? // [{ minLevel, value }] — ASCENDING by minLevel, last-match-wins
@@ -922,6 +930,15 @@ enum SpellSchool {
   transmutation
 }
 
+// "each" rolls one instance's dice per instance (Scorching Ray, Eldritch Blast); "once" rolls the
+// dice a single time and applies the result to every instance (2014 Magic Missile — Sage Advice
+// Compendium: the darts' damage is rolled once, not per dart). Null instanceRoll on a row that sets
+// instanceCount reads as "each" — resolveEffectSpec's default, not this enum's.
+enum EffectInstanceRoll {
+  each
+  once
+}
+
 // Serves universal actions (available to every character) to GET /api/reference;
 // `key` also doubles as the dispatch identity ACTION_EFFECT_FN is keyed by for the
 // actions/transactions endpoint. Every row is `universal: true` — class/subclass/
@@ -1130,6 +1147,18 @@ model Spell {
   upcastDicePerLevel Int?
   // Cantrip damage scales with character level (5/11/17 thresholds) per 5e rules.
   cantripScaling     Boolean @default(false)
+
+  // Multi-instance effects (#1981/#1986) — Magic Missile's darts, Scorching Ray's rays, Eldritch
+  // Blast's beams. Null instanceCount = today's single-roll shape, byte-identical. Non-null:
+  // effectDiceCount/effectDiceFaces/effectModifier become PER-INSTANCE; cantripScaling then scales
+  // instanceCount by the level tier instead of dice; upcastInstancesPerLevel adds instances per slot
+  // step (upcastDicePerLevel, if it were ever combined, would still scale per-instance dice).
+  instanceCount           Int?
+  // instanceRoll is per-edition CONTENT (a rules-text ruling on roll granularity), not a rule fork —
+  // null reads as "each" (resolveEffectSpec's default). 2014 Magic Missile is "once" per the Sage
+  // Advice Compendium ruling that its damage is rolled a single time, not per dart.
+  instanceRoll            EffectInstanceRoll?
+  upcastInstancesPerLevel Int?
 
   grantedBy        SubclassGrantedSpell[]
   speciesGrantedBy SpeciesGrantedSpell[]

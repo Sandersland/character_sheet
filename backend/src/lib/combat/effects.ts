@@ -24,10 +24,25 @@ function resolveEffectDice(row: EffectRow, resolveDie?: ClassDieResolver): Effec
 }
 
 // The two arms are mutually exclusive by level (0 vs >0), so check order is immaterial.
+// A row may set upcastInstancesPerLevel with no upcastDicePerLevel (Magic Missile, Scorching Ray)
+// or vice versa (any pre-#1981 spell) — either alone is enough to select slotUpcast.
 function resolveEffectScaling(row: EffectRow): EffectScaling {
   if (row.level === 0 && row.cantripScaling) return { mode: "cantripLevel" };
-  if (row.level > 0 && row.upcastDicePerLevel) return { mode: "slotUpcast", dicePerStep: row.upcastDicePerLevel };
+  if (row.level > 0 && (row.upcastDicePerLevel || row.upcastInstancesPerLevel)) {
+    return {
+      mode: "slotUpcast",
+      ...(row.upcastDicePerLevel ? { dicePerStep: row.upcastDicePerLevel } : {}),
+      ...(row.upcastInstancesPerLevel ? { instancesPerStep: row.upcastInstancesPerLevel } : {}),
+    };
+  }
   return { mode: "none" };
+}
+
+// Present only when the row sets instanceCount (Magic Missile's darts, Scorching Ray's rays,
+// Eldritch Blast's beams, #1981) — absent instanceRoll on such a row defaults to "each".
+function resolveInstances(row: EffectRow): EffectSpec["instances"] {
+  if (row.instanceCount == null) return undefined;
+  return { count: row.instanceCount, roll: row.instanceRoll ?? "each" };
 }
 
 function resolveEffectType(effectKind: string | null | undefined): EffectType {
@@ -44,6 +59,7 @@ type EffectRowWithModifierSource = EffectRow & { effectModifierSource?: string |
 // An adapter over the existing flat columns, no schema migration — resolveDie's faces supersede the
 // fixed effectDiceFaces when present.
 export function readEffectSpec(row: EffectRowWithModifierSource, resolveDie?: ClassDieResolver): EffectSpec {
+  const instances = resolveInstances(row);
   return {
     effectType: resolveEffectType(row.effectKind),
     dice: resolveEffectDice(row, resolveDie),
@@ -57,6 +73,10 @@ export function readEffectSpec(row: EffectRowWithModifierSource, resolveDie?: Cl
     buffTarget: row.buffTarget ?? null,
     buffModifier: row.buffModifier ?? null,
     modifierSource: row.effectModifierSource ?? null,
+    // Key omitted (not `instances: undefined`) so an un-instanced row's serialized/snapshotted
+    // spec stays byte-identical to pre-#1981 — a snapshot serializer renders undefined-valued
+    // keys explicitly, unlike `toEqual`.
+    ...(instances ? { instances } : {}),
   };
 }
 
@@ -112,36 +132,69 @@ export function resolveBuffSpec(spec: EffectSpec): BuffDescriptor | null {
 }
 
 // effectiveStep is the scaling step count (upcast levels above base, or focus/ki above base cost; 0 for cantrips).
+// characterLevel 1-4 -> tier 1 (no scaling); 5-10 -> 2; 11-16 -> 3; 17+ -> 4. SRD 5.2 p.? / PHB'14
+// p.? cantrip damage-scaling breakpoints, shared by every scaling cantrip regardless of edition.
+function cantripTierMultiplier(characterLevel: number): number {
+  if (characterLevel >= 17) return 4;
+  if (characterLevel >= 11) return 3;
+  if (characterLevel >= 5) return 2;
+  return 1;
+}
+
+// Splits the count/instanceCount scaling out of resolveEffectSpec so that function's own
+// cyclomatic/cognitive score stays under the fallow guardrail (#1981 added the instanceCount arm).
+function scaleCountAndInstances(
+  spec: EffectSpec,
+  effectiveStep: number,
+  characterLevel: number,
+): { count: number; instanceCount?: number } {
+  let count = spec.dice!.count;
+  let instanceCount = spec.instances?.count;
+
+  if (spec.scaling.mode === "cantripLevel") {
+    // A multi-instance cantrip (Eldritch Blast) scales its BEAM COUNT, not its dice — dice stay
+    // per-instance. An un-instanced cantrip (Fire Bolt) scales dice, exactly as before #1981.
+    const tier = cantripTierMultiplier(characterLevel);
+    if (instanceCount !== undefined) instanceCount *= tier;
+    else count *= tier;
+  } else if (spec.scaling.mode === "slotUpcast" || spec.scaling.mode === "poolStep") {
+    // Same formula for both: a spell-slot upcast step and a pool (ki/focus)
+    // overspend step (#1503) each add `dicePerStep` dice per step above the
+    // effect's base cost. instancesPerStep (Magic Missile, Scorching Ray) adds
+    // instances the same way, independently — a row could in principle set both.
+    count += effectiveStep * (spec.scaling.dicePerStep ?? 0);
+    if (instanceCount !== undefined) {
+      instanceCount += effectiveStep * (spec.scaling.instancesPerStep ?? 0);
+    }
+  }
+
+  return { count, instanceCount };
+}
+
+// classLevel, not characterLevel: cantripLevel scaling uses total character level, while classLevel
+// is the granting class entry's own level — collapsing them onto one field made a Fighter 1/Wizard 19
+// heal 1d10+20. A caller resolving a ClassFeature row for a possibly-multiclass character MUST pass
+// classLevel; only "classLevel" is resolved today, other modifierSource values fall through unresolved.
+function resolveModifier(spec: EffectSpec, ctx: { characterLevel: number; classLevel?: number; abilityMod?: number }): number {
+  let modifier = spec.dice!.modifier ?? 0;
+  if (spec.effectType === "heal" && spec.addAbilityModToHeal) {
+    modifier += ctx.abilityMod ?? 0;
+  }
+  if (spec.modifierSource === "classLevel") {
+    modifier += ctx.classLevel ?? ctx.characterLevel;
+  }
+  return modifier;
+}
+
 export function resolveEffectSpec(
   spec: EffectSpec,
   effectiveStep: number,
   ctx: { characterLevel: number; classLevel?: number; abilityMod?: number },
-): { count: number; faces: number; modifier: number } | null {
+): { count: number; faces: number; modifier: number; instanceCount?: number } | null {
   if (!spec.dice) return null;
 
-  let count = spec.dice.count;
-  if (spec.scaling.mode === "cantripLevel") {
-    if (ctx.characterLevel >= 17) count *= 4;
-    else if (ctx.characterLevel >= 11) count *= 3;
-    else if (ctx.characterLevel >= 5) count *= 2;
-  } else if (spec.scaling.mode === "slotUpcast" || spec.scaling.mode === "poolStep") {
-    // Same formula for both: a spell-slot upcast step and a pool (ki/focus)
-    // overspend step (#1503) each add `dicePerStep` dice per step above the
-    // effect's base cost.
-    count += effectiveStep * (spec.scaling.dicePerStep ?? 0);
-  }
+  const { count, instanceCount } = scaleCountAndInstances(spec, effectiveStep, ctx.characterLevel);
+  const modifier = resolveModifier(spec, ctx);
 
-  let modifier = spec.dice.modifier ?? 0;
-  if (spec.effectType === "heal" && spec.addAbilityModToHeal) {
-    modifier += ctx.abilityMod ?? 0;
-  }
-  // classLevel, not characterLevel: cantripLevel scaling uses total character level, while classLevel
-  // is the granting class entry's own level — collapsing them onto one field made a Fighter 1/Wizard 19
-  // heal 1d10+20. A caller resolving a ClassFeature row for a possibly-multiclass character MUST pass
-  // classLevel; only "classLevel" is resolved today, other modifierSource values fall through unresolved.
-  if (spec.modifierSource === "classLevel") {
-    modifier += ctx.classLevel ?? ctx.characterLevel;
-  }
-
-  return { count, faces: spec.dice.faces, modifier };
+  return { count, faces: spec.dice.faces, modifier, ...(instanceCount !== undefined ? { instanceCount } : {}) };
 }

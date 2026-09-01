@@ -15,7 +15,12 @@ interface SpellRow {
   id: string;
   name: string;
   effect?: { effectType: string; dice?: { count: number; faces: number; modifier: number }; scaling: { mode: string; dicePerStep?: number } };
-  effectRolls?: { slotLevel: number; roll: { count: number; faces: number; modifier: number } }[];
+  effectRolls?: {
+    slotLevel: number;
+    roll: { count: number; faces: number; modifier: number };
+    instanceCount?: number;
+    instanceRoll?: "each" | "once";
+  }[];
 }
 
 function agent() {
@@ -242,5 +247,112 @@ describe("POST /api/characters/:id/experience — cantrip roll updates in the sa
     expect(spells(res).find((s) => s.name === "Fire Bolt")!.effectRolls).toEqual([
       { slotLevel: 0, roll: { count: 2, faces: 10, modifier: 0 } },
     ]);
+  });
+});
+
+describe("GET /api/characters/:id — served instanceCount/instanceRoll on multi-instance spells (#1981)", () => {
+  const MULTI_ID = "test-effect-rolls-multi-instance";
+
+  const ELDRITCH_BLAST = {
+    id: "fixture-eldritch-blast",
+    name: "Eldritch Blast",
+    level: 0,
+    school: "evocation",
+    prepared: true,
+    castingTime: "1 action",
+    range: "120 ft",
+    duration: "Instantaneous",
+    description: "A beam of crackling energy.",
+    effectKind: "damage",
+    effectDiceCount: 1,
+    effectDiceFaces: 10,
+    damageType: "force",
+    attackType: "attack",
+    cantripScaling: true,
+    instanceCount: 1,
+    instanceRoll: "each",
+  };
+
+  const MAGIC_MISSILE = {
+    id: "fixture-magic-missile",
+    name: "Magic Missile",
+    level: 1,
+    school: "evocation",
+    prepared: true,
+    castingTime: "1 action",
+    range: "120 ft",
+    duration: "Instantaneous",
+    description: "Darts of magical force.",
+    effectKind: "damage",
+    effectDiceCount: 1,
+    effectDiceFaces: 4,
+    effectModifier: 1,
+    damageType: "force",
+    upcastInstancesPerLevel: 1,
+    instanceCount: 3,
+    instanceRoll: "once",
+  };
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: "Effect Rolls Test Wizard Multi" },
+      create: { name: "Effect Rolls Test Wizard Multi", hitDie: "d6", savingThrows: ["intelligence", "wisdom"], skillChoiceCount: 2, skillChoices: ["arcana"], isSpellcaster: true },
+      update: {},
+    });
+    await prisma.character.create({
+      data: {
+        id: MULTI_ID,
+        name: "Effect Rolls Multi-Instance Wizard",
+        ownerId: OWNER_ID,
+        alignment: "Neutral Good",
+        initiativeBonus: 1,
+        speed: 30,
+        skills: [],
+        toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        experiencePoints: 48000, // level 9 → FULL_CASTER_SLOTS[9] has levels 1-5
+        abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
+        hitPoints: { current: 40, max: 40, temp: 0 },
+        hitDice: { total: 9, die: "d6" },
+        spellcasting: { slotsUsed: {}, spells: [ELDRITCH_BLAST, MAGIC_MISSILE, FIRE_BOLT] } as Prisma.InputJsonValue,
+        classEntries: { create: [{ name: "wizard", classId: cls.id, position: 0 }] },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MULTI_ID } });
+    await prisma.characterClass.deleteMany({ where: { name: "Effect Rolls Test Wizard Multi" } });
+  });
+
+  it("Eldritch Blast serves instanceCount scaled by character level, instanceRoll each", async () => {
+    const res = await agent().get(`/api/characters/${MULTI_ID}`);
+    const eb = spells(res).find((s) => s.name === "Eldritch Blast")!;
+    expect(eb.effectRolls).toEqual([
+      { slotLevel: 0, roll: { count: 1, faces: 10, modifier: 0 }, instanceCount: 2, instanceRoll: "each" },
+    ]);
+  });
+
+  it("Magic Missile serves instanceCount rising by upcastInstancesPerLevel per slot, instanceRoll once", async () => {
+    const res = await agent().get(`/api/characters/${MULTI_ID}`);
+    const mm = spells(res).find((s) => s.name === "Magic Missile")!;
+    expect(mm.effectRolls).toEqual([
+      { slotLevel: 1, roll: { count: 1, faces: 4, modifier: 1 }, instanceCount: 3, instanceRoll: "once" },
+      { slotLevel: 2, roll: { count: 1, faces: 4, modifier: 1 }, instanceCount: 4, instanceRoll: "once" },
+      { slotLevel: 3, roll: { count: 1, faces: 4, modifier: 1 }, instanceCount: 5, instanceRoll: "once" },
+      { slotLevel: 4, roll: { count: 1, faces: 4, modifier: 1 }, instanceCount: 6, instanceRoll: "once" },
+      { slotLevel: 5, roll: { count: 1, faces: 4, modifier: 1 }, instanceCount: 7, instanceRoll: "once" },
+    ]);
+  });
+
+  it("an un-instanced spell (Fire Bolt) serves no instanceCount/instanceRoll keys", async () => {
+    const res = await agent().get(`/api/characters/${MULTI_ID}`);
+    const fireBolt = spells(res).find((s) => s.name === "Fire Bolt")!;
+    for (const roll of fireBolt.effectRolls!) {
+      expect(roll.instanceCount).toBeUndefined();
+      expect(roll.instanceRoll).toBeUndefined();
+    }
   });
 });

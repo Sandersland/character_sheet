@@ -41,14 +41,22 @@ export interface CatalogSpell {
   };
   saveEffect?: (typeof SAVE_EFFECT_VALUES)[number];
   effectKind?: (typeof EFFECT_KIND_VALUES)[number];
+  // instanceCount != null makes effectDiceCount/effectDiceFaces/effectModifier PER-INSTANCE, not
+  // combined (e.g. Magic Missile's dart is 1d4+1, not the pre-#1981 combined 3d4+3).
   effectDiceCount?: number;
   effectDiceFaces?: number;
-  effectModifier?: number;    // flat bonus (e.g. +3 in "3d4+3" for Magic Missile)
+  effectModifier?: number;    // flat bonus added after dice
   damageType?: (typeof DAMAGE_TYPE_VALUES)[number];
   attackType?: (typeof ATTACK_TYPE_VALUES)[number];
   saveAbility?: (typeof ABILITY_VALUES)[number];
   upcastDicePerLevel?: number;
   cantripScaling?: boolean;
+  // Multi-instance effects (#1981/#1986) — Magic Missile's darts, Scorching Ray's rays, Eldritch
+  // Blast's beams. instanceRoll is per-edition CONTENT (a rules-text ruling on roll granularity),
+  // not a rule fork; omitted reads as "each".
+  instanceCount?: number;
+  instanceRoll?: "each" | "once";
+  upcastInstancesPerLevel?: number;
   // buffModifier is the ABSOLUTE value the target reads, not a delta — flat add for "ac" (Shield of Faith 2), full unarmored base for "acUnarmoredBase" (Mage Armor 13), floor for "acFloor" (Barkskin 17).
   buffTarget?: (typeof BUFF_TARGET_VALUES)[number];
   buffModifier?: number;
@@ -88,6 +96,9 @@ export const spellSeedSchema = z.object({
   saveAbility: z.enum(ABILITY_VALUES).optional(),
   upcastDicePerLevel: z.number().int().positive().optional(),
   cantripScaling: z.boolean().optional(),
+  instanceCount: z.number().int().positive().optional(),
+  instanceRoll: z.enum(["each", "once"]).optional(),
+  upcastInstancesPerLevel: z.number().int().positive().optional(),
   buffTarget: z.enum(BUFF_TARGET_VALUES).optional(),
   buffModifier: z.number().int().nonnegative().optional(),
   edition: z.enum(["EDITION_2014", "EDITION_2024"]).optional(),
@@ -233,6 +244,11 @@ export const SPELLS: CatalogSpell[] = [
     effectDiceCount: 1,
     effectDiceFaces: 10,
     damageType: "force",
+    // SRD 5.2: the beam count is the scaling axis (two beams at 5th, three at 11th, four at
+    // 17th) — dice stay 1d10 per beam, unlike a plain scaling cantrip.
+    cantripScaling: true,
+    instanceCount: 1,
+    instanceRoll: "each",
     attackType: "attack",
   },
   {
@@ -327,15 +343,26 @@ export const SPELLS: CatalogSpell[] = [
     castingTime: "1 action",
     range: "120 ft",
     duration: "Instantaneous",
-    description: "Three glowing darts of magical force hit automatically (1d4+1 each = 3d4+3 total). At higher levels: +1 dart per slot level above 1st.",
+    description: "Three glowing darts of magical force hit automatically (1d4+1 each). At higher levels: +1 dart per slot level above 1st.",
     classes: ["wizard", "sorcerer"],
     components: { verbal: true, somatic: true, material: false },
     effectKind: "damage",
-    effectDiceCount: 3,
+    effectDiceCount: 1,
     effectDiceFaces: 4,
-    effectModifier: 3,
+    effectModifier: 1,
     damageType: "force",
-    upcastDicePerLevel: 1,
+    // SRD 5.2 (#1981): three darts, 1d4+1 EACH, +1 dart per slot level above 1st (structurally
+    // fixes the pre-#1981 upcast bug: adding a whole dart at +1 dice/+1 modifier, not just dice).
+    instanceCount: 3,
+    upcastInstancesPerLevel: 1,
+    // "each", unlike the 2014 fork's "once": SRD 5.2's one-roll rule ("Damage Rolls") now reads
+    // "forces two or more targets to make SAVING THROWS ... roll the damage once", narrowed from
+    // PHB'14 p.196's "deals damage to more than one target at the same time" — MM has no save, so
+    // the roll-once mandate no longer covers it and each dart rolls its own 1d4+1. The spell text
+    // still says "the darts all strike simultaneously" (timing, not roll granularity), and WotC has
+    // published no 2024-specific MM ruling — that's the residual ambiguity, resolved from the rule
+    // text above.
+    instanceRoll: "each",
   },
   {
     name: "Cure Wounds",
@@ -658,11 +685,14 @@ export const SPELLS: CatalogSpell[] = [
     classes: ["wizard", "sorcerer"],
     components: { verbal: true, somatic: true, material: false },
     effectKind: "damage",
-    effectDiceCount: 6,
+    effectDiceCount: 2,
     effectDiceFaces: 6,
     damageType: "fire",
     attackType: "attack",
-    upcastDicePerLevel: 2,
+    // SRD 5.2: each ray is its own attack roll and its own 2d6, not one combined roll for all three.
+    instanceCount: 3,
+    instanceRoll: "each",
+    upcastInstancesPerLevel: 1,
   },
   {
     name: "Gust of Wind",

@@ -21,6 +21,11 @@ export const WARLOCK_SPELLS_2014: CatalogSpell[] = [
     effectDiceCount: 1,
     effectDiceFaces: 10,
     damageType: "force",
+    // PHB'14 p.110: the beam count is the scaling axis (two beams at 5th, three at 11th, four
+    // at 17th), each beam its own attack roll — dice stay 1d10 per beam.
+    cantripScaling: true,
+    instanceCount: 1,
+    instanceRoll: "each",
   },
   {
     name: "Hellish Rebuke",

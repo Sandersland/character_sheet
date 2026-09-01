@@ -76,6 +76,23 @@ describe("spellSeedSchema — saveEffect", () => {
   });
 });
 
+describe("spellSeedSchema — multi-instance fields (#1981)", () => {
+  it("accepts instanceCount + instanceRoll + upcastInstancesPerLevel", () => {
+    expect(
+      spellSeedSchema.safeParse({ ...baseSpell, instanceCount: 3, instanceRoll: "once", upcastInstancesPerLevel: 1 })
+        .success,
+    ).toBe(true);
+  });
+
+  it("rejects an instanceRoll outside each/once", () => {
+    expect(spellSeedSchema.safeParse({ ...baseSpell, instanceCount: 3, instanceRoll: "all" }).success).toBe(false);
+  });
+
+  it("rejects a non-positive instanceCount", () => {
+    expect(spellSeedSchema.safeParse({ ...baseSpell, instanceCount: 0 }).success).toBe(false);
+  });
+});
+
 describe("spellSeedSchema — buffTarget (narrower than ClassFeature's: AC family only)", () => {
   it("accepts ac/acUnarmoredBase/acFloor", () => {
     for (const buffTarget of ["ac", "acUnarmoredBase", "acFloor"]) {

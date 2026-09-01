@@ -193,6 +193,12 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns, Cho
   effectDieSource?: string | null;
   effectModifier?: number | null;
   effectModifierSource?: string | null; // "classLevel" | "abilityMod:<ability>" — see EffectSpec.modifierSource. Seed validation rejects "abilityMod:<ability>" until a reader resolves it.
+  // Multi-instance columns (#1981), schema-parity with Spell — inert today: castSpecFromRow's
+  // forced `level: 0` pins every ClassFeature row's scaling to "none", so instanceCount here
+  // never scales; it would only ever serve as a flat, unscaled instance count.
+  instanceCount?: number | null;
+  instanceRoll?: "each" | "once" | null;
+  upcastInstancesPerLevel?: number | null;
   damageType?: string | null;
   attackType?: string | null;
   saveAbility?: string | null;

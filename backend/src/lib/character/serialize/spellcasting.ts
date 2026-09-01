@@ -211,8 +211,16 @@ function decorateSpellEffects(
     const effectRolls: EffectRoll[] = [];
     for (const slotLevel of castableSlotLevels(spell, view)) {
       const effectiveStep = spell.level === 0 ? 0 : Math.max(0, slotLevel - spell.level);
-      const roll = resolveEffectSpec(effect, effectiveStep, { characterLevel, abilityMod });
-      if (roll) effectRolls.push({ slotLevel, roll });
+      const resolved = resolveEffectSpec(effect, effectiveStep, { characterLevel, abilityMod });
+      if (resolved) {
+        const { instanceCount, ...roll } = resolved;
+        effectRolls.push({
+          slotLevel,
+          roll,
+          // instanceRoll rides the spec, not the resolved roll — the granularity ruling never scales.
+          ...(instanceCount !== undefined ? { instanceCount, instanceRoll: effect.instances?.roll ?? "each" } : {}),
+        });
+      }
     }
     const castCost = deriveSpellCastCost(spell.castingTime);
     return { ...spell, effect, effectRolls, castCost };

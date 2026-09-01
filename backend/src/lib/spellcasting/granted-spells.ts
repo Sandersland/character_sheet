@@ -77,6 +77,9 @@ function optionalSpellFields(s: GrantedSpellCatalogSpell): Partial<SpellEntry> {
     out.saveEffect = s.saveEffect;
     out.upcastDicePerLevel = s.upcastDicePerLevel;
     if (s.cantripScaling) out.cantripScaling = true;
+    out.instanceCount = s.instanceCount;
+    out.instanceRoll = s.instanceRoll;
+    out.upcastInstancesPerLevel = s.upcastInstancesPerLevel;
     out.buffTarget = s.buffTarget;
     out.buffModifier = s.buffModifier;
   }

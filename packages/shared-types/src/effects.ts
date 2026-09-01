@@ -1,10 +1,15 @@
 /** "utility" carries no roll; "buff" applies a passive stat modifier while the granting concentration holds. */
 export type EffectType = "damage" | "heal" | "utility" | "buff";
 
+/** "each" rolls one instance's dice per instance (Scorching Ray, Eldritch Blast); "once" rolls the dice a single time and applies the result to every instance (2014 Magic Missile — Sage Advice Compendium). */
+export type EffectInstanceRoll = "each" | "once";
+
 /** cantripLevel scales by character level, slotUpcast by slot steps, poolStep by spend above base cost (`readAbilityCost`'s `effectiveStep`). */
 export interface EffectScaling {
   mode: "none" | "slotUpcast" | "cantripLevel" | "poolStep";
   dicePerStep?: number;
+  /** slotUpcast/poolStep only, from `upcastInstancesPerLevel` — instances added per step, alongside (never instead of) `dicePerStep`. */
+  instancesPerStep?: number;
 }
 
 export interface EffectSpec {
@@ -22,6 +27,8 @@ export interface EffectSpec {
   buffModifier?: number | null;
   /** "classLevel" adds the character's class level (e.g. Second Wind's `1d10 + Fighter level`); "abilityMod:<ability>" is reserved — no consumer resolves it yet. */
   modifierSource?: string | null;
+  /** Present only for a multi-instance effect (Magic Missile's darts, Scorching Ray's rays, Eldritch Blast's beams, #1981) — `dice` is then PER-INSTANCE, not combined. Absent = today's single-roll shape. */
+  instances?: { count: number; roll: EffectInstanceRoll };
 }
 
 // Flat effect columns snapshotted from the catalog; shared by SpellEntry, custom-spell input, and frontend Spell snapshot shapes.
@@ -40,6 +47,10 @@ export interface EffectColumns {
   cantripScaling?: boolean;
   buffTarget?: string | null;
   buffModifier?: number | null;
+  /** Multi-instance columns (#1981) — see EffectSpec.instances. Null instanceCount = un-instanced. */
+  instanceCount?: number | null;
+  instanceRoll?: EffectInstanceRoll | null;
+  upcastInstancesPerLevel?: number | null;
 }
 
 // A row carrying effect columns plus the level that decides the scaling axis.
@@ -49,4 +60,7 @@ export type EffectRow = EffectColumns & { level: number; concentration?: boolean
 export interface EffectRoll {
   slotLevel: number;
   roll: { count: number; faces: number; modifier: number };
+  /** Resolved instance count for this slot level (post cantrip/upcast scaling) and the spec's roll granularity — present only for a multi-instance effect. */
+  instanceCount?: number;
+  instanceRoll?: EffectInstanceRoll;
 }

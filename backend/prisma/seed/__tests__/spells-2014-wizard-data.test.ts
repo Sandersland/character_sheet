@@ -338,6 +338,19 @@ describe("WIZARD_SPELLS_2014 — value spot-checks", () => {
     expect(find("Magic Missile").classes).toEqual(["wizard", "sorcerer"]);
   });
 
+  it("Magic Missile: three darts, 1d4+1 EACH, +1 dart per slot level above 1st, instanceRoll 'once' (Sage Advice — simultaneous strike) (#1981)", () => {
+    const s = find("Magic Missile");
+    expect(s.effectKind).toBe("damage");
+    expect(s.effectDiceCount).toBe(1);
+    expect(s.effectDiceFaces).toBe(4);
+    expect(s.effectModifier).toBe(1);
+    expect(s.damageType).toBe("force");
+    expect(s.instanceCount).toBe(3);
+    expect(s.upcastInstancesPerLevel).toBe(1);
+    expect(s.instanceRoll).toBe("once");
+    expect(s.upcastDicePerLevel).toBeUndefined();
+  });
+
   it("Flaming Sphere: DEX save, half on success, 2d6 fire + upcast — dnd5eapi's own dc field was null despite the prose", () => {
     const s = find("Flaming Sphere");
     expect(s.attackType).toBe("save");
@@ -356,6 +369,13 @@ describe("WIZARD_SPELLS_2014 — value spot-checks", () => {
     expect(s.effectDiceCount).toBe(2);
     expect(s.effectDiceFaces).toBe(6);
     expect(s.damageType).toBe("fire");
+  });
+
+  it("Scorching Ray: three rays, each its own attack roll, +1 ray per slot level above 2nd, instanceRoll 'each' (#1981)", () => {
+    const s = find("Scorching Ray");
+    expect(s.instanceCount).toBe(3);
+    expect(s.upcastInstancesPerLevel).toBe(1);
+    expect(s.instanceRoll).toBe("each");
   });
 
   it("Weird: the mass Phantasmal Killer — 4d10 psychic, saveEffect 'none', hand-added since dnd5eapi's own damage field was null (unlike Phantasmal Killer's identical mechanic)", () => {

@@ -347,6 +347,7 @@ const SPELL_COLUMN_DEFAULTS = {
   effectModifier: null, damageType: null, attackType: null,
   saveAbility: null, saveEffect: null, upcastDicePerLevel: null,
   buffTarget: null, buffModifier: null,
+  instanceCount: null, instanceRoll: null, upcastInstancesPerLevel: null,
 } as const;
 
 // Layering over the reset defaults makes a toggled-off optional actually reset on reseed (#1132) — a bare partial update leaves it at its prior value.

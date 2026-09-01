@@ -218,11 +218,16 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "sorcerer"],
     components: { verbal: true, somatic: true, material: false },
     effectKind: "damage",
-    effectDiceCount: 3,
+    effectDiceCount: 1,
     effectDiceFaces: 4,
-    effectModifier: 3,
+    effectModifier: 1,
     damageType: "force",
-    upcastDicePerLevel: 1,
+    // PHB'14 p.257: three darts, 1d4+1 EACH, +1 dart per slot level above 1st. instanceRoll
+    // "once": the Sage Advice Compendium rules that because "the darts all strike simultaneously"
+    // you roll damage once and apply it to every dart, not once per dart.
+    instanceCount: 3,
+    upcastInstancesPerLevel: 1,
+    instanceRoll: "once",
   },
   // PHB'14 p. 271.
   {
@@ -465,6 +470,11 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     effectDiceCount: 2,
     effectDiceFaces: 6,
     damageType: "fire",
+    // PHB'14 p.271: three rays, each its OWN attack roll and its own 2d6 damage roll, +1 ray per
+    // slot level above 2nd (this row had no upcast scaling at all before #1981 — a pre-existing gap).
+    instanceCount: 3,
+    upcastInstancesPerLevel: 1,
+    instanceRoll: "each",
   },
   {
     name: "Web",
