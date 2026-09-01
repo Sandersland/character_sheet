@@ -78,12 +78,14 @@ function DamageArea({
   missed,
   canRoll,
   damageType,
+  isHeal,
   disabled,
 }: {
   instance: ResolutionInstanceView;
   missed: boolean;
   canRoll: boolean;
   damageType: string | undefined;
+  isHeal: boolean;
   disabled: boolean;
 }) {
   if (missed) return <span className="text-[11px] text-parchment-500">Missed — no damage</span>;
@@ -100,7 +102,7 @@ function DamageArea({
           : "border-parchment-300 bg-parchment-100 text-parchment-700 hover:bg-parchment-200"
       }`}
     >
-      {instance.isCrit ? "Roll crit damage" : "Roll damage"}
+      {isHeal ? "Roll healing" : instance.isCrit ? "Roll crit damage" : "Roll damage"}
     </button>
   );
 }
@@ -110,11 +112,13 @@ function EachInstanceRow({
   instance,
   hasToHit,
   damageType,
+  isHeal,
   disabled,
 }: {
   instance: ResolutionInstanceView;
   hasToHit: boolean;
   damageType: string | undefined;
+  isHeal: boolean;
   disabled: boolean;
 }) {
   const missed = hasToHit && instance.verdict === "miss";
@@ -129,7 +133,7 @@ function EachInstanceRow({
         </span>
         {hasToHit && <ToHitArea instance={instance} disabled={disabled} />}
       </div>
-      <DamageArea instance={instance} missed={missed} canRoll={canRollDamage} damageType={damageType} disabled={disabled} />
+      <DamageArea instance={instance} missed={missed} canRoll={canRollDamage} damageType={damageType} isHeal={isHeal} disabled={disabled} />
     </li>
   );
 }
@@ -191,7 +195,7 @@ function SharedRollRow({ view }: { view: ResolutionView }) {
       onClick={view.onRollEffect}
       className="min-h-11 w-full rounded-control bg-garnet-soft-surface px-3 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
     >
-      Roll damage — applies to every instance
+      {view.effect?.kind === "heal" ? "Roll healing" : "Roll damage"} — applies to every instance
     </button>
   );
 }
@@ -249,6 +253,7 @@ export default function InstanceResolutionStrip({
               instance={instance}
               hasToHit={hasToHit}
               damageType={view.effect?.damageType}
+              isHeal={view.effect?.kind === "heal"}
               disabled={view.disabled}
             />
           ),

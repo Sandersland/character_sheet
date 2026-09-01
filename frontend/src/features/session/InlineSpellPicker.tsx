@@ -258,7 +258,10 @@ function SpellResolver({
   });
 
   function handleCommit(rolls: ResolutionRolls) {
-    const apply = isHeal ? buildHealApply(target, rolls.effect?.total ?? 0) : undefined;
+    // Same instanced-total fallback as castSettledEntry — an instanced heal's total lives per
+    // instance, and reading only the top-level effect shipped a heal of 0 (whole-epic review).
+    const healTotal = rolls.effect?.total ?? (rolls.instances ? sumInstanceEffects(rolls.instances) : undefined);
+    const apply = isHeal ? buildHealApply(target, healTotal ?? 0) : undefined;
     const op = buildSpellResolveOp(resolution, rolls, spell, effectiveSlot, apply);
     resolveActionMutation
       .mutateAsync(op)

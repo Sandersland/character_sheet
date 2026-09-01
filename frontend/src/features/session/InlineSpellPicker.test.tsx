@@ -268,6 +268,33 @@ describe("InlineSpellPicker — heal shape (Cure Wounds)", () => {
     expect(op.apply).toMatchObject({ target: "self", kind: "heal" });
     expect(op.apply?.amount).toBeGreaterThan(0);
   });
+
+  // Whole-epic review blocker: an instanced heal's total lives per instance, and reading only the
+  // top-level effect shipped apply.amount 0 — the slot spent, no HP written, no signal.
+  it("an instanced heal commits apply.amount as the sum of every instance's healing", async () => {
+    const user = userEvent.setup();
+    seedMid();
+    const instancedHeal: Spell = {
+      ...CURE_WOUNDS,
+      id: "entry-split-mend",
+      name: "Split Mend",
+      effectRolls: [{ slotLevel: 1, roll: { count: 1, faces: 8, modifier: 4 }, instanceCount: 2, instanceRoll: "each" }],
+    };
+    renderPicker(makeCharacter([instancedHeal]));
+
+    await user.click(screen.getByRole("button", { name: /^Split Mend/ }));
+    for (const button of screen.getAllByRole("button", { name: "Roll healing" })) {
+      await user.click(button);
+    }
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    const op = lastOp();
+    expect(op.effect).toBeNull();
+    expect(op.instances).toHaveLength(2);
+    const instanceSum = op.instances!.reduce((sum, i) => sum + (i.effect?.total ?? 0), 0);
+    expect(instanceSum).toBeGreaterThan(0);
+    expect(op.apply).toMatchObject({ target: "self", kind: "heal", amount: instanceSum });
+  });
 });
 
 describe("InlineSpellPicker — no-roll utility shape (Druidcraft)", () => {

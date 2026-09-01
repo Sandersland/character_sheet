@@ -51,6 +51,11 @@ export class InvalidResolveActionOperationError extends Error {
   status = 400;
 }
 
+function sumInstanceEffectTotals(instances: ResolveActionOperation["instances"]): number | undefined {
+  const totals = (instances ?? []).flatMap((i) => (i.effect ? [i.effect.total] : []));
+  return totals.length > 0 ? totals.reduce((sum, t) => sum + t, 0) : undefined;
+}
+
 // Assassinate's eligibility gate (#1526): the character row is already
 // widened to carry classEntries/rulesEdition for this, so the check costs no
 // extra query. Self-or-announce still means the server never computes the
@@ -142,8 +147,10 @@ async function payActionCostAndSideEffectsInTx(
   const castOp: CastSpellOperation = {
     type: "castSpell",
     entryId: op.entryId,
+    // An instanced op's total lives per instance, never top-level — summing here keeps `roll`
+    // meaning "the cast's rolled total" for every consumer of the forwarded castSpell op.
+    roll: op.effect?.total ?? sumInstanceEffectTotals(op.instances) ?? 0,
     ...(op.slotLevel !== undefined ? { slotLevel: op.slotLevel } : {}),
-    roll: op.effect?.total ?? 0,
     ...(op.apply ? { apply: op.apply } : {}),
   };
   // Reaching here means the op declared a spell (entryId); castSpellForResolutionInTx
