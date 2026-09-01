@@ -20,6 +20,7 @@ interface SpellEffectDiceFieldsProps {
 }
 
 export default function SpellEffectDiceFields({ draft, update }: SpellEffectDiceFieldsProps) {
+  const isMultiInstance = (draft.instanceCount ?? 1) > 1;
   return (
     <>
       <label className="block">
@@ -74,7 +75,9 @@ export default function SpellEffectDiceFields({ draft, update }: SpellEffectDice
           className={INPUT_CLS}
           value={draft.instanceCount ?? ""}
           onChange={(e) => {
-            const instanceCount = e.target.value === "" ? undefined : Number(e.target.value);
+            // < 1 (a typed "0") coerces to unset — min={1} only blocks the stepper, and a stored 0
+            // would fail the backend's positive() as a raw 400.
+            const instanceCount = e.target.value === "" || Number(e.target.value) < 1 ? undefined : Number(e.target.value);
             // Dropping the count below 2 hides the dependent fields, so clear them in the same
             // patch — a stranded instanceRoll/upcastInstancesPerLevel fails validation against
             // inputs the form no longer renders. Above 1, write the select's displayed "each"
@@ -88,7 +91,7 @@ export default function SpellEffectDiceFields({ draft, update }: SpellEffectDice
           placeholder="1"
         />
       </label>
-      {(draft.instanceCount ?? 1) > 1 && (
+      {isMultiInstance && (
         <label className="block">
           <span className={LABEL_CLS}>Damage rolls</span>
           <select

@@ -10,7 +10,7 @@ import type { ResolutionRolls, ResolutionTurnState, ResolutionView } from "@/fea
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { buildResolveActionOp } from "@/lib/resolveActionOp";
-import { sumInstanceEffects } from "@/lib/resolutionEvents";
+import { resolvedEffectTotal } from "@/lib/resolutionEvents";
 import { castAnnounceLine } from "@/lib/spellCast";
 import { spellToResolution } from "@/lib/spellToResolution";
 import {
@@ -96,13 +96,6 @@ function buildSpellResolveOp(
     entryId: spell.id,
     ...(apply ? { apply } : {}),
   });
-}
-
-// Multi-instance rolls (#1981/#1986) never populate the top-level `rolls.effect` — the cast's total
-// lives per instance instead (Scorching Ray's rays, Eldritch Blast's beams). Both consumers of "what
-// did this cast total" (the settled banner and the heal apply) read it through here.
-function resolvedEffectTotal(rolls: ResolutionRolls): number | undefined {
-  return rolls.effect?.total ?? (rolls.instances ? sumInstanceEffects(rolls.instances) : undefined);
 }
 
 function castSettledEntry(

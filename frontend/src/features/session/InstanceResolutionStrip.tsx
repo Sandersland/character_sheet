@@ -92,7 +92,7 @@ function DamageArea({
   isHeal: boolean;
   disabled: boolean;
 }) {
-  if (missed) return <span className="text-[11px] text-parchment-500">Missed — no damage</span>;
+  if (missed) return <span className="text-[11px] text-parchment-500">{isHeal ? "Missed — no healing" : "Missed — no damage"}</span>;
   if (instance.effectRoll) return <AttackResultLine result={instance.effectRoll} kind="damage" damageType={damageType} />;
   if (!canRoll) return null;
   return (

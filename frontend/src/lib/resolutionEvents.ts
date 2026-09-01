@@ -82,3 +82,13 @@ export function sumInstanceEffects(instances: { effect?: ResolveActionEventEffec
   if (landed.length === 0) return undefined;
   return landed.reduce((sum, i) => sum + i.effect.total, 0);
 }
+
+// Multi-instance rolls never populate the top-level `rolls.effect` — the cast's total lives per
+// instance (Scorching Ray's rays, Eldritch Blast's beams). Every consumer of "what did this cast
+// total" (the settled banner, a heal's apply amount) reads through here.
+export function resolvedEffectTotal(rolls: {
+  effect?: { total: number } | null;
+  instances?: { effect?: ResolveActionEventEffect | null }[] | null;
+}): number | undefined {
+  return rolls.effect?.total ?? sumInstanceEffects(rolls.instances ?? []);
+}
