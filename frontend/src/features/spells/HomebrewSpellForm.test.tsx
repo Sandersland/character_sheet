@@ -200,12 +200,12 @@ describe("HomebrewSpellForm", () => {
     await user.type(screen.getByLabelText(/dice count/i), "1");
     await user.type(screen.getByLabelText(/dice faces/i), "4");
 
-    expect(screen.queryByLabelText(/roll damage/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/damage rolls/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/upcast instances.level/i)).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/instance count/i), "3");
-    expect(screen.getByLabelText(/roll damage/i)).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText(/roll damage/i), "once");
+    expect(screen.getByLabelText(/damage rolls/i)).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText(/damage rolls/i), "once");
     await user.type(screen.getByLabelText(/upcast instances.level/i), "1");
 
     await user.click(screen.getByRole("button", { name: /create homebrew spell/i }));

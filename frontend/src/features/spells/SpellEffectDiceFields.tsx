@@ -6,10 +6,12 @@ interface EffectDiceDraft {
   effectDiceCount?: number;
   effectDiceFaces?: number;
   effectModifier?: number;
-  // Multi-instance authoring (#1981/#1984) — count > 1 is what gates the roll-mode select on;
-  // upcastInstancesPerLevel lives on the parent (HomebrewSpellEffectFields), alongside upcastDicePerLevel.
+  // Multi-instance authoring (#1981/#1984) — count > 1 is what gates the roll-mode select on.
+  // upcastInstancesPerLevel's INPUT lives on the parent (HomebrewSpellEffectFields), alongside
+  // upcastDicePerLevel; it's in this draft type so clearing the count can clear it too.
   instanceCount?: number;
   instanceRoll?: "each" | "once";
+  upcastInstancesPerLevel?: number;
 }
 
 interface SpellEffectDiceFieldsProps {
@@ -71,13 +73,23 @@ export default function SpellEffectDiceFields({ draft, update }: SpellEffectDice
           min={1}
           className={INPUT_CLS}
           value={draft.instanceCount ?? ""}
-          onChange={(e) => update({ instanceCount: e.target.value === "" ? undefined : Number(e.target.value) })}
+          onChange={(e) => {
+            const instanceCount = e.target.value === "" ? undefined : Number(e.target.value);
+            // Dropping the count below 2 hides the dependent fields, so clear them in the same
+            // patch — a stranded instanceRoll/upcastInstancesPerLevel fails validation against
+            // inputs the form no longer renders.
+            update(
+              (instanceCount ?? 1) > 1
+                ? { instanceCount }
+                : { instanceCount, instanceRoll: undefined, upcastInstancesPerLevel: undefined },
+            );
+          }}
           placeholder="1"
         />
       </label>
       {(draft.instanceCount ?? 1) > 1 && (
         <label className="block">
-          <span className={LABEL_CLS}>Roll damage</span>
+          <span className={LABEL_CLS}>Damage rolls</span>
           <select
             className={INPUT_CLS}
             value={draft.instanceRoll ?? "each"}

@@ -376,6 +376,24 @@ describe("PATCH /api/spells/custom/:id", () => {
     expect(memberships.map((m) => m.className).sort()).toEqual(["sorcerer", "wizard"]);
   });
 
+  // The full-field replace nulls instanceCount when the body omits it — a body that keeps
+  // instanceRoll must hit the same coherence check create does, or an edit could strand it.
+  it("400s an edit that drops instanceCount while keeping instanceRoll", async () => {
+    const created = await agent(cookieOwner)
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
+      .send({ ...VALID_SPELL, name: "Edit Incoherent", instanceCount: 3, instanceRoll: "each" });
+    expect(created.status).toBe(201);
+
+    const patched = await agent(cookieOwner)
+      .patch(`/api/spells/custom/${created.body.id}`)
+      .send({ ...VALID_SPELL, name: "Edit Incoherent", instanceRoll: "each" });
+    expect(patched.status).toBe(400);
+    expect(patched.body.error).toMatch(/instanceRoll requires instanceCount/);
+
+    const row = await prisma.spell.findUniqueOrThrow({ where: { id: created.body.id } });
+    expect(row.instanceCount).toBe(3);
+  });
+
   it("404s an id that doesn't exist", async () => {
     const res = await agent(cookieOwner)
       .patch("/api/spells/custom/does-not-exist")
