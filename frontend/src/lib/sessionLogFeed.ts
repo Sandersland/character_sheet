@@ -378,7 +378,9 @@ function buildSaveResolutionRow(
   return { id: e.id, round, tone: isHeal ? "heal" : "default", runKind: "resolveAction", segments, drillIn };
 }
 
-// Multi-die effects (e.g. Magic Missile's 3 darts) are ONE `effect` roll whose `faces` already carries the per-dart breakdown — no separate instances model needed.
+// An auto-hit effect with no per-instance breakdown — a scaled heal (Cure Wounds' 2d8) or a
+// legacy resolveAction event stored before #1981/#1982 gave Magic Missile its own `instances`
+// (that old shape is still rendered byte-identically here, never migrated).
 function buildEffectOnlyResolutionRow(
   e: CharacterEvent,
   data: ResolveActionEventData,

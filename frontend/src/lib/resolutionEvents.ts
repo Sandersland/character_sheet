@@ -69,3 +69,14 @@ export function doubleRollForOnceModeCrit(result: RollResult): RollResult {
     total: diceSubtotal * 2 + result.modifier,
   };
 }
+
+// The turn's "Spells cast" tally (CastTallyBanner) reads RecordedSpellCast.total off the top-level
+// `rolls.effect`, which stays null for an instanced cast (InstanceResolutionStrip rolls per instance,
+// never the top-level roll, per ResolutionRolls' own comment) — without this, Scorching Ray/Eldritch
+// Blast/Magic Missile silently dropped their damage from the banner. undefined (not 0) when nothing
+// landed, matching the un-instanced miss convention: "no roll happened" reads as no total, not "0 damage".
+export function sumInstanceEffects(instances: { effect?: ResolveActionEventEffect | null }[]): number | undefined {
+  const landed = instances.filter((i): i is { effect: ResolveActionEventEffect } => i.effect != null);
+  if (landed.length === 0) return undefined;
+  return landed.reduce((sum, i) => sum + i.effect.total, 0);
+}

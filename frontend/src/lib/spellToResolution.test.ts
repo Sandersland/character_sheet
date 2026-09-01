@@ -86,6 +86,22 @@ const SCORCHING_RAY: Spell = {
 // (cantripLevel scaling), not slot level, so its one effectRolls entry always keys off slotLevel 0.
 // Two separately-served fixtures (not one spell re-scaled client-side) stand in for what the backend
 // serves a level-5-tier warlock (2 beams) vs a level-17 one (4 beams) — served shape only, no client math.
+const ELDRITCH_BLAST_TIER1: Spell = {
+  id: "entry-eldritch-blast",
+  name: "Eldritch Blast",
+  level: 0,
+  school: "evocation",
+  castingTime: "1 action",
+  range: "120 feet",
+  duration: "Instantaneous",
+  description: "",
+  attackType: "attack",
+  damageType: "force",
+  effectKind: "damage",
+  castCost: "action",
+  effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 10, modifier: 0 }, instanceCount: 1, instanceRoll: "each" }],
+};
+
 const ELDRITCH_BLAST_TIER2: Spell = {
   id: "entry-eldritch-blast",
   name: "Eldritch Blast",
@@ -212,6 +228,13 @@ describe("spellToResolution", () => {
     const resolution = spellToResolution(FIRE_BOLT, 0, STATS);
 
     expect(resolution.instances).toBeUndefined();
+  });
+
+  it("cantrip-instanced shape (Eldritch Blast): a level-1-tier warlock's served entry still carries instances (count 1), not an un-instanced shape — the 1-beam base case (#1985)", () => {
+    const resolution = spellToResolution(ELDRITCH_BLAST_TIER1, 0, STATS);
+
+    expect(resolution.toHit).toEqual({ bonus: 6, critRange: 20 });
+    expect(resolution.instances).toEqual({ count: 1, roll: "each" });
   });
 
   it("cantrip-instanced shape (Eldritch Blast): looks up the entry by slotLevel 0 and copies the served beam count verbatim — 2 beams at a level-5-tier character", () => {

@@ -133,6 +133,22 @@ const previewHeal = previewSpell({
 
 const previewUtility = previewSpell({ name: "Detect Magic", level: 1 });
 
+const previewScorchingRay = previewSpell({
+  name: "Scorching Ray",
+  level: 2,
+  effectKind: "damage",
+  damageType: "fire",
+  effectRolls: [{ slotLevel: 2, roll: { count: 2, faces: 6, modifier: 0 }, instanceCount: 3, instanceRoll: "each" }],
+});
+
+const previewEldritchBlastOneBeam = previewSpell({
+  name: "Eldritch Blast",
+  level: 0,
+  effectKind: "damage",
+  damageType: "force",
+  effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 10, modifier: 0 }, instanceCount: 1, instanceRoll: "each" }],
+});
+
 describe("effectPreview — golden string snapshots (#1381)", () => {
   it("effectPreview strings", () => {
     expect(effectPreview(previewFireball, 5)).toBe("10d6 fire");
@@ -144,6 +160,14 @@ describe("effectPreview — golden string snapshots (#1381)", () => {
   it("the grimoire and the picker render the same heal string at the same slot (#1381)", () => {
     expect(effectPreview(previewHeal)).toBe("2d8 + 3 healing");
     expect(effectPreview(previewHeal, 1)).toBe(effectPreview(previewHeal));
+  });
+
+  it("prefixes a multi-instance roll with its instance count, not the combined dice (#1981/#1986)", () => {
+    expect(effectPreview(previewScorchingRay, 2)).toBe("3 × 2d6 fire");
+  });
+
+  it("omits the instance prefix at instanceCount 1 — reads identically to an un-instanced roll (Eldritch Blast's base beam)", () => {
+    expect(effectPreview(previewEldritchBlastOneBeam)).toBe("1d10 force");
   });
 });
 

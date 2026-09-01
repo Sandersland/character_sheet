@@ -223,7 +223,8 @@ describe("InlineSpellPicker — leveled, instanced damage spell (Magic Missile, 
   it("rolls every dart's own damage (per-instance strip, roll:'each') before Done commits the instanced op", async () => {
     const user = userEvent.setup();
     seedMid();
-    renderPicker(makeCharacter([MAGIC_MISSILE]));
+    const onCastSettled = vi.fn();
+    renderPicker(makeCharacter([MAGIC_MISSILE]), { onCastSettled });
 
     await user.click(screen.getByRole("button", { name: /^Magic Missile/ }));
     expect(screen.getByText("Magic Missile · 3 instances")).toBeInTheDocument();
@@ -239,6 +240,15 @@ describe("InlineSpellPicker — leveled, instanced damage spell (Magic Missile, 
     expect(op.toHit ?? null).toBeNull();
     expect(op.effect ?? null).toBeNull();
     expect(op.instances).toHaveLength(3);
+
+    // The top-level `effect` a non-instanced cast's tally total reads off stays null for an
+    // instanced cast (op.effect asserted above) — onCastSettled must still carry the summed
+    // per-dart total, not silently drop it from the "Spells cast" banner (#1985 polish).
+    const expectedTotal = op.instances!.reduce((sum, i) => sum + (i.effect?.total ?? 0), 0);
+    expect(expectedTotal).toBeGreaterThan(0);
+    expect(onCastSettled).toHaveBeenCalledWith(
+      expect.objectContaining({ spellName: "Magic Missile", total: expectedTotal, damageType: "force" }),
+    );
   });
 });
 

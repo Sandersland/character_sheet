@@ -219,6 +219,38 @@ describe("InstanceResolutionStrip — auto-hit instanced (roll:'each', 2024 Magi
 });
 
 describe("InstanceResolutionStrip — cantrip-instanced attack (Eldritch Blast, #1983 review)", () => {
+  it("renders one beam and the singular heading for a level-1-tier warlock (#1985)", () => {
+    const toHit = { bonus: 6, critRange: 20 };
+    render(
+      <InstanceResolutionStrip
+        view={baseView({
+          source: "Eldritch Blast",
+          toHit,
+          instanceRoll: "each",
+          instances: [baseInstance({ index: 0 })],
+        })}
+      />,
+    );
+    expect(screen.getByText("Eldritch Blast · 1 instance")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Roll to hit" })).toHaveLength(1);
+  });
+
+  it("renders two beams for a level-5-tier warlock (#1985)", () => {
+    const toHit = { bonus: 6, critRange: 20 };
+    render(
+      <InstanceResolutionStrip
+        view={baseView({
+          source: "Eldritch Blast",
+          toHit,
+          instanceRoll: "each",
+          instances: [baseInstance({ index: 0 }), baseInstance({ index: 1 })],
+        })}
+      />,
+    );
+    expect(screen.getByText("Eldritch Blast · 2 instances")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Roll to hit" })).toHaveLength(2);
+  });
+
   it("renders one attack-instanced row per served beam — 4 beams at a level-17-tier character, toHit present (unlike Magic Missile)", () => {
     const toHit = { bonus: 6, critRange: 20 };
     render(

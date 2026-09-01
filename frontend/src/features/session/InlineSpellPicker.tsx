@@ -10,6 +10,7 @@ import type { ResolutionRolls, ResolutionTurnState, ResolutionView } from "@/fea
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { buildResolveActionOp } from "@/lib/resolveActionOp";
+import { sumInstanceEffects } from "@/lib/resolutionEvents";
 import { castAnnounceLine } from "@/lib/spellCast";
 import { spellToResolution } from "@/lib/spellToResolution";
 import {
@@ -104,10 +105,13 @@ function castSettledEntry(
   rolls: ResolutionRolls,
   spellSaveDC: number | undefined,
 ): RecordedSpellCast {
+  // Multi-instance rolls (#1981/#1986) never populate the top-level `rolls.effect` — its total lives
+  // per instance instead (Scorching Ray's rays, Eldritch Blast's beams).
+  const total = rolls.effect?.total ?? (rolls.instances ? sumInstanceEffects(rolls.instances) : undefined);
   return {
     spellName: spell.name,
     level: effectiveSlot,
-    total: rolls.effect?.total,
+    total,
     damageType: !isHeal ? spell.damageType ?? undefined : undefined,
     announce: castAnnounceLine(spell, spellSaveDC) ?? undefined,
   };

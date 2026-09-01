@@ -78,13 +78,18 @@ export function slotOrdinal(n: number): string {
 }
 
 // Reads the served effectRolls (#1381); the roll always includes the heal
-// ability modifier per SRD 5.1/5.2 Cure Wounds.
+// ability modifier per SRD 5.1/5.2 Cure Wounds. `roll` is always per-instance
+// dice (Scorching Ray's 2d6, not a combined 6d6), so a multi-instance entry
+// (#1981/#1986) needs the same "N × " prefix catalogEffectLine already uses —
+// without it this read like one 2d6 roll instead of three.
 export function effectPreview(spell: Spell, chosenSlotLevel?: number): string | null {
   const slotLevel = chosenSlotLevel ?? spell.level;
-  const roll = spell.effectRolls?.find((e) => e.slotLevel === slotLevel)?.roll;
-  if (!roll) return null;
+  const entry = spell.effectRolls?.find((e) => e.slotLevel === slotLevel);
+  if (!entry) return null;
+  const { roll, instanceCount } = entry;
+  const prefix = instanceCount && instanceCount > 1 ? `${instanceCount} × ` : "";
 
-  return `${roll.count}d${roll.faces}${modifierLabel(roll.modifier ?? 0)} ${effectKindLabel(spell)}`;
+  return `${prefix}${roll.count}d${roll.faces}${modifierLabel(roll.modifier ?? 0)} ${effectKindLabel(spell)}`;
 }
 
 function modifierLabel(modifier: number): string {
