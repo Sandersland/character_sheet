@@ -221,8 +221,9 @@ function unlabeledAddend(value: number): string {
 }
 
 // Pulls the trailing flat modifier off the served `spec` text ("1d6 + 4" → 4) so the drill-in's addend still reconciles `formula` to `total` with no labeled breakdown; null when spec has no trailing modifier.
+// Tolerates formatRollSpec's parenthesized suffix ("2d4 + 1 (crit)") — anchoring at end-of-string dropped the modifier and broke reconciliation for a component-less crit spec.
 function parseSpecModifier(spec: string): number | null {
-  const match = spec.match(/([+-])\s*(\d+)\s*$/);
+  const match = spec.match(/([+-])\s*(\d+)\s*(?:\([^)]*\)\s*)?$/);
   if (!match) return null;
   return (match[1] === "-" ? -1 : 1) * Number(match[2]);
 }

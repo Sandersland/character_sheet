@@ -278,6 +278,22 @@ describe("buildFeedItems resolveAction effect drill-in reconciliation (MUST-fix 
     expect(damageDrill.total).toBe("8 piercing");
   });
 
+  it("keeps the trailing modifier when the spec carries formatRollSpec's crit suffix (once-mode crit dart)", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Magic Missile",
+        instances: [
+          { effect: { spec: "2d4 + 1 (crit)", faces: [3, 3], total: 7, type: "force", kind: "damage", crit: true } },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    const drill = rows[0].drillIn![0];
+    expect(drill.formula).toBe("2d4 (3, 3 — dice doubled) + 1");
+    expect(sumFormula(drill.formula)).toBe(7);
+    expect(drill.total).toBe("7 force");
+  });
+
   it("floors to the spec's own trailing modifier for a multi-die effect (legacy combined-roll spell)", () => {
     const events = [
       resolveEvent("cast", {
