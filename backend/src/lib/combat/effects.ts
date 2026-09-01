@@ -59,7 +59,9 @@ type EffectRowWithModifierSource = EffectRow & { effectModifierSource?: string |
 // An adapter over the existing flat columns, no schema migration — resolveDie's faces supersede the
 // fixed effectDiceFaces when present. readEffectSpec and catalogEffectSpec are the two EffectSpec
 // builders (Spell/ClassFeature rows vs GrantedAbility/maneuver rows) — a new EffectSpec field needs
-// both updated together or one row family silently stops serving it.
+// both updated together or one row family silently stops serving it. Exception so far: `instances`
+// — CatalogEffectRow carries no instance columns, so catalogEffectSpec structurally cannot serve
+// them; extend CatalogEffectRow first when a granted-ability/maneuver row needs instances.
 export function readEffectSpec(row: EffectRowWithModifierSource, resolveDie?: ClassDieResolver): EffectSpec {
   const instances = resolveInstances(row);
   return {

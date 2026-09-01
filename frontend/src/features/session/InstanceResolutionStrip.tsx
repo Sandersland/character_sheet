@@ -3,13 +3,17 @@
 // view.instances is present, since the top-level toHit/effect fields ResolutionRail's step content
 // reads are meaningless once a cast has N independent (or N fanned-out) rolls. Visual pattern
 // borrowed from AttackTallyStrip (pending/hit/miss/crit chips + damage) but deliberately not
-// importing it or its types — a resolution instance and a swing tally row are different shapes.
+// importing its components — a resolution instance and a swing tally row are different shapes.
+// The verdict TYPE is shared (TallyVerdict): one vocabulary either side of the wire.
 
 import AttackResultLine from "@/features/session/AttackResultLine";
 import { CompleteButton } from "@/features/session/railPrimitives";
 import type { ResolutionInstanceView, ResolutionView } from "@/features/session/useResolution";
+import type { TallyVerdict } from "@/lib/attackTallySummary";
 
-type Verdict = "hit" | "miss" | "crit";
+// The type IS shared even though the components are not — a verdict means the same thing on a swing
+// tally row and a resolution instance, and the wire schema enforces one vocabulary for both.
+type Verdict = TallyVerdict;
 
 const VERDICT_LABEL: Record<Verdict, string> = { hit: "Hit", miss: "Miss", crit: "Crit" };
 

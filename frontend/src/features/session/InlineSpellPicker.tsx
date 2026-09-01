@@ -98,6 +98,13 @@ function buildSpellResolveOp(
   });
 }
 
+// Multi-instance rolls (#1981/#1986) never populate the top-level `rolls.effect` — the cast's total
+// lives per instance instead (Scorching Ray's rays, Eldritch Blast's beams). Both consumers of "what
+// did this cast total" (the settled banner and the heal apply) read it through here.
+function resolvedEffectTotal(rolls: ResolutionRolls): number | undefined {
+  return rolls.effect?.total ?? (rolls.instances ? sumInstanceEffects(rolls.instances) : undefined);
+}
+
 function castSettledEntry(
   spell: Spell,
   isHeal: boolean,
@@ -105,9 +112,7 @@ function castSettledEntry(
   rolls: ResolutionRolls,
   spellSaveDC: number | undefined,
 ): RecordedSpellCast {
-  // Multi-instance rolls (#1981/#1986) never populate the top-level `rolls.effect` — its total lives
-  // per instance instead (Scorching Ray's rays, Eldritch Blast's beams).
-  const total = rolls.effect?.total ?? (rolls.instances ? sumInstanceEffects(rolls.instances) : undefined);
+  const total = resolvedEffectTotal(rolls);
   return {
     spellName: spell.name,
     level: effectiveSlot,
@@ -258,10 +263,7 @@ function SpellResolver({
   });
 
   function handleCommit(rolls: ResolutionRolls) {
-    // Same instanced-total fallback as castSettledEntry — an instanced heal's total lives per
-    // instance, and reading only the top-level effect shipped a heal of 0 (whole-epic review).
-    const healTotal = rolls.effect?.total ?? (rolls.instances ? sumInstanceEffects(rolls.instances) : undefined);
-    const apply = isHeal ? buildHealApply(target, healTotal ?? 0) : undefined;
+    const apply = isHeal ? buildHealApply(target, resolvedEffectTotal(rolls) ?? 0) : undefined;
     const op = buildSpellResolveOp(resolution, rolls, spell, effectiveSlot, apply);
     resolveActionMutation
       .mutateAsync(op)
