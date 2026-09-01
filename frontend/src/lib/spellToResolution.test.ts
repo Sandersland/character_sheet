@@ -38,7 +38,9 @@ const SACRED_FLAME: Spell = {
   effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 8, modifier: 0 } }],
 };
 
-const MAGIC_MISSILE: Spell = {
+// Real served shape (#1981): per-dart dice (1d4+1), instanceCount/instanceRoll carried
+// alongside — not the pre-#1981 combined-roll shape (3d4+3).
+const MAGIC_MISSILE_2024: Spell = {
   id: "entry-magic-missile",
   name: "Magic Missile",
   level: 1,
@@ -51,8 +53,32 @@ const MAGIC_MISSILE: Spell = {
   damageType: "force",
   castCost: "action",
   effectRolls: [
-    { slotLevel: 1, roll: { count: 3, faces: 4, modifier: 3 } },
-    { slotLevel: 2, roll: { count: 4, faces: 4, modifier: 4 } },
+    { slotLevel: 1, roll: { count: 1, faces: 4, modifier: 1 }, instanceCount: 3, instanceRoll: "each" },
+    { slotLevel: 2, roll: { count: 1, faces: 4, modifier: 1 }, instanceCount: 4, instanceRoll: "each" },
+  ],
+};
+
+const MAGIC_MISSILE_2014: Spell = {
+  ...MAGIC_MISSILE_2024,
+  effectRolls: MAGIC_MISSILE_2024.effectRolls!.map((entry) => ({ ...entry, instanceRoll: "once" })),
+};
+
+const SCORCHING_RAY: Spell = {
+  id: "entry-scorching-ray",
+  name: "Scorching Ray",
+  level: 2,
+  school: "evocation",
+  castingTime: "1 action",
+  range: "120 feet",
+  duration: "Instantaneous",
+  description: "",
+  attackType: "attack",
+  damageType: "fire",
+  effectKind: "damage",
+  castCost: "action",
+  effectRolls: [
+    { slotLevel: 2, roll: { count: 2, faces: 6, modifier: 0 }, instanceCount: 3, instanceRoll: "each" },
+    { slotLevel: 3, roll: { count: 2, faces: 6, modifier: 0 }, instanceCount: 4, instanceRoll: "each" },
   ],
 };
 
@@ -123,15 +149,44 @@ describe("spellToResolution", () => {
   });
 
   it("auto-hit shape (Magic Missile): neither toHit nor save, effect only, at the chosen slot level", () => {
-    const resolution = spellToResolution(MAGIC_MISSILE, 2, STATS);
+    const resolution = spellToResolution(MAGIC_MISSILE_2024, 2, STATS);
 
     expect(resolution.toHit).toBeUndefined();
     expect(resolution.save).toBeUndefined();
     expect(resolution.effect).toMatchObject({
-      spec: { count: 4, faces: 4, modifier: 4 },
+      spec: { count: 1, faces: 4, modifier: 1 },
       kind: "damage",
       damageType: "force",
     });
+  });
+
+  it("instances shape: copies the served instanceCount/instanceRoll verbatim for the chosen slot level (2024 'each')", () => {
+    const resolution = spellToResolution(MAGIC_MISSILE_2024, 1, STATS);
+
+    expect(resolution.instances).toEqual({ count: 3, roll: "each" });
+
+    const upcast = spellToResolution(MAGIC_MISSILE_2024, 2, STATS);
+    expect(upcast.instances).toEqual({ count: 4, roll: "each" });
+  });
+
+  it("instances shape: 2014 Magic Missile carries roll 'once' (Sage Advice: rolled once, applied to every dart)", () => {
+    const resolution = spellToResolution(MAGIC_MISSILE_2014, 1, STATS);
+
+    expect(resolution.instances).toEqual({ count: 3, roll: "once" });
+  });
+
+  it("instances shape: an attack-roll instanced spell (Scorching Ray) carries toHit AND instances together", () => {
+    const resolution = spellToResolution(SCORCHING_RAY, 2, STATS);
+
+    expect(resolution.toHit).toEqual({ bonus: 6, critRange: 20 });
+    expect(resolution.instances).toEqual({ count: 3, roll: "each" });
+    expect(resolution.effect).toMatchObject({ spec: { count: 2, faces: 6, modifier: 0 }, damageType: "fire" });
+  });
+
+  it("instances is absent for an un-instanced spell entry (Fire Bolt)", () => {
+    const resolution = spellToResolution(FIRE_BOLT, 0, STATS);
+
+    expect(resolution.instances).toBeUndefined();
   });
 
   it("no-roll utility shape (Druidcraft): no toHit/save/effect at all", () => {

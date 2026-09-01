@@ -38,10 +38,34 @@ const SAVE_RESOLUTION: TurnResolution = {
   effect: { spec: { count: 1, faces: 8, modifier: 0 }, kind: "damage", damageType: "radiant" },
 };
 
+// A genuinely un-instanced auto-hit spell (real served shape — Acid Splash has no attack roll, no save,
+// no instances) — kept distinct from Magic Missile below, which is ALWAYS instanced (#1981).
 const AUTO_HIT_RESOLUTION: TurnResolution = {
+  source: "Acid Splash",
+  cost: { kind: "action" },
+  effect: { spec: { count: 1, faces: 6, modifier: 0 }, kind: "damage", damageType: "acid" },
+};
+
+// Real served Magic Missile shape (#1981): per-dart dice (1d4+1), instances metadata carried
+// alongside — never the pre-#1981 combined-roll shape.
+const MAGIC_MISSILE_EACH: TurnResolution = {
   source: "Magic Missile",
   cost: { kind: "action" },
-  effect: { spec: { count: 3, faces: 4, modifier: 3 }, kind: "damage", damageType: "force" },
+  effect: { spec: { count: 1, faces: 4, modifier: 1 }, kind: "damage", damageType: "force" },
+  instances: { count: 3, roll: "each" },
+};
+
+const MAGIC_MISSILE_ONCE: TurnResolution = {
+  ...MAGIC_MISSILE_EACH,
+  instances: { count: 3, roll: "once" },
+};
+
+const SCORCHING_RAY_RESOLUTION: TurnResolution = {
+  source: "Scorching Ray",
+  cost: { kind: "action" },
+  toHit: { bonus: 6, critRange: 20 },
+  effect: { spec: { count: 2, faces: 6, modifier: 0 }, kind: "damage", damageType: "fire" },
+  instances: { count: 3, roll: "each" },
 };
 
 const NO_ROLL_RESOLUTION: TurnResolution = {
@@ -327,7 +351,7 @@ describe("useResolution — saving-throw shape", () => {
 
 describe("useResolution — auto-hit shape", () => {
   it("straight to damage, no to-hit or call-it steps", () => {
-    mockDice([{ face: 3, faces: 4 }, { face: 2, faces: 4 }, { face: 4, faces: 4 }]);
+    mockDice([{ face: 4, faces: 6 }]);
     const { result, commit } = setup({ resolution: AUTO_HIT_RESOLUTION });
 
     expect(result.current.view.steps).toEqual([{ kind: "damage", state: "active", settled: false }]);
@@ -339,6 +363,196 @@ describe("useResolution — auto-hit shape", () => {
     expect(rolls.toHit).toBeNull();
     expect(rolls.save).toBeNull();
     expect(rolls.effect).toMatchObject({ kind: "damage", crit: false });
+    expect(rolls.instances).toBeUndefined();
+  });
+});
+
+describe("useResolution — auto-hit instanced shape, roll:'each' (2024 Magic Missile)", () => {
+  it("each dart rolls its own damage; ready only once every dart has rolled", () => {
+    mockDice([{ face: 3, faces: 4 }, { face: 2, faces: 4 }, { face: 4, faces: 4 }]);
+    const { result, commit } = setup({ resolution: MAGIC_MISSILE_EACH });
+
+    expect(result.current.view.steps).toEqual([{ kind: "damage", state: "active", settled: false }]);
+    expect(result.current.view.instances).toHaveLength(3);
+
+    act(() => result.current.view.instances![0].onRollEffect());
+    expect(result.current.view.readyToComplete).toBe(false);
+    act(() => result.current.view.instances![1].onRollEffect());
+    expect(result.current.view.readyToComplete).toBe(false);
+    act(() => result.current.view.instances![2].onRollEffect());
+    expect(result.current.view.readyToComplete).toBe(true);
+
+    expect(result.current.view.instances![0].effectRoll?.total).toBe(4);
+    expect(result.current.view.instances![1].effectRoll?.total).toBe(3);
+    expect(result.current.view.instances![2].effectRoll?.total).toBe(5);
+
+    act(() => result.current.view.onComplete());
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.toHit).toBeNull();
+    expect(rolls.effect).toBeNull();
+    expect(rolls.instances).toHaveLength(3);
+    expect(rolls.instances!.map((i) => i.effect?.total)).toEqual([4, 3, 5]);
+  });
+});
+
+describe("useResolution — auto-hit instanced shape, roll:'once' (2014 Magic Missile)", () => {
+  it("rolls damage once and fans the SAME total to every dart", () => {
+    mockDice([{ face: 3, faces: 4 }]);
+    const { result, commit } = setup({ resolution: MAGIC_MISSILE_ONCE });
+
+    // The shared roll reuses the top-level effect step/button, exactly like a plain auto-hit spell.
+    expect(result.current.view.steps).toEqual([{ kind: "damage", state: "active", settled: false }]);
+    act(() => result.current.view.onRollEffect());
+    expect(result.current.view.readyToComplete).toBe(true);
+
+    expect(result.current.view.instances).toHaveLength(3);
+    for (const instance of result.current.view.instances!) {
+      expect(instance.effectRoll?.total).toBe(4);
+    }
+
+    act(() => result.current.view.onComplete());
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.toHit).toBeNull();
+    expect(rolls.effect).toBeNull();
+    expect(rolls.instances).toHaveLength(3);
+    expect(rolls.instances!.every((i) => i.effect?.total === 4)).toBe(true);
+    expect(rolls.instances!.every((i) => i.effect?.crit === false)).toBe(true);
+  });
+
+  it("a crit-called dart doubles the SHARED total for that dart only, no reroll", () => {
+    mockDice([{ face: 3, faces: 4 }]);
+    const { result, commit } = setup({ resolution: MAGIC_MISSILE_ONCE });
+
+    act(() => result.current.view.onRollEffect());
+    act(() => result.current.view.instances![1].onCallCrit());
+
+    expect(result.current.view.instances![0].effectRoll?.total).toBe(4);
+    expect(result.current.view.instances![1].effectRoll?.total).toBe(8);
+    expect(result.current.view.instances![1].isCrit).toBe(true);
+    expect(result.current.view.instances![2].effectRoll?.total).toBe(4);
+
+    act(() => result.current.view.onComplete());
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.instances!.map((i) => ({ total: i.effect?.total, crit: i.effect?.crit }))).toEqual([
+      { total: 4, crit: false },
+      { total: 8, crit: true },
+      { total: 4, crit: false },
+    ]);
+  });
+});
+
+describe("useResolution — attack-instanced shape (Scorching Ray, Eldritch Blast)", () => {
+  it("requires all three to-hit + call-it + damage steps settled before readyToComplete", () => {
+    mockDice([
+      { face: 15, faces: 20 }, // instance 0 to-hit
+      { face: 1, faces: 20 }, // instance 1 to-hit (nat 1, auto-miss)
+      { face: 20, faces: 20 }, // instance 2 to-hit (nat 20, auto-crit)
+      { face: 4, faces: 6 },
+      { face: 3, faces: 6 }, // instance 0 damage (2d6)
+      { face: 1, faces: 6 },
+      { face: 2, faces: 6 }, // instance 2 crit damage (4d6)
+      { face: 5, faces: 6 },
+      { face: 6, faces: 6 },
+    ]);
+    const { result, commit, turnState } = setup({ resolution: SCORCHING_RAY_RESOLUTION });
+
+    expect(result.current.view.steps).toEqual([
+      { kind: "toHit", state: "active", settled: false },
+      { kind: "callIt", state: "pending", settled: false },
+      { kind: "damage", state: "pending", settled: false },
+    ]);
+    expect(result.current.view.instances).toHaveLength(3);
+
+    act(() => result.current.view.instances![0].onRollToHit());
+    act(() => result.current.view.instances![1].onRollToHit());
+    act(() => result.current.view.instances![2].onRollToHit());
+    expect(result.current.view.readyToComplete).toBe(false);
+
+    // instance 1 is a nat 1 — auto-miss, no call needed; instance 2 nat 20 auto-crits.
+    expect(result.current.view.instances![1].verdict).toBe("miss");
+    expect(result.current.view.instances![2].verdict).toBe("crit");
+
+    act(() => result.current.view.instances![0].onCallCrit());
+    expect(result.current.view.readyToComplete).toBe(false);
+
+    act(() => result.current.view.instances![0].onRollEffect());
+    expect(result.current.view.readyToComplete).toBe(false);
+    act(() => result.current.view.instances![2].onRollEffect());
+    expect(result.current.view.readyToComplete).toBe(true);
+
+    act(() => result.current.view.onComplete());
+    expect(turnState.consumeAction).toHaveBeenCalledTimes(1);
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.toHit).toBeNull();
+    expect(rolls.effect).toBeNull();
+    expect(rolls.instances).toHaveLength(3);
+    expect(rolls.instances![0].toHit).toMatchObject({ verdict: "crit" });
+    expect(rolls.instances![0].effect).toMatchObject({ crit: true });
+    expect(rolls.instances![1].toHit).toMatchObject({ verdict: "miss" });
+    expect(rolls.instances![1].effect).toBeUndefined();
+    expect(rolls.instances![2].toHit).toMatchObject({ verdict: "crit" });
+    expect(rolls.instances![2].effect).toMatchObject({ crit: true });
+  });
+
+  it("a mixed hit/miss/crit cast commits one op with three instances entries", () => {
+    mockDice([
+      { face: 10, faces: 20 },
+      { face: 3, faces: 20 },
+      { face: 15, faces: 20 },
+      { face: 4, faces: 6 },
+      { face: 5, faces: 6 },
+      { face: 2, faces: 6 },
+      { face: 3, faces: 6 },
+    ]);
+    const { result, commit } = setup({ resolution: SCORCHING_RAY_RESOLUTION });
+
+    act(() => result.current.view.instances![0].onRollToHit());
+    act(() => result.current.view.instances![0].onCallMiss());
+    act(() => result.current.view.instances![1].onRollToHit());
+    act(() => result.current.view.instances![1].onRollEffect()); // implicit hit (#811)
+    act(() => result.current.view.instances![2].onRollToHit());
+    act(() => result.current.view.instances![2].onCallCrit());
+    act(() => result.current.view.instances![2].onRollEffect());
+
+    expect(result.current.view.instances![0].verdict).toBe("miss");
+    expect(result.current.view.instances![1].verdict).toBe("hit");
+    expect(result.current.view.instances![2].verdict).toBe("crit");
+    expect(result.current.view.readyToComplete).toBe(true);
+
+    act(() => result.current.view.onComplete());
+    expect(commit).toHaveBeenCalledTimes(1);
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.instances).toHaveLength(3);
+  });
+
+  it("rolling an instance's damage before its to-hit resolves an implicit hit instead of leaving its verdict permanently undefined (#811, regression)", () => {
+    mockDice([{ face: 4, faces: 6 }, { face: 3, faces: 6 }, { face: 10, faces: 20 }]);
+    const { result } = setup({ resolution: SCORCHING_RAY_RESOLUTION });
+
+    // Instance 0 rolls damage first — before it has ever rolled to hit. The strip's DamageArea
+    // permits this (canRoll mirrors ResolutionRail's own DamageStepContent, gated only on a called
+    // miss, not on the die having landed yet) — this must not strand the verdict at undefined forever.
+    act(() => result.current.view.instances![0].onRollEffect());
+    expect(result.current.view.instances![0].effectRoll).not.toBeNull();
+    expect(result.current.view.instances![0].verdict).toBe("hit");
+    expect(result.current.view.instances![0].toHitRoll).toBeNull();
+
+    // The toHit step still needs the die literally rolled for every instance before completion —
+    // same as the un-instanced rail (rolling damage alone never satisfies stepRail's own hasRoll).
+    act(() => result.current.view.instances![0].onRollToHit());
+    expect(result.current.view.instances![0].toHitRoll).not.toBeNull();
+  });
+
+  it("rolling to-hit after an instance's speculative damage roll keeps that damage instead of discarding it", () => {
+    mockDice([{ face: 4, faces: 6 }, { face: 3, faces: 6 }, { face: 10, faces: 20 }]);
+    const { result } = setup({ resolution: SCORCHING_RAY_RESOLUTION });
+
+    act(() => result.current.view.instances![0].onRollEffect());
+    const rolledEffect = result.current.view.instances![0].effectRoll;
+    expect(rolledEffect).not.toBeNull();
+
+    act(() => result.current.view.instances![0].onRollToHit());
+    expect(result.current.view.instances![0].effectRoll).toEqual(rolledEffect);
   });
 });
 

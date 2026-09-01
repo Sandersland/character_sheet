@@ -1,11 +1,12 @@
 import { useState } from "react";
 
 import { applyResolveActionOperations, type ResolveActionOperation } from "@/api/client";
+import InstanceResolutionStrip from "@/features/session/InstanceResolutionStrip";
 import ResolutionRail from "@/features/session/ResolutionRail";
 import SlotLevelSelector from "@/features/session/SlotLevelSelector";
 import SpellTargetToggle from "@/features/session/SpellTargetToggle";
 import { INERT_RESOLUTION_CONSUMERS, useResolution } from "@/features/session/useResolution";
-import type { ResolutionRolls, ResolutionTurnState } from "@/features/session/useResolution";
+import type { ResolutionRolls, ResolutionTurnState, ResolutionView } from "@/features/session/useResolution";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { buildResolveActionOp } from "@/lib/resolveActionOp";
@@ -110,6 +111,17 @@ function castSettledEntry(
     damageType: !isHeal ? spell.damageType ?? undefined : undefined,
     announce: castAnnounceLine(spell, spellSaveDC) ?? undefined,
   };
+}
+
+// Picks the per-instance strip over the linear rail whenever the chosen slot level's resolution is
+// instanced (Magic Missile/Scorching Ray/Eldritch Blast) — split out of SpellResolver (#1983 review)
+// to keep that function under fallow's cognitive-complexity threshold.
+function SpellResolutionRail({ resolution, view }: { resolution: ReturnType<typeof spellToResolution>; view: ResolutionView }) {
+  return resolution.instances ? (
+    <InstanceResolutionStrip view={view} completeLabel="Cast" />
+  ) : (
+    <ResolutionRail view={view} completeLabel="Cast" />
+  );
 }
 
 function SpellResolverHeader({ spell }: { spell: Spell }) {
@@ -280,7 +292,7 @@ function SpellResolver({
         allies={allies}
         onSelect={setTarget}
       />
-      <ResolutionRail view={view} completeLabel="Cast" />
+      <SpellResolutionRail resolution={resolution} view={view} />
       {resolveActionMutation.error && (
         <p className="text-xs font-semibold text-garnet-700">{resolveActionMutation.error}</p>
       )}

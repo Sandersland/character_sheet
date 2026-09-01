@@ -7,6 +7,9 @@
 // applying itself server-side off the op's entryId. `effect.kind` is "heal" for
 // a heal spell and omits `damageType` — "healing" is a display fallback, never
 // a real 5e damage type (mirrors buildEffectEvent's contract, useResolution.ts).
+// `instances` rides alongside toHit/effect/save (#1981/#1983) whenever the chosen
+// slot level's served entry is itself multi-instance (Magic Missile, Scorching
+// Ray, Eldritch Blast) — the rail loops resolution per instance instead of once.
 
 import { computeCastSpec } from "@/lib/spellCast";
 import type { TurnResolution, TurnResolutionCostKind } from "@character-sheet/shared-types";
@@ -67,6 +70,15 @@ function effectFor(spell: Spell, spec: ReturnType<typeof computeCastSpec>): Turn
   };
 }
 
+// Copies the served EffectRoll.instanceCount/instanceRoll for this slot level verbatim (#1981/#1983)
+// — never re-derived. Absent unless the entry itself is instanced (Magic Missile, Scorching Ray,
+// Eldritch Blast); an un-instanced spell's entry carries neither field.
+function instancesFor(spell: Spell, slotLevel: number): TurnResolution["instances"] {
+  const entry = spell.effectRolls?.find((e) => e.slotLevel === slotLevel);
+  if (entry?.instanceCount == null || !entry.instanceRoll) return undefined;
+  return { count: entry.instanceCount, roll: entry.instanceRoll };
+}
+
 export function spellToResolution(
   spell: Spell,
   slotLevel: number,
@@ -75,6 +87,7 @@ export function spellToResolution(
   const toHit = toHitFor(spell, stats);
   const save = saveFor(spell, stats);
   const effect = effectFor(spell, computeCastSpec(spell, slotLevel));
+  const instances = instancesFor(spell, slotLevel);
 
   return {
     source: spell.name,
@@ -82,5 +95,6 @@ export function spellToResolution(
     ...(toHit ? { toHit } : {}),
     ...(save ? { save } : {}),
     ...(effect ? { effect } : {}),
+    ...(instances ? { instances } : {}),
   };
 }

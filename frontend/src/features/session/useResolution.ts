@@ -4,16 +4,18 @@ import { useRef, useState } from "react";
 
 import { critDamageSpec } from "@/lib/attackMath";
 import { autoVerdict, toHitSnapshot } from "@/lib/attackTallySummary";
-import { formatRollSpec, keptD20 } from "@/lib/dice";
 import { randomId } from "@/lib/ids";
+import { buildEffectEvent, buildToHitEvent, type ToHitRollState } from "@/lib/resolutionEvents";
 import { computeResolutionSteps, resolutionReady, type ResolutionStep } from "@/lib/resolutionSteps";
 import { resolveRollMode, rollModeChip } from "@/lib/rollMode";
 import { useRoll } from "@/features/dice/RollContext";
+import { useInstanceResolution } from "@/features/session/useInstanceResolution";
 import type { TallyAttackRoll, TallyVerdict } from "@/lib/attackTallySummary";
 import type { RollMode, RollResult, RollSpec } from "@/lib/dice";
 import type { TurnStateView } from "@/features/session/useTurnState";
 import type {
   ResolveActionEventEffect,
+  ResolveActionEventInstance,
   ResolveActionEventSave,
   ResolveActionEventToHit,
   TurnResolution,
@@ -35,20 +37,29 @@ export const INERT_RESOLUTION_CONSUMERS: Pick<
   consumeReaction: () => {},
 };
 
-/** `save` is never rolled (no target model) — echoed from the descriptor so the adapter needs only this object. */
+/** `save` is never rolled (no target model) — echoed from the descriptor so the adapter needs only this object. `instances` is present only for an instanced resolution and is then mutually exclusive with `toHit`/`effect` (both null), mirroring the op schema (resolveActionOperationSchema's superRefine). */
 export interface ResolutionRolls {
   actionId: string;
   toHit: ResolveActionEventToHit | null;
   save: ResolveActionEventSave | null;
   effect: ResolveActionEventEffect | null;
+  instances?: ResolveActionEventInstance[];
 }
 
-interface ToHitState {
-  result: RollResult;
-  attack: TallyAttackRoll;
+type ToHitState = ToHitRollState;
+
+/** Per-instance view exposed for a compact resolution strip (InstanceResolutionStrip, #1983) — same roll/action shape as the top-level `ResolutionView` fields, scoped to one dart/ray/beam. For a roll:"once" resolution (2014 Magic Missile), `toHitRoll`/`attack` stay null and `onRollToHit`/`onCallMiss` are no-ops — `effectRoll` mirrors the shared top-level roll (doubled when `isCrit`), and `onCallCrit` toggles this instance's own crit flag instead of calling a per-instance die. Built by `useInstanceResolution` (#1983 review — split out to keep this file under fallow's cognitive-complexity threshold). */
+export interface ResolutionInstanceView {
+  index: number;
+  toHitRoll: RollResult | null;
+  attack: TallyAttackRoll | null;
   verdict: TallyVerdict | undefined;
-  /** Folded into `result.total` at roll time; `buildToHitEvent` adds it into `bonus` so kept + bonus === total (descriptor's own `bonus` alone doesn't cover it). */
-  modifier: number;
+  isCrit: boolean;
+  effectRoll: RollResult | null;
+  onRollToHit: () => void;
+  onCallMiss: () => void;
+  onCallCrit: () => void;
+  onRollEffect: () => void;
 }
 
 export interface ResolutionView {
@@ -71,6 +82,10 @@ export interface ResolutionView {
 
   effect: TurnResolution["effect"];
   effectRoll: RollResult | null;
+
+  /** Present only for an instanced resolution (Magic Missile's darts, Scorching Ray's rays, Eldritch Blast's beams) — length === resolution.instances.count. A consumer branches on this instead of the top-level toHit/effect fields, which stay inert (never rolled) once instances is present. */
+  instances?: ResolutionInstanceView[];
+  instanceRoll?: "each" | "once";
 
   onRollToHit: () => void;
   /** Refused when the die already locked the verdict (nat 1 or crit-range hit) — mirrors AttackStepCard's CallItStep. */
@@ -115,43 +130,9 @@ function isDieLocked(attack: TallyAttackRoll): boolean {
   return attack.criticalHit || attack.nat1;
 }
 
-function buildToHitEvent(
-  state: ToHitState,
-  descriptor: NonNullable<TurnResolution["toHit"]>,
-  boost: number,
-): ResolveActionEventToHit {
-  const verdict = state.verdict;
-  if (verdict === undefined) {
-    throw new Error("useResolution: buildToHitEvent called before the verdict settled");
-  }
-  return {
-    faces: state.result.dice.map((d) => d.value),
-    kept: keptD20(state.result)?.value ?? state.result.total,
-    nat20: state.attack.nat20,
-    // descriptor.bonus alone omits the roll-mode flat modifier and the #1844 boost — both fold in here so kept + bonus === total holds (ResolveActionEventToHit's contract).
-    bonus: descriptor.bonus + state.modifier + boost,
-    total: state.result.total + boost,
-    verdict,
-    ...(descriptor.components ? { components: descriptor.components } : {}),
-  };
-}
-
-function buildEffectEvent(
-  result: RollResult,
-  descriptor: NonNullable<TurnResolution["effect"]>,
-  crit: boolean,
-): ResolveActionEventEffect {
-  return {
-    spec: formatRollSpec(result.spec),
-    faces: result.dice.map((d) => d.value),
-    total: result.total,
-    // "healing" is a display fallback here, never a real 5e damage type — damageType is absent only for a heal.
-    type: descriptor.damageType ?? "healing",
-    kind: descriptor.kind,
-    crit,
-    ...(descriptor.components ? { components: descriptor.components } : {}),
-  };
-}
+// Stands in for the top-level roll actions once instanceRes.usesPerInstanceEach — a single module-scope
+// constant so the view-assembly ternary is one branch, not four (#1983 review, see the four functions' own comment).
+function NOOP_ACTION() {}
 
 export function useResolution({
   resolution,
@@ -171,17 +152,31 @@ export function useResolution({
   const verdict = toHitState?.verdict;
   const isCrit = verdict === "crit";
 
-  const steps = computeResolutionSteps(resolution, {
-    toHit: toHitState?.result ?? null,
-    verdict,
-    effect: effectRoll,
-  });
-  const readyToComplete = resolutionReady(steps);
-
   const resolvedAttack = resolveRollMode(rollModifiers, { kind: "attack" }, manualMode);
   const attackChip = resolution.toHit ? rollModeChip(resolvedAttack) : "";
   const attackMode = resolvedAttack.mode;
 
+  const instanceRes = useInstanceResolution({
+    resolution,
+    resolvedAttack,
+    roll,
+    disabled,
+    completed,
+    sharedEffectRoll: effectRoll,
+  });
+  const isInstanced = resolution.instances !== undefined;
+
+  const steps = computeResolutionSteps(resolution, {
+    toHit: toHitState?.result ?? null,
+    verdict,
+    effect: effectRoll,
+    ...(instanceRes.usesPerInstanceEach ? { instances: instanceRes.instanceStateList } : {}),
+  });
+  const readyToComplete = resolutionReady(steps);
+
+  // These four never fire once instanceRes.usesPerInstanceEach is true — the view assembly below
+  // swaps them for NOOP_ACTION instead of folding the gate into each guard clause, so an instanced
+  // cast doesn't inflate these pre-existing (already-tested) functions' own complexity (#1983 review).
   function onRollToHit() {
     if (disabled || completed || !resolution.toHit || toHitState) return;
     const spec: RollSpec = {
@@ -229,14 +224,30 @@ export function useResolution({
     setToHitBoost((b) => b + delta);
   }
 
+  // instances is mutually exclusive with toHit/effect at the wire (resolveActionOperationSchema's
+  // superRefine) — an instanced resolution sends both top-level fields null, never populated, even
+  // in roll:"once" mode where the shared roll lives in `effectRoll` internally. `readyToComplete`
+  // already guards a mid-flight (unsettled-verdict) toHitState from ever reaching here — onComplete
+  // is the only caller, never evaluated eagerly on every render.
+  function committedToHit(): ResolveActionEventToHit | null {
+    if (isInstanced || !resolution.toHit || !toHitState) return null;
+    return buildToHitEvent(toHitState, resolution.toHit, toHitBoost);
+  }
+
+  function committedEffect(): ResolveActionEventEffect | null {
+    if (isInstanced || !resolution.effect || !effectRoll) return null;
+    return buildEffectEvent(effectRoll, resolution.effect, isCrit);
+  }
+
   function onComplete() {
     if (disabled || completed || !readyToComplete) return;
     // `commit` runs before the spend/complete side effects, so a throwing commit doesn't consume the action-economy slot or block a retry.
     commit({
       actionId: actionIdRef.current,
-      toHit: resolution.toHit && toHitState ? buildToHitEvent(toHitState, resolution.toHit, toHitBoost) : null,
+      toHit: committedToHit(),
       save: resolution.save ?? null,
-      effect: resolution.effect && effectRoll ? buildEffectEvent(effectRoll, resolution.effect, isCrit) : null,
+      effect: committedEffect(),
+      ...(isInstanced ? { instances: instanceRes.buildInstanceEvents() } : {}),
     });
     spendSlot(resolution.cost, turnState);
     setCompleted(true);
@@ -246,9 +257,14 @@ export function useResolution({
     setToHitState(null);
     setEffectRoll(null);
     setToHitBoost(0);
+    instanceRes.reset();
     setCompleted(false);
     actionIdRef.current = randomId();
   }
+
+  const topLevelActions = instanceRes.usesPerInstanceEach
+    ? { onRollToHit: NOOP_ACTION, onCallMiss: NOOP_ACTION, onCallCrit: NOOP_ACTION, onRollEffect: NOOP_ACTION }
+    : { onRollToHit, onCallMiss, onCallCrit, onRollEffect };
 
   const view: ResolutionView = {
     source: resolution.source,
@@ -266,10 +282,8 @@ export function useResolution({
     save: resolution.save,
     effect: resolution.effect,
     effectRoll,
-    onRollToHit,
-    onCallMiss,
-    onCallCrit,
-    onRollEffect,
+    ...(instanceRes.instances ? { instances: instanceRes.instances, instanceRoll: resolution.instances!.roll } : {}),
+    ...topLevelActions,
     boostToHit,
     onComplete,
   };

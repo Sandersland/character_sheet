@@ -254,7 +254,7 @@ describe("ResolutionRail — auto-hit shape", () => {
       <ResolutionRail
         view={baseView({
           steps: [{ kind: "damage", state: "active", settled: false }],
-          effect: { spec: { count: 3, faces: 4, modifier: 3 }, kind: "damage", damageType: "force" },
+          effect: { spec: { count: 1, faces: 6, modifier: 0 }, kind: "damage", damageType: "acid" },
         })}
       />,
     );

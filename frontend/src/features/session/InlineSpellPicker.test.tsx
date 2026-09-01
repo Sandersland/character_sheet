@@ -219,20 +219,26 @@ describe("InlineSpellPicker — saving-throw shape (Sacred Flame)", () => {
   });
 });
 
-describe("InlineSpellPicker — leveled damage spell (Magic Missile)", () => {
-  it("commits with the chosen slotLevel and no apply (announce-only, no target model)", async () => {
+describe("InlineSpellPicker — leveled, instanced damage spell (Magic Missile, #1981/#1983)", () => {
+  it("rolls every dart's own damage (per-instance strip, roll:'each') before Done commits the instanced op", async () => {
     const user = userEvent.setup();
     seedMid();
     renderPicker(makeCharacter([MAGIC_MISSILE]));
 
     await user.click(screen.getByRole("button", { name: /^Magic Missile/ }));
-    await user.click(screen.getByRole("button", { name: "Roll damage" }));
+    expect(screen.getByText("Magic Missile · 3 instances")).toBeInTheDocument();
+    for (const button of screen.getAllByRole("button", { name: "Roll damage" })) {
+      await user.click(button);
+    }
     await user.click(screen.getByRole("button", { name: "Done" }));
 
     const op = lastOp();
     expect(op.slotLevel).toBe(1);
     expect(op.entryId).toBe("entry-magic-missile");
     expect(op.apply).toBeUndefined();
+    expect(op.toHit ?? null).toBeNull();
+    expect(op.effect ?? null).toBeNull();
+    expect(op.instances).toHaveLength(3);
   });
 });
 
