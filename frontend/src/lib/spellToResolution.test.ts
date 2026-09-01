@@ -82,6 +82,31 @@ const SCORCHING_RAY: Spell = {
   ],
 };
 
+// Cantrip-instanced shape (#1983 review) — Eldritch Blast's beam count scales with CHARACTER level
+// (cantripLevel scaling), not slot level, so its one effectRolls entry always keys off slotLevel 0.
+// Two separately-served fixtures (not one spell re-scaled client-side) stand in for what the backend
+// serves a level-5-tier warlock (2 beams) vs a level-17 one (4 beams) — served shape only, no client math.
+const ELDRITCH_BLAST_TIER2: Spell = {
+  id: "entry-eldritch-blast",
+  name: "Eldritch Blast",
+  level: 0,
+  school: "evocation",
+  castingTime: "1 action",
+  range: "120 feet",
+  duration: "Instantaneous",
+  description: "",
+  attackType: "attack",
+  damageType: "force",
+  effectKind: "damage",
+  castCost: "action",
+  effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 10, modifier: 0 }, instanceCount: 2, instanceRoll: "each" }],
+};
+
+const ELDRITCH_BLAST_TIER4: Spell = {
+  ...ELDRITCH_BLAST_TIER2,
+  effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 10, modifier: 0 }, instanceCount: 4, instanceRoll: "each" }],
+};
+
 const DRUIDCRAFT: Spell = {
   id: "entry-druidcraft",
   name: "Druidcraft",
@@ -187,6 +212,20 @@ describe("spellToResolution", () => {
     const resolution = spellToResolution(FIRE_BOLT, 0, STATS);
 
     expect(resolution.instances).toBeUndefined();
+  });
+
+  it("cantrip-instanced shape (Eldritch Blast): looks up the entry by slotLevel 0 and copies the served beam count verbatim — 2 beams at a level-5-tier character", () => {
+    const resolution = spellToResolution(ELDRITCH_BLAST_TIER2, 0, STATS);
+
+    expect(resolution.toHit).toEqual({ bonus: 6, critRange: 20 });
+    expect(resolution.instances).toEqual({ count: 2, roll: "each" });
+    expect(resolution.effect).toMatchObject({ spec: { count: 1, faces: 10, modifier: 0 }, damageType: "force" });
+  });
+
+  it("cantrip-instanced shape (Eldritch Blast): 4 beams at a level-17-tier character — a different served entry, never client-scaled from the level-5 one", () => {
+    const resolution = spellToResolution(ELDRITCH_BLAST_TIER4, 0, STATS);
+
+    expect(resolution.instances).toEqual({ count: 4, roll: "each" });
   });
 
   it("no-roll utility shape (Druidcraft): no toHit/save/effect at all", () => {

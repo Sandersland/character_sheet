@@ -218,6 +218,29 @@ describe("InstanceResolutionStrip — auto-hit instanced (roll:'each', 2024 Magi
   });
 });
 
+describe("InstanceResolutionStrip — cantrip-instanced attack (Eldritch Blast, #1983 review)", () => {
+  it("renders one attack-instanced row per served beam — 4 beams at a level-17-tier character, toHit present (unlike Magic Missile)", () => {
+    const toHit = { bonus: 6, critRange: 20 };
+    render(
+      <InstanceResolutionStrip
+        view={baseView({
+          source: "Eldritch Blast",
+          toHit,
+          instanceRoll: "each",
+          instances: [
+            baseInstance({ index: 0 }),
+            baseInstance({ index: 1 }),
+            baseInstance({ index: 2 }),
+            baseInstance({ index: 3 }),
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText("Eldritch Blast · 4 instances")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Roll to hit" })).toHaveLength(4);
+  });
+});
+
 describe("InstanceResolutionStrip — auto-hit instanced (roll:'once', 2014 Magic Missile)", () => {
   it("renders ONE shared roll button, not per-instance ones", () => {
     const onRollEffect = vi.fn();
@@ -252,19 +275,89 @@ describe("InstanceResolutionStrip — auto-hit instanced (roll:'once', 2014 Magi
     expect(screen.getAllByRole("button", { name: "Crit?" })).toHaveLength(2);
   });
 
-  it("a crit-toggled instance shows a Crit chip instead of the toggle button and its own (doubled) total", () => {
-    const onCallCrit = vi.fn();
+  it("a crit-toggled instance shows a Crit-labeled button (not a static chip) and its own (doubled) total", () => {
     render(
       <InstanceResolutionStrip
         view={baseView({
           toHit: undefined,
           instanceRoll: "once",
           effectRoll: roll(4),
-          instances: [baseInstance({ index: 0, effectRoll: roll(8), isCrit: true, onCallCrit })],
+          instances: [baseInstance({ index: 0, effectRoll: roll(8), isCrit: true })],
         })}
       />,
     );
-    expect(screen.getByText("Crit")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Crit" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Crit?" })).not.toBeInTheDocument();
+  });
+
+  it("the crit toggle stays clickable both ways — a mis-click can be undone by clicking it again", async () => {
+    const onCallCrit = vi.fn();
+    const { rerender } = render(
+      <InstanceResolutionStrip
+        view={baseView({
+          toHit: undefined,
+          instanceRoll: "once",
+          effectRoll: roll(4),
+          instances: [baseInstance({ index: 0, effectRoll: roll(4), isCrit: false, onCallCrit })],
+        })}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Crit?" }));
+    expect(onCallCrit).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <InstanceResolutionStrip
+        view={baseView({
+          toHit: undefined,
+          instanceRoll: "once",
+          effectRoll: roll(4),
+          instances: [baseInstance({ index: 0, effectRoll: roll(7), isCrit: true, onCallCrit })],
+        })}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Crit" }));
+    expect(onCallCrit).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("InstanceResolutionStrip — advantage/disadvantage chip (#1983 review)", () => {
+  it("renders the attack-mode chip for an attack-instanced cast, matching ResolutionRail's own ToHitStepContent", () => {
+    render(
+      <InstanceResolutionStrip
+        view={baseView({
+          toHit: { bonus: 6, critRange: 20 },
+          instanceRoll: "each",
+          attackChip: "disadvantage — Poisoned",
+          instances: [baseInstance({ index: 0 }), baseInstance({ index: 1 }), baseInstance({ index: 2 })],
+        })}
+      />,
+    );
+    expect(screen.getByText("disadvantage — Poisoned")).toBeInTheDocument();
+  });
+
+  it("renders no chip when attackChip is empty (#486) or the cast is auto-hit (no toHit at all)", () => {
+    const { rerender } = render(
+      <InstanceResolutionStrip
+        view={baseView({
+          toHit: { bonus: 6, critRange: 20 },
+          instanceRoll: "each",
+          attackChip: "",
+          instances: [baseInstance({ index: 0 })],
+        })}
+      />,
+    );
+    expect(screen.queryByText(/advantage/)).not.toBeInTheDocument();
+
+    rerender(
+      <InstanceResolutionStrip
+        view={baseView({
+          toHit: undefined,
+          instanceRoll: "each",
+          attackChip: "advantage",
+          instances: [baseInstance({ index: 0 })],
+        })}
+      />,
+    );
+    expect(screen.queryByText("advantage")).not.toBeInTheDocument();
   });
 });

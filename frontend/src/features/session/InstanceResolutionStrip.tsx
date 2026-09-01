@@ -6,6 +6,7 @@
 // importing it or its types — a resolution instance and a swing tally row are different shapes.
 
 import AttackResultLine from "@/features/session/AttackResultLine";
+import { CompleteButton } from "@/features/session/railPrimitives";
 import type { ResolutionInstanceView, ResolutionView } from "@/features/session/useResolution";
 
 type Verdict = "hit" | "miss" | "crit";
@@ -133,7 +134,11 @@ function EachInstanceRow({
   );
 }
 
-// roll:"once" row — no per-instance roll, just the shared roll's fanned-out (and possibly doubled) total plus a manual crit toggle.
+// roll:"once" row — no per-instance roll, just the shared roll's fanned-out (and possibly doubled)
+// total plus a manual crit toggle. The toggle stays ONE clickable button either way (never swapped
+// for an inert chip) — instance.onCallCrit genuinely flips the flag (useInstanceResolution's
+// onCallCritOnce), so a mis-click is undone by clicking it again, same as calling a non-die-locked
+// verdict at the top level.
 function OnceInstanceRow({
   instance,
   damageType,
@@ -153,18 +158,19 @@ function OnceInstanceRow({
       ) : (
         <span className="text-[11px] text-parchment-500">awaiting the shared roll</span>
       )}
-      {instance.isCrit ? (
-        <VerdictChip verdict="crit" />
-      ) : (
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={instance.onCallCrit}
-          className="shrink-0 rounded-control border border-garnet-200 bg-garnet-50 px-1.5 py-0.5 text-[10px] font-semibold text-garnet-800 transition-colors hover:bg-garnet-100 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Crit?
-        </button>
-      )}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={instance.onCallCrit}
+        aria-pressed={instance.isCrit}
+        className={`shrink-0 rounded-control border px-1.5 py-0.5 text-[10px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+          instance.isCrit
+            ? "border-garnet-300 bg-garnet-100 text-garnet-800 hover:bg-garnet-200"
+            : "border-garnet-200 bg-garnet-50 text-garnet-800 hover:bg-garnet-100"
+        }`}
+      >
+        {instance.isCrit ? "Crit" : "Crit?"}
+      </button>
     </li>
   );
 }
@@ -190,6 +196,26 @@ function SharedRollRow({ view }: { view: ResolutionView }) {
   );
 }
 
+// Heading + advantage/disadvantage chip — mirrors ResolutionRail's own ToHitStepContent chip
+// (advantage/disadvantage applies uniformly to every instance's own d20, one resolvedAttack mode for
+// the whole cast, so one chip covers the strip; without it an instanced attack rolling with advantage
+// gave no indication at all). Split out of InstanceResolutionStrip (#1983 review) to keep it under
+// fallow's cognitive-complexity threshold.
+function StripHeader({ view, instanceCount, hasToHit }: { view: ResolutionView; instanceCount: number; hasToHit: boolean }) {
+  return (
+    <>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
+        {view.source} · {instanceCount} instance{instanceCount === 1 ? "" : "s"}
+      </p>
+      {hasToHit && view.attackChip && (
+        <span className="block text-[10px] font-semibold uppercase tracking-wide text-parchment-500">
+          {view.attackChip}
+        </span>
+      )}
+    </>
+  );
+}
+
 export default function InstanceResolutionStrip({
   view,
   completeLabel = "Confirm",
@@ -206,9 +232,7 @@ export default function InstanceResolutionStrip({
 
   return (
     <div className="flex flex-col gap-3 rounded-card border border-garnet-200 bg-parchment-50 p-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-        {view.source} · {instances.length} instance{instances.length === 1 ? "" : "s"}
-      </p>
+      <StripHeader view={view} instanceCount={instances.length} hasToHit={hasToHit} />
       {isOnce && <SharedRollRow view={view} />}
       <ul className="flex flex-col gap-1.5">
         {instances.map((instance) =>
@@ -230,20 +254,7 @@ export default function InstanceResolutionStrip({
           ),
         )}
       </ul>
-      {canComplete && (
-        <button
-          type="button"
-          disabled={view.disabled}
-          onClick={view.onComplete}
-          title={view.disabled ? "No action economy remaining" : undefined}
-          className="min-h-11 w-full rounded-control bg-garnet-soft-surface px-3 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {/* Mirrors ResolutionRail's CompleteButton: an instanced resolution always has at least one
-              step (toHit/callIt/damage, or just damage), so the button reads "Done" rather than the
-              caller's completeLabel — the same convention every un-instanced multi-step cast/swing uses. */}
-          {view.steps.length === 0 ? completeLabel : "Done"}
-        </button>
-      )}
+      {canComplete && <CompleteButton view={view} completeLabel={completeLabel} />}
     </div>
   );
 }

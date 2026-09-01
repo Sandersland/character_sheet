@@ -52,3 +52,20 @@ export function buildEffectEvent(
     ...(descriptor.components ? { components: descriptor.components } : {}),
   };
 }
+
+// A roll:"once" instance's crit can't re-roll — the whole point of "once" (2014 Magic Missile) is
+// one shared roll for every dart — so this doubles the ALREADY-ROLLED dice subtotal only, per the
+// real 5e rule (attackMath.ts's critDamageSpec / dice.ts's critCount are the authority: double the
+// DICE count, the modifier stays flat once). Echoing each already-rolled die's value a second time
+// (never re-rolling fresh values) keeps `total` reconciling to `sum(faces) + modifier`, which
+// sessionLogFeed's drill-in and AttackResultLine's rendering both assume. Feed the result through
+// buildEffectEvent (not built ad hoc) so spec/faces/total/crit stay in the same one place.
+export function doubleRollForOnceModeCrit(result: RollResult): RollResult {
+  const diceSubtotal = result.total - result.modifier;
+  return {
+    ...result,
+    dice: [...result.dice, ...result.dice],
+    spec: { ...result.spec, crit: true },
+    total: diceSubtotal * 2 + result.modifier,
+  };
+}

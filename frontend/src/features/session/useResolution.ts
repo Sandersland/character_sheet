@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 
 import { critDamageSpec } from "@/lib/attackMath";
-import { autoVerdict, toHitSnapshot } from "@/lib/attackTallySummary";
+import { autoVerdict, isDieLocked, toHitSnapshot } from "@/lib/attackTallySummary";
 import { randomId } from "@/lib/ids";
 import { buildEffectEvent, buildToHitEvent, type ToHitRollState } from "@/lib/resolutionEvents";
 import { computeResolutionSteps, resolutionReady, type ResolutionStep } from "@/lib/resolutionSteps";
@@ -123,11 +123,6 @@ function spendSlot(cost: TurnResolution["cost"], turnState: ResolutionTurnState)
   if (cost.kind === "action") turnState.consumeAction();
   else if (cost.kind === "bonusAction") turnState.consumeBonusAction();
   else turnState.consumeReaction();
-}
-
-// Keeps a nat20 always paired with verdict "crit" — resolveActionToHitSchema's superRefine requires it.
-function isDieLocked(attack: TallyAttackRoll): boolean {
-  return attack.criticalHit || attack.nat1;
 }
 
 // Stands in for the top-level roll actions once instanceRes.usesPerInstanceEach — a single module-scope

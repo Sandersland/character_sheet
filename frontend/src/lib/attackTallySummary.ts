@@ -45,8 +45,15 @@ export function autoVerdict(attack: TallyAttackRoll): TallyVerdict | undefined {
   return undefined;
 }
 
+// Keeps a nat20 always paired with verdict "crit" (and a nat1 with "miss") — resolveActionToHitSchema's
+// superRefine enforces the nat20/crit half of this on the wire. Shared by useResolution and
+// useInstanceResolution's own crit-call guards (#1983 review) so the wire invariant lives in one place.
+export function isDieLocked(attack: TallyAttackRoll): boolean {
+  return attack.criticalHit || attack.nat1;
+}
+
 export function isVerdictLocked(row: AttackTallyRow): boolean {
-  return row.attack.criticalHit || row.attack.nat1;
+  return isDieLocked(row.attack);
 }
 
 export function isMissRow(row: AttackTallyRow): boolean {

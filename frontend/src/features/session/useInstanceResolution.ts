@@ -7,8 +7,8 @@
 import { useState } from "react";
 
 import { critDamageSpec } from "@/lib/attackMath";
-import { autoVerdict, toHitSnapshot } from "@/lib/attackTallySummary";
-import { buildEffectEvent, buildToHitEvent as buildToHitEventShared } from "@/lib/resolutionEvents";
+import { autoVerdict, isDieLocked, toHitSnapshot } from "@/lib/attackTallySummary";
+import { buildEffectEvent, buildToHitEvent as buildToHitEventShared, doubleRollForOnceModeCrit } from "@/lib/resolutionEvents";
 import { isPerInstanceEach } from "@/lib/resolutionSteps";
 import type { InstanceRollState } from "@/lib/resolutionSteps";
 import type { TallyAttackRoll, TallyVerdict } from "@/lib/attackTallySummary";
@@ -26,11 +26,6 @@ interface InstanceState {
 }
 
 const EMPTY_INSTANCE_STATE: InstanceState = { toHit: null, attack: null, verdict: undefined, effect: null, modifier: 0 };
-
-// Keeps a nat20 always paired with verdict "crit" — resolveActionToHitSchema's superRefine requires it. Duplicated from useResolution's own isDieLocked (both tiny, one line) rather than exported/imported across the split — see that file's own copy for the citation.
-function isDieLocked(attack: TallyAttackRoll): boolean {
-  return attack.criticalHit || attack.nat1;
-}
 
 // No instance ever gets the #1844 external to-hit boost, so this thin wrapper over the shared
 // buildToHitEvent always passes boost 0 and never throws (verdict is checked by the caller first).
@@ -139,23 +134,26 @@ export function useInstanceResolution({
     setInstanceRolls((prev) => ({ ...prev, [i]: { ...(prev[i] ?? EMPTY_INSTANCE_STATE), effect: result, verdict } }));
   }
 
-  // roll:"once" only — flags this instance as a DM-ruled crit; the shared roll never re-rolls, its total
-  // just doubles for this instance at both display time (instanceViews below) and commit time
-  // (buildInstanceEvents) — "matches critDamageSpec semantics" without a second roll (#1983 scope).
+  // roll:"once" only — flags this instance as a DM-ruled crit; there's no per-instance die to lock (no
+  // toHit exists for an auto-hit instance), so this toggles freely — on and back off — until commit,
+  // the same as the un-instanced rail lets you re-call a non-die-locked verdict. The shared roll never
+  // re-rolls; doubling its dice subtotal for display/commit is doubleRollForOnceModeCrit's job (dice
+  // only, never the modifier — see that function's own comment for the 5e citation).
   function onCallCritOnce(i: number) {
     if (disabled || completed) return;
-    setOnceCrits((prev) => ({ ...prev, [i]: true }));
+    setOnceCrits((prev) => ({ ...prev, [i]: !prev[i] }));
   }
 
   function onceInstanceView(i: number, sharedEffectRoll: RollResult | null): ResolutionInstanceView {
     const crit = Boolean(onceCrits[i]);
+    const displayRoll = crit && sharedEffectRoll ? doubleRollForOnceModeCrit(sharedEffectRoll) : sharedEffectRoll;
     return {
       index: i,
       toHitRoll: null,
       attack: null,
       verdict: crit ? "crit" : undefined,
       isCrit: crit,
-      effectRoll: sharedEffectRoll ? { ...sharedEffectRoll, total: crit ? sharedEffectRoll.total * 2 : sharedEffectRoll.total } : null,
+      effectRoll: displayRoll,
       onRollToHit: () => {},
       onCallMiss: () => {},
       onCallCrit: () => onCallCritOnce(i),
@@ -182,12 +180,17 @@ export function useInstanceResolution({
   function buildOnceInstanceEvents(): ResolveActionEventInstance[] {
     if (!resolution.effect || !sharedEffectRoll || !instanceSpec) return [];
     const base = buildEffectEvent(sharedEffectRoll, resolution.effect, false);
-    return Array.from({ length: instanceSpec.count }, (_, i) => {
-      const crit = Boolean(onceCrits[i]);
-      return { effect: crit ? { ...base, total: base.total * 2, crit: true } : base };
-    });
+    const critEffect = buildEffectEvent(doubleRollForOnceModeCrit(sharedEffectRoll), resolution.effect, true);
+    return Array.from({ length: instanceSpec.count }, (_, i) => ({
+      effect: onceCrits[i] ? critEffect : base,
+    }));
   }
 
+  // Every element carries a toHit or an effect (never neither) — resolveActionInstanceSchema's own
+  // refine (f70e1279) rejects a hollow `{}` instance, and readyToComplete already guarantees each
+  // instance settled (attack-instanced: toHit rolled + verdict called; auto-hit: effect rolled)
+  // before onComplete can ever reach this, so the filter below should never actually drop anything —
+  // it exists so a hollow instance is structurally impossible to send rather than trusted to not occur.
   function buildEachInstanceEvents(): ResolveActionEventInstance[] {
     if (!instanceSpec) return [];
     return Array.from({ length: instanceSpec.count }, (_, i) => {
@@ -195,7 +198,7 @@ export function useInstanceResolution({
       const toHitEvt = resolution.toHit && inst.toHit && inst.verdict !== undefined ? buildToHitEvent(inst, resolution.toHit) : null;
       const effectEvt = resolution.effect && inst.effect ? buildEffectEvent(inst.effect, resolution.effect, inst.verdict === "crit") : null;
       return { ...(toHitEvt ? { toHit: toHitEvt } : {}), ...(effectEvt ? { effect: effectEvt } : {}) };
-    });
+    }).filter((entry) => entry.toHit != null || entry.effect != null);
   }
 
   function buildInstanceEvents(): ResolveActionEventInstance[] {

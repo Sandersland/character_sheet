@@ -68,6 +68,18 @@ const SCORCHING_RAY_RESOLUTION: TurnResolution = {
   instances: { count: 3, roll: "each" },
 };
 
+// Cantrip-instanced (#1983 review): Eldritch Blast's beam count scales with character level
+// (cantripLevel scaling, not slot upcast), so no slotLevel is served in the resolution at all — the
+// hook's per-instance loop doesn't care either way, but this pins that the AC's own example (2 beams
+// at a level-5-tier character) actually flows through it.
+const ELDRITCH_BLAST_RESOLUTION: TurnResolution = {
+  source: "Eldritch Blast",
+  cost: { kind: "action" },
+  toHit: { bonus: 6, critRange: 20 },
+  effect: { spec: { count: 1, faces: 10, modifier: 0 }, kind: "damage", damageType: "force" },
+  instances: { count: 2, roll: "each" },
+};
+
 const NO_ROLL_RESOLUTION: TurnResolution = {
   source: "Druidcraft",
   cost: { kind: "action" },
@@ -419,7 +431,7 @@ describe("useResolution — auto-hit instanced shape, roll:'once' (2014 Magic Mi
     expect(rolls.instances!.every((i) => i.effect?.crit === false)).toBe(true);
   });
 
-  it("a crit-called dart doubles the SHARED total for that dart only, no reroll", () => {
+  it("a crit-called dart doubles the SHARED roll's DICE ONLY (5e crit rule), not the flat modifier — 1d4+1 rolled 3 (total 4) crits to 7, not 8", () => {
     mockDice([{ face: 3, faces: 4 }]);
     const { result, commit } = setup({ resolution: MAGIC_MISSILE_ONCE });
 
@@ -427,17 +439,34 @@ describe("useResolution — auto-hit instanced shape, roll:'once' (2014 Magic Mi
     act(() => result.current.view.instances![1].onCallCrit());
 
     expect(result.current.view.instances![0].effectRoll?.total).toBe(4);
-    expect(result.current.view.instances![1].effectRoll?.total).toBe(8);
+    expect(result.current.view.instances![1].effectRoll?.total).toBe(7);
+    expect(result.current.view.instances![1].effectRoll?.dice).toHaveLength(2);
     expect(result.current.view.instances![1].isCrit).toBe(true);
     expect(result.current.view.instances![2].effectRoll?.total).toBe(4);
 
     act(() => result.current.view.onComplete());
     const rolls = commit.mock.calls[0][0] as ResolutionRolls;
-    expect(rolls.instances!.map((i) => ({ total: i.effect?.total, crit: i.effect?.crit }))).toEqual([
-      { total: 4, crit: false },
-      { total: 8, crit: true },
-      { total: 4, crit: false },
+    expect(rolls.instances!.map((i) => ({ total: i.effect?.total, crit: i.effect?.crit, faces: i.effect?.faces }))).toEqual([
+      { total: 4, crit: false, faces: [3] },
+      { total: 7, crit: true, faces: [3, 3] },
+      { total: 4, crit: false, faces: [3] },
     ]);
+    // The committed spec/faces reconcile to the total, matching sessionLogFeed's drill-in contract.
+    expect(rolls.instances![1].effect!.spec).toBe("2d4 + 1 (crit)");
+  });
+
+  it("the crit flag toggles freely until commit — a mis-click can be undone", () => {
+    mockDice([{ face: 3, faces: 4 }]);
+    const { result } = setup({ resolution: MAGIC_MISSILE_ONCE });
+
+    act(() => result.current.view.onRollEffect());
+    act(() => result.current.view.instances![1].onCallCrit());
+    expect(result.current.view.instances![1].isCrit).toBe(true);
+    expect(result.current.view.instances![1].effectRoll?.total).toBe(7);
+
+    act(() => result.current.view.instances![1].onCallCrit());
+    expect(result.current.view.instances![1].isCrit).toBe(false);
+    expect(result.current.view.instances![1].effectRoll?.total).toBe(4);
   });
 });
 
@@ -553,6 +582,28 @@ describe("useResolution — attack-instanced shape (Scorching Ray, Eldritch Blas
 
     act(() => result.current.view.instances![0].onRollToHit());
     expect(result.current.view.instances![0].effectRoll).toEqual(rolledEffect);
+  });
+
+  it("Eldritch Blast's own served beam count (2 at a level-5-tier character) drives the loop and the committed op — the AC's own example", () => {
+    mockDice([
+      { face: 10, faces: 20 },
+      { face: 15, faces: 20 },
+      { face: 6, faces: 10 },
+      { face: 4, faces: 10 },
+    ]);
+    const { result, commit } = setup({ resolution: ELDRITCH_BLAST_RESOLUTION });
+
+    expect(result.current.view.instances).toHaveLength(2);
+    act(() => result.current.view.instances![0].onRollToHit());
+    act(() => result.current.view.instances![0].onRollEffect());
+    act(() => result.current.view.instances![1].onRollToHit());
+    act(() => result.current.view.instances![1].onRollEffect());
+    expect(result.current.view.readyToComplete).toBe(true);
+
+    act(() => result.current.view.onComplete());
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.instances).toHaveLength(2);
+    expect(rolls.instances!.every((i) => i.toHit != null && i.effect != null)).toBe(true);
   });
 });
 
