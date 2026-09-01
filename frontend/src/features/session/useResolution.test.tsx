@@ -572,16 +572,49 @@ describe("useResolution — attack-instanced shape (Scorching Ray, Eldritch Blas
     expect(result.current.view.instances![0].toHitRoll).not.toBeNull();
   });
 
-  it("rolling to-hit after an instance's speculative damage roll keeps that damage instead of discarding it", () => {
+  // A to-hit die landing after a speculative damage roll VOIDS that damage (#1987 round-4 review):
+  // a nat-1 must not commit a missed instance with damage, a nat-20's damage must re-roll with the
+  // crit spec, and a normal die re-opens the call-it step — in every case the pre-rolled effect goes.
+  it("a nat-1 rolled after speculative damage voids the damage along with the miss", () => {
+    mockDice([{ face: 4, faces: 6 }, { face: 3, faces: 6 }, { face: 1, faces: 20 }]);
+    const { result } = setup({ resolution: SCORCHING_RAY_RESOLUTION });
+
+    act(() => result.current.view.instances![0].onRollEffect());
+    expect(result.current.view.instances![0].effectRoll).not.toBeNull();
+
+    act(() => result.current.view.instances![0].onRollToHit());
+    expect(result.current.view.instances![0].verdict).toBe("miss");
+    expect(result.current.view.instances![0].effectRoll).toBeNull();
+  });
+
+  it("a crit-range die rolled after speculative damage voids the normal-spec damage so it re-rolls doubled", () => {
+    mockDice([
+      { face: 4, faces: 6 }, { face: 3, faces: 6 },
+      { face: 20, faces: 20 },
+      { face: 5, faces: 6 }, { face: 2, faces: 6 }, { face: 6, faces: 6 }, { face: 1, faces: 6 },
+    ]);
+    const { result } = setup({ resolution: SCORCHING_RAY_RESOLUTION });
+
+    act(() => result.current.view.instances![0].onRollEffect());
+    act(() => result.current.view.instances![0].onRollToHit());
+    expect(result.current.view.instances![0].verdict).toBe("crit");
+    expect(result.current.view.instances![0].effectRoll).toBeNull();
+
+    act(() => result.current.view.instances![0].onRollEffect());
+    expect(result.current.view.instances![0].effectRoll!.dice).toHaveLength(4);
+  });
+
+  it("a normal die rolled after speculative damage voids the implied hit and re-opens the call", () => {
     mockDice([{ face: 4, faces: 6 }, { face: 3, faces: 6 }, { face: 10, faces: 20 }]);
     const { result } = setup({ resolution: SCORCHING_RAY_RESOLUTION });
 
     act(() => result.current.view.instances![0].onRollEffect());
-    const rolledEffect = result.current.view.instances![0].effectRoll;
-    expect(rolledEffect).not.toBeNull();
-
     act(() => result.current.view.instances![0].onRollToHit());
-    expect(result.current.view.instances![0].effectRoll).toEqual(rolledEffect);
+    expect(result.current.view.instances![0].verdict).toBeUndefined();
+    expect(result.current.view.instances![0].effectRoll).toBeNull();
+
+    act(() => result.current.view.instances![0].onCallMiss());
+    expect(result.current.view.instances![0].verdict).toBe("miss");
   });
 
   it("Eldritch Blast's own served beam count (2 at a level-5-tier character) drives the loop and the committed op — the AC's own example", () => {

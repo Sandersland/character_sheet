@@ -82,12 +82,20 @@ export function useInstanceResolution({
     };
     const result = roll(spec, `${resolution.source} attack — instance ${i + 1}`);
     const attack = toHitSnapshot(result, resolution.toHit.critRange);
-    // Spreads any prior state instead of replacing it wholesale — the strip lets a player roll this
-    // instance's damage before its to-hit (see onRollEffectInstance's own comment), and this must not
-    // discard that already-rolled damage out from under them.
+    // The strip lets a player roll this instance's damage first (implied hit, onRollEffectInstance) —
+    // but a to-hit die landing afterward outranks it, so any pre-rolled effect is VOIDED with the
+    // verdict: a nat-1 can't keep committed damage, a nat-20's damage must re-roll with the crit
+    // spec, and a normal die re-opens the call-it step cleanly.
     setInstanceRolls((prev) => ({
       ...prev,
-      [i]: { ...(prev[i] ?? EMPTY_INSTANCE_STATE), toHit: result, attack, verdict: autoVerdict(attack), modifier: resolvedAttack.modifier },
+      [i]: {
+        ...(prev[i] ?? EMPTY_INSTANCE_STATE),
+        toHit: result,
+        attack,
+        verdict: autoVerdict(attack),
+        modifier: resolvedAttack.modifier,
+        ...(prev[i]?.effect ? { effect: null } : {}),
+      },
     }));
   }
 

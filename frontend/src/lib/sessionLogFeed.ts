@@ -421,7 +421,8 @@ function instanceVerdictNote(toHit: ResolveActionEventToHit | null | undefined):
 function buildInstanceDrillRow(instance: ResolveActionEventInstance, index: number): DrillInRow {
   const label = `Instance ${index + 1}`;
   const note = instanceVerdictNote(instance.toHit);
-  if (!instance.effect) return { label, note: note ?? "No damage rolled." };
+  // A missed instance never renders a damage breakdown, even if a stale effect rode along in the data.
+  if (!instance.effect || instance.toHit?.verdict === "miss") return { label, note: note ?? "No damage rolled." };
   const isCrit = instance.toHit?.verdict === "crit" || instance.effect.crit === true;
   return { ...buildEffectDrillRow(instance.effect, isCrit), label, note };
 }
@@ -431,7 +432,10 @@ function buildInstanceDrillRow(instance: ResolveActionEventInstance, index: numb
 // effect is safe today. A hypothetical mixed-type instanced effect would collapse to the first type in
 // this summary line; the per-instance drill-in still shows each instance's own real type regardless.
 function instancesEffectTotal(instances: ResolveActionEventInstance[]): { total: number; type: string; kind: "damage" | "heal" } {
+  // A missed instance's effect (shouldn't be persisted, but the JSON column can't promise that)
+  // must not inflate the total.
   const effects = instances
+    .filter((i) => !i.toHit || i.toHit.verdict !== "miss")
     .map((i) => i.effect)
     .filter((eff): eff is ResolveActionEventEffect => eff != null);
   return {

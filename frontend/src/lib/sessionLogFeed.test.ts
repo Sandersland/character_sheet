@@ -515,6 +515,30 @@ describe("buildFeedItems resolveAction instances[] shape (#1981/#1982 — Magic 
     expect(rows[0].drillIn![1].total).toBeUndefined();
   });
 
+  // Defence-in-depth (#1987 round-4 review): a missed instance shouldn't be persisted with an effect,
+  // but the JSON column can't promise that — the feed must neither count it nor render its breakdown.
+  it("ignores a missed instance's stale effect in both the summed total and the drill-in", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Scorching Ray",
+        instances: [
+          {
+            toHit: { faces: [15], kept: 15, nat20: false, bonus: 5, total: 20, verdict: "hit" },
+            effect: { spec: "2d6", faces: [4, 5], total: 9, type: "fire", kind: "damage", crit: false },
+          },
+          {
+            toHit: { faces: [4], kept: 4, nat20: false, bonus: 5, total: 9, verdict: "miss" },
+            effect: { spec: "2d6", faces: [6, 6], total: 12, type: "fire", kind: "damage", crit: false },
+          },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Test Scorching Ray — 9 fire damage.");
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Instance 2", note: "Missed" });
+    expect(rows[0].drillIn![1].total).toBeUndefined();
+  });
+
   it("sums cast-level riders into the same sentence — riders are rolled once, never per instance", () => {
     const events = [
       resolveEvent("cast", {
