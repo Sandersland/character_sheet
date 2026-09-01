@@ -868,6 +868,13 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(res.status).toBe(400);
   });
 
+  it("400s on an instance carrying neither toHit nor effect", async () => {
+    const res = await post([
+      { type: "resolveAction", actionId: "a-hollow", source: "Test Spell", cost: { kind: "action" as const }, instances: [{}] },
+    ]);
+    expect(res.status).toBe(400);
+  });
+
   // A shared save DC across every instance (e.g. a hypothetical multi-target save spell) is NOT
   // mutually exclusive with instances — only top-level toHit/effect are.
   it("accepts a top-level save alongside instances[]", async () => {

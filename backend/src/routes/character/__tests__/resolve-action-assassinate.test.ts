@@ -47,8 +47,11 @@ function assassinateOp(actionId = "action-1") {
   };
 }
 
-// Scorching Ray-style instanced attack (#1981/#1982): one hit, one crit — a mixed instance set exercises
-// the "at least one instance crits" superRefine branch rather than the top-level toHit one.
+// Scorching Ray-style instanced attack (#1981/#1982): one miss, one crit — exercises the
+// "at least one instance crits" superRefine branch rather than the top-level toHit one. The
+// non-crit instance is a MISS, not a hit: under PHB'14 p.97 Assassinate every hit against the
+// surprised target is a crit, so hit-without-crit alongside assassinate is a state the rules
+// can't produce (the server would still accept it — self-or-announce, it never re-derives).
 function instancedAssassinateOp(actionId = "action-instanced", assassinate = true) {
   return {
     type: "resolveAction" as const,
@@ -57,8 +60,7 @@ function instancedAssassinateOp(actionId = "action-instanced", assassinate = tru
     cost: { kind: "action" as const },
     instances: [
       {
-        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" as const },
-        effect: { spec: "2d6", faces: [3, 4], total: 7, type: "fire", kind: "damage" as const, crit: false },
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "miss" as const },
       },
       {
         toHit: { faces: [20], kept: 20, nat20: true, bonus: 5, total: 25, verdict: "crit" as const },

@@ -98,11 +98,17 @@ const resolveActionEffectSchema = z.object({
 });
 
 // One instance's rolls within an `instances[]` op — same shape as the op's own top-level toHit/effect,
-// reusing their schemas (and superRefine cross-checks) verbatim per instance.
-const resolveActionInstanceSchema = z.object({
-  toHit: resolveActionToHitSchema.nullable().optional(),
-  effect: resolveActionEffectSchema.nullable().optional(),
-});
+// reusing their schemas (and superRefine cross-checks) verbatim per instance. An instance carrying
+// NEITHER is rejected: it would say nothing, and the feed's all-missed/summing branches both assume
+// every instance asserts at least one of the two.
+const resolveActionInstanceSchema = z
+  .object({
+    toHit: resolveActionToHitSchema.nullable().optional(),
+    effect: resolveActionEffectSchema.nullable().optional(),
+  })
+  .refine((i) => i.toHit != null || i.effect != null, {
+    message: "an instance must carry a toHit or an effect",
+  });
 
 const resolveActionOperationSchema = z
   .object({
@@ -145,7 +151,7 @@ const resolveActionOperationSchema = z
       })
       .optional(),
     // 2014 Assassin Assassinate (#1526) — see ResolveActionEventData.assassinate for the full contract.
-    // Op-level, not per-instance: PHB'14 Assassinate ("any hit you score against a creature that
+    // Op-level, not per-instance: PHB'14 p.97 Assassinate ("any hit you score against a creature that
     // is surprised is a critical hit") describes the TARGET's surprised state, not one beam/ray, so
     // one flag covers the whole resolution even when it's instanced (Scorching Ray, Eldritch Blast).
     // Wire-shape consistency only here (assassinate ⇒ at least one crit, top-level or per-instance);
