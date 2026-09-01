@@ -49,6 +49,10 @@ export interface Spell {
   saveAbility?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
+  // Multi-instance columns (#1981/#1984) — see shared-types' EffectColumns for the mechanic.
+  instanceCount?: number | null;
+  instanceRoll?: "each" | "once" | null;
+  upcastInstancesPerLevel?: number | null;
   // Applied server-side on cast; the FE treats a buff spell as no-roll — its AC change shows in armorClassBreakdown.
   buffTarget?: string | null;
   buffModifier?: number | null;
@@ -87,6 +91,10 @@ export interface CatalogSpell {
   saveAbility?: string;
   upcastDicePerLevel?: number;
   cantripScaling: boolean;
+  // Multi-instance columns (#1981/#1984) — see shared-types' EffectColumns for the mechanic.
+  instanceCount?: number;
+  instanceRoll?: "each" | "once";
+  upcastInstancesPerLevel?: number;
   buffTarget?: string;
   buffModifier?: number;
 }
@@ -124,6 +132,10 @@ export interface HomebrewSpell {
   saveAbility?: string;
   saveEffect?: "half" | "none";
   upcastDicePerLevel?: number;
+  // Multi-instance columns (#1981/#1984) — see shared-types' EffectColumns for the mechanic.
+  instanceCount?: number;
+  instanceRoll?: "each" | "once";
+  upcastInstancesPerLevel?: number;
 }
 
 // Sent as { operations: SpellcastingOperation[] } to POST /api/characters/:id/spellcasting/transactions.

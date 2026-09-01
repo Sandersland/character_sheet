@@ -211,6 +211,153 @@ describe("POST /api/spells/custom", () => {
     expect(res.body.classes).toEqual([]);
     expect(res.body.effectKind).toBeUndefined();
   });
+
+  // Mirrors spellSeedSchema's own multi-instance refines (#1981), enforced here by
+  // validateCustomSpellCoherence — see its own unit tests for the pure-function cases.
+  describe("multi-instance fields (#1981/#1984)", () => {
+    it("creates and re-serves a homebrew spell with instanceCount + instanceRoll + upcastInstancesPerLevel", async () => {
+      const res = await agent(cookieOwner)
+        .post(`/api/spells/custom?characterId=${CHAR_2014}`)
+        .send({
+          ...VALID_SPELL,
+          name: "Test Split Bolt",
+          instanceCount: 3,
+          instanceRoll: "each",
+          upcastInstancesPerLevel: 1,
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.instanceCount).toBe(3);
+      expect(res.body.instanceRoll).toBe("each");
+      expect(res.body.upcastInstancesPerLevel).toBe(1);
+
+      const row = await prisma.spell.findUniqueOrThrow({ where: { id: res.body.id } });
+      expect(row.instanceCount).toBe(3);
+      expect(row.instanceRoll).toBe("each");
+      expect(row.upcastInstancesPerLevel).toBe(1);
+    });
+
+    it("400s instanceRoll without instanceCount", async () => {
+      const res = await agent(cookieOwner)
+        .post(`/api/spells/custom?characterId=${CHAR_2014}`)
+        .send({ ...VALID_SPELL, name: "Orphan Roll", instanceRoll: "once" });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/instanceRoll requires instanceCount/);
+    });
+
+    it("400s upcastInstancesPerLevel without instanceCount", async () => {
+      const res = await agent(cookieOwner)
+        .post(`/api/spells/custom?characterId=${CHAR_2014}`)
+        .send({ ...VALID_SPELL, name: "Orphan Upcast", upcastInstancesPerLevel: 1 });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/upcastInstancesPerLevel requires instanceCount/);
+    });
+
+    it("400s upcastInstancesPerLevel on a cantrip (level 0)", async () => {
+      const { level: _level, ...rest } = VALID_SPELL;
+      void _level;
+      const res = await agent(cookieOwner)
+        .post(`/api/spells/custom?characterId=${CHAR_2014}`)
+        .send({ ...rest, name: "Cantrip Upcast", level: 0, instanceCount: 2, upcastInstancesPerLevel: 1 });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/never legal on a cantrip/);
+    });
+  });
+});
+
+// Proves the custom-spell persistence path round-trips instanceCount/instanceRoll all the way to a
+// character's served effectRolls, not just back to the create response — the wire seam #1984 must
+// close (create → learn → GET all read the same Spell columns through the same shared helpers as a
+// seeded catalog spell, see spell-effect-fields.ts). CHAR_2014 above carries no classEntries (a
+// non-caster fixture, buildSpellcastingView returns undefined for it), so this needs its own
+// caster fixture — mirrors spell-effect-rolls.test.ts's WIZARD_ID setup.
+describe("a custom instanced spell round-trips through learn onto a character's effectRolls (#1984)", () => {
+  const ROUND_TRIP_WIZARD_ID = "test-custom-spells-instance-wizard";
+  const ROUND_TRIP_CLASS_NAME = "Custom Spells Instance Round Trip Wizard";
+
+  beforeAll(async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: ROUND_TRIP_CLASS_NAME },
+      create: {
+        name: ROUND_TRIP_CLASS_NAME,
+        hitDie: "d6",
+        savingThrows: ["intelligence", "wisdom"],
+        skillChoiceCount: 2,
+        skillChoices: ["arcana"],
+        isSpellcaster: true,
+      },
+      update: {},
+    });
+    await prisma.character.deleteMany({ where: { id: ROUND_TRIP_WIZARD_ID } });
+    await prisma.character.create({
+      data: {
+        id: ROUND_TRIP_WIZARD_ID,
+        name: "Custom Spells Instance Round Trip Wizard",
+        ownerId: OWNER,
+        rulesEdition: "EDITION_2024",
+        alignment: "Neutral Good",
+        experiencePoints: 0,
+        initiativeBonus: 1,
+        speed: 30,
+        skills: [],
+        toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
+        hitPoints: { current: 8, max: 8, temp: 0 },
+        hitDice: { total: 1, die: "d6" },
+        classEntries: { create: [{ name: "wizard", classId: cls.id, position: 0 }] },
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { id: ROUND_TRIP_WIZARD_ID } });
+    await prisma.characterClass.deleteMany({ where: { name: ROUND_TRIP_CLASS_NAME } });
+  });
+
+  it("a custom instanced cantrip serves instanceCount/instanceRoll on its learned effectRolls entry", async () => {
+    const created = await agent(cookieOwner)
+      .post(`/api/spells/custom?characterId=${ROUND_TRIP_WIZARD_ID}`)
+      .send({
+        name: "Test Twin Ray",
+        level: 0,
+        school: "evocation",
+        castingTime: "1 action",
+        range: "60 feet",
+        duration: "Instantaneous",
+        description: "Two rays of test force.",
+        classes: ["wizard"],
+        effectKind: "damage",
+        effectDiceCount: 1,
+        effectDiceFaces: 6,
+        damageType: "force",
+        attackType: "attack",
+        instanceCount: 2,
+        // "each", never "once": attack+once is the rail-deadlock combination the coherence
+        // check rejects (#1987 round-5 review) — this fixture predated the rule.
+        instanceRoll: "each",
+      });
+    expect(created.status).toBe(201);
+
+    const learned = await agent(cookieOwner)
+      .post(`/api/characters/${ROUND_TRIP_WIZARD_ID}/spellcasting/transactions`)
+      .send({ operations: [{ type: "learnSpell", spellId: created.body.id }] });
+    expect(learned.status).toBe(200);
+
+    const entry = (
+      learned.body.spellcasting.spells as Array<{
+        spellId?: string;
+        instanceCount?: number;
+        instanceRoll?: string;
+        effectRolls?: unknown[];
+      }>
+    ).find((s) => s.spellId === created.body.id)!;
+    expect(entry).toBeDefined();
+    expect(entry.instanceCount).toBe(2);
+    expect(entry.instanceRoll).toBe("each");
+    expect(entry.effectRolls).toEqual([
+      { slotLevel: 0, roll: { count: 1, faces: 6, modifier: 0 }, instanceCount: 2, instanceRoll: "each" },
+    ]);
+  });
 });
 
 describe("PATCH /api/spells/custom/:id", () => {
@@ -229,6 +376,24 @@ describe("PATCH /api/spells/custom/:id", () => {
 
     const memberships = await prisma.spellClass.findMany({ where: { spellId: id } });
     expect(memberships.map((m) => m.className).sort()).toEqual(["sorcerer", "wizard"]);
+  });
+
+  // The full-field replace nulls instanceCount when the body omits it — a body that keeps
+  // instanceRoll must hit the same coherence check create does, or an edit could strand it.
+  it("400s an edit that drops instanceCount while keeping instanceRoll", async () => {
+    const created = await agent(cookieOwner)
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
+      .send({ ...VALID_SPELL, name: "Edit Incoherent", instanceCount: 3, instanceRoll: "each" });
+    expect(created.status).toBe(201);
+
+    const patched = await agent(cookieOwner)
+      .patch(`/api/spells/custom/${created.body.id}`)
+      .send({ ...VALID_SPELL, name: "Edit Incoherent", instanceRoll: "each" });
+    expect(patched.status).toBe(400);
+    expect(patched.body.error).toMatch(/instanceRoll requires instanceCount/);
+
+    const row = await prisma.spell.findUniqueOrThrow({ where: { id: created.body.id } });
+    expect(row.instanceCount).toBe(3);
   });
 
   it("404s an id that doesn't exist", async () => {

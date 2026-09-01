@@ -13,6 +13,10 @@ const SPELL_EFFECT_FIELD_NAMES = [
   "saveAbility",
   "saveEffect",
   "upcastDicePerLevel",
+  // Multi-instance columns (#1981/#1984) — see shared-types' EffectColumns for the mechanic.
+  "instanceCount",
+  "instanceRoll",
+  "upcastInstancesPerLevel",
 ] as const satisfies readonly (keyof CustomSpellInput & keyof Spell)[];
 
 export type SpellEffectFieldName = (typeof SPELL_EFFECT_FIELD_NAMES)[number];

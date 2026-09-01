@@ -5,6 +5,7 @@ import type { CharacterEvent } from "@/types/character";
 import type {
   ResolveActionEventData,
   ResolveActionEventEffect,
+  ResolveActionEventInstance,
   ResolveActionEventToHit,
   ResolveActionEventSave,
   RollEventAttackComponents,
@@ -220,8 +221,9 @@ function unlabeledAddend(value: number): string {
 }
 
 // Pulls the trailing flat modifier off the served `spec` text ("1d6 + 4" → 4) so the drill-in's addend still reconciles `formula` to `total` with no labeled breakdown; null when spec has no trailing modifier.
+// Tolerates formatRollSpec's parenthesized suffix ("2d4 + 1 (crit)") — anchoring at end-of-string dropped the modifier and broke reconciliation for a component-less crit spec.
 function parseSpecModifier(spec: string): number | null {
-  const match = spec.match(/([+-])\s*(\d+)\s*$/);
+  const match = spec.match(/([+-])\s*(\d+)\s*(?:\([^)]*\)\s*)?$/);
   if (!match) return null;
   return (match[1] === "-" ? -1 : 1) * Number(match[2]);
 }
@@ -376,7 +378,9 @@ function buildSaveResolutionRow(
   return { id: e.id, round, tone: isHeal ? "heal" : "default", runKind: "resolveAction", segments, drillIn };
 }
 
-// Multi-die effects (e.g. Magic Missile's 3 darts) are ONE `effect` roll whose `faces` already carries the per-dart breakdown — no separate instances model needed.
+// An auto-hit effect with no per-instance breakdown — a scaled heal (Cure Wounds' 2d8) or a
+// legacy resolveAction event stored before #1981/#1982 gave Magic Missile its own `instances`
+// (that old shape is still rendered byte-identically here, never migrated).
 function buildEffectOnlyResolutionRow(
   e: CharacterEvent,
   data: ResolveActionEventData,
@@ -405,6 +409,120 @@ function buildEffectOnlyResolutionRow(
   };
 }
 
+function instanceVerdictNote(toHit: ResolveActionEventToHit | null | undefined): string | undefined {
+  if (!toHit) return undefined;
+  if (toHit.verdict === "miss") return "Missed";
+  if (toHit.verdict === "crit") return "Critical hit!";
+  return "Hit";
+}
+
+// One drillIn row per instance — verdict (when the instance carries its own toHit) plus its damage
+// breakdown, reusing buildEffectDrillRow so the dice token/addends render identically to a single-roll effect.
+function buildInstanceDrillRow(instance: ResolveActionEventInstance, index: number): DrillInRow {
+  const label = `Instance ${index + 1}`;
+  const note = instanceVerdictNote(instance.toHit);
+  // A missed instance never renders a damage breakdown, even if a stale effect rode along in the data.
+  if (!instance.effect || instance.toHit?.verdict === "miss") return { label, note: note ?? "No damage rolled." };
+  const isCrit = instance.toHit?.verdict === "crit" || instance.effect.crit === true;
+  return { ...buildEffectDrillRow(instance.effect, isCrit), label, note };
+}
+
+// Every seeded multi-instance effect is one damage type per cast (Scorching Ray's rays all fire, Eldritch
+// Blast's beams all force, Magic Missile's darts all force) — taking type/kind from the first present
+// effect is safe today. A hypothetical mixed-type instanced effect would collapse to the first type in
+// this summary line; the per-instance drill-in still shows each instance's own real type regardless.
+function instancesEffectTotal(instances: ResolveActionEventInstance[]): { total: number; type: string; kind: "damage" | "heal" } {
+  // A missed instance's effect (shouldn't be persisted, but the JSON column can't promise that)
+  // must not inflate the total.
+  const effects = instances
+    .filter((i) => !i.toHit || i.toHit.verdict !== "miss")
+    .map((i) => i.effect)
+    .filter((eff): eff is ResolveActionEventEffect => eff != null);
+  return {
+    total: effects.reduce((sum, eff) => sum + eff.total, 0),
+    type: effects[0]?.type ?? "",
+    kind: effects[0]?.kind ?? "damage",
+  };
+}
+
+// Every instance missed (Scorching Ray-style, each carrying its own toHit) — same muted/italic treatment
+// buildMissResolutionRow gives a single-instance miss, plural wording, one drill-in line per instance
+// (each already reads "Missed" via buildInstanceDrillRow). No riders: a total miss lands no damage.
+function buildAllMissedInstancedRow(
+  e: CharacterEvent,
+  instances: ResolveActionEventInstance[],
+  source: string,
+  round: number | undefined,
+): FeedRow {
+  return {
+    id: e.id,
+    round,
+    tone: "muted",
+    italic: true,
+    runKind: "resolveAction",
+    segments: [{ text: source, bold: true, italic: false }, { text: " — all missed." }],
+    drillIn: instances.map(buildInstanceDrillRow),
+  };
+}
+
+// A multi-instance cast (Magic Missile's darts, Scorching Ray's rays, Eldritch Blast's beams, #1981/#1982)
+// stays one row: the sentence sums every instance's total the same way buildAttackResolutionRow sums
+// effect+riders (via effectTailSegments, fed a synthetic effect standing in for the summed instances),
+// and the drill-in lists one row per instance (verdict + damage) followed by any cast-level riders.
+// `data.instances` is mutually exclusive with top-level toHit/effect at the op schema, but a top-level
+// `save` can still ride alongside it (a shared DC across every instance), so it renders first when present.
+function buildInstancedResolutionRow(
+  e: CharacterEvent,
+  data: ResolveActionEventData,
+  source: string,
+  riders: ResolveActionEventEffect[],
+  round: number | undefined,
+): FeedRow {
+  const instances = data.instances!;
+  if (instances.every((i) => i.toHit?.verdict === "miss")) {
+    return buildAllMissedInstancedRow(e, instances, source, round);
+  }
+
+  // No landed effect anywhere and not all-missed (a data anomaly — the commit path always writes
+  // auto-hit effects) — degrade to the stored summary rather than render "0  damage".
+  if (!instances.some((i) => i.effect != null && (!i.toHit || i.toHit.verdict !== "miss"))) {
+    return summaryFallbackRow(e, round);
+  }
+
+  const { total, type, kind } = instancesEffectTotal(instances);
+  const isHeal = kind === "heal";
+  // Same miss filter as instancesEffectTotal — a missed instance's stale crit flag must not
+  // label the whole row a critical hit.
+  const isCrit = instances.some(
+    (i) => i.toHit?.verdict !== "miss" && (i.toHit?.verdict === "crit" || i.effect?.crit === true),
+  );
+  const combined: ResolveActionEventEffect = { spec: "", faces: [], total, type, kind, crit: false };
+  // Assassinate (#1526): the same "critical hit — Assassinate!" cause buildAttackResolutionRow surfaces
+  // for a single-instance crit, since an instanced Assassinate crit is just as target-surprised-caused.
+  const critLabel = data.assassinate ? "critical hit — Assassinate!" : "critical hit!";
+  const segments: LogSegment[] = isCrit
+    ? [
+        { text: source, bold: true },
+        { text: " — " },
+        { text: critLabel, tone: "harm" },
+        { text: " " },
+        { text: `${total}`, bold: true },
+        ...effectTailSegments(combined, riders, true),
+      ]
+    : [
+        { text: source, bold: true },
+        { text: isHeal ? " — healed " : " — " },
+        { text: `${total}`, bold: true },
+        ...effectTailSegments(combined, riders, !isHeal),
+      ];
+
+  const drillIn: DrillInRow[] = [];
+  if (data.save) drillIn.push(buildSaveDrillRow(data.save));
+  drillIn.push(...instances.map(buildInstanceDrillRow), ...riders.map(buildRiderDrillRow));
+
+  return { id: e.id, round, tone: isHeal ? "heal" : "default", runKind: "resolveAction", segments, drillIn };
+}
+
 function buildNoRollResolutionRow(e: CharacterEvent, source: string, round: number | undefined): FeedRow {
   return {
     id: e.id,
@@ -416,11 +534,15 @@ function buildNoRollResolutionRow(e: CharacterEvent, source: string, round: numb
 }
 
 // toHit/save/effect are mutually exclusive-ish by design (see ResolveActionEventData); `riders` rides along regardless of shape, summed the same way by every builder.
+// `instances` is checked first: mutually exclusive with top-level toHit/effect at the op schema, so an
+// instanced event never also matches the toHit/effect branches below. Absent/empty falls straight through
+// to the pre-#1982 dispatch, unchanged.
 function buildResolveActionRow(e: CharacterEvent, round: number | undefined): FeedRow {
   const data = (e.data ?? {}) as ResolveActionEventData;
   const source = data.source || e.summary;
   const riders = data.riders ?? [];
 
+  if (data.instances && data.instances.length > 0) return buildInstancedResolutionRow(e, data, source, riders, round);
   if (data.toHit) return buildAttackResolutionRow(e, data, source, riders, round);
   if (data.save) return buildSaveResolutionRow(e, data, source, riders, round);
   if (data.effect) return buildEffectOnlyResolutionRow(e, data, source, riders, round);

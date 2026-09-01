@@ -32,7 +32,7 @@ import {
   type ResolveActionRequestOperation,
 } from "./resolve-action-ops.js";
 import { writeStandaloneRollEvent } from "./standalone-roll-op.js";
-import type { CastSpellOperation } from "@character-sheet/shared-types";
+import type { CastSpellOperation, ResolveActionEventData } from "@character-sheet/shared-types";
 
 const RESOLVE_ACTION_SELECT = {
   id: true,
@@ -49,6 +49,13 @@ export { resolveActionRequestOperationSchema, type ResolveActionRequestOperation
 // status → the 400 the central `errorHandler` maps (client op-validation error).
 export class InvalidResolveActionOperationError extends Error {
   status = 400;
+}
+
+// Twin of the frontend sumInstanceEffects — same landed-filter/sum/undefined-when-none semantics on
+// either side of the wire; change the all-miss convention in both or neither.
+function sumInstanceEffectTotals(instances: ResolveActionOperation["instances"]): number | undefined {
+  const totals = (instances ?? []).flatMap((i) => (i.effect ? [i.effect.total] : []));
+  return totals.length > 0 ? totals.reduce((sum, t) => sum + t, 0) : undefined;
 }
 
 // Assassinate's eligibility gate (#1526): the character row is already
@@ -142,8 +149,10 @@ async function payActionCostAndSideEffectsInTx(
   const castOp: CastSpellOperation = {
     type: "castSpell",
     entryId: op.entryId,
+    // An instanced op's total lives per instance, never top-level — summing here keeps `roll`
+    // meaning "the cast's rolled total" for every consumer of the forwarded castSpell op.
+    roll: op.effect?.total ?? sumInstanceEffectTotals(op.instances) ?? 0,
     ...(op.slotLevel !== undefined ? { slotLevel: op.slotLevel } : {}),
-    roll: op.effect?.total ?? 0,
     ...(op.apply ? { apply: op.apply } : {}),
   };
   // Reaching here means the op declared a spell (entryId); castSpellForResolutionInTx
@@ -181,7 +190,43 @@ async function recordSpellCastForOp(
 
 function summaryFor(op: ResolveActionOperation): string {
   const costWord = op.cost.attacks && op.cost.attacks > 1 ? `${op.cost.attacks} attacks` : op.cost.kind;
-  return `Resolved ${op.source} (${costWord})`;
+  const instanceWord = op.instances && op.instances.length > 1 ? `, ${op.instances.length} instances` : "";
+  return `Resolved ${op.source} (${costWord}${instanceWord})`;
+}
+
+// Pulled out of applyOp below so its own field-by-field null-coalescing doesn't inflate the
+// transaction closure's complexity — every field here mirrors the op verbatim except for the
+// always-an-array/always-a-boolean normalizations noted per field. Typed as the shared wire
+// contract (not Record<string, unknown>) so a field renamed/dropped on either side breaks the build.
+function resolveActionEventData(op: ResolveActionOperation): ResolveActionEventData {
+  return {
+    actionId: op.actionId,
+    source: op.source,
+    cost: op.cost,
+    toHit: op.toHit ?? null,
+    save: op.save ?? null,
+    effect: op.effect ?? null,
+    // Always an array (never undefined) so the feed never has to
+    // distinguish "no riders" from "old event predates riders" (#1843).
+    riders: op.riders ?? [],
+    // Multi-instance roll set (#1981/#1982) — always an array (never
+    // undefined), same convention as riders above. Mutually exclusive
+    // with toHit/effect at the op schema, so this is empty whenever
+    // those are set and vice versa.
+    instances: op.instances ?? [],
+    slotLevel: op.slotLevel ?? null,
+    // The spellcasting entry this resolution cast, when it's a spell
+    // (#1833) — audit-trail provenance only; the feed doesn't need it
+    // to render (source/toHit/save/effect/riders already say what
+    // happened), and undo doesn't read it either (the concentration/
+    // buff/apply side effects it triggered already logged their own
+    // events with their own before/after under this same batch).
+    entryId: op.entryId ?? null,
+    // 2014 Assassinate attribution (#1526) — always a boolean (never
+    // undefined) so the feed can distinguish "not Assassinate" from
+    // "old event predates this field", same convention as `riders`.
+    assassinate: op.assassinate ?? false,
+  };
 }
 
 /**
@@ -221,29 +266,9 @@ export async function applyResolveActionOperations(
         summary: summaryFor(op),
         before,
         after,
-        data: {
-          actionId: op.actionId,
-          source: op.source,
-          cost: op.cost,
-          toHit: op.toHit ?? null,
-          save: op.save ?? null,
-          effect: op.effect ?? null,
-          // Always an array (never undefined) so the feed never has to
-          // distinguish "no riders" from "old event predates riders" (#1843).
-          riders: op.riders ?? [],
-          slotLevel: op.slotLevel ?? null,
-          // The spellcasting entry this resolution cast, when it's a spell
-          // (#1833) — audit-trail provenance only; the feed doesn't need it
-          // to render (source/toHit/save/effect/riders already say what
-          // happened), and undo doesn't read it either (the concentration/
-          // buff/apply side effects it triggered already logged their own
-          // events with their own before/after under this same batch).
-          entryId: op.entryId ?? null,
-          // 2014 Assassinate attribution (#1526) — always a boolean (never
-          // undefined) so the feed can distinguish "not Assassinate" from
-          // "old event predates this field", same convention as `riders`.
-          assassinate: op.assassinate ?? false,
-        },
+        // logEvent's data param is the untyped Record<string, unknown> JSON-storage boundary every
+        // event category shares; resolveActionEventData stays typed up to here for drift protection.
+        data: resolveActionEventData(op) as unknown as Record<string, unknown>,
         batchId,
         sessionId,
       });

@@ -40,6 +40,12 @@ export interface TurnResolutionEffect {
   components?: RollEventDamageComponents;
 }
 
+/** Present only for a multi-instance cast (Magic Missile's darts, Scorching Ray's rays, Eldritch Blast's beams, #1981/#1983) — `count` and `roll` are copied verbatim off the served `EffectRoll.instanceCount`/`instanceRoll` for the chosen slot level, never computed client-side. `effect.spec` stays PER-INSTANCE dice; the rail rolls it once per instance ("each") or once and fans the result out ("once"). */
+export interface TurnResolutionInstances {
+  count: number;
+  roll: "each" | "once";
+}
+
 /** `toHit`/`save` are mutually exclusive: a weapon swing or attack-roll spell sets `toHit`, a saving-throw spell sets `save`, an auto-hit or no-roll spell sets neither; `effect` is absent for a no-roll resolution. */
 export interface TurnResolution {
   source: string;
@@ -47,4 +53,5 @@ export interface TurnResolution {
   toHit?: TurnResolutionToHit;
   save?: TurnResolutionSave;
   effect?: TurnResolutionEffect;
+  instances?: TurnResolutionInstances;
 }

@@ -1,5 +1,5 @@
 import AttackResultLine from "@/features/session/AttackResultLine";
-import { CritButton, RailStep, VerdictChip } from "@/features/session/railPrimitives";
+import { CompleteButton, CritButton, RailStep, VerdictChip } from "@/features/session/railPrimitives";
 import { abilityLabel } from "@/lib/abilities";
 import type { ResolutionStep, ResolutionStepKind } from "@/lib/resolutionSteps";
 import type { ResolutionView } from "@/features/session/useResolution";
@@ -142,20 +142,6 @@ function stepContent(step: ResolutionStep, view: ResolutionView): React.ReactNod
     case "damage":
       return <DamageStepContent view={view} />;
   }
-}
-
-function CompleteButton({ view, completeLabel }: { view: ResolutionView; completeLabel: string }) {
-  return (
-    <button
-      type="button"
-      disabled={view.disabled}
-      onClick={view.onComplete}
-      title={view.disabled ? "No action economy remaining" : undefined}
-      className="min-h-11 w-full rounded-control bg-garnet-soft-surface px-3 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      {view.steps.length === 0 ? completeLabel : "Done"}
-    </button>
-  );
 }
 
 export default function ResolutionRail({

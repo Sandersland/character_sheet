@@ -26,7 +26,17 @@ export default function HomebrewSpellDamageFields({ draft, update }: HomebrewSpe
           ))}
         </select>
       </label>
-      <SpellAttackTypeSelect value={draft.attackType} onChange={(attackType) => update({ attackType })} />
+      {/* Flipping to "attack" clears a stale "once" — the option disappears from the roll-mode select,
+          and a hidden "once" would fail coherence validation against a form that looks valid. */}
+      <SpellAttackTypeSelect
+        value={draft.attackType}
+        onChange={(attackType) =>
+          update({
+            attackType,
+            ...(attackType === "attack" && draft.instanceRoll === "once" ? { instanceRoll: "each" as const } : {}),
+          })
+        }
+      />
       {draft.attackType === "save" && (
         <>
           <label className="block">

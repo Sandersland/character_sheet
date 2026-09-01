@@ -87,4 +87,35 @@ describe("catalogEffectLine", () => {
   it("returns null when the effect has no dice (Mage Armor-style buffs)", () => {
     expect(catalogEffectLine(catalogSpell({ effectKind: "damage" }))).toBeNull();
   });
+
+  describe("multi-instance spells (#1981/#1984)", () => {
+    it("prefixes 'N × ' when instanceCount is greater than 1 (Scorching Ray)", () => {
+      expect(
+        catalogEffectLine(
+          catalogSpell({ effectKind: "damage", damageType: "fire", effectDiceCount: 2, effectDiceFaces: 6, instanceCount: 3 }),
+        ),
+      ).toBe("fire damage — 3 × 2d6");
+    });
+
+    it("does not prefix when instanceCount is exactly 1 (Eldritch Blast's base beam)", () => {
+      expect(
+        catalogEffectLine(
+          catalogSpell({ effectKind: "damage", damageType: "force", effectDiceCount: 1, effectDiceFaces: 10, instanceCount: 1 }),
+        ),
+      ).toBe("force damage — 1d10");
+    });
+
+    it("does not prefix an un-instanced spell", () => {
+      expect(catalogEffectLine(catalogSpell({ effectKind: "damage", damageType: "fire", effectDiceCount: 8, effectDiceFaces: 6 })))
+        .toBe("fire damage — 8d6");
+    });
+
+    it("keeps the modifier after the instance prefix", () => {
+      expect(
+        catalogEffectLine(
+          catalogSpell({ effectKind: "damage", damageType: "force", effectDiceCount: 1, effectDiceFaces: 4, effectModifier: 1, instanceCount: 3 }),
+        ),
+      ).toBe("force damage — 3 × 1d4 + 1");
+    });
+  });
 });

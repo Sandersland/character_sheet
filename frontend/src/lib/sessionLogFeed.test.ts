@@ -231,18 +231,20 @@ describe("buildFeedItems resolveAction save shape (Sacred Flame)", () => {
   });
 });
 
-describe("buildFeedItems resolveAction auto-hit / multi-die shape (Magic Missile)", () => {
-  it("renders one row; the effect's faces[] give the per-dart breakdown in the drill-in, no instances array", () => {
+// A single combined effect.faces[] roll, not instances[] — the pre-#1981 shape a spell without
+// instanceCount still serves today (and every event persisted before #1982 shipped).
+describe("buildFeedItems resolveAction auto-hit / multi-die shape (legacy combined-roll spell)", () => {
+  it("renders one row; the effect's faces[] give the per-die breakdown in the drill-in", () => {
     const events = [
       resolveEvent("cast", {
-        source: "Magic Missile",
+        source: "Test Combined Spell",
         effect: { spec: "3d4+3", faces: [2, 3, 4], total: 12, type: "force", kind: "damage", crit: false },
         slotLevel: 1,
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
     expect(rows).toHaveLength(1);
-    expect(text(rows[0])).toBe("Magic Missile — 12 force damage.");
+    expect(text(rows[0])).toBe("Test Combined Spell — 12 force damage.");
     expect(rows[0].drillIn).toHaveLength(1);
     expect(rows[0].drillIn![0].formula).toBe("3d4 (2, 3, 4) + 3");
   });
@@ -276,10 +278,26 @@ describe("buildFeedItems resolveAction effect drill-in reconciliation (MUST-fix 
     expect(damageDrill.total).toBe("8 piercing");
   });
 
-  it("floors to the spec's own trailing modifier for a multi-die effect (Magic Missile)", () => {
+  it("keeps the trailing modifier when the spec carries formatRollSpec's crit suffix (once-mode crit dart)", () => {
     const events = [
       resolveEvent("cast", {
         source: "Magic Missile",
+        instances: [
+          { effect: { spec: "2d4 + 1 (crit)", faces: [3, 3], total: 7, type: "force", kind: "damage", crit: true } },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    const drill = rows[0].drillIn![0];
+    expect(drill.formula).toBe("2d4 (3, 3 — dice doubled) + 1");
+    expect(sumFormula(drill.formula)).toBe(7);
+    expect(drill.total).toBe("7 force");
+  });
+
+  it("floors to the spec's own trailing modifier for a multi-die effect (legacy combined-roll spell)", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Combined Spell",
         effect: { spec: "3d4+3", faces: [2, 3, 4], total: 12, type: "force", kind: "damage", crit: false },
       }),
     ];
@@ -440,18 +458,194 @@ describe("buildFeedItems resolveAction typed damage riders (#1843 — additive r
     expect(feedItemRowCount(buildFeedItems(events))).toBe(1);
   });
 
-  it("Magic Missile (same-type count>=1 effect, no riders) still renders unaffected", () => {
+  it("a legacy combined-roll effect (same-type count>=1, no riders) still renders unaffected", () => {
     const events = [
       resolveEvent("cast", {
-        source: "Magic Missile",
+        source: "Test Combined Spell",
         effect: { spec: "3d4+3", faces: [2, 3, 4], total: 12, type: "force", kind: "damage", crit: false },
         slotLevel: 1,
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
     expect(rows).toHaveLength(1);
-    expect(text(rows[0])).toBe("Magic Missile — 12 force damage.");
+    expect(text(rows[0])).toBe("Test Combined Spell — 12 force damage.");
     expect(rows[0].drillIn).toHaveLength(1);
+  });
+});
+
+describe("buildFeedItems resolveAction instances[] shape (#1981/#1982 — Magic Missile darts, Scorching Ray rays, Eldritch Blast beams)", () => {
+  it("sums every instance's effect into one sentence, with one drill-in row per instance", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Magic Missile",
+        instances: [
+          { effect: { spec: "1d4+1", faces: [2], total: 3, type: "force", kind: "damage", crit: false } },
+          { effect: { spec: "1d4+1", faces: [3], total: 4, type: "force", kind: "damage", crit: false } },
+          { effect: { spec: "1d4+1", faces: [4], total: 5, type: "force", kind: "damage", crit: false } },
+        ],
+        slotLevel: 1,
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows).toHaveLength(1);
+    expect(text(rows[0])).toBe("Test Magic Missile — 12 force damage.");
+    expect(rows[0].drillIn).toHaveLength(3);
+    expect(rows[0].drillIn![0]).toMatchObject({ label: "Instance 1", total: "3 force" });
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Instance 2", total: "4 force" });
+    expect(rows[0].drillIn![2]).toMatchObject({ label: "Instance 3", total: "5 force" });
+  });
+
+  it("labels each instance's own verdict when it carries a toHit (Scorching Ray-style)", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Scorching Ray",
+        instances: [
+          {
+            toHit: { faces: [15], kept: 15, nat20: false, bonus: 5, total: 20, verdict: "hit" },
+            effect: { spec: "2d6", faces: [4, 5], total: 9, type: "fire", kind: "damage", crit: false },
+          },
+          { toHit: { faces: [4], kept: 4, nat20: false, bonus: 5, total: 9, verdict: "miss" } },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].drillIn).toHaveLength(2);
+    expect(rows[0].drillIn![0]).toMatchObject({ label: "Instance 1", note: "Hit", total: "9 fire" });
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Instance 2", note: "Missed" });
+    expect(rows[0].drillIn![1].total).toBeUndefined();
+  });
+
+  // Defence-in-depth (#1987 round-4 review): a missed instance shouldn't be persisted with an effect,
+  // but the JSON column can't promise that — the feed must neither count it nor render its breakdown.
+  it("ignores a missed instance's stale effect in both the summed total and the drill-in", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Scorching Ray",
+        instances: [
+          {
+            toHit: { faces: [15], kept: 15, nat20: false, bonus: 5, total: 20, verdict: "hit" },
+            effect: { spec: "2d6", faces: [4, 5], total: 9, type: "fire", kind: "damage", crit: false },
+          },
+          {
+            toHit: { faces: [4], kept: 4, nat20: false, bonus: 5, total: 9, verdict: "miss" },
+            effect: { spec: "2d6", faces: [6, 6], total: 12, type: "fire", kind: "damage", crit: false },
+          },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Test Scorching Ray — 9 fire damage.");
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Instance 2", note: "Missed" });
+    expect(rows[0].drillIn![1].total).toBeUndefined();
+  });
+
+  it("sums cast-level riders into the same sentence — riders are rolled once, never per instance", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Eldritch Blast",
+        instances: [{ effect: { spec: "1d10", faces: [6], total: 6, type: "force", kind: "damage", crit: false } }],
+        riders: [{ spec: "1d4", faces: [3], total: 3, type: "cold", kind: "damage", crit: false, source: "Frost Rune" }],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Test Eldritch Blast — 6 force + 3 cold damage.");
+    expect(rows[0].drillIn).toHaveLength(2);
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Frost Rune" });
+  });
+
+  it("renders every-instance-missed as a muted italic miss row, not '0  damage.'", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Scorching Ray",
+        instances: [
+          { toHit: { faces: [4], kept: 4, nat20: false, bonus: 5, total: 9, verdict: "miss" } },
+          { toHit: { faces: [7], kept: 7, nat20: false, bonus: 5, total: 12, verdict: "miss" } },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Test Scorching Ray — all missed.");
+    expect(rows[0].tone).toBe("muted");
+    expect(rows[0].italic).toBe(true);
+    expect(rows[0].drillIn).toHaveLength(2);
+    expect(rows[0].drillIn![0]).toMatchObject({ label: "Instance 1", note: "Missed" });
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Instance 2", note: "Missed" });
+  });
+
+  it("leads with 'critical hit!' in the collapsed sentence when any instance crit", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Scorching Ray",
+        instances: [
+          {
+            toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+            effect: { spec: "2d6", faces: [3, 4], total: 7, type: "fire", kind: "damage", crit: false },
+          },
+          {
+            toHit: { faces: [20], kept: 20, nat20: true, bonus: 5, total: 25, verdict: "crit" },
+            effect: { spec: "4d6", faces: [1, 2, 3, 4], total: 10, type: "fire", kind: "damage", crit: true },
+          },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Test Scorching Ray — critical hit! 17 fire damage.");
+  });
+
+  it("labels an instanced crit as Assassinate when the event carries it", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test Scorching Ray",
+        assassinate: true,
+        instances: [
+          {
+            toHit: { faces: [20], kept: 20, nat20: true, bonus: 5, total: 25, verdict: "crit" },
+            effect: { spec: "4d6", faces: [1, 2, 3, 4], total: 10, type: "fire", kind: "damage", crit: true },
+          },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toContain("critical hit — Assassinate!");
+  });
+
+  it("renders a shared save DC ahead of the per-instance lines when the op carries one", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Test AoE",
+        save: { dc: 15, ability: "dexterity" },
+        instances: [{ effect: { spec: "2d6", faces: [4, 5], total: 9, type: "fire", kind: "damage", crit: false } }],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].drillIn![0]).toMatchObject({ label: "Save", total: "DC 15 Dexterity" });
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Instance 1" });
+  });
+
+  // Pins the pre-#1982 rendering: an event whose data omits `instances` entirely, and one where the op
+  // explicitly sent an empty array, both fall through to the toHit/effect dispatch unchanged and render
+  // byte-identically to each other.
+  it("an absent or empty instances[] falls through to the pre-#1982 dispatch unchanged", () => {
+    const withEmpty = resolveEvent("cast-empty", {
+      source: "Shortsword",
+      toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+      effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
+      instances: [],
+    });
+    const withoutKey = resolveEvent("cast-absent", {
+      source: "Shortsword",
+      toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+      effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
+    });
+    // Looked up by id rather than destructured positionally — buildFeedItems renders oldest-first
+    // (reversing the newest-first input), so a positional destructure of this array doesn't match
+    // the fixtures' declaration order and invites exactly this mix-up.
+    const rows = buildFeedItems([withEmpty, withoutKey]).map(rowOf);
+    const emptyRow = rows.find((r) => r.id === "cast-empty")!;
+    const absentRow = rows.find((r) => r.id === "cast-absent")!;
+    expect(text(emptyRow)).toBe("Shortsword — hit for 8 piercing.");
+    expect(emptyRow.drillIn).toHaveLength(2);
+    expect(emptyRow).toEqual({ ...absentRow, id: emptyRow.id });
   });
 });
 

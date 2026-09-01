@@ -5,6 +5,7 @@ import {
   attackTallyLines,
   autoVerdict,
   isCritRow,
+  isDieLocked,
   isMissRow,
   isVerdictLocked,
   type AttackTallyRow,
@@ -47,6 +48,14 @@ describe("verdict predicates", () => {
     expect(isVerdictLocked(row({ attack: roll({ nat20: true, criticalHit: true }) }))).toBe(true);
     expect(isVerdictLocked(row({ attack: roll({ nat1: true }) }))).toBe(true);
     expect(isVerdictLocked(row())).toBe(false);
+  });
+
+  // isVerdictLocked delegates to this (row.attack); useResolution's and useInstanceResolution's own
+  // crit-call guards import it directly, no per-file duplicate (#1983 review).
+  it("isDieLocked is true for a crit-range hit or nat 1, false otherwise", () => {
+    expect(isDieLocked(roll({ nat20: true, criticalHit: true }))).toBe(true);
+    expect(isDieLocked(roll({ nat1: true }))).toBe(true);
+    expect(isDieLocked(roll())).toBe(false);
   });
 
   it("isMissRow only for an explicit miss verdict", () => {

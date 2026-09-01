@@ -37,9 +37,13 @@ export function buildResolveActionOp(
       kind: COST_KIND[resolution.cost.kind],
       ...(resolution.cost.attacks !== undefined ? { attacks: resolution.cost.attacks } : {}),
     },
+    // toHit/effect stay null (never omitted) for an instanced resolution — the op schema's
+    // superRefine only rejects a NON-null toHit/effect alongside instances, so sending the null
+    // pair through unconditionally here is fine (#1983).
     toHit: rolls.toHit,
     save: rolls.save,
     effect: rolls.effect,
+    ...(rolls.instances && rolls.instances.length > 0 ? { instances: rolls.instances } : {}),
     ...(riders && riders.length > 0 ? { riders } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
     ...(entryId !== undefined ? { entryId } : {}),

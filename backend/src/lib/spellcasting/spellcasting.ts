@@ -223,6 +223,9 @@ function catalogSpellToEntry(catalogSpell: Spell): SpellEntry {
     saveAbility: orUndef(catalogSpell.saveAbility),
     upcastDicePerLevel: orUndef(catalogSpell.upcastDicePerLevel),
     cantripScaling: catalogSpell.cantripScaling,
+    instanceCount: orUndef(catalogSpell.instanceCount),
+    instanceRoll: orUndef(catalogSpell.instanceRoll),
+    upcastInstancesPerLevel: orUndef(catalogSpell.upcastInstancesPerLevel),
     buffTarget: orUndef(catalogSpell.buffTarget),
     buffModifier: orUndef(catalogSpell.buffModifier),
   };

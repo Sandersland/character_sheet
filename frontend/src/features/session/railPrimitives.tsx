@@ -148,3 +148,21 @@ export function CritButton({
     </button>
   );
 }
+
+// Shared by ResolutionRail and InstanceResolutionStrip (#1983 review — was duplicated verbatim
+// between the two) — an instanced or un-instanced resolution both always have at least one step
+// (toHit/callIt/damage, or just damage), so the button reads "Done" rather than the caller's own
+// completeLabel — the same convention every multi-step cast/swing uses either way.
+export function CompleteButton({ view, completeLabel }: { view: ResolutionView; completeLabel: string }) {
+  return (
+    <button
+      type="button"
+      disabled={view.disabled}
+      onClick={view.onComplete}
+      title={view.disabled ? "No action economy remaining" : undefined}
+      className="min-h-11 w-full rounded-control bg-garnet-soft-surface px-3 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {view.steps.length === 0 ? completeLabel : "Done"}
+    </button>
+  );
+}

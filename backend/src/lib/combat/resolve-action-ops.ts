@@ -2,8 +2,16 @@
  * resolveAction op schema (#1829) — wire shape for POST /api/characters/:id/resolve-action/transactions.
  * Backend-local, not `@character-sheet/contracts`, mirroring `castSpellOpSchema` staying local to its own route.
  *
- * ONE `effect` roll per resolution, never an `instances[]` array — Magic Missile's three darts are one `count: 3` spec.
- * `riders` (#1843) are additive typed damage riders on top of `effect`, each validated via `resolveActionEffectSchema`.
+ * Current contract (#1982): a single-instance op (a weapon swing, Fire Bolt) carries its roll at the top
+ * level, `toHit`/`effect`. A multi-instance op (Magic Missile's darts, Scorching Ray's rays, Eldritch
+ * Blast's beams, #1981) carries them in `instances[]` instead, each element cross-checked by the SAME
+ * `resolveActionToHitSchema`/`resolveActionEffectSchema` as the top-level fields. The two are mutually
+ * exclusive (superRefine below) — an op has EITHER top-level `toHit`/`effect` OR `instances`, never both.
+ * Either way it's still one op, one undoable `CharacterEvent`, and one slot spend, regardless of instance count.
+ *
+ * `riders` (#1843) are additive typed damage riders on top of the primary roll (top-level `effect` OR the
+ * summed `instances`), each validated via `resolveActionEffectSchema` — cast-level and rolled once, never
+ * per-instance (no per-instance rider mechanic exists yet, epic #1986).
  * `entryId`/`apply` are present only for a spell resolution, routing through `castSpellForResolutionInTx`'s
  * `castAbilityInTx` sequence so concentration/buff/apply side effects still run. `apply` mirrors
  * `castSpellOpSchema`'s own shape exactly so the two never drift.
@@ -71,7 +79,9 @@ const resolveActionSaveSchema = z.object({
 
 // One damage/heal roll. `spec` is the served dice spec text (e.g. "3d4+3");
 // `faces` is every die rolled — count(faces) >= 1 covers a multi-die spec
-// (Magic Missile) without a dedicated instances array. `components`
+// within ONE roll (e.g. Magic Missile pre-#1981's combined 3d4). A
+// per-instance breakout of separately-rolled dice uses `instances[]`
+// instead, each element its own instance of this same schema. `components`
 // (RollEventDamageComponents) is optional/nullable, echoed through like toHit.components.
 const resolveActionEffectSchema = z.object({
   spec: z.string().min(1),
@@ -86,6 +96,19 @@ const resolveActionEffectSchema = z.object({
   // effect, whose attribution is the op-level `source`.
   source: z.string().min(1).optional(),
 });
+
+// One instance's rolls within an `instances[]` op — same shape as the op's own top-level toHit/effect,
+// reusing their schemas (and superRefine cross-checks) verbatim per instance. An instance carrying
+// NEITHER is rejected: it would say nothing, and the feed's all-missed/summing branches both assume
+// every instance asserts at least one of the two.
+const resolveActionInstanceSchema = z
+  .object({
+    toHit: resolveActionToHitSchema.nullable().optional(),
+    effect: resolveActionEffectSchema.nullable().optional(),
+  })
+  .refine((i) => i.toHit != null || i.effect != null, {
+    message: "an instance must carry a toHit or an effect",
+  });
 
 const resolveActionOperationSchema = z
   .object({
@@ -102,6 +125,11 @@ const resolveActionOperationSchema = z
     // Typed damage riders (#1843) — zero or more, each validated as its own
     // effect. Omitted/empty for the common no-rider swing.
     riders: z.array(resolveActionEffectSchema).optional(),
+    // Multi-instance roll set (#1981/#1982) — mutually exclusive with the top-level
+    // toHit/effect (superRefine below). min(1): an empty `instances: []` would make
+    // "instanced" vacuous and indistinguishable from omitting the field, so it's
+    // rejected rather than silently treated as un-instanced.
+    instances: z.array(resolveActionInstanceSchema).min(1).optional(),
     // Present only for a leveled spell cast (or upcast) — expends one slot of
     // this level via the same payer castSpell uses. Absent for a cantrip or a
     // weapon swing, which have no character state to spend.
@@ -123,17 +151,31 @@ const resolveActionOperationSchema = z
       })
       .optional(),
     // 2014 Assassin Assassinate (#1526) — see ResolveActionEventData.assassinate for the full contract.
-    // Wire-shape consistency only here (assassinate ⇒ verdict crit); ELIGIBILITY (is this character
-    // even a 2014 Assassin L3+) needs the character row, so that check lives in
-    // applyResolveActionOperations' applyOp, not this schema.
+    // Op-level, not per-instance: PHB'14 p.97 Assassinate ("any hit you score against a creature that
+    // is surprised is a critical hit") describes the TARGET's surprised state, not one beam/ray, so
+    // one flag covers the whole resolution even when it's instanced (Scorching Ray, Eldritch Blast).
+    // Wire-shape consistency only here (assassinate ⇒ at least one crit, top-level or per-instance);
+    // ELIGIBILITY (is this character even a 2014 Assassin L3+) needs the character row, so that
+    // check lives in applyResolveActionOperations' applyOp, not this schema.
     assassinate: z.boolean().optional(),
   })
   .superRefine((val, ctx) => {
-    if (val.assassinate && val.toHit?.verdict !== "crit") {
+    // Every hitting instance against a surprised target is its own crit (the client marks each one);
+    // the server only gates WHO may assert the flag at all, never re-derives which instances hit
+    // (self-or-announce) — so ONE crit, top-level or among instances, is enough to accept the wire shape.
+    const hasCrit = val.toHit?.verdict === "crit" || (val.instances?.some((i) => i.toHit?.verdict === "crit") ?? false);
+    if (val.assassinate && !hasCrit) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["assassinate"],
-        message: "assassinate requires toHit.verdict to be crit",
+        message: "assassinate requires toHit.verdict to be crit on the top-level roll or at least one instance",
+      });
+    }
+    if (val.instances && (val.toHit != null || val.effect != null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["instances"],
+        message: "instances is mutually exclusive with top-level toHit/effect",
       });
     }
   });

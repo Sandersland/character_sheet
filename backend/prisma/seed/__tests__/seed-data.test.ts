@@ -582,6 +582,35 @@ describe("SRD 5.2 catalog values — CHUNK 1 cantrips + L1 (#1132)", () => {
   });
 });
 
+describe("SRD 5.2 catalog values — multi-instance rows (#1981)", () => {
+  it("Magic Missile: 3 darts of 1d4+1 each, +1 dart per slot, instanceRoll 'each' (SRD 5.2 one-roll rule now covers only saving-throw effects, unlike PHB'14 p.196)", () => {
+    const mm = get("Magic Missile");
+    expect([mm.effectDiceCount, mm.effectDiceFaces, mm.effectModifier]).toEqual([1, 4, 1]);
+    expect(mm.instanceCount).toBe(3);
+    expect(mm.upcastInstancesPerLevel).toBe(1);
+    expect(mm.instanceRoll).toBe("each");
+    expect(mm.upcastDicePerLevel).toBeUndefined();
+  });
+
+  it("Scorching Ray: 3 rays of 2d6 each with their own attack rolls, +1 ray per slot", () => {
+    const sr = get("Scorching Ray");
+    expect([sr.effectDiceCount, sr.effectDiceFaces]).toEqual([2, 6]);
+    expect(sr.instanceCount).toBe(3);
+    expect(sr.upcastInstancesPerLevel).toBe(1);
+    expect(sr.instanceRoll).toBe("each");
+    expect(sr.upcastDicePerLevel).toBeUndefined();
+  });
+
+  it("Eldritch Blast: 1 beam of 1d10, cantripScaling scales the beam count", () => {
+    const eb = get("Eldritch Blast");
+    expect([eb.effectDiceCount, eb.effectDiceFaces]).toEqual([1, 10]);
+    expect(eb.cantripScaling).toBe(true);
+    expect(eb.instanceCount).toBe(1);
+    expect(eb.instanceRoll).toBe("each");
+    expect(eb.upcastInstancesPerLevel).toBeUndefined();
+  });
+});
+
 describe("SRD 5.2 catalog values — CHUNK 2 L2 + L3 (#1132)", () => {
   it("Barkskin becomes a non-concentration bonus-action floor-17 buff", () => {
     const bark = get("Barkskin");

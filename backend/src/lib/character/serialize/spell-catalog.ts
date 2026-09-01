@@ -35,6 +35,9 @@ function overlaySpellMechanics(spell: SpellEntry, mechanics: Spell): SpellEntry 
     saveAbility: orUndef(mechanics.saveAbility),
     upcastDicePerLevel: orUndef(mechanics.upcastDicePerLevel),
     cantripScaling: mechanics.cantripScaling,
+    instanceCount: orUndef(mechanics.instanceCount),
+    instanceRoll: orUndef(mechanics.instanceRoll),
+    upcastInstancesPerLevel: orUndef(mechanics.upcastInstancesPerLevel),
     buffTarget: orUndef(mechanics.buffTarget),
     buffModifier: orUndef(mechanics.buffModifier),
   };

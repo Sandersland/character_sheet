@@ -17,15 +17,30 @@ export default function HomebrewSpellEffectFields({ draft, update }: HomebrewSpe
         <span className={LABEL_CLS}>Upcast dice/level</span>
         <input
           type="number"
-          min={0}
+          min={1}
           className={INPUT_CLS}
           value={draft.upcastDicePerLevel ?? ""}
           onChange={(e) =>
             update({ upcastDicePerLevel: e.target.value === "" ? undefined : Number(e.target.value) })
           }
-          placeholder="0"
+          placeholder="1"
         />
       </label>
+      {(draft.instanceCount ?? 1) > 1 && (
+        <label className="block">
+          <span className={LABEL_CLS}>Upcast instances/level</span>
+          <input
+            type="number"
+            min={1}
+            className={INPUT_CLS}
+            value={draft.upcastInstancesPerLevel ?? ""}
+            onChange={(e) =>
+              update({ upcastInstancesPerLevel: e.target.value === "" ? undefined : Number(e.target.value) })
+            }
+            placeholder="1"
+          />
+        </label>
+      )}
       {draft.effectKind === "damage" && <HomebrewSpellDamageFields draft={draft} update={update} />}
     </div>
   );

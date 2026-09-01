@@ -128,6 +128,64 @@ describe("deriveGrantedSpells", () => {
     expect(spell.effectKind).toBe("buff");
   });
 
+  // #1981 review: a Prisma-loaded catalog row carries instanceCount/instanceRoll/upcastInstancesPerLevel
+  // as explicit `null`, not `undefined` — a naive `out.x = s.x` would serve three null keys on every
+  // damage/heal/buff grant, breaking the "un-instanced rows stay byte-identical" contract.
+  it("omits instanceCount/instanceRoll/upcastInstancesPerLevel keys for a damage grant with no instances (#1981)", () => {
+    const source: GrantedSpellSource = {
+      name: "Test Patron",
+      grantedSpells: [
+        {
+          gateLevel: 1,
+          castingAbility: "charisma",
+          edition: null,
+          spell: catalogSpell({
+            name: "Chill Touch",
+            level: 0,
+            effectKind: "damage",
+            effectDiceCount: 1,
+            effectDiceFaces: 8,
+            instanceCount: null,
+            instanceRoll: null,
+            upcastInstancesPerLevel: null,
+          }),
+        },
+      ],
+    };
+    const [spell] = deriveGrantedSpells(source, 1, "EDITION_2024");
+    expect("instanceCount" in spell).toBe(false);
+    expect("instanceRoll" in spell).toBe(false);
+    expect("upcastInstancesPerLevel" in spell).toBe(false);
+  });
+
+  it("carries instanceCount/instanceRoll/upcastInstancesPerLevel through for an instanced grant (#1981)", () => {
+    const source: GrantedSpellSource = {
+      name: "Test Patron",
+      grantedSpells: [
+        {
+          gateLevel: 1,
+          castingAbility: "charisma",
+          edition: null,
+          spell: catalogSpell({
+            name: "Eldritch Blast",
+            level: 0,
+            effectKind: "damage",
+            effectDiceCount: 1,
+            effectDiceFaces: 10,
+            cantripScaling: true,
+            instanceCount: 1,
+            instanceRoll: "each",
+            upcastInstancesPerLevel: null,
+          }),
+        },
+      ],
+    };
+    const [spell] = deriveGrantedSpells(source, 1, "EDITION_2024");
+    expect(spell.instanceCount).toBe(1);
+    expect(spell.instanceRoll).toBe("each");
+    expect("upcastInstancesPerLevel" in spell).toBe(false);
+  });
+
   // #1625: the set filter (shared-or-own-edition) lives in this module and nowhere else.
   describe("edition filter (#1625)", () => {
     const forked: GrantedSpellSource = {

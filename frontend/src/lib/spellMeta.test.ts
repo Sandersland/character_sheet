@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { effectPreview, isAttackCantrip, partyHealAllies, schoolLabel } from "@/lib/spellMeta";
+import { effectPreview, isAttackCantrip, partyHealAllies, schoolLabel, upcastHint } from "@/lib/spellMeta";
 import type { Session, Spell } from "@/types/character";
 
 describe("schoolLabel", () => {
@@ -133,6 +133,22 @@ const previewHeal = previewSpell({
 
 const previewUtility = previewSpell({ name: "Detect Magic", level: 1 });
 
+const previewScorchingRay = previewSpell({
+  name: "Scorching Ray",
+  level: 2,
+  effectKind: "damage",
+  damageType: "fire",
+  effectRolls: [{ slotLevel: 2, roll: { count: 2, faces: 6, modifier: 0 }, instanceCount: 3, instanceRoll: "each" }],
+});
+
+const previewEldritchBlastOneBeam = previewSpell({
+  name: "Eldritch Blast",
+  level: 0,
+  effectKind: "damage",
+  damageType: "force",
+  effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 10, modifier: 0 }, instanceCount: 1, instanceRoll: "each" }],
+});
+
 describe("effectPreview — golden string snapshots (#1381)", () => {
   it("effectPreview strings", () => {
     expect(effectPreview(previewFireball, 5)).toBe("10d6 fire");
@@ -144,5 +160,43 @@ describe("effectPreview — golden string snapshots (#1381)", () => {
   it("the grimoire and the picker render the same heal string at the same slot (#1381)", () => {
     expect(effectPreview(previewHeal)).toBe("2d8 + 3 healing");
     expect(effectPreview(previewHeal, 1)).toBe(effectPreview(previewHeal));
+  });
+
+  it("prefixes a multi-instance roll with its instance count, not the combined dice (#1981/#1986)", () => {
+    expect(effectPreview(previewScorchingRay, 2)).toBe("3 × 2d6 fire");
+  });
+
+  it("omits the instance prefix at instanceCount 1 — reads identically to an un-instanced roll (Eldritch Blast's base beam)", () => {
+    expect(effectPreview(previewEldritchBlastOneBeam)).toBe("1d10 force");
+  });
+});
+
+describe("upcastHint — multi-instance phrasing (#1981/#1984)", () => {
+  it("returns null for a cantrip regardless of upcast fields", () => {
+    expect(upcastHint({ level: 0, upcastDicePerLevel: 1, effectDiceFaces: 6, upcastInstancesPerLevel: undefined })).toBeNull();
+  });
+
+  it("keeps the plain dice-upcast phrasing when only upcastDicePerLevel is set (unaffected byte-identically)", () => {
+    expect(upcastHint({ level: 3, upcastDicePerLevel: 1, effectDiceFaces: 6, upcastInstancesPerLevel: undefined }))
+      .toBe("Upcast: +1d6 per slot level above 3");
+  });
+
+  it("renders instance-only upcast phrasing when only upcastInstancesPerLevel is set (Scorching Ray)", () => {
+    expect(upcastHint({ level: 2, upcastDicePerLevel: undefined, effectDiceFaces: 6, upcastInstancesPerLevel: 1 }))
+      .toBe("Upcast: +1 instance per slot level above 2");
+  });
+
+  it("pluralizes instance count when upcastInstancesPerLevel is greater than 1", () => {
+    expect(upcastHint({ level: 1, upcastDicePerLevel: undefined, effectDiceFaces: 4, upcastInstancesPerLevel: 2 }))
+      .toBe("Upcast: +2 instances per slot level above 1");
+  });
+
+  it("combines dice and instance upcast phrasing when a row sets both", () => {
+    expect(upcastHint({ level: 1, upcastDicePerLevel: 1, effectDiceFaces: 4, upcastInstancesPerLevel: 1 }))
+      .toBe("Upcast: +1d4 and +1 instance per slot level above 1");
+  });
+
+  it("returns null when neither upcast axis is set", () => {
+    expect(upcastHint({ level: 1, upcastDicePerLevel: undefined, effectDiceFaces: 6, upcastInstancesPerLevel: undefined })).toBeNull();
   });
 });

@@ -109,6 +109,47 @@ describe("buildHomebrewSpellPayload", () => {
     );
     expect(withoutUpcast.upcastDicePerLevel).toBeUndefined();
   });
+
+  describe("multi-instance fields (#1981/#1984)", () => {
+    it("omits instanceCount/instanceRoll/upcastInstancesPerLevel when unset — un-instanced spells stay byte-identical", () => {
+      const payload = buildHomebrewSpellPayload(
+        { ...BLANK_HOMEBREW_SPELL, name: "Bolt", effectKind: "damage", effectDiceCount: 8, effectDiceFaces: 6 },
+        true,
+      );
+      expect(payload.instanceCount).toBeUndefined();
+      expect(payload.instanceRoll).toBeUndefined();
+      expect(payload.upcastInstancesPerLevel).toBeUndefined();
+    });
+
+    it("includes instanceCount alone when set to 1 (no roll mode / upcast instances)", () => {
+      const payload = buildHomebrewSpellPayload(
+        { ...BLANK_HOMEBREW_SPELL, name: "Bolt", effectKind: "damage", effectDiceCount: 1, effectDiceFaces: 10, instanceCount: 1, instanceRoll: "once", upcastInstancesPerLevel: 1 },
+        true,
+      );
+      expect(payload.instanceCount).toBe(1);
+      expect(payload.instanceRoll).toBeUndefined();
+      expect(payload.upcastInstancesPerLevel).toBeUndefined();
+    });
+
+    it("includes instanceRoll + upcastInstancesPerLevel once instanceCount is greater than 1", () => {
+      const payload = buildHomebrewSpellPayload(
+        {
+          ...BLANK_HOMEBREW_SPELL,
+          name: "Bolt",
+          effectKind: "damage",
+          effectDiceCount: 1,
+          effectDiceFaces: 4,
+          instanceCount: 3,
+          instanceRoll: "once",
+          upcastInstancesPerLevel: 1,
+        },
+        true,
+      );
+      expect(payload.instanceCount).toBe(3);
+      expect(payload.instanceRoll).toBe("once");
+      expect(payload.upcastInstancesPerLevel).toBe(1);
+    });
+  });
 });
 
 describe("validateHomebrewSpellDraft", () => {
@@ -168,6 +209,52 @@ describe("validateHomebrewSpellDraft", () => {
 
   it("ignores effect fields entirely when hasEffect is false", () => {
     expect(validateHomebrewSpellDraft({ ...base, effectKind: "damage" }, false)).toBeNull();
+  });
+
+  describe("multi-instance fields (#1981/#1984)", () => {
+    const instanced = { ...base, effectKind: "damage" as const, effectDiceCount: 1, effectDiceFaces: 6, level: 1 };
+
+    it("rejects instanceRoll without instanceCount", () => {
+      expect(validateHomebrewSpellDraft({ ...instanced, instanceRoll: "each" }, true)).toMatch(/instance count/i);
+    });
+
+    it("rejects upcastInstancesPerLevel without instanceCount", () => {
+      expect(validateHomebrewSpellDraft({ ...instanced, upcastInstancesPerLevel: 1 }, true)).toMatch(/instance count/i);
+    });
+
+    it("rejects upcastInstancesPerLevel on a cantrip (level 0)", () => {
+      expect(
+        validateHomebrewSpellDraft({ ...instanced, level: 0, instanceCount: 2, upcastInstancesPerLevel: 1 }, true),
+      ).toMatch(/cantrip/i);
+    });
+
+    it("accepts instanceCount + instanceRoll + upcastInstancesPerLevel together on a leveled spell", () => {
+      expect(
+        validateHomebrewSpellDraft(
+          { ...instanced, instanceCount: 3, instanceRoll: "once", upcastInstancesPerLevel: 1 },
+          true,
+        ),
+      ).toBeNull();
+    });
+
+    it('rejects "once" on an attack-roll spell — the rail deadlock combination (#1987 round-5 review)', () => {
+      expect(
+        validateHomebrewSpellDraft(
+          { ...instanced, attackType: "attack", instanceCount: 3, instanceRoll: "once" },
+          true,
+        ),
+      ).toMatch(/attack-roll/i);
+      expect(
+        validateHomebrewSpellDraft(
+          { ...instanced, attackType: "attack", instanceCount: 3, instanceRoll: "each" },
+          true,
+        ),
+      ).toBeNull();
+    });
+
+    it("passes an un-instanced spell unaffected", () => {
+      expect(validateHomebrewSpellDraft(instanced, true)).toBeNull();
+    });
   });
 });
 
@@ -295,5 +382,19 @@ describe("toHomebrewSpellInput", () => {
   it("defaults components to all-false-but-verbal when the row has none", () => {
     const spell = catalogSpell({ ownerId: "u1", components: undefined });
     expect(toHomebrewSpellInput(spell).components).toEqual({ verbal: true, somatic: false, material: false });
+  });
+
+  it("carries instanceCount/instanceRoll/upcastInstancesPerLevel into the editable draft (#1984)", () => {
+    const spell = catalogSpell({
+      ownerId: "u1",
+      instanceCount: 3,
+      instanceRoll: "once",
+      upcastInstancesPerLevel: 1,
+    });
+    expect(toHomebrewSpellInput(spell)).toMatchObject({
+      instanceCount: 3,
+      instanceRoll: "once",
+      upcastInstancesPerLevel: 1,
+    });
   });
 });

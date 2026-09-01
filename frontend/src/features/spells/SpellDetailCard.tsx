@@ -27,6 +27,9 @@ export interface SpellDetailView {
   effectModifier?: number | null;
   damageType?: string | null;
   upcastDicePerLevel?: number | null;
+  // Multi-instance columns (#1981/#1984) — see shared-types' EffectColumns for the mechanic.
+  instanceCount?: number | null;
+  upcastInstancesPerLevel?: number | null;
 }
 
 interface CtaSlot {

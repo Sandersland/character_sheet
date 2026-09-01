@@ -35,6 +35,10 @@ export interface SpellEntry {
   saveAbility?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
+  // Multi-instance columns (#1981) — see shared-types' EffectColumns for the mechanic.
+  instanceCount?: number | null;
+  instanceRoll?: "each" | "once" | null;
+  upcastInstancesPerLevel?: number | null;
   // buffTarget: "ac" | "acUnarmoredBase" | "acFloor" (#363) — present only when effectKind is "buff"; snapshotted from the catalog at learn time.
   buffTarget?: string | null;
   buffModifier?: number | null;

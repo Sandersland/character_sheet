@@ -85,6 +85,42 @@ describe("SpellDetailCard", () => {
     expect(screen.getByText(/Upcast:/)).toBeInTheDocument();
   });
 
+  it("prefixes the effect pill with 'N × ' for a multi-instance spell (#1981/#1984)", () => {
+    const scorchingRay: SpellDetailView = {
+      ...holdPerson,
+      name: "Scorching Ray",
+      school: "evocation",
+      concentration: false,
+      attackType: "attack",
+      effectKind: "damage",
+      effectDiceCount: 2,
+      effectDiceFaces: 6,
+      damageType: "fire",
+      instanceCount: 3,
+    };
+    render(<SpellDetailCard spell={scorchingRay} cta={cta()} onClose={vi.fn()} />);
+    expect(screen.getByText(/3 × 2d6/)).toBeInTheDocument();
+  });
+
+  it("shows instance-upcast phrasing when upcastInstancesPerLevel is set", () => {
+    const scorchingRay: SpellDetailView = {
+      ...holdPerson,
+      name: "Scorching Ray",
+      level: 2,
+      school: "evocation",
+      concentration: false,
+      attackType: "attack",
+      effectKind: "damage",
+      effectDiceCount: 2,
+      effectDiceFaces: 6,
+      damageType: "fire",
+      instanceCount: 3,
+      upcastInstancesPerLevel: 1,
+    };
+    render(<SpellDetailCard spell={scorchingRay} cta={cta()} onClose={vi.fn()} />);
+    expect(screen.getByText(/\+1 instance per slot level above 2/)).toBeInTheDocument();
+  });
+
   it("renders the CTA label, honors disabled, and fires onPress", async () => {
     const onPress = vi.fn();
     const { rerender } = render(

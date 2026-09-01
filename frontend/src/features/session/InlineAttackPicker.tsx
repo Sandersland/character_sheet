@@ -247,8 +247,12 @@ export default function InlineAttackPicker({
     },
   });
   function handleCommit(rolls: ResolutionRolls) {
-    // The server schema requires toHit.verdict === "crit" whenever assassinate is set, so a miss (verdict settled by "it Missed") must never send true.
-    const assassinate = local.assassinateSurprised && rolls.toHit?.verdict === "crit";
+    // The server schema requires a crit verdict — top-level or on at least one instance — whenever
+    // assassinate is set, so an all-miss/no-crit resolution must never send true (mirrors
+    // resolveActionOperationSchema's own hasCrit check, #1983 — weapon attacks aren't instanced
+    // today, but this stays correct if a future multi-attack swing reuses this commit path).
+    const hasCrit = rolls.toHit?.verdict === "crit" || (rolls.instances?.some((i) => i.toHit?.verdict === "crit") ?? false);
+    const assassinate = local.assassinateSurprised && hasCrit;
     commit(resolution, rolls, local.riderEffects, assassinate);
   }
 

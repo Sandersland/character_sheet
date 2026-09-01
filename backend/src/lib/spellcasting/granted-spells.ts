@@ -77,6 +77,14 @@ function optionalSpellFields(s: GrantedSpellCatalogSpell): Partial<SpellEntry> {
     out.saveEffect = s.saveEffect;
     out.upcastDicePerLevel = s.upcastDicePerLevel;
     if (s.cantripScaling) out.cantripScaling = true;
+    // A Prisma row carries these as explicit `null`, not `undefined` — unconditional assignment
+    // would serve three null keys on every un-instanced grant, unlike readEffectSpec's own
+    // key-omission discipline (#1981 review).
+    if (s.instanceCount != null) {
+      out.instanceCount = s.instanceCount;
+      if (s.instanceRoll != null) out.instanceRoll = s.instanceRoll;
+      if (s.upcastInstancesPerLevel != null) out.upcastInstancesPerLevel = s.upcastInstancesPerLevel;
+    }
     out.buffTarget = s.buffTarget;
     out.buffModifier = s.buffModifier;
   }

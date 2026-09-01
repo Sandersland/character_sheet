@@ -11,6 +11,10 @@
 // Custom entries (no spellId) and dangling spellIds (catalog row gone, e.g. Toll
 // the Dead) are left untouched — those snapshots keep working forever as-is.
 //
+// Reused for #1981's multi-instance rewrite (Magic Missile/Scorching Ray/Eldritch Blast, both
+// editions): a character who learned one before the rewrite is frozen in the old combined-dice
+// shape until this runs — rerun this script (not a new one) for any future catalog resweep too.
+//
 // Idempotent: a character whose snapshots already match the catalog is a no-op.
 // Logs a summary (no undoable event) — this is a text/data refresh, not a
 // gameplay mutation. Imports only lib/ + prisma, per the migration-script rule.
@@ -44,6 +48,9 @@ function catalogSnapshotFields(spell: Spell) {
     saveAbility: spell.saveAbility,
     upcastDicePerLevel: spell.upcastDicePerLevel,
     cantripScaling: spell.cantripScaling,
+    instanceCount: spell.instanceCount,
+    instanceRoll: spell.instanceRoll,
+    upcastInstancesPerLevel: spell.upcastInstancesPerLevel,
     buffTarget: spell.buffTarget,
     buffModifier: spell.buffModifier,
   };

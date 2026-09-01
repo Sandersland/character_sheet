@@ -104,6 +104,43 @@ describe("buildResolveActionOp", () => {
     });
   });
 
+  describe("instances (#1981/#1983)", () => {
+    const INSTANCES = [
+      { toHit: { ...TO_HIT, verdict: "hit" as const }, effect: EFFECT },
+      { toHit: { ...TO_HIT, verdict: "miss" as const } },
+    ];
+
+    it("emits op.instances verbatim, sending top-level toHit/effect as explicit null (schema-permitted) rather than omitting them", () => {
+      const resolution: TurnResolution = {
+        source: "Scorching Ray",
+        cost: { kind: "action" },
+        instances: { count: 2, roll: "each" },
+      };
+
+      const op = buildResolveActionOp(resolution, rolls({ toHit: null, effect: null, instances: INSTANCES }));
+
+      expect(op.instances).toEqual(INSTANCES);
+      expect(op.toHit).toBeNull();
+      expect(op.effect).toBeNull();
+    });
+
+    it("omits instances entirely when rolls carries none (the common single-instance op)", () => {
+      const resolution: TurnResolution = { source: "Fire Bolt", cost: { kind: "action" } };
+
+      const op = buildResolveActionOp(resolution, rolls());
+
+      expect(op).not.toHaveProperty("instances");
+    });
+
+    it("omits instances when rolls carries an empty array", () => {
+      const resolution: TurnResolution = { source: "Fire Bolt", cost: { kind: "action" } };
+
+      const op = buildResolveActionOp(resolution, rolls({ instances: [] }));
+
+      expect(op).not.toHaveProperty("instances");
+    });
+  });
+
   describe("entryId/apply (#1833)", () => {
     it("carries entryId when the options supply it — omits it otherwise", () => {
       const resolution: TurnResolution = { source: "Cure Wounds", cost: { kind: "action" } };
