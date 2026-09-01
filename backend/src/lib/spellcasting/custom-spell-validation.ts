@@ -40,6 +40,11 @@ function validateCustomSpellInstanceCoherence(input: CustomSpellCoherenceInput):
   if (input.upcastInstancesPerLevel !== undefined && input.level < 1) {
     return "upcastInstancesPerLevel is a slot-upcast axis — never legal on a cantrip (level 0)";
   }
+  // attack+once would deadlock the rail: the step machine demands a per-instance to-hit the
+  // once-mode view never offers. No seeded spell pairs them (MM: no attack; SR/EB: "each").
+  if (input.attackType === "attack" && input.instanceRoll === "once") {
+    return 'instanceRoll "once" is not valid for an attack-roll spell — each attack rolls its own instance';
+  }
   return null;
 }
 

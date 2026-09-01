@@ -28,11 +28,13 @@ function resolveEffectDice(row: EffectRow, resolveDie?: ClassDieResolver): Effec
 // or vice versa (any pre-#1981 spell) — either alone is enough to select slotUpcast.
 function resolveEffectScaling(row: EffectRow): EffectScaling {
   if (row.level === 0 && row.cantripScaling) return { mode: "cantripLevel" };
-  if (row.level > 0 && (row.upcastDicePerLevel || row.upcastInstancesPerLevel)) {
+  // Explicit null checks, not truthiness — a stored 0 (schema-rejected today, but this is a plain
+  // column read) must not silently drop the whole slotUpcast mode.
+  if (row.level > 0 && (row.upcastDicePerLevel != null || row.upcastInstancesPerLevel != null)) {
     return {
       mode: "slotUpcast",
-      ...(row.upcastDicePerLevel ? { dicePerStep: row.upcastDicePerLevel } : {}),
-      ...(row.upcastInstancesPerLevel ? { instancesPerStep: row.upcastInstancesPerLevel } : {}),
+      ...(row.upcastDicePerLevel != null ? { dicePerStep: row.upcastDicePerLevel } : {}),
+      ...(row.upcastInstancesPerLevel != null ? { instancesPerStep: row.upcastInstancesPerLevel } : {}),
     };
   }
   return { mode: "none" };

@@ -237,6 +237,21 @@ describe("validateHomebrewSpellDraft", () => {
       ).toBeNull();
     });
 
+    it('rejects "once" on an attack-roll spell — the rail deadlock combination (#1987 round-5 review)', () => {
+      expect(
+        validateHomebrewSpellDraft(
+          { ...instanced, attackType: "attack", instanceCount: 3, instanceRoll: "once" },
+          true,
+        ),
+      ).toMatch(/attack-roll/i);
+      expect(
+        validateHomebrewSpellDraft(
+          { ...instanced, attackType: "attack", instanceCount: 3, instanceRoll: "each" },
+          true,
+        ),
+      ).toBeNull();
+    });
+
     it("passes an un-instanced spell unaffected", () => {
       expect(validateHomebrewSpellDraft(instanced, true)).toBeNull();
     });

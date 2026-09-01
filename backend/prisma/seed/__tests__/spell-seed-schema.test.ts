@@ -111,6 +111,15 @@ describe("spellSeedSchema — multi-instance fields (#1981)", () => {
       spellSeedSchema.safeParse({ ...baseSpell, level: 1, instanceCount: 3, upcastInstancesPerLevel: 1 }).success,
     ).toBe(true);
   });
+
+  it('rejects instanceRoll "once" on an attack-roll spell — the rail deadlock combination (#1987 round-5 review)', () => {
+    expect(
+      spellSeedSchema.safeParse({ ...baseSpell, attackType: "attack", instanceCount: 3, instanceRoll: "once" }).success,
+    ).toBe(false);
+    expect(
+      spellSeedSchema.safeParse({ ...baseSpell, attackType: "attack", instanceCount: 3, instanceRoll: "each" }).success,
+    ).toBe(true);
+  });
 });
 
 describe("spellSeedSchema — buffTarget (narrower than ClassFeature's: AC family only)", () => {

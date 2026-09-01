@@ -117,6 +117,12 @@ export const spellSeedSchema = z.object({
   .refine((s) => s.upcastInstancesPerLevel == null || s.level >= 1, {
     message: "upcastInstancesPerLevel is a slot-upcast axis — never legal on a cantrip (level 0)",
     path: ["upcastInstancesPerLevel"],
+  })
+  // attack+once would deadlock the rail (per-instance to-hit demanded, never offered) — no 5e
+  // spell pairs them; validateCustomSpellInstanceCoherence mirrors this for homebrew.
+  .refine((s) => s.attackType !== "attack" || s.instanceRoll !== "once", {
+    message: 'instanceRoll "once" is not valid for an attack-roll spell',
+    path: ["instanceRoll"],
   });
 
 // Renames the catalog row in place at seed time (applySpellRenames), preserving its id so SubclassGrantedSpell/InventoryCapability.spellId FKs survive. `to` must be a live SPELLS name; `from` must not be.

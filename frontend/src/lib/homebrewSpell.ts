@@ -78,6 +78,9 @@ function validateHomebrewInstanceFields(draft: HomebrewSpellInput): string | nul
   if (draft.upcastInstancesPerLevel !== undefined && draft.level < 1) {
     return "Upcast instances/level is never legal on a cantrip (level 0).";
   }
+  if (draft.attackType === "attack" && draft.instanceRoll === "once") {
+    return '"Roll once" is not valid for an attack-roll spell — each attack rolls its own instance.';
+  }
   return null;
 }
 

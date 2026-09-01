@@ -483,6 +483,12 @@ function buildInstancedResolutionRow(
     return buildAllMissedInstancedRow(e, instances, source, round);
   }
 
+  // No landed effect anywhere and not all-missed (a data anomaly — the commit path always writes
+  // auto-hit effects) — degrade to the stored summary rather than render "0  damage".
+  if (!instances.some((i) => i.effect != null && (!i.toHit || i.toHit.verdict !== "miss"))) {
+    return summaryFallbackRow(e, round);
+  }
+
   const { total, type, kind } = instancesEffectTotal(instances);
   const isHeal = kind === "heal";
   const isCrit = instances.some((i) => i.toHit?.verdict === "crit" || i.effect?.crit === true);
