@@ -58,6 +58,7 @@ async function backdateSession(sessionId: string, agoMs: number): Promise<Date> 
   await prisma.session.update({ where: { id: sessionId }, data: { startedAt: at } });
   await prisma.sessionParticipant.updateMany({ where: { sessionId }, data: { joinedAt: at } });
   await prisma.characterEvent.updateMany({ where: { sessionId }, data: { createdAt: at } });
+  await prisma.journalEntry.updateMany({ where: { sessionId }, data: { createdAt: at } });
   return at;
 }
 

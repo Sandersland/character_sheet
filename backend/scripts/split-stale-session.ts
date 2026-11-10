@@ -83,7 +83,8 @@ function firstActivityByCharacter(segment: Segment, participantIds: Set<string>)
 }
 
 function leftAtWithin(leftAt: Date | null, segment: Segment): Date | null {
-  return leftAt && leftAt >= segment.start && leftAt <= segment.end ? leftAt : null;
+  if (!leftAt || leftAt < segment.start) return null;
+  return leftAt > segment.end ? segment.end : leftAt;
 }
 
 async function applySplit(db: PrismaClient, session: LoadedSession, segments: Segment[]): Promise<string[]> {

@@ -136,6 +136,21 @@ describe("splitSession", () => {
     );
   });
 
+  it("clamps a departure that fell in the idle gap to the end of the sitting it left", async () => {
+    const sessionId = await makeMergedSession("ended");
+    await prisma.sessionParticipant.updateMany({
+      where: { sessionId, characterId: CHAR_B },
+      data: { leftAt: at(firstSitting, 5) },
+    });
+
+    await splitSession(sessionId, { apply: true });
+
+    const b = await prisma.sessionParticipant.findUniqueOrThrow({
+      where: { sessionId_characterId: { sessionId, characterId: CHAR_B } },
+    });
+    expect(b.leftAt?.getTime()).toBe(at(firstSitting, 3).getTime());
+  });
+
   it("closes a still-active merged session", async () => {
     const sessionId = await makeMergedSession("active");
 

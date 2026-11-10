@@ -123,28 +123,20 @@ function autoCloseEndTime(
   return graceExpired ? new Date(lastLeftMs + SESSION_GRACE_MS) : null;
 }
 
+// Checked newest-signal-first so a session in play costs at most one indexed lookup; this runs on every transaction via getActiveSessionId.
 async function inactivityEndTime(session: SessionWithParticipants): Promise<Date | null> {
   const isIdle = (at: Date) => Date.now() - at.getTime() >= SESSION_INACTIVITY_MS;
-  if (!isIdle(session.startedAt)) return null;
-  const lastActivity = await lastSessionActivity(prisma, session);
-  return isIdle(lastActivity) ? lastActivity : null;
-}
+  const seen = [session.startedAt, ...session.participants.flatMap((p) => [p.joinedAt, p.leftAt])];
+  const latestOf = (dates: (Date | null | undefined)[]) =>
+    new Date(Math.max(...dates.filter((d): d is Date => d != null).map((d) => d.getTime())));
+  if (!isIdle(latestOf(seen))) return null;
 
-async function lastSessionActivity(
-  db: Prisma.TransactionClient,
-  session: Pick<SessionWithParticipants, "id" | "startedAt" | "participants">,
-): Promise<Date> {
-  const [event, journal] = await Promise.all([
-    db.characterEvent.aggregate({ where: { sessionId: session.id }, _max: { createdAt: true } }),
-    db.journalEntry.aggregate({ where: { sessionId: session.id }, _max: { createdAt: true } }),
-  ]);
-  const candidates = [
-    session.startedAt,
-    event._max.createdAt,
-    journal._max.createdAt,
-    ...session.participants.flatMap((p) => [p.joinedAt, p.leftAt]),
-  ].filter((d): d is Date => d !== null);
-  return new Date(Math.max(...candidates.map((d) => d.getTime())));
+  const latest = { where: { sessionId: session.id }, orderBy: { createdAt: "desc" }, select: { createdAt: true } } as const;
+  const event = await prisma.characterEvent.findFirst(latest);
+  if (event && !isIdle(event.createdAt)) return null;
+  const journal = await prisma.journalEntry.findFirst(latest);
+  if (journal && !isIdle(journal.createdAt)) return null;
+  return latestOf([...seen, event?.createdAt, journal?.createdAt]);
 }
 
 // Idempotent — also called from applyExperienceOperations's retroactive recompute.
