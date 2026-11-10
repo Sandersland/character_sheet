@@ -29,6 +29,9 @@ export class CombatError extends Error {
 }
 
 const SESSION_GRACE_MS = 60 * 60 * 1000;
+// Players close tabs instead of pressing Leave, so the everyone-left rule alone let a session sit open for two weeks and swallow the next sitting.
+// fallow-ignore-next-line unused-export -- also read by split-stale-session, under the ignored backend/scripts/**
+export const SESSION_INACTIVITY_MS = 12 * 60 * 60 * 1000;
 
 // campaignPreferences rides along so the session UI can offer party-target healing only to allies who opted in (#462).
 const sessionWithParticipants = {
@@ -100,7 +103,7 @@ async function maybeAutoClose(
   session: SessionWithParticipants,
 ): Promise<SessionWithParticipants> {
   if (session.status !== "active") return session;
-  const endedAt = autoCloseEndTime(session.participants);
+  const endedAt = autoCloseEndTime(session.participants) ?? (await inactivityEndTime(session));
   if (!endedAt) return session;
   await closeSession(session, endedAt);
   return { ...session, status: "ended", endedAt };
@@ -118,6 +121,30 @@ function autoCloseEndTime(
   const lastLeftMs = Math.max(...participants.map((p) => p.leftAt!.getTime()));
   const graceExpired = Date.now() - lastLeftMs >= SESSION_GRACE_MS;
   return graceExpired ? new Date(lastLeftMs + SESSION_GRACE_MS) : null;
+}
+
+async function inactivityEndTime(session: SessionWithParticipants): Promise<Date | null> {
+  const isIdle = (at: Date) => Date.now() - at.getTime() >= SESSION_INACTIVITY_MS;
+  if (!isIdle(session.startedAt)) return null;
+  const lastActivity = await lastSessionActivity(prisma, session);
+  return isIdle(lastActivity) ? lastActivity : null;
+}
+
+async function lastSessionActivity(
+  db: Prisma.TransactionClient,
+  session: Pick<SessionWithParticipants, "id" | "startedAt" | "participants">,
+): Promise<Date> {
+  const [event, journal] = await Promise.all([
+    db.characterEvent.aggregate({ where: { sessionId: session.id }, _max: { createdAt: true } }),
+    db.journalEntry.aggregate({ where: { sessionId: session.id }, _max: { createdAt: true } }),
+  ]);
+  const candidates = [
+    session.startedAt,
+    event._max.createdAt,
+    journal._max.createdAt,
+    ...session.participants.flatMap((p) => [p.joinedAt, p.leftAt]),
+  ].filter((d): d is Date => d !== null);
+  return new Date(Math.max(...candidates.map((d) => d.getTime())));
 }
 
 // Idempotent — also called from applyExperienceOperations's retroactive recompute.

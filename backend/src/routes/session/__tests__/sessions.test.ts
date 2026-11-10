@@ -51,6 +51,16 @@ async function setupCampaign(): Promise<string> {
   return campaignId;
 }
 
+const HOUR_MS = 60 * 60 * 1000;
+
+async function backdateSession(sessionId: string, agoMs: number): Promise<Date> {
+  const at = new Date(Date.now() - agoMs);
+  await prisma.session.update({ where: { id: sessionId }, data: { startedAt: at } });
+  await prisma.sessionParticipant.updateMany({ where: { sessionId }, data: { joinedAt: at } });
+  await prisma.characterEvent.updateMany({ where: { sessionId }, data: { createdAt: at } });
+  return at;
+}
+
 function startUrl(campaignId: string) {
   return `/api/campaigns/${campaignId}/sessions`;
 }
@@ -250,6 +260,48 @@ describe("auto-close after the grace period", () => {
     const session = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
     expect(session.status).toBe("ended");
     expect(session.endedAt).not.toBeNull();
+  });
+
+  it("auto-closes a session nobody touched for 12h, ending it at the last activity", async () => {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    const sessionId = start.body.session.id as string;
+    const lastActivity = await backdateSession(sessionId, 13 * HOUR_MS);
+
+    const active = await agent(cookieOwner).get(`/api/characters/${CHAR_OWNER}/sessions/active`);
+    expect(active.status).toBe(200);
+    expect(active.body).toBeNull();
+
+    const session = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
+    expect(session.status).toBe("ended");
+    expect(session.endedAt?.getTime()).toBe(lastActivity.getTime());
+    expect(session.summary).not.toBeNull();
+  });
+
+  it("stays open past 12h when an event was logged recently", async () => {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    const sessionId = start.body.session.id as string;
+    await backdateSession(sessionId, 13 * HOUR_MS);
+    await prisma.characterEvent.create({
+      data: { characterId: CHAR_OWNER, category: "combat", type: "combatStarted", summary: "Combat started", sessionId },
+    });
+
+    const active = await agent(cookieOwner).get(`/api/characters/${CHAR_OWNER}/sessions/active`);
+    expect(active.body?.id).toBe(sessionId);
+  });
+
+  it("stays open past 12h when a journal entry was written recently", async () => {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    const sessionId = start.body.session.id as string;
+    await backdateSession(sessionId, 13 * HOUR_MS);
+    await prisma.journalEntry.create({
+      data: { characterId: CHAR_OWNER, sessionId, date: new Date(), body: "still here", authorUserId: OWNER },
+    });
+
+    const active = await agent(cookieOwner).get(`/api/characters/${CHAR_OWNER}/sessions/active`);
+    expect(active.body?.id).toBe(sessionId);
   });
 
   it("stays open if someone rejoined before the grace elapsed", async () => {

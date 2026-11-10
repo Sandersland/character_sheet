@@ -249,6 +249,24 @@ describe("solo session event tagging", () => {
   });
 });
 
+describe("solo session inactivity auto-close", () => {
+  it("auto-closes a solo session nobody touched for 12h", async () => {
+    const session = await startSoloSession(CHAR_SOLO);
+    const idleSince = new Date(Date.now() - 13 * 60 * 60 * 1000);
+    await prisma.session.update({ where: { id: session.id }, data: { startedAt: idleSince } });
+    await prisma.sessionParticipant.updateMany({ where: { sessionId: session.id }, data: { joinedAt: idleSince } });
+    await prisma.characterEvent.updateMany({ where: { sessionId: session.id }, data: { createdAt: idleSince } });
+
+    const active = await agent().get(`/api/characters/${CHAR_SOLO}/sessions/active`);
+    expect(active.status).toBe(200);
+    expect(active.body).toBeNull();
+
+    const closed = await prisma.session.findUniqueOrThrow({ where: { id: session.id } });
+    expect(closed.status).toBe("ended");
+    expect(closed.endedAt?.getTime()).toBe(idleSince.getTime());
+  });
+});
+
 describe("solo session combat + rolls", () => {
   it("logs combat start, round, and a roll on a solo session", async () => {
     const session = await startSoloSession(CHAR_SOLO);
