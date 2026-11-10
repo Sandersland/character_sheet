@@ -11,6 +11,7 @@ export interface ChronicleChapter {
   startedAt: string | null;
   noteCount: number;
   participantIds: string[];
+  live: boolean;
 }
 
 export interface ChroniclePart {
@@ -39,6 +40,8 @@ export interface ChronicleInput {
   noteCountBySessionId: Map<string, number>;
   betweenNoteCount: number;
   hasSessionlessEntries: boolean;
+  /** The session the character has joined and is playing right now, if any. */
+  liveSessionId?: string | null;
 }
 
 const ROMAN: Array<[number, string]> = [
@@ -59,7 +62,7 @@ export function toRoman(value: number): string {
   return out;
 }
 
-function toChapter(session: ChronicleSession, noteCount: number): ChronicleChapter {
+function toChapter(session: ChronicleSession, noteCount: number, live: boolean): ChronicleChapter {
   const title = session.title?.trim() ? session.title.trim() : `Session ${session.sessionNumber}`;
   return {
     id: session.id,
@@ -69,6 +72,7 @@ function toChapter(session: ChronicleSession, noteCount: number): ChronicleChapt
     startedAt: session.startedAt,
     noteCount,
     participantIds: session.participants?.map((p) => p.characterId) ?? [],
+    live,
   };
 }
 
@@ -92,6 +96,7 @@ function makeBetween(noteCount: number, present: boolean): ChronicleChapter | nu
     startedAt: null,
     noteCount,
     participantIds: [],
+    live: false,
   };
 }
 
@@ -141,9 +146,9 @@ function buildParts(
 }
 
 export function buildChronicleSpine(input: ChronicleInput): ChronicleSpine {
-  const { arcs, sessions, noteCountBySessionId, betweenNoteCount, hasSessionlessEntries } = input;
+  const { arcs, sessions, noteCountBySessionId, betweenNoteCount, hasSessionlessEntries, liveSessionId } = input;
 
-  const chapters = sessions.map((s) => toChapter(s, noteCountBySessionId.get(s.id) ?? 0));
+  const chapters = sessions.map((s) => toChapter(s, noteCountBySessionId.get(s.id) ?? 0, s.id === liveSessionId));
   const between = makeBetween(betweenNoteCount, hasSessionlessEntries);
   const totalNotes = chapters.reduce((sum, c) => sum + c.noteCount, 0) + (between?.noteCount ?? 0);
   const chapterCount = chapters.length;
@@ -153,6 +158,8 @@ export function buildChronicleSpine(input: ChronicleInput): ChronicleSpine {
 }
 
 export function defaultChapterId(spine: ChronicleSpine): string | null {
+  const live = spine.chapters.find((c) => c.live);
+  if (live) return live.id;
   if (spine.hasParts) {
     for (const part of spine.parts) {
       if (part.chapters.length > 0) return part.chapters[0].id;

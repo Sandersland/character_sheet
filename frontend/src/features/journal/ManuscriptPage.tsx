@@ -15,6 +15,8 @@ interface ManuscriptPageProps {
   entities: Map<string, CampaignEntity>;
   canRename: boolean;
   onRename: (title: string) => Promise<boolean>;
+  liveChapter?: ChronicleChapter | null;
+  onSwitchToLive?: () => void;
 }
 
 const DROP_CAP =
@@ -41,6 +43,8 @@ export default function ManuscriptPage({
   entities,
   canRename,
   onRename,
+  liveChapter,
+  onSwitchToLive,
 }: ManuscriptPageProps) {
   const { character } = useCurrentCharacter();
   const { busy, error, create, update, remove } = useJournalMutations(character.id);
@@ -125,7 +129,11 @@ export default function ManuscriptPage({
       <FieldNotes notes={notes} row={rowState} {...editPanelProps} />
 
       <div className="mt-auto pt-6">
+        {liveChapter && liveChapter.id !== chapter.id && (
+          <LiveSessionNotice chapter={chapter} liveChapter={liveChapter} onSwitch={onSwitchToLive} />
+        )}
         <ChapterComposer
+          chapterId={chapter.id}
           campaignId={character.campaignId}
           busy={busy}
           onSave={(body, visibility) =>
@@ -421,17 +429,49 @@ function RowActions({
   );
 }
 
+function LiveSessionNotice({
+  chapter,
+  liveChapter,
+  onSwitch,
+}: {
+  chapter: ChronicleChapter;
+  liveChapter: ChronicleChapter;
+  onSwitch?: () => void;
+}) {
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-control border border-gold-300 bg-gold-50 px-3 py-2 text-xs text-gold-900">
+      <span>
+        You're in a live session ({liveChapter.title}). Notes added in this chapter are filed under{" "}
+        <strong>{chapter.title}</strong>. Quick capture always goes to the live session.
+      </span>
+      {onSwitch && (
+        <button type="button" onClick={onSwitch} className="font-semibold text-garnet-700 hover:underline">
+          Switch to live session
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ChapterComposer({
+  chapterId,
   campaignId,
   busy,
   onSave,
 }: {
+  chapterId: string;
   campaignId?: string | null;
   busy: boolean;
   onSave: (body: string, visibility?: EntryVisibility) => Promise<boolean>;
 }) {
   const [value, setValue] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [privateForChapter, setPrivateForChapter] = useState(chapterId);
+  // The draft text follows a chapter switch, but Private does not: a note silently hidden from the DM is worse than an unchecked box.
+  if (privateForChapter !== chapterId) {
+    setPrivateForChapter(chapterId);
+    setIsPrivate(false);
+  }
 
   async function save() {
     const body = value.trim();

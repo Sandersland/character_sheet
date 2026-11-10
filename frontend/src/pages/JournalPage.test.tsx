@@ -8,7 +8,7 @@ import * as client from "@/api/client";
 import { getQueryClient } from "@/api/queryClient";
 import { sessionKeys } from "@/api/queryKeys";
 import { __resetCampaignEntitiesCacheForTests } from "@/hooks/useCampaignEntities";
-import type { CampaignArc, Character, ChronicleSession, JournalEntry } from "@/types/character";
+import type { CampaignArc, Character, ChronicleSession, JournalEntry, SessionDoorwayState } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchCharacter: vi.fn(),
@@ -19,6 +19,8 @@ vi.mock("@/api/client", () => ({
   updateJournalEntry: vi.fn(),
   deleteJournalEntry: vi.fn(),
   updateSessionTitle: vi.fn(),
+  fetchSessionDoorway: vi.fn(),
+  fetchActiveSession: vi.fn().mockResolvedValue(null),
 }));
 
 // Force the desktop layout (spine + manuscript render together) — the default
@@ -71,6 +73,27 @@ function makeCharacter(over: Partial<Character>): Character {
   } as unknown as Character;
 }
 
+function noDoorway(): SessionDoorwayState {
+  return { campaignId: "camp-1", role: "PLAYER", canStart: true, kind: "none", session: null };
+}
+
+function liveDoorway(sessionId: string): SessionDoorwayState {
+  return {
+    campaignId: "camp-1",
+    role: "PLAYER",
+    canStart: true,
+    kind: "liveJoined",
+    session: { id: sessionId, status: "active", startedAt: "2026-07-13T00:00:00.000Z", scheduledAt: null, title: null, joined: true, round: null },
+  };
+}
+
+function liveAndPastSessions() {
+  return [
+    session({ id: "s2", sessionNumber: 2, title: "The Burning Inn", status: "active" }),
+    session({ id: "s1", sessionNumber: 1, title: "The Road to Vadua" }),
+  ];
+}
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/characters/char-1/journal"]}>
@@ -88,6 +111,8 @@ beforeEach(() => {
   vi.mocked(client.fetchCampaignArcs).mockResolvedValue([]);
   vi.mocked(client.fetchChronicleSessions).mockResolvedValue([]);
   vi.mocked(client.fetchEntities).mockResolvedValue([]);
+  vi.mocked(client.fetchSessionDoorway).mockResolvedValue(noDoorway());
+  getQueryClient().clear();
 });
 
 describe("JournalPage", () => {
@@ -173,5 +198,105 @@ describe("JournalPage", () => {
       sessionKeys.chronicle("camp-1", "char-1"),
     );
     expect(cached?.sessions.find((s) => s.id === "s1")?.title).toBe("New Name");
+  });
+
+  describe("during a live session (#1991)", () => {
+    beforeEach(() => {
+      vi.mocked(client.fetchSessionDoorway).mockResolvedValue(liveDoorway("s2"));
+      vi.mocked(client.fetchChronicleSessions).mockResolvedValue(liveAndPastSessions());
+      vi.mocked(client.fetchCharacter).mockResolvedValue(makeCharacter({}));
+      vi.mocked(client.createJournalEntry).mockResolvedValue(makeCharacter({}));
+    });
+
+    it("selects the live chapter and tags it Live in the spine", async () => {
+      renderPage();
+
+      expect(await screen.findByRole("heading", { name: "The Burning Inn" })).toBeInTheDocument();
+      const liveRow = screen.getByRole("button", { name: /The Burning Inn/ });
+      expect(await within(liveRow).findByText("Live")).toBeInTheDocument();
+      expect(within(screen.getByRole("button", { name: /The Road to Vadua/ })).queryByText("Live")).toBeNull();
+    });
+
+    it("refetches the chronicle when the live session is missing from it", async () => {
+      vi.mocked(client.fetchChronicleSessions)
+        .mockResolvedValueOnce([session({ id: "s1", sessionNumber: 1, title: "The Road to Vadua" })])
+        .mockResolvedValue(liveAndPastSessions());
+
+      renderPage();
+
+      expect(await screen.findByRole("heading", { name: "The Burning Inn" })).toBeInTheDocument();
+      expect(client.fetchChronicleSessions).toHaveBeenCalledTimes(2);
+    });
+
+    it("files a quick-capture note into the live session even with an older chapter selected", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /The Road to Vadua/ }));
+      await screen.findByRole("heading", { name: "The Road to Vadua" });
+
+      await user.click(screen.getByRole("button", { name: "Quick capture" }));
+      await user.type(screen.getByRole("textbox", { name: /quick note/i }), "Waylin talks");
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => expect(client.createJournalEntry).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(client.createJournalEntry).mock.calls[0][1]).toMatchObject({ kind: "NOTE", sessionId: "s2" });
+    });
+
+    it("warns when writing on an older chapter, still files there, and offers a switch that keeps the draft", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /The Road to Vadua/ }));
+      await screen.findByRole("heading", { name: "The Road to Vadua" });
+
+      expect(await screen.findByText(/You're in a live session/)).toBeInTheDocument();
+      const composer = screen.getByRole("textbox", { name: "Add to this chapter" });
+      await user.type(composer, "A note about last time");
+      await user.click(screen.getByRole("button", { name: "Switch to live session" }));
+
+      expect(await screen.findByRole("heading", { name: "The Burning Inn" })).toBeInTheDocument();
+      expect(screen.queryByText(/You're in a live session/)).toBeNull();
+      expect(screen.getByRole("textbox", { name: "Add to this chapter" })).toHaveTextContent("A note about last time");
+    });
+
+    it("clears Private when switching to the live session", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /The Road to Vadua/ }));
+      await screen.findByText(/You're in a live session/);
+
+      await user.click(screen.getByRole("checkbox", { name: "Private" }));
+      await user.click(screen.getByRole("button", { name: "Switch to live session" }));
+
+      await screen.findByRole("heading", { name: "The Burning Inn" });
+      expect(screen.getByRole("checkbox", { name: "Private" })).not.toBeChecked();
+    });
+
+    it("files a chapter note into the selected older chapter when the player stays there", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /The Road to Vadua/ }));
+      await screen.findByText(/You're in a live session/);
+
+      await user.type(screen.getByRole("textbox", { name: "Add to this chapter" }), "Remembered later");
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => expect(client.createJournalEntry).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(client.createJournalEntry).mock.calls[0][1]).toMatchObject({ sessionId: "s1" });
+    });
+  });
+
+  it("shows no live-session notice when there is no live session", async () => {
+    vi.mocked(client.fetchChronicleSessions).mockResolvedValue([
+      session({ id: "s2", sessionNumber: 2, title: "The Burning Inn" }),
+      session({ id: "s1", sessionNumber: 1, title: "The Road to Vadua" }),
+    ]);
+    vi.mocked(client.fetchCharacter).mockResolvedValue(makeCharacter({}));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /The Road to Vadua/ }));
+    await screen.findByRole("heading", { name: "The Road to Vadua" });
+    expect(screen.queryByText(/You're in a live session/)).toBeNull();
+    expect(screen.queryByText("Live")).toBeNull();
   });
 });
