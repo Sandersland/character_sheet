@@ -1,24 +1,19 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ArrowLeft } from "@/components/ui/icons";
 import CapturePalette from "@/features/journal/CapturePalette";
 import ChronicleSpine from "@/features/journal/ChronicleSpine";
 import ManuscriptPage from "@/features/journal/ManuscriptPage";
-import {
-  buildChronicleSpine,
-  defaultChapterId,
-  findChapter,
-  type ChronicleSpine as Spine,
-} from "@/features/journal/chronicle";
-import { useChronicle } from "@/features/journal/useChronicle";
+import type { ChronicleChapter, ChronicleSpine as Spine } from "@/features/journal/chronicle";
+import { useChronicleSelection } from "@/features/journal/useChronicleSelection";
 import { useRenameChapterMutation } from "@/features/journal/useRenameChapterMutation";
+import { LiveSessionProvider } from "@/features/session/LiveSessionProvider";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
 import { CharacterRouteGate } from "@/hooks/CharacterRouteGate";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
-import type { Character } from "@/types/character";
 
 export default function JournalPage() {
   return (
@@ -28,65 +23,27 @@ export default function JournalPage() {
   );
 }
 
-function deriveNoteCounts(journal: Character["journal"]) {
-  const bySession = new Map<string, number>();
-  let between = 0;
-  for (const entry of journal) {
-    if (entry.sessionId) bySession.set(entry.sessionId, (bySession.get(entry.sessionId) ?? 0) + 1);
-    else between += 1;
-  }
-  return { bySession, between };
-}
-
 function JournalPageBody() {
   const { character } = useCurrentCharacter();
-  const isMobile = useIsBelowMd();
-  const { arcs, sessions, error } = useChronicle(character);
-  const { byId } = useCampaignEntities(character.campaignId);
-  const renameMutation = useRenameChapterMutation(character.id);
+  return (
+    <LiveSessionProvider characterId={character.id}>
+      <JournalChronicle />
+    </LiveSessionProvider>
+  );
+}
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+function JournalChronicle() {
+  const { character } = useCurrentCharacter();
+  const isMobile = useIsBelowMd();
+  const selection = useChronicleSelection(character);
+  const { spine, error, effectiveId, setSelectedId, liveSessionId, selectedChapter, liveChapter } = selection;
   const [filter, setFilter] = useState("");
 
-  const counts = useMemo(() => deriveNoteCounts(character.journal), [character.journal]);
-  const spine = useMemo(
-    () =>
-      buildChronicleSpine({
-        arcs,
-        sessions,
-        noteCountBySessionId: counts.bySession,
-        betweenNoteCount: counts.between,
-        hasSessionlessEntries: counts.between > 0,
-      }),
-    [arcs, sessions, counts],
-  );
-
-  // Derived (not stored) so the selection tracks the newest session as the
-  // chronicle loads, instead of sticking on the between-sessions default from
-  // the empty spine.
-  const effectiveId = selectedId && findChapter(spine, selectedId) ? selectedId : defaultChapterId(spine);
-  const selectedChapter = findChapter(spine, effectiveId);
-
-  async function handleRename(title: string): Promise<boolean> {
-    if (!character.campaignId || !selectedChapter?.sessionId) return false;
-    try {
-      await renameMutation.mutateAsync({
-        campaignId: character.campaignId,
-        sessionId: selectedChapter.sessionId,
-        title,
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   const manuscript = selectedChapter ? (
-    <ManuscriptPage
+    <JournalManuscript
       chapter={selectedChapter}
-      entities={byId}
-      canRename={selectedChapter.sessionId != null && selectedChapter.participantIds.includes(character.id)}
-      onRename={handleRename}
+      liveChapter={liveChapter}
+      onSwitchToLive={() => liveChapter && setSelectedId(liveChapter.id)}
     />
   ) : (
     <div className="rounded-card bg-parchment-50 p-12 text-center font-display text-parchment-500 shadow-card">
@@ -101,13 +58,48 @@ function JournalPageBody() {
     onFilterChange: setFilter,
     error,
     manuscript,
-    selectedSessionId: selectedChapter?.sessionId ?? undefined,
+    captureSessionId: liveSessionId ?? selectedChapter?.sessionId ?? undefined,
   };
 
   return isMobile ? (
     <JournalMobileView {...shared} onSelect={setSelectedId} />
   ) : (
     <JournalDesktopView {...shared} onSelect={setSelectedId} />
+  );
+}
+
+function JournalManuscript({
+  chapter,
+  liveChapter,
+  onSwitchToLive,
+}: {
+  chapter: ChronicleChapter;
+  liveChapter: ChronicleChapter | null;
+  onSwitchToLive: () => void;
+}) {
+  const { character } = useCurrentCharacter();
+  const { byId } = useCampaignEntities(character.campaignId);
+  const renameMutation = useRenameChapterMutation(character.id);
+
+  async function handleRename(title: string): Promise<boolean> {
+    if (!character.campaignId || !chapter.sessionId) return false;
+    try {
+      await renameMutation.mutateAsync({ campaignId: character.campaignId, sessionId: chapter.sessionId, title });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return (
+    <ManuscriptPage
+      chapter={chapter}
+      entities={byId}
+      canRename={chapter.sessionId != null && chapter.participantIds.includes(character.id)}
+      onRename={handleRename}
+      liveChapter={liveChapter}
+      onSwitchToLive={onSwitchToLive}
+    />
   );
 }
 
@@ -119,7 +111,8 @@ interface JournalViewProps {
   onSelect: (chapterId: string) => void;
   error: string | null;
   manuscript: React.ReactNode;
-  selectedSessionId?: string;
+  /** The live session while the character is in one — quick capture is in-session capture — otherwise the selected chapter's. */
+  captureSessionId?: string;
 }
 
 function BackLink() {
@@ -167,7 +160,7 @@ function JournalDesktopView(props: JournalViewProps) {
       </div>
       {captureOpen && (
         <CapturePalette
-          sessionId={props.selectedSessionId}
+          sessionId={props.captureSessionId}
           onClose={closeCapture}
         />
       )}
@@ -223,7 +216,7 @@ function JournalMobileView(props: JournalViewProps) {
       )}
       {captureOpen && (
         <CapturePalette
-          sessionId={props.selectedSessionId}
+          sessionId={props.captureSessionId}
           onClose={() => setCaptureOpen(false)}
         />
       )}

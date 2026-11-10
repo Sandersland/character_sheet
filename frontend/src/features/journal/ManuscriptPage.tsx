@@ -15,6 +15,8 @@ interface ManuscriptPageProps {
   entities: Map<string, CampaignEntity>;
   canRename: boolean;
   onRename: (title: string) => Promise<boolean>;
+  liveChapter?: ChronicleChapter | null;
+  onSwitchToLive?: () => void;
 }
 
 const DROP_CAP =
@@ -41,6 +43,8 @@ export default function ManuscriptPage({
   entities,
   canRename,
   onRename,
+  liveChapter,
+  onSwitchToLive,
 }: ManuscriptPageProps) {
   const { character } = useCurrentCharacter();
   const { busy, error, create, update, remove } = useJournalMutations(character.id);
@@ -125,6 +129,9 @@ export default function ManuscriptPage({
       <FieldNotes notes={notes} row={rowState} {...editPanelProps} />
 
       <div className="mt-auto pt-6">
+        {liveChapter && liveChapter.id !== chapter.id && (
+          <LiveSessionNotice chapter={chapter} liveChapter={liveChapter} onSwitch={onSwitchToLive} />
+        )}
         <ChapterComposer
           campaignId={character.campaignId}
           busy={busy}
@@ -417,6 +424,29 @@ function RowActions({
       >
         Delete
       </button>
+    </div>
+  );
+}
+
+function LiveSessionNotice({
+  chapter,
+  liveChapter,
+  onSwitch,
+}: {
+  chapter: ChronicleChapter;
+  liveChapter: ChronicleChapter;
+  onSwitch?: () => void;
+}) {
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-control border border-gold-300 bg-gold-50 px-3 py-2 text-xs text-gold-900">
+      <span>
+        You're in a live session ({liveChapter.title}). Notes here are filed under <strong>{chapter.title}</strong>.
+      </span>
+      {onSwitch && (
+        <button type="button" onClick={onSwitch} className="font-semibold text-garnet-700 hover:underline">
+          Switch to live session
+        </button>
+      )}
     </div>
   );
 }

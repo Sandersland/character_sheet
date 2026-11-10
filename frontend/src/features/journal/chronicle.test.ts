@@ -161,6 +161,18 @@ describe("defaultChapterId", () => {
     expect(defaultChapterId(spine)).toBe("s2");
   });
 
+  it("prefers the live session's chapter over the newest one", () => {
+    const spine = buildChronicleSpine(
+      buildInput({
+        sessions: [session({ id: "s2", sessionNumber: 2 }), session({ id: "s1", sessionNumber: 1 })],
+        liveSessionId: "s1",
+      }),
+    );
+    expect(defaultChapterId(spine)).toBe("s1");
+    expect(findChapter(spine, "s1")?.live).toBe(true);
+    expect(findChapter(spine, "s2")?.live).toBe(false);
+  });
+
   it("falls back to the between bucket when there are no sessions", () => {
     const spine = buildChronicleSpine(buildInput({ hasSessionlessEntries: true, betweenNoteCount: 1 }));
     expect(defaultChapterId(spine)).toBe(BETWEEN_CHAPTER_ID);

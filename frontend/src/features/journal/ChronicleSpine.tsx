@@ -157,8 +157,13 @@ function ChapterRow({
         >
           {chapter.title}
         </span>
-        <span className="block text-[11.5px] text-parchment-500">
+        <span className="flex items-center gap-1.5 text-[11.5px] text-parchment-500">
           {chapter.noteCount} {chapter.noteCount === 1 ? "note" : "notes"}
+          {chapter.live && (
+            <span className="rounded-full bg-garnet-surface px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-garnet-on-surface">
+              Live
+            </span>
+          )}
         </span>
       </span>
       {chapter.startedAt && (
