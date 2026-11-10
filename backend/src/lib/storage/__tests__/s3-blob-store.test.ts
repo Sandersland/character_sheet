@@ -4,7 +4,7 @@ import { beforeAll, describe } from "vitest";
 import { createS3BlobStore } from "../s3-blob-store.js";
 import { runBlobStoreContract } from "./blob-store-contract.js";
 
-// #1614: without S3_TEST_ENDPOINT the whole file skips, keeping the local suite hermetic (no network, no credentials); CI runs it against MinIO.
+// #1614: without S3_TEST_ENDPOINT the whole file skips, keeping the local suite hermetic (no network, no credentials); CI runs it against SeaweedFS.
 const endpoint = process.env.S3_TEST_ENDPOINT;
 const credentials = {
   bucket: process.env.S3_TEST_BUCKET ?? "test-bucket",
