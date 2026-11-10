@@ -158,7 +158,7 @@ export function buildChronicleSpine(input: ChronicleInput): ChronicleSpine {
 }
 
 export function defaultChapterId(spine: ChronicleSpine): string | null {
-  const live = [...spine.chapters, ...spine.parts.flatMap((p) => p.chapters)].find((c) => c.live);
+  const live = spine.chapters.find((c) => c.live);
   if (live) return live.id;
   if (spine.hasParts) {
     for (const part of spine.parts) {

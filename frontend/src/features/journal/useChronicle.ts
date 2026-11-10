@@ -26,7 +26,7 @@ export function useChronicle(character: Character | null | undefined, liveSessio
     staleTime: 0,
   });
 
-  // Nothing invalidates this key when a session starts, so a page opened before the sitting would otherwise keep the previous session as its newest chapter. One refetch per live session, so a session the API never lists can't loop.
+  // Nothing invalidates this key when a session starts, so a page opened before the sitting would otherwise keep the previous session as its newest chapter. At most one refetch per live session per mount, so a session the API never lists can't loop.
   const refetchedFor = useRef<string | null>(null);
   const liveMissing = Boolean(liveSessionId && data && !data.sessions.some((s) => s.id === liveSessionId));
   useEffect(() => {
