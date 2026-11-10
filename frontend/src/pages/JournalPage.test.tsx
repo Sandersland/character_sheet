@@ -258,6 +258,19 @@ describe("JournalPage", () => {
       expect(screen.getByRole("textbox", { name: "Add to this chapter" })).toHaveTextContent("A note about last time");
     });
 
+    it("clears Private when switching to the live session", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /The Road to Vadua/ }));
+      await screen.findByText(/You're in a live session/);
+
+      await user.click(screen.getByRole("checkbox", { name: "Private" }));
+      await user.click(screen.getByRole("button", { name: "Switch to live session" }));
+
+      await screen.findByRole("heading", { name: "The Burning Inn" });
+      expect(screen.getByRole("checkbox", { name: "Private" })).not.toBeChecked();
+    });
+
     it("files a chapter note into the selected older chapter when the player stays there", async () => {
       const user = userEvent.setup();
       renderPage();
