@@ -29,9 +29,8 @@ export class CombatError extends Error {
 }
 
 const SESSION_GRACE_MS = 60 * 60 * 1000;
-// Players close tabs instead of pressing Leave, so the everyone-left rule alone let a session sit open for two weeks and swallow the next sitting.
-// fallow-ignore-next-line unused-export -- also read by split-stale-session, under the ignored backend/scripts/**
-export const SESSION_INACTIVITY_MS = 12 * 60 * 60 * 1000;
+// Players close tabs instead of pressing Leave, so the everyone-left rule alone never closes a session nobody ended.
+const SESSION_INACTIVITY_MS = 12 * 60 * 60 * 1000;
 
 // campaignPreferences rides along so the session UI can offer party-target healing only to allies who opted in (#462).
 const sessionWithParticipants = {
