@@ -29,6 +29,9 @@ export class CombatError extends Error {
 }
 
 const SESSION_GRACE_MS = 60 * 60 * 1000;
+// Players close tabs instead of pressing Leave, so the everyone-left rule alone let a session sit open for two weeks and swallow the next sitting.
+// fallow-ignore-next-line unused-export -- also read by split-stale-session, under the ignored backend/scripts/**
+export const SESSION_INACTIVITY_MS = 12 * 60 * 60 * 1000;
 
 // campaignPreferences rides along so the session UI can offer party-target healing only to allies who opted in (#462).
 const sessionWithParticipants = {
@@ -100,7 +103,7 @@ async function maybeAutoClose(
   session: SessionWithParticipants,
 ): Promise<SessionWithParticipants> {
   if (session.status !== "active") return session;
-  const endedAt = autoCloseEndTime(session.participants);
+  const endedAt = autoCloseEndTime(session.participants) ?? (await inactivityEndTime(session));
   if (!endedAt) return session;
   await closeSession(session, endedAt);
   return { ...session, status: "ended", endedAt };
@@ -118,6 +121,22 @@ function autoCloseEndTime(
   const lastLeftMs = Math.max(...participants.map((p) => p.leftAt!.getTime()));
   const graceExpired = Date.now() - lastLeftMs >= SESSION_GRACE_MS;
   return graceExpired ? new Date(lastLeftMs + SESSION_GRACE_MS) : null;
+}
+
+// Checked newest-signal-first so a session in play costs at most one indexed lookup; this runs on every transaction via getActiveSessionId.
+async function inactivityEndTime(session: SessionWithParticipants): Promise<Date | null> {
+  const isIdle = (at: Date) => Date.now() - at.getTime() >= SESSION_INACTIVITY_MS;
+  const seen = [session.startedAt, ...session.participants.flatMap((p) => [p.joinedAt, p.leftAt])];
+  const latestOf = (dates: (Date | null | undefined)[]) =>
+    new Date(Math.max(...dates.filter((d): d is Date => d != null).map((d) => d.getTime())));
+  if (!isIdle(latestOf(seen))) return null;
+
+  const latest = { where: { sessionId: session.id }, orderBy: { createdAt: "desc" }, select: { createdAt: true } } as const;
+  const event = await prisma.characterEvent.findFirst(latest);
+  if (event && !isIdle(event.createdAt)) return null;
+  const journal = await prisma.journalEntry.findFirst(latest);
+  if (journal && !isIdle(journal.createdAt)) return null;
+  return latestOf([...seen, event?.createdAt, journal?.createdAt]);
 }
 
 // Idempotent — also called from applyExperienceOperations's retroactive recompute.
