@@ -896,6 +896,29 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     expect(within(screen.getByRole("dialog")).getByText("This action")).toBeInTheDocument();
   });
 
+  it("an Opportunity Attack mid-Extra-Attack is its own single swing and leaves the Action's remaining attack alone", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const user = userEvent.setup();
+    renderHub(extraAttackFighter());
+    await openAttackPicker(user);
+    const sheet = () => within(screen.getByRole("dialog"));
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    const closeBtns = sheet().getAllByRole("button", { name: /^Close$/ });
+    await user.click(closeBtns[closeBtns.length - 1]);
+
+    await user.click(screen.getByRole("button", { name: /Use Reaction/ }));
+    await user.click(screen.getByRole("button", { name: /Opportunity Attack/ }));
+    expect(sheet().getByText(/^1 attack · /)).toBeInTheDocument();
+    expect(sheet().getByRole("button", { name: /^Cancel$/ })).toBeInTheDocument();
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Resume attack — 1 of 2 remaining/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Use Reaction/ })).not.toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
   it("Turn-summary banner: appears with tally lines once the sheet is closed, dismissible (#802/#812)", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const user = userEvent.setup();

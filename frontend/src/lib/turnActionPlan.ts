@@ -29,11 +29,12 @@ export function planActionClick(
     // handleActionClick to open the bonusAttack counter (enterTwfMode).
     // Never sends on open: a resource spent here would stay spent when the
     // player backs out of the sheet pre-roll — the sheet commits it instead
-    // (Flurry's Focus on its first strike, #1993).
+    // (Flurry's Focus on its first strike, #1993). A reaction attack likewise
+    // spends its reaction on the to-hit roll, not on open.
     case "attack-picker":
     case "twf-picker":
     case "flurry-picker":
-      return { consumeSlot: true, openResolution: true, send: "none" };
+      return { consumeSlot: resolver.slot !== "reaction", openResolution: true, send: "none" };
 
     case "heal-roll":
       // healRoll absent (#1528, e.g. Second Wind) means a server-rolled row

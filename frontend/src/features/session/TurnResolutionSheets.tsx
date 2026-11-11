@@ -90,14 +90,13 @@ function LoadoutResolutionSheet({
   );
 }
 
-// A reaction attack (Opportunity Attack) spends the reaction on its to-hit roll, not when the sheet opens, so backing out pre-roll is free.
-function spendReactionOnRoll(turnState: TurnState & TurnStateActions): TurnState & TurnStateActions {
+// An Opportunity Attack is one swing paid for by the reaction on its to-hit roll (so backing out pre-roll is free). It never touches the Attack action's counter or tally, even when it interrupts an unfinished Extra Attack on your own turn.
+function reactionAttackTurnState(turnState: TurnState & TurnStateActions): TurnState & TurnStateActions {
   return {
     ...turnState,
-    recordAttack: (recorded) => {
-      turnState.consumeReaction();
-      turnState.recordAttack(recorded);
-    },
+    attack: null,
+    attackTally: [],
+    recordAttack: () => turnState.consumeReaction(),
   };
 }
 
@@ -115,7 +114,9 @@ function AttackResolutionSheet({
   | "setShowActionMenu"
   | "onLogChanged"
 >) {
-  const isReaction = activeResolution?.resolver.slot === "reaction";
+  if (activeResolution?.resolver.slot === "reaction") {
+    return <ReactionAttackSheet turnState={turnState} closeResolution={closeResolution} onLogChanged={onLogChanged} />;
+  }
   const attack = turnState.attack;
   const exhausted = attack !== null && attack.used >= attack.total;
   const closeAttackSheet = () => {
@@ -126,16 +127,32 @@ function AttackResolutionSheet({
   return (
     <BottomSheet title="Attack" subtitle={attackKicker(turnState.attack)} wide onClose={closeAttackSheet}>
       <InlineAttackPicker
-        turnState={isReaction ? spendReactionOnRoll(turnState) : turnState}
+        turnState={turnState}
         onClose={closeAttackSheet}
         onCancel={() => {
           turnState.cancelAttack();
           closeResolution();
-          // An Opportunity Attack can be cancelled between turns, where a reopened Action menu would surface stale on the next Start my turn.
-          if (activeResolution?.resolver.slot === "action") setShowActionMenu(true);
+          setShowActionMenu(true);
         }}
         onLogChanged={onLogChanged}
-        refundLabel={isReaction ? "Cancel" : undefined}
+      />
+    </BottomSheet>
+  );
+}
+
+function ReactionAttackSheet({
+  turnState,
+  closeResolution,
+  onLogChanged,
+}: Pick<TurnResolutionSheetsProps, "turnState" | "closeResolution" | "onLogChanged">) {
+  return (
+    <BottomSheet title="Attack" subtitle={attackKicker(null)} wide onClose={closeResolution}>
+      <InlineAttackPicker
+        turnState={reactionAttackTurnState(turnState)}
+        onClose={closeResolution}
+        onCancel={closeResolution}
+        onLogChanged={onLogChanged}
+        refundLabel="Cancel"
       />
     </BottomSheet>
   );

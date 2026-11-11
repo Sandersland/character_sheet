@@ -20,6 +20,11 @@ describe("planActionClick", () => {
     expect(plan).toEqual({ consumeSlot: true, openResolution: true, send: "none" });
   });
 
+  it("a reaction attack-picker leaves the reaction unspent on open — the sheet spends it on the to-hit roll (Opportunity Attack)", () => {
+    const plan = planActionClick(resolverFor("opportunityAttack"), character);
+    expect(plan).toEqual({ consumeSlot: false, openResolution: true, send: "none" });
+  });
+
   it("flurry-picker never spends its Focus on open — the sheet spends it on the first strike (#1217, #1993)", () => {
     const plan = planActionClick(resolverFor("flurryOfBlows"), character);
     expect(plan).toEqual({ consumeSlot: true, openResolution: true, send: "none" });

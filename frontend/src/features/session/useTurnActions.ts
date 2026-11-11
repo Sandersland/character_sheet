@@ -229,9 +229,7 @@ export function useTurnActions({
     const action = availableActions.find((a) => a.key === key);
     const resolver = resolverFor(key, action);
     const plan = planActionClick(resolver, character);
-    // A reaction attack (Opportunity Attack) spends the reaction on its to-hit roll inside the attack sheet, so backing out before rolling costs nothing.
-    const spendsOnRoll = resolver?.kind === "attack-picker" && cost === "reaction";
-    if (plan.consumeSlot && !spendsOnRoll) consumeSlotFor(cost, resolver?.kind);
+    if (plan.consumeSlot) consumeSlotFor(cost, resolver?.kind);
     void sendForPlan(plan, key, resolver, cost);
     // action is passed through so openResolution's own resolverFor call can synthesize a row-driven resolver too (#1676).
     if (plan.openResolution) openResolution(key, undefined, action);
