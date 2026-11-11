@@ -18,6 +18,7 @@ jobs:
     # must stay JOB-level: a skipped job still reports a "skipped" conclusion,
     # which satisfies main's required claude-review check; a workflow-level
     # filter would report nothing and block the promote's auto-merge forever.
+    timeout-minutes: 20
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
@@ -34,22 +35,37 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Sonnet review for every PR. A SHARED mandate — a comment-drift check, an
-      # anti-false-positive guard, and a formal REQUEST_CHANGES verdict — applies
-      # uniformly to ALL base branches (#157). Docs are pointers, not mirrors
-      # (see CLAUDE.md): the reviewer flags a doc only when the diff makes an
-      # existing doc statement FALSE, never for missing additions.
-      # --allowed-tools keep the reviewer's read/search tools AND permit
-      # `gh pr review`, so the reviewer can submit its verdict — which the
-      # "Enforce verdict" step below turns into a pass/fail check.
-      # NOTE: preserve the single-outer / double-inner quoting around
-      # --append-system-prompt; the inner double quotes keep the prompt a single
-      # arg. `$SHARED` is interpolated via the standard '"'"$VAR"'"' splice.
-      - name: Configure review
-        id: cfg
+      # Decides FULL vs INCREMENTAL review and writes the diff to review (#1996).
+      # The incremental base is the commit of claude[bot]'s last SUBMITTED review,
+      # never the event's `before`: cancel-in-progress kills a superseded run
+      # before it reviews, so `before` would silently skip that push's commits.
+      # Falls back to FULL when there is no earlier bot review, or when the
+      # branch was rewritten (compare status not `ahead`).
+      - name: Prepare review scope
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
         run: |
-          SHARED='COMMENT DRIFT: inspect the diff for code comments, docstrings, or schema.prisma model comments that the change contradicts or strands (code under a comment changed but the comment claim is now stale, or new behavior a nearby comment misdescribes); flag each inline. Docs under docs/ and CLAUDE.md are pointers, not mirrors: flag them ONLY if this diff makes an existing statement in them false — never request additions describing new code. ANTI-FALSE-POSITIVE: Review the three-dot base...head diff only. Before claiming any file/doc/symbol is missing or absent, read it at the PR HEAD with the Read tool and confirm; never infer absence from a merge diff. VERDICT: submit a formal PR review of REQUEST_CHANGES (run: gh pr review ${{ github.event.pull_request.number }} --request-changes --body <summary>) when there are findings beyond minor nits; otherwise approve or comment as usual. Keep the inline --comment findings; the verdict just summarizes.'
-          echo 'claude_args=--model claude-sonnet-4-6 --allowed-tools "Bash(gh:*)" "Read" "Grep" "Glob" --append-system-prompt "'"$SHARED"'"' >> "$GITHUB_OUTPUT"
+          mkdir -p .review
+          echo ".review/" >> .git/info/exclude
+          base=$(gh api "/repos/$REPO/pulls/$PR/reviews" --paginate \
+            --jq '[.[] | select(.user.login == "claude[bot]")] | last | .commit_id // empty')
+          mode=full
+          if [ "${{ github.event.action }}" = synchronize ] && [ -n "$base" ] && [ "$base" != "$HEAD_SHA" ]; then
+            status=$(gh api "/repos/$REPO/compare/$base...$HEAD_SHA" --jq .status || echo error)
+            [ "$status" = ahead ] && mode=incremental
+          fi
+          if [ "$mode" = incremental ]; then
+            gh api -H "Accept: application/vnd.github.diff" "/repos/$REPO/compare/$base...$HEAD_SHA" > .review/scope.diff
+          else
+            gh pr diff "$PR" > .review/scope.diff || echo "(diff too large for gh pr diff — list files with gh pr view $PR --json files and Read them)" > .review/scope.diff
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "Review mode: $mode (base ${base:-none}, head $HEAD_SHA, $(wc -l < .review/scope.diff) diff lines)"
 
       # Record a UTC marker before the review runs. "Enforce verdict" only counts
       # reviews submitted after this instant, so a stale CHANGES_REQUESTED from an
@@ -58,19 +74,38 @@ jobs:
         id: marker
         run: echo "ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
+      # One focused reviewer instead of the multi-agent code-review plugin (#1995):
+      # the plugin's sequential stages (gate -> summary -> 4 parallel reviewers ->
+      # one validator per finding), each re-reading CLAUDE.md, took 20-30 min per
+      # non-trivial PR. The self-verification rule below stands in for the
+      # plugin's separate validator stage.
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
-          # Show a live "review in progress" tracking comment on the PR.
           track_progress: true
-          # --comment posts findings as inline review comments on the diff,
-          # instead of leaving them in the Action log.
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment'
-          claude_args: ${{ steps.cfg.outputs.claude_args }}
+          claude_args: >-
+            --model claude-sonnet-5-5
+            --allowed-tools "Bash(gh:*)" "Read" "Grep" "Glob" "mcp__github_inline_comment__create_inline_comment"
+          prompt: |
+            Review pull request ${{ github.repository }}#${{ github.event.pull_request.number }} ("${{ github.event.pull_request.title }}").
+
+            SCOPE: ${{ steps.scope.outputs.mode }} review. The diff to review is in .review/scope.diff — read it first; the working tree is the PR code, so Read/Grep it for context.
+            - full: the diff is the whole PR (base...head).
+            - incremental: the diff is ONLY the commits pushed since your last review (at commit ${{ steps.scope.outputs.base }}). Flag issues only in those changes. ALSO read your previous review and inline comments (gh pr view ${{ github.event.pull_request.number }} --json reviews,comments; gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments) and check every earlier BLOCKING finding at HEAD: if any is still unfixed, it counts as a finding of this review.
+
+            Read the root CLAUDE.md once and hold the change to it — it overrides general preferences.
+
+            FLAG ONLY HIGH-SIGNAL ISSUES: code that will not compile or type-check; logic that is wrong for realistic inputs or state; a clear CLAUDE.md violation where you can quote the rule; COMMENT DRIFT (a comment, docstring, or schema.prisma model comment the change makes false or strands). Docs under docs/ and CLAUDE.md are pointers, not mirrors: flag them only if this diff makes an existing statement false — never ask for additions describing new code. Do not flag style, naming, subjective improvements, or issues in code the diff did not touch.
+
+            VERIFY BEFORE FLAGGING: for each candidate, Read the code at HEAD and confirm the failure path concretely (inputs/state -> wrong result). Never claim a file, symbol, or doc is missing without reading for it. Drop anything you cannot confirm — a false positive costs more than a miss.
+
+            OUTPUT:
+            1. One inline comment per confirmed issue via mcp__github_inline_comment__create_inline_comment with confirmed: true — the defect, the concrete failure, and the fix (a suggestion block only when committing it fixes the issue entirely).
+            2. ALWAYS finish by submitting exactly one formal review (it records which commit you reviewed, for the next incremental run):
+               - findings beyond minor nits: gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<summary>"
+               - otherwise: gh pr review ${{ github.event.pull_request.number }} --comment --body "<summary, or: No issues found (${{ steps.scope.outputs.mode }} review).>"
 
       # anthropics/claude-code-action@v1 exits 0 regardless of the review verdict
       # and exposes no conclusion/verdict output, so the formal REQUEST_CHANGES
