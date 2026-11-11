@@ -397,6 +397,7 @@ const RESOLVER_KIND_VALUES = [
   "toggle",
   "slot-picker",
 ] as const satisfies readonly ResolutionKind[];
+const ATTACK_SHEET_RESOLVER_KINDS: readonly (typeof RESOLVER_KIND_VALUES)[number][] = ["attack-picker", "twf-picker", "flurry-picker"];
 type _ResolverKindValuesCoverResolutionKind = ResolutionKind extends (typeof RESOLVER_KIND_VALUES)[number] ? true : never;
 const _resolverKindValuesCoverResolutionKind: _ResolverKindValuesCoverResolutionKind = true;
 void _resolverKindValuesCoverResolutionKind;
@@ -520,6 +521,12 @@ export const classFeatureSeedSchema = z
     // runtime, not a literal tuple zod can enumerate — membership is checked by the `.refine` below.
     buffTarget: z.string().min(1).optional(),
     buffModifier: z.number().int().nonnegative().optional(),
+  })
+  // planActionClick sends nothing when these sheets open, and only the hand-authored Attack/TWF/Flurry
+  // commit their own cost — a seeded row's cost would silently never be spent (#1993).
+  .refine((row) => row.resolverKind === undefined || !ATTACK_SHEET_RESOLVER_KINDS.includes(row.resolverKind), {
+    message: "attack-picker/twf-picker/flurry-picker have no commit path for a seeded row's cost",
+    path: ["resolverKind"],
   })
   .refine((row) => !row.actionOnly || (Boolean(row.activationCost) && Boolean(row.resourceKey)), {
     message: "an actionOnly row must declare both activationCost and resourceKey",
