@@ -30,24 +30,20 @@ interface TurnHubProps {
   onOpenLog?: () => void;
 }
 
-function TurnHubIdle({
-  onLogChanged,
+function TurnReactionSlot({
   turnState,
   turn,
 }: {
-  onLogChanged: () => void;
   turnState: TurnStateView;
   turn: ReturnType<typeof useTurnActions>;
 }) {
   const { character } = useCurrentCharacter();
-  const { inCombat, round, reactionUsed, consumeReaction } = turnState;
+  const { reactionUsed, consumeReaction } = turnState;
   const {
-    busy, error, reactionMessage, effectMessage,
+    busy, error, reactionMessage,
     showReactionMenu, setShowReactionMenu, setReactionMessage,
     dieLabel, dieBusy, superiorityRemaining, classReactions, reactionManeuvers,
-    reactionSheetModel,
-    handleActionClick, handleReactionManeuver,
-    handleStartCombat, handleEndCombat, handleStartTurn,
+    reactionSheetModel, handleActionClick, handleReactionManeuver,
   } = turn;
 
   const deflect = useDeflectAttacksReaction({
@@ -66,6 +62,45 @@ function TurnHubIdle({
     }
     handleActionClick(key, cost);
   }
+
+  return (
+    <ReactionSlot
+      reactionUsed={reactionUsed}
+      showReactionMenu={showReactionMenu}
+      setShowReactionMenu={setShowReactionMenu}
+      classReactions={classReactions}
+      sheetModel={reactionSheetModel}
+      reactionManeuvers={reactionManeuvers}
+      superiorityRemaining={superiorityRemaining}
+      dieLabel={dieLabel}
+      dieBusy={dieBusy}
+      busy={busy || deflect.busy}
+      reactionMessage={reactionMessage}
+      error={error ?? deflect.error}
+      handleActionClick={handleReactionActionClick}
+      handleReactionManeuver={handleReactionManeuver}
+      consumeReaction={consumeReaction}
+      deflectRedirectAvailable={deflect.deflectRedirectAvailable}
+      redirectLabel={deflect.redirectLabel}
+      handleDeflectAttacksRedirect={deflect.handleDeflectAttacksRedirect}
+    />
+  );
+}
+
+function TurnHubIdle({
+  onLogChanged,
+  turnState,
+  turn,
+  resolutionSheets,
+}: {
+  onLogChanged: () => void;
+  turnState: TurnStateView;
+  turn: ReturnType<typeof useTurnActions>;
+  /** Reactions fire between turns too (5e), so a reaction that opens a picker (Opportunity Attack, reaction spell) needs the sheets here as well. */
+  resolutionSheets: React.ReactNode;
+}) {
+  const { inCombat, round } = turnState;
+  const { effectMessage, handleStartCombat, handleEndCombat, handleStartTurn } = turn;
 
   if (!inCombat) {
     return (
@@ -114,26 +149,9 @@ function TurnHubIdle({
 
         <TurnConcentrationBanner onLogChanged={onLogChanged} />
 
-        <ReactionSlot
-          reactionUsed={reactionUsed}
-          showReactionMenu={showReactionMenu}
-          setShowReactionMenu={setShowReactionMenu}
-          classReactions={classReactions}
-          sheetModel={reactionSheetModel}
-          reactionManeuvers={reactionManeuvers}
-          superiorityRemaining={superiorityRemaining}
-          dieLabel={dieLabel}
-          dieBusy={dieBusy}
-          busy={busy || deflect.busy}
-          reactionMessage={reactionMessage}
-          error={error ?? deflect.error}
-          handleActionClick={handleReactionActionClick}
-          handleReactionManeuver={handleReactionManeuver}
-          consumeReaction={consumeReaction}
-          deflectRedirectAvailable={deflect.deflectRedirectAvailable}
-          redirectLabel={deflect.redirectLabel}
-          handleDeflectAttacksRedirect={deflect.handleDeflectAttacksRedirect}
-        />
+        <TurnReactionSlot turnState={turnState} turn={turn} />
+
+        {resolutionSheets}
 
         <button
           type="button"
@@ -338,7 +356,6 @@ function TurnMessages({
   );
 }
 
-// fallow-ignore-next-line complexity -- composing the #1241 useDeflectAttacksReaction sibling hook (same pattern as the pre-existing useTallyResolve below) pushed cognitive from 15 to 16; the added surface is one hook call + a 6-line dispatch wrapper, not new branchy logic
 export default function TurnHub({ sessionId, turnState, onLogChanged, allies, overlaysActive = true, onOpenLog }: TurnHubProps) {
   const { character } = useCurrentCharacter();
   const isBelowMd = useIsBelowMd();
@@ -348,55 +365,36 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
     phase,
     actionsRemaining,
     bonusActionUsed,
-    reactionUsed,
     attack,
     bonusAttack,
     attackTally,
     castTally,
     twfAvailable,
     consumeBonusAction,
-    consumeReaction,
     clearAttackTally,
     clearCastTally,
     history,
   } = turnState;
 
   const turn = useTurnActions({ character, sessionId, turnState, onLogChanged });
-  const { busy, error, reactionMessage, effectMessage, send } = turn;
+  const { busy, error, effectMessage, send } = turn;
   // Re-reads the interlock a reverted cast clears, rather than a stale closed-over value.
   const handleUndo = useUndoWithCombatRefresh(turn.handleUndo);
   const {
     showActionMenu, setShowActionMenu, showBonusMenu, setShowBonusMenu,
-    showReactionMenu, setShowReactionMenu, setReactionMessage, activeResolution, closeResolution,
+    activeResolution, closeResolution,
     loadoutSwap,
   } = turn;
   const {
     dieLabel, dieBusy, superiorityRemaining, classActions, classBonusActions,
-    classReactions, durableReminders, reactionManeuvers, effectManeuvers,
+    durableReminders, effectManeuvers,
     actionSurgePool, actionSurgeAvailable,
-    actionSheetModel, bonusSheetModel, reactionSheetModel,
+    actionSheetModel, bonusSheetModel,
   } = turn;
   const {
     handleActionClick, handleAttackAction, handleResumeAttack, handleTwfAction, handleFlurryAction,
-    handleActionSurge, handleEndTurn, handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
+    handleActionSurge, handleEndTurn, handleEffectManeuver, handleBonusSpellCast,
   } = turn;
-
-  const deflect = useDeflectAttacksReaction({
-    character,
-    availableActions: character.availableActions ?? [],
-    reactionUsed,
-    consumeReaction,
-    setShowReactionMenu,
-    setReactionMessage,
-    attachBatchId: turnState.attachBatchId,
-  });
-  function handleReactionActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
-    if (key === "deflectAttacks" || key === "deflectMissiles") {
-      deflect.handleDeflectAttacks();
-      return;
-    }
-    handleActionClick(key, cost);
-  }
 
   const tallyResolve = useTallyResolve({
     character,
@@ -405,12 +403,28 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
     onLogChanged,
   });
 
+  const resolutionSheets = overlaysActive && (
+    <TurnResolutionSheets
+      sessionId={sessionId}
+      turnState={turnState}
+      activeResolution={activeResolution}
+      closeResolution={closeResolution}
+      setShowActionMenu={setShowActionMenu}
+      setShowBonusMenu={setShowBonusMenu}
+      onLogChanged={onLogChanged}
+      allies={allies}
+      send={send}
+      loadoutSwap={loadoutSwap}
+    />
+  );
+
   if (phase === "idle") {
     return (
       <TurnHubIdle
         onLogChanged={onLogChanged}
         turnState={turnState}
         turn={turn}
+        resolutionSheets={resolutionSheets}
       />
     );
   }
@@ -451,48 +465,13 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
       consumeBonusAction={consumeBonusAction}
     />
   );
-  const reactionSlot = (
-    <ReactionSlot
-      reactionUsed={reactionUsed}
-      showReactionMenu={showReactionMenu}
-      setShowReactionMenu={setShowReactionMenu}
-      classReactions={classReactions}
-      sheetModel={reactionSheetModel}
-      reactionManeuvers={reactionManeuvers}
-      superiorityRemaining={superiorityRemaining}
-      dieLabel={dieLabel}
-      dieBusy={dieBusy}
-      busy={busy || deflect.busy}
-      reactionMessage={reactionMessage}
-      error={error ?? deflect.error}
-      handleActionClick={handleReactionActionClick}
-      handleReactionManeuver={handleReactionManeuver}
-      consumeReaction={consumeReaction}
-      deflectRedirectAvailable={deflect.deflectRedirectAvailable}
-      redirectLabel={deflect.redirectLabel}
-      handleDeflectAttacksRedirect={deflect.handleDeflectAttacksRedirect}
-    />
-  );
+  const reactionSlot = <TurnReactionSlot turnState={turnState} turn={turn} />;
   const actionSurge = (
     <ActionSurgeButton
       available={actionSurgeAvailable}
       pool={actionSurgePool}
       busy={busy}
       onSurge={handleActionSurge}
-    />
-  );
-  const resolutionSheets = overlaysActive && (
-    <TurnResolutionSheets
-      sessionId={sessionId}
-      turnState={turnState}
-      activeResolution={activeResolution}
-      closeResolution={closeResolution}
-      setShowActionMenu={setShowActionMenu}
-      setShowBonusMenu={setShowBonusMenu}
-      onLogChanged={onLogChanged}
-      allies={allies}
-      send={send}
-      loadoutSwap={loadoutSwap}
     />
   );
   const trailingBeforeSurge = (
