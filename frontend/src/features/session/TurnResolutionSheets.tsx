@@ -90,18 +90,32 @@ function LoadoutResolutionSheet({
   );
 }
 
+// A reaction attack (Opportunity Attack) spends the reaction on its to-hit roll, not when the sheet opens, so backing out pre-roll is free.
+function spendReactionOnRoll(turnState: TurnState & TurnStateActions): TurnState & TurnStateActions {
+  return {
+    ...turnState,
+    recordAttack: (recorded) => {
+      turnState.consumeReaction();
+      turnState.recordAttack(recorded);
+    },
+  };
+}
+
 function AttackResolutionSheet({
   turnState,
+  activeResolution,
   closeResolution,
   setShowActionMenu,
   onLogChanged,
 }: Pick<
   TurnResolutionSheetsProps,
   | "turnState"
+  | "activeResolution"
   | "closeResolution"
   | "setShowActionMenu"
   | "onLogChanged"
 >) {
+  const isReaction = activeResolution?.resolver.slot === "reaction";
   const attack = turnState.attack;
   const exhausted = attack !== null && attack.used >= attack.total;
   const closeAttackSheet = () => {
@@ -112,14 +126,16 @@ function AttackResolutionSheet({
   return (
     <BottomSheet title="Attack" subtitle={attackKicker(turnState.attack)} wide onClose={closeAttackSheet}>
       <InlineAttackPicker
-        turnState={turnState}
+        turnState={isReaction ? spendReactionOnRoll(turnState) : turnState}
         onClose={closeAttackSheet}
         onCancel={() => {
           turnState.cancelAttack();
           closeResolution();
-          setShowActionMenu(true);
+          // An Opportunity Attack can be cancelled between turns, where a reopened Action menu would surface stale on the next Start my turn.
+          if (activeResolution?.resolver.slot === "action") setShowActionMenu(true);
         }}
         onLogChanged={onLogChanged}
+        refundLabel={isReaction ? "Cancel" : undefined}
       />
     </BottomSheet>
   );
