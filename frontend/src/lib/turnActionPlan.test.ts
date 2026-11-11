@@ -20,9 +20,15 @@ describe("planActionClick", () => {
     expect(plan).toEqual({ consumeSlot: true, openResolution: true, send: "none" });
   });
 
-  it("flurry-picker shares the attack-picker send shape (unreachable at runtime — Flurry actually dispatches via handleFlurryAction, #1217)", () => {
+  it("flurry-picker never spends its Focus on open — the sheet spends it on the first strike (#1217, #1993)", () => {
     const plan = planActionClick(resolverFor("flurryOfBlows"), character);
-    expect(plan).toEqual({ consumeSlot: true, openResolution: true, send: "plain" });
+    expect(plan).toEqual({ consumeSlot: true, openResolution: true, send: "none" });
+  });
+
+  it("a server-effect attack-picker row fires nothing on open, so backing out of the sheet costs no resource (#1993)", () => {
+    const row = { key: "rowAttack", name: "Row Attack", cost: "action", enabled: true, resolverKind: "attack-picker" } as const;
+    const plan = planActionClick(resolverFor(row.key, row), character);
+    expect(plan.send).toBe("none");
   });
 
   it("heal-roll consumes the slot and rolls the heal spec (Wholeness of Body — a still-client-rolled heal-roll resolver)", () => {

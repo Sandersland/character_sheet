@@ -35,6 +35,12 @@ describe("classFeatureSeedSchema — resolverKind (mirrors frontend ResolutionKi
     const result = classFeatureSeedSchema.safeParse({ ...baseRow, resolverKind: "modal-picker" });
     expect(result.success).toBe(false);
   });
+
+  it("rejects the attack-sheet kinds, which have no commit path for a seeded row's cost (#1993)", () => {
+    for (const resolverKind of ["attack-picker", "twf-picker", "flurry-picker"]) {
+      expect(classFeatureSeedSchema.safeParse({ ...baseRow, resolverKind }).success, resolverKind).toBe(false);
+    }
+  });
 });
 
 describe("classFeatureSeedSchema — costKind (mirrors AbilityCost's kind discriminant)", () => {
