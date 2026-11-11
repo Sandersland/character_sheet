@@ -39,8 +39,10 @@ jobs:
       # The incremental base is the commit of claude[bot]'s last SUBMITTED review,
       # never the event's `before`: cancel-in-progress kills a superseded run
       # before it reviews, so `before` would silently skip that push's commits.
-      # Falls back to FULL when there is no earlier bot review, or when the
-      # branch was rewritten (compare status not `ahead`).
+      # Falls back to FULL when there is no earlier bot review, when the branch
+      # was rewritten (compare status not `ahead`), or when the range holds a
+      # merge commit — merging the base branch in would otherwise put every
+      # change that arrived from it into the "new commits" diff.
       - name: Prepare review scope
         id: scope
         env:
@@ -55,8 +57,10 @@ jobs:
             --jq '[.[] | select(.user.login == "claude[bot]")] | last | .commit_id // empty')
           mode=full
           if [ "${{ github.event.action }}" = synchronize ] && [ -n "$base" ] && [ "$base" != "$HEAD_SHA" ]; then
-            status=$(gh api "/repos/$REPO/compare/$base...$HEAD_SHA" --jq .status || echo error)
-            [ "$status" = ahead ] && mode=incremental
+            verdict=$(gh api "/repos/$REPO/compare/$base...$HEAD_SHA" \
+              --jq 'if .status == "ahead" and ([.commits[] | select(.parents | length > 1)] | length) == 0 then "incremental" else "full" end' \
+              || echo full)
+            mode=$verdict
           fi
           if [ "$mode" = incremental ]; then
             gh api -H "Accept: application/vnd.github.diff" "/repos/$REPO/compare/$base...$HEAD_SHA" > .review/scope.diff
