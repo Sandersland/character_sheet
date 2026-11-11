@@ -1,0 +1,31 @@
+name: Set up Node + dependencies
+description: setup-node, then restore node_modules from cache or run npm ci (#2001)
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version-file: .nvmrc
+
+    # Caches the installed trees, not npm's download cache: a hit skips npm ci
+    # entirely. These three paths are every node_modules npm ci creates here
+    # (packages/* are symlinked into the root tree, not given their own). The
+    # key covers everything an install depends on, so a hit is byte-identical
+    # to a fresh npm ci.
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          node_modules
+          backend/node_modules
+          frontend/node_modules
+        key: node-modules-${{ runner.os }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('package-lock.json') }}
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm install -g npm@11 # align with npm 11 that generated package-lock.json (npm/cli#4828)
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci --no-audit --no-fund

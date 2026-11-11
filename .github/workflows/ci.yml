@@ -16,6 +16,7 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v5
@@ -23,15 +24,15 @@ jobs:
       # Migration-shape gate (#1373): an enum-narrowing migration whose USING
       # cast aborts on populated rows leaves the DB in P3009, which blocks every
       # migration behind it. Deliberately in `lint`, not the `fallow` job where
-      # the other grep gates live: `fallow` needs: test, so this 10ms sh gate
+      # the other grep gates live: `fallow` needs: test-backend, so this 10ms sh gate
       # would otherwise wait on Postgres + vitest + coverage. Needs no node, so
-      # it runs before `npm ci`. Twin of the lefthook pre-commit job.
+      # it runs before dependency setup. Twin of the lefthook pre-commit job.
       - name: enum-narrowing migrations guarded
         run: sh scripts/check-enum-narrowing.sh
 
       # Subclass identity must resolve via resolveSubclassSlug, never a
       # substring match on the freeform display name (#1277). Needs no node,
-      # so it runs before `npm ci` alongside the enum-narrowing gate. Twin of
+      # so it runs before dependency setup alongside the enum-narrowing gate. Twin of
       # the lefthook pre-commit job.
       - name: subclass identity resolved via slug, not substring
         run: sh scripts/check-subclass-substring.sh
@@ -69,14 +70,7 @@ jobs:
       - name: migrated classes stay out of class-specific TS
         run: sh scripts/check-class-ts-migration.sh
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
-
-      - run: npm ci --no-audit --no-fund
+      - uses: ./.github/actions/setup-deps
 
       - run: npm run lint
 
@@ -99,12 +93,13 @@ jobs:
     # "skipped" conclusion, which satisfies the required check (a workflow-level
     # filter would block merges instead).
     runs-on: ubuntu-latest
-    # `needs: test` so the backend health step can consume the vitest coverage
-    # artifact the test job uploads (#717): fallow reads Istanbul coverage for
+    timeout-minutes: 10
+    # `needs: test-backend` so the backend health step can consume the vitest coverage
+    # artifact test-backend uploads (#717): fallow reads Istanbul coverage for
     # exact CRAP, and the coverage-producing run needs Postgres, which lives in
-    # the test job. The trade is that fallow's fast gates now wait on the test
-    # job — acceptable for an accurate hot-path-risk bar.
-    needs: test
+    # test-backend. The trade is that fallow's fast gates now wait on test-backend
+    # — acceptable for an accurate hot-path-risk bar.
+    needs: test-backend
     if: >-
       github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository
@@ -116,14 +111,7 @@ jobs:
           # merge-base commits, which the default shallow clone doesn't have.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
-
-      - run: npm ci --no-audit --no-fund
+      - uses: ./.github/actions/setup-deps
 
       # The backend's `@/generated/prisma/*` client is gitignored, so without this
       # step fallow can't resolve those imports and flags every NEW file that
@@ -192,7 +180,7 @@ jobs:
       # `audit --gate new-only` step above, which only inspects the PR diff (a
       # refactor that pushes an EXISTING function over the bar is caught here too).
       #   --production  excludes test/story files (test complexity isn't gated)
-      #   --coverage    feeds fallow the vitest Istanbul coverage the test job
+      #   --coverage    feeds fallow the vitest Istanbul coverage test-backend
       #     produced, so CRAP is exact (untested complexity → real high CRAP)
       #     instead of the export-reference estimate that inflated under
       #     --production (#717).
@@ -208,7 +196,7 @@ jobs:
       # $GITHUB_WORKSPACE absolute paths across jobs), so no --coverage-root remap
       # is needed. Plain mode (no --min-severity) is stricter than the frontend
       # step's `high` bar: it fails on ANY backend production finding.
-      - name: Download backend coverage (from the test job)
+      - name: Download backend coverage (from test-backend)
         uses: actions/download-artifact@v4
         with:
           name: backend-coverage
@@ -224,18 +212,12 @@ jobs:
     # it only type-checks and bundles; `prisma generate` provides the client
     # types the backend `tsc` imports.
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
-
-      - run: npm ci --no-audit --no-fund
+      - uses: ./.github/actions/setup-deps
 
       - name: Prisma generate
         working-directory: backend
@@ -312,8 +294,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  test:
+  test-backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -337,14 +320,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
-
-      - run: npm ci --no-audit --no-fund
+      - uses: ./.github/actions/setup-deps
 
       # No migrate/seed here: vitest's global setup migrates and seeds its own
       # template database and clones one per worker (#1269), so the job-level
@@ -375,7 +351,7 @@ jobs:
 
       # Backend runs WITH coverage so the fallow job can gate real CRAP (#717);
       # test:coverage IS the backend `vitest run` plus Istanbul instrumentation
-      # (no double run). Frontend keeps its plain test run.
+      # (no double run).
       - name: Backend tests (with coverage for the fallow CRAP gate)
         env:
           S3_TEST_ENDPOINT: http://localhost:8333
@@ -383,9 +359,6 @@ jobs:
           S3_TEST_ACCESS_KEY_ID: minioadmin
           S3_TEST_SECRET_ACCESS_KEY: minioadmin
         run: npm run test:coverage --workspace backend
-
-      - name: Frontend tests
-        run: npm test --workspace frontend
 
       - name: Upload backend coverage
         uses: actions/upload-artifact@v4
@@ -397,9 +370,37 @@ jobs:
           # the fallow job's download fail with a confusing "artifact not found".
           if-no-files-found: error
 
+  # Split from test-backend (#1997) so the two suites run side by side instead
+  # of back to back. Needs no Postgres, S3 or Prisma client.
+  test-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/setup-deps
+
+      - run: npm test --workspace frontend
+
+  # Branch protection requires a check named `test`; this job keeps that name
+  # alive over the test-backend/test-frontend split (#1997). `always()` makes it
+  # report a real failure when a half fails instead of being skipped — a skipped
+  # required check would let the PR merge.
+  test:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Both test halves passed
+        run: |
+          [ "${{ needs.test-backend.result }}" = success ] && [ "${{ needs.test-frontend.result }}" = success ] \
+            || { echo "test-backend=${{ needs.test-backend.result }} test-frontend=${{ needs.test-frontend.result }}"; exit 1; }
+
   e2e:
     # Playwright smoke suite against a booted dev stack (same postgres service as
-    # `test`, plus the backend + Vite dev servers the e2e harness proxies through).
+    # `test-backend`, plus the backend + Vite dev servers the e2e harness proxies through).
     # Runs on every PR and reports status, but is NOT a required status check
     # (branch protection lists claude-review/lint/test/build/fallow only) — a red
     # run here does not block merge, so watch it manually on UI-layout changes.
@@ -431,14 +432,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
-
-      - run: npm ci --no-audit --no-fund
+      - uses: ./.github/actions/setup-deps
 
       - name: Prisma generate / migrate / seed
         working-directory: backend
@@ -447,9 +441,28 @@ jobs:
           npx prisma migrate deploy
           npx prisma db seed
 
+      - name: Playwright version
+        id: pw
+        working-directory: frontend
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # The browser download is cacheable; its apt system deps are not (they live
+      # outside the cached dir), so a cache hit still runs install-deps (#2001).
+      - id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
       - name: Install Playwright chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         working-directory: frontend
         run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system deps
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        working-directory: frontend
+        run: npx playwright install-deps chromium
 
       - name: Start backend
         # ALLOW_DEV_LOGIN powers the e2e harness's passwordless session mint; PORT
