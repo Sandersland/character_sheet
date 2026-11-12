@@ -35,45 +35,23 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Decides FULL vs INCREMENTAL review and writes the diff to review (#1996).
-      # The incremental base is the commit of claude[bot]'s last SUBMITTED review,
-      # never the event's `before`: cancel-in-progress kills a superseded run
-      # before it reviews, so `before` would silently skip that push's commits.
-      # Falls back to FULL when there is no earlier bot review, when the branch
-      # was rewritten (compare status not `ahead`), or when the range holds a
-      # merge commit — merging the base branch in would otherwise put every
-      # change that arrived from it into the "new commits" diff.
+      # The prompt and every script live in .github/claude-review/, not inline:
+      # the action skips itself on any PR that edits THIS file (it must match
+      # the default branch), so keeping it to wiring means prompt and logic
+      # changes still get reviewed on their own PR.
       - name: Prepare review scope
         id: scope
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          REPO: ${{ github.repository }}
-        run: |
-          mkdir -p .review
-          echo ".review/" >> .git/info/exclude
-          base=$(gh api "/repos/$REPO/pulls/$PR/reviews" --paginate \
-            --jq '[.[] | select(.user.login == "claude[bot]")] | last | .commit_id // empty')
-          mode=full
-          if [ "${{ github.event.action }}" = synchronize ] && [ -n "$base" ] && [ "$base" != "$HEAD_SHA" ]; then
-            verdict=$(gh api "/repos/$REPO/compare/$base...$HEAD_SHA" \
-              --jq 'if .status == "ahead" and ([.commits[] | select(.parents | length > 1)] | length) == 0 then "incremental" else "full" end' \
-              || echo full)
-            mode=$verdict
-          fi
-          if [ "$mode" = incremental ]; then
-            gh api -H "Accept: application/vnd.github.diff" "/repos/$REPO/compare/$base...$HEAD_SHA" > .review/scope.diff
-          else
-            gh pr diff "$PR" > .review/scope.diff || echo "(diff too large for gh pr diff — list files with gh pr view $PR --json files and Read them)" > .review/scope.diff
-          fi
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "base=$base" >> "$GITHUB_OUTPUT"
-          echo "Review mode: $mode (base ${base:-none}, head $HEAD_SHA, $(wc -l < .review/scope.diff) diff lines)"
+          EVENT_ACTION: ${{ github.event.action }}
+        run: .github/claude-review/prepare-scope.sh
 
-      # Record a UTC marker before the review runs. "Enforce verdict" only counts
-      # reviews submitted after this instant, so a stale CHANGES_REQUESTED from an
-      # earlier run (or a human) can't fail or pass the check on its own.
+      # enforce-verdict.sh only counts reviews submitted after this instant, so a
+      # stale CHANGES_REQUESTED from an earlier run (or a human) can't fail or
+      # pass the check on its own.
       - name: Mark review start
         id: marker
         run: echo "ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
@@ -81,8 +59,8 @@ jobs:
       # One focused reviewer instead of the multi-agent code-review plugin (#1995):
       # the plugin's sequential stages (gate -> summary -> 4 parallel reviewers ->
       # one validator per finding), each re-reading CLAUDE.md, took 20-30 min per
-      # non-trivial PR. The self-verification rule below stands in for the
-      # plugin's separate validator stage. The INVESTIGATE step is mandatory:
+      # non-trivial PR. The prompt's self-verification rule stands in for the
+      # plugin's separate validator stage, and its INVESTIGATE step is mandatory:
       # without it the reviewer read only the diff and returned "No issues" on a
       # 554-line PR in 6 turns.
       - name: Run Claude Code Review
@@ -94,78 +72,31 @@ jobs:
           claude_args: >-
             --model claude-sonnet-5-5
             --allowed-tools "Bash(gh:*)" "Read" "Grep" "Glob" "mcp__github_inline_comment__create_inline_comment"
-          prompt: |
-            Review pull request ${{ github.repository }}#${{ github.event.pull_request.number }} ("${{ github.event.pull_request.title }}").
+          prompt: ${{ steps.scope.outputs.prompt }}
 
-            SCOPE: ${{ steps.scope.outputs.mode }} review. The diff to review is in .review/scope.diff — read it first; the working tree is the PR code, so Read/Grep it for context.
-            - full: the diff is the whole PR (base...head).
-            - incremental: the diff is ONLY the commits pushed since your last review (at commit ${{ steps.scope.outputs.base }}). Flag issues only in those changes. ALSO read your previous review and inline comments (gh pr view ${{ github.event.pull_request.number }} --json reviews,comments; gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments) and check every earlier BLOCKING finding at HEAD: if any is still unfixed, it counts as a finding of this review.
-
-            Read the root CLAUDE.md once and hold the change to it — it overrides general preferences.
-
-            INVESTIGATE BEFORE JUDGING — a diff alone hides most real bugs, so do all of this before deciding anything:
-            - Read every changed source file IN FULL at HEAD, not just its hunks.
-            - For every function, hook, component, prop, or type whose behaviour or signature changed, Grep its callers and read them: a change that is right in isolation is often wrong at a call site the diff never shows.
-            - Walk the changed logic through realistic edge states (empty/null, the first vs. a later iteration, interrupting an in-progress flow, cancel/undo paths, a resource already spent, both rules editions) and ask what each caller observes.
-            - Check that the tests touched or added actually exercise the changed branches.
-
-            FLAG ONLY HIGH-SIGNAL ISSUES: code that will not compile or type-check; logic that is wrong for realistic inputs or state; a clear CLAUDE.md violation where you can quote the rule; COMMENT DRIFT (a comment, docstring, or schema.prisma model comment the change makes false or strands). Docs under docs/ and CLAUDE.md are pointers, not mirrors: flag them only if this diff makes an existing statement false — never ask for additions describing new code. Do not flag style, naming, subjective improvements, or issues in code the diff did not touch.
-
-            VERIFY BEFORE FLAGGING: for each candidate, Read the code at HEAD and confirm the failure path concretely (inputs/state -> wrong result). Never claim a file, symbol, or doc is missing without reading for it. Drop anything you cannot confirm.
-
-            OUTPUT:
-            1. One inline comment per confirmed issue via mcp__github_inline_comment__create_inline_comment with confirmed: true — the defect, the concrete failure, and the fix (a suggestion block only when committing it fixes the issue entirely).
-            2. ALWAYS finish by submitting exactly one formal review (it records which commit you reviewed, for the next incremental run):
-               - findings beyond minor nits: gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<summary>"
-               - otherwise: gh pr review ${{ github.event.pull_request.number }} --comment --body "<summary, or: No issues found (${{ steps.scope.outputs.mode }} review).>"
-
-      # anthropics/claude-code-action@v1 exits 0 regardless of the review verdict
-      # and exposes no conclusion/verdict output, so the formal REQUEST_CHANGES
-      # review it submits would not, on its own, fail this check. Re-read the PR's
-      # reviews and fail when a blocking review landed during this run. We filter
-      # by submit time (the concurrency group guarantees a single in-flight run
-      # per PR) rather than by reviewer identity, which the action doesn't expose.
       # Applies to BOTH base branches so main gets a red check too.
       - name: Enforce verdict
+        id: verdict
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          marker='${{ steps.marker.outputs.ts }}'
-          reviews=$(gh pr view ${{ github.event.pull_request.number }} --json reviews --jq '.reviews')
-          blocking=$(printf '%s' "$reviews" | jq --arg marker "$marker" '[.[] | select(.submittedAt > $marker and .state == "CHANGES_REQUESTED")] | length')
-          if [ "$blocking" -gt 0 ]; then
-            echo "::error::Claude Code Review requested changes on this PR. Resolve the blocking findings and push to re-run."
-            exit 1
-          fi
-          echo "No blocking review verdict — claude-review passes."
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          MARKER: ${{ steps.marker.outputs.ts }}
+        run: .github/claude-review/enforce-verdict.sh
 
-      # A clean run leaves the CHECK green, but a CHANGES_REQUESTED review the
-      # bot submitted on an EARLIER run is never auto-dismissed (main/staging
-      # keep dismiss_stale_reviews:false so human approvals survive a push). That
-      # stale verdict keeps reviewDecision = CHANGES_REQUESTED and blocks merge
-      # until a human dismisses it by hand. Since this step only runs when
-      # "Enforce verdict" passed (no post-marker CHANGES_REQUESTED exists), any
-      # remaining CHANGES_REQUESTED by the bot is provably stale — dismiss it.
-      # Scope to the reviewer bot's own login so a HUMAN change-request is never
-      # touched. REST /reviews is used (not gh pr view) because the dismissals
-      # endpoint needs the integer review id, not a GraphQL node id.
+      # Only after a run that actually reviewed: when the action skipped itself,
+      # an earlier change-request was never re-checked, so it is not stale.
       - name: Dismiss stale bot change-request
-        if: success()
+        if: success() && steps.verdict.outputs.reviewed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          pr='${{ github.event.pull_request.number }}'
-          repo='${{ github.repository }}'
-          bot='claude[bot]'
-          ids=$(gh api "/repos/$repo/pulls/$pr/reviews" --paginate \
-            --jq ".[] | select(.state == \"CHANGES_REQUESTED\" and .user.login == \"$bot\") | .id")
-          if [ -z "$ids" ]; then
-            echo "No stale ${bot} change-request to dismiss."
-            exit 0
-          fi
-          for id in $ids; do
-            echo "Dismissing stale ${bot} review $id (superseded by clean re-run)."
-            gh api -X PUT "/repos/$repo/pulls/$pr/reviews/$id/dismissals" \
-              -f message="Superseded: claude-review re-ran clean on a later commit." \
-              -f event="DISMISS" >/dev/null
-          done
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: .github/claude-review/dismiss-stale.sh
+
+      - name: Flag a run that did not review
+        if: success() && steps.verdict.outputs.reviewed != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: .github/claude-review/notify-not-reviewed.sh

@@ -340,14 +340,7 @@ jobs:
         run: docker run --rm -d --name s3 -p 8333:8333 chrislusf/seaweedfs:4.53 server -s3
 
       - name: Wait for SeaweedFS S3
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:8333/healthz >/dev/null; then
-              echo "s3 ready after ${i}s"; exit 0
-            fi
-            sleep 1
-          done
-          echo "s3 failed to start"; docker logs s3; exit 1
+        run: .github/scripts/wait-for-urls.sh 30 http://localhost:8333/healthz || { docker logs s3; exit 1; }
 
       # Backend runs WITH coverage so the fallow job can gate real CRAP (#717);
       # test:coverage IS the backend `vitest run` plus Istanbul instrumentation
@@ -394,9 +387,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Both test halves passed
-        run: |
-          [ "${{ needs.test-backend.result }}" = success ] && [ "${{ needs.test-frontend.result }}" = success ] \
-            || { echo "test-backend=${{ needs.test-backend.result }} test-frontend=${{ needs.test-frontend.result }}"; exit 1; }
+        run: >-
+          .github/scripts/require-success.sh
+          test-backend=${{ needs.test-backend.result }}
+          test-frontend=${{ needs.test-frontend.result }}
 
   e2e:
     # Playwright smoke suite against a booted dev stack (same postgres service as
@@ -491,14 +485,7 @@ jobs:
         run: nohup npm run preview --workspace frontend -- --port 5173 > /tmp/frontend.log 2>&1 &
 
       - name: Wait for stack
-        run: |
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:4000/api/health >/dev/null && curl -sf http://localhost:5173 >/dev/null; then
-              echo "stack ready after ${i}s"; exit 0
-            fi
-            sleep 1
-          done
-          echo "stack failed to start"; cat /tmp/backend.log /tmp/frontend.log; exit 1
+        run: .github/scripts/wait-for-urls.sh 60 http://localhost:4000/api/health http://localhost:5173 -- /tmp/backend.log /tmp/frontend.log
 
       - name: Run Playwright
         working-directory: frontend
