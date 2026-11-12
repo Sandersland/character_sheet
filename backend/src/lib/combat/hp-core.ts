@@ -4,11 +4,9 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { exhaustionMaxHpPenalty } from "@/lib/srd/condition-data.js";
 import { characterAdvancementSlots } from "@/lib/srd/advancement-slots.js";
 import { normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources-state.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-// status → the 400 the central `errorHandler` maps (client op-validation error).
-export class InvalidHitPointOperationError extends Error {
-  status = 400;
-}
+export class InvalidHitPointOperationError extends ValidationError {}
 
 export interface HitPoints {
   current: number;

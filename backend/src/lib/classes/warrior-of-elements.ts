@@ -20,8 +20,9 @@ import type {
   WarriorOfElementsOperation,
   WarriorOfElementsResult,
 } from "@character-sheet/shared-types";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidWarriorOfElementsOperationError extends Error {}
+class InvalidWarriorOfElementsOperationError extends ValidationError {}
 
 export const ELEMENTAL_ATTUNEMENT_BUFF_KEY = "elementalAttunement";
 const ELEMENTAL_BURST_FOCUS_COST = 2;

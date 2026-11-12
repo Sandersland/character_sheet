@@ -21,9 +21,6 @@
   // literal `// fallow-ignore-file` comment isn't usable here: `//` isn't a valid
   // CSS comment token and risks swallowing the real rule below it during parsing.
   "ignorePatterns": ["backend/scripts/**", "frontend/e2e/screenshot.css"],
-  // Error classes carry a numeric `status` read duck-typed by the Express error
-  // middleware (backend/src/lib/auth/errors.ts, lib/inventory/inventory.ts) — never a static reference.
-  "usedClassMembers": ["status"],
   // The frontend/backend 5e-rules boundary (#1272, epic #1369), as a machine
   // check instead of a paragraph. Disjoint zones; a violation needs BOTH
   // files zoned, so unzoned trees (backend/prisma/seed, frontend/e2e,

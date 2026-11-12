@@ -4,8 +4,6 @@ import { z } from "zod";
 import { EQUIP_SLOTS } from "@character-sheet/contracts";
 import {
   applyInventoryOperations,
-  InsufficientCurrencyError,
-  InvalidInventoryOperationError,
 } from "@/lib/inventory/inventory.js";
 import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
@@ -198,7 +196,6 @@ makeTransactionsEndpoint({
   router: inventoryRouter,
   schema: transactionsRequestSchema,
   apply: (characterId, data) => applyInventoryOperations(characterId, data.operations),
-  domainErrors: [InsufficientCurrencyError, InvalidInventoryOperationError],
   // Surface per-use roll outcomes so the client can play the 3D dice + toast.
   respond: (character, useResults) =>
     useResults.length > 0 ? { ...character, useResults } : character,

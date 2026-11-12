@@ -3,7 +3,7 @@ import { catalogForkSchema, type CatalogForkInput } from "@character-sheet/contr
 
 import type { CatalogEntry, Spell } from "@/generated/prisma/client.js";
 import { assertCampaignOwner } from "@/lib/auth/access.js";
-import { AuthorizationError, NotFoundError } from "@/lib/auth/errors.js";
+import { AuthorizationError, NotFoundError } from "@/lib/core/errors.js";
 import { forkContent, type ForkTarget } from "@/lib/catalog/fork.js";
 import { isCatalogEntryVisibleToUser } from "@/lib/catalog/entitlement.js";
 import { parseBodyOr400 } from "@/http/parse-body.js";

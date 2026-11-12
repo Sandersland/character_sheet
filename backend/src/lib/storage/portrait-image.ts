@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { ValidationError } from "@/lib/core/errors.js";
 
 // #1616: cross-plan contract pinned with the upload UI; portraitMultipart enforces it pre-decode.
 export const PORTRAIT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -8,13 +9,7 @@ export const PORTRAIT_CONTENT_TYPE = "image/webp";
 
 const PORTRAIT_EDGE_PX = 512;
 
-export class PortraitImageError extends Error {
-  readonly status = 400;
-  constructor(message: string) {
-    super(message);
-    this.name = "PortraitImageError";
-  }
-}
+export class PortraitImageError extends ValidationError {}
 
 // SVG is deliberately absent — sharp can sniff and rasterize it, but as a document format it's a classic stored-XSS/script-smuggling carrier. "image/jpg" is a common non-IANA alias accepted alongside "image/jpeg" so a programmatic client declaring it over honest JPEG bytes doesn't 400.
 const ACCEPTED_MIME_BY_FORMAT: Readonly<Record<string, readonly string[]>> = {

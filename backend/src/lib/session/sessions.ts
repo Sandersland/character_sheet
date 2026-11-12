@@ -11,20 +11,17 @@ import {
 } from "./session-summary.js";
 import { Prisma, type SpellCastKind } from "@/generated/prisma/client.js";
 import type { CombatState } from "@character-sheet/shared-types";
+import { DomainError } from "@/lib/core/errors.js";
 
-// The central errorHandler reads `.status` on thrown errors; default 409 (conflict), pass 404 at not-found throw sites.
-export class SessionError extends Error {
-  status: number;
+// Default 409 (conflict); pass 404 at not-found throw sites.
+export class SessionError extends DomainError {
   constructor(message: string, status = 409) {
-    super(message);
-    this.status = status;
+    super(message, status);
   }
 }
-export class CombatError extends Error {
-  status: number;
+export class CombatError extends DomainError {
   constructor(message: string, status = 409) {
-    super(message);
-    this.status = status;
+    super(message, status);
   }
 }
 

@@ -1,4 +1,5 @@
 import { Prisma } from "@/generated/prisma/client.js";
+import { ConflictError, ValidationError } from "@/lib/core/errors.js";
 
 // The index signature only satisfies Prisma's InputJsonObject structural requirement for the Json column write — every real field is still named and typed above it.
 export interface Currency {
@@ -9,17 +10,10 @@ export interface Currency {
   [key: string]: number;
 }
 
-// status → the 400 the central `errorHandler` maps (client op-validation error).
-export class InsufficientCurrencyError extends Error {
-  status = 400;
-}
-export class InvalidInventoryOperationError extends Error {
-  status = 400;
-}
-// Overrides to an explicit 409 so the central `errorHandler` surfaces an attunement cap breach distinctly from a plain 400.
-export class AttunementLimitError extends InvalidInventoryOperationError {
-  status = 409;
-}
+export class InsufficientCurrencyError extends ValidationError {}
+export class InvalidInventoryOperationError extends ValidationError {}
+// A 409, not a 400, so an attunement cap breach reads distinctly from a plain op-validation failure.
+export class AttunementLimitError extends ConflictError {}
 
 function applyCurrencyDelta(current: Currency, delta: Currency, sign: 1 | -1): Currency {
   const next: Currency = {

@@ -4,8 +4,6 @@ import { z } from "zod";
 import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 import {
   applyResolveActionOperations,
-  InvalidResolveActionOperationError,
-  InvalidSpellcastingOperationError,
   resolveActionRequestOperationSchema,
 } from "@/lib/combat/resolve-action.js";
 
@@ -23,7 +21,6 @@ makeTransactionsEndpoint({
   router: resolveActionRouter,
   schema: transactionsRequestSchema,
   apply: (characterId, data, userId) => applyResolveActionOperations(characterId, data.operations, userId),
-  domainErrors: [InvalidResolveActionOperationError, InvalidSpellcastingOperationError],
   // batchId rides beside the character for turn undo (#758); the client API layer splits it off.
   respond: (character, batchId) => ({ ...character, batchId }),
 });

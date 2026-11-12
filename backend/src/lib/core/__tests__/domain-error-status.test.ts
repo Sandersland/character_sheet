@@ -1,6 +1,7 @@
 // Pins the intentional HTTP `status` each domain error carries (#1007): errorHandler maps `err.status` to the response code, so these values ARE the route contract.
 import { describe, expect, it } from "vitest";
 
+import { ConflictError } from "@/lib/core/errors.js";
 import { InvalidHitPointOperationError } from "@/lib/combat/hp-core.js";
 import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
 import {
@@ -22,9 +23,9 @@ describe("domain errors carry an explicit HTTP status", () => {
     expect(new UnknownActionError("x").status).toBe(400);
   });
 
-  it("attunement-cap breach keeps its distinct 409 (subclass override)", () => {
+  it("attunement-cap breach keeps its distinct 409 (ConflictError)", () => {
     expect(new AttunementLimitError("x").status).toBe(409);
-    expect(new AttunementLimitError("x")).toBeInstanceOf(InvalidInventoryOperationError);
+    expect(new AttunementLimitError("x")).toBeInstanceOf(ConflictError);
   });
 
   it("session/combat errors default to 409 (conflict) and take 404 for not-found", () => {

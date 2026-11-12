@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler } from "express";
 
 import { config } from "@/lib/core/config.js";
+import { DomainError } from "@/lib/core/errors.js";
 import { logger } from "@/lib/core/logger.js";
 
 // Express recognizes a 4-arg middleware as an error handler; with express-async-errors installed, async throws in any route land here.
@@ -17,17 +18,19 @@ function isPrismaUniqueViolation(err: unknown): boolean {
   );
 }
 
+// Library errors that predate DomainError carry the status themselves: express.json / body-parser (http-errors: 400 parse failure, 413 too large, 415 wrong charset). Client range only, so a stray 5xx can't be forged into a response.
+function clientStatusFromHttpError(err: unknown): number | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const { status, statusCode } = err as { status?: unknown; statusCode?: unknown };
+  const candidate = status ?? statusCode;
+  return typeof candidate === "number" && candidate >= 400 && candidate <= 499 ? candidate : undefined;
+}
+
 function statusFromError(err: unknown): number {
+  if (err instanceof DomainError) return err.status;
   if (isPrismaRecordNotFound(err)) return 404;
   if (isPrismaUniqueViolation(err)) return 409;
-  if (err && typeof err === "object") {
-    const candidate = (err as { status?: unknown; statusCode?: unknown }).status ??
-      (err as { statusCode?: unknown }).statusCode;
-    if (typeof candidate === "number" && candidate >= 400 && candidate <= 599) {
-      return candidate;
-    }
-  }
-  return 500;
+  return clientStatusFromHttpError(err) ?? 500;
 }
 
 export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {

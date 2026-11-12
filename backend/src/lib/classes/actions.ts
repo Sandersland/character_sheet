@@ -12,14 +12,12 @@ import { effectBuffsFromRow, type ClassFeatureRow, type ClassFeatureRowsCarrier,
 import { monkPoolKey } from "./ki-focus.js";
 import { applyAnnounceAugmentors, type AugmentorContext } from "./announce-augmentors.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
-// An op referencing an actionKey in neither dispatch table. status → the 400 the
-// central `errorHandler` maps, so the actions route needs no try/catch.
-export class UnknownActionError extends Error {
-  status = 400;
-}
+// An op referencing an actionKey in neither dispatch table.
+export class UnknownActionError extends ValidationError {}
 
 interface ActionClassGate {
   className: string; // lowercase

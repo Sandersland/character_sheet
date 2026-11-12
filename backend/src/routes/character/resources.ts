@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import {
   applyResourceOperations,
-  InvalidResourceOperationError,
 } from "@/lib/classes/resources.js";
 import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
@@ -110,6 +109,5 @@ makeTransactionsEndpoint({
   router: resourcesRouter,
   schema: transactionsRequestSchema,
   apply: (characterId, data) => applyResourceOperations(characterId, data.operations),
-  domainErrors: [InvalidResourceOperationError],
   respond: (character, results) => ({ ...character, results }),
 });

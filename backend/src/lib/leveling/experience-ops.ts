@@ -23,8 +23,9 @@ import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
 import { abilityModifier, characterFightingStyleFeatSlots, deriveFeatBonuses, hitDieFace } from "@/lib/srd/srd.js";
 import { recomputeSummaries } from "@/lib/session/sessions.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidExperienceOperationError extends Error {}
+export class InvalidExperienceOperationError extends ValidationError {}
 
 function computeLevelDownState(
   character: {

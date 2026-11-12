@@ -1,10 +1,9 @@
 import type { Prisma } from "@/generated/prisma/client.js";
 import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
 import type { ActivationRequirement, ArmorActivationRequirement } from "./class-feature-rows.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class ActivationRequirementError extends Error {
-  status = 400;
-}
+export class ActivationRequirementError extends ValidationError {}
 
 export interface EquippedArmorState {
   hasLightArmor: boolean;

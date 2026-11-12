@@ -1,8 +1,9 @@
-// Shared scaffold behind every POST …/transactions endpoint: assert edit access, zod-validate the body (400), apply ops (domain-error → 400, else rethrow), then re-fetch and return serializeCharacter.
+// Shared scaffold behind every POST …/transactions endpoint: assert edit access, zod-validate the body (400), apply ops (DomainError → its status, else rethrow), then re-fetch and return serializeCharacter.
 import type { Request, Response, Router } from "express";
 import type { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
+import { DomainError } from "@/lib/core/errors.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
@@ -19,7 +20,7 @@ export async function runTransaction<Schema extends z.ZodTypeAny, Result>(
   req: Request<{ id: string }>,
   res: Response,
 ): Promise<void> {
-  const { schema, apply, domainErrors, respond } = handler;
+  const { schema, apply, respond } = handler;
 
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
@@ -33,12 +34,8 @@ export async function runTransaction<Schema extends z.ZodTypeAny, Result>(
   try {
     result = await apply(req.params.id, parseResult.data, req.user!.id);
   } catch (error) {
-    if (domainErrors.some((ErrorClass) => error instanceof ErrorClass)) {
-      // A domain error may carry an explicit status (e.g. attunement-cap breach → 409); defaults to 400 for plain validation failures.
-      const status = typeof (error as { status?: unknown }).status === "number"
-        ? (error as { status: number }).status
-        : 400;
-      res.status(status).json({ error: (error as Error).message });
+    if (error instanceof DomainError) {
+      res.status(error.status).json({ error: error.message });
       return;
     }
     throw error;

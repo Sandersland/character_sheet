@@ -11,8 +11,9 @@ import { editionOf } from "@/lib/rules/edition.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { monkSaveDC } from "./ki-focus.js";
 import { resolveSubclassSlug, type SubclassSlug } from "./subclass-slug.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidOpenHandTechniqueOperationError extends Error {}
+class InvalidOpenHandTechniqueOperationError extends ValidationError {}
 
 // SRD 5.2 / PHB'24 p.90; SRD 5.1 / PHB'14 p.78 (Way of the Open Hand's own Open Hand Technique) — edition-invariant.
 export const OPEN_HAND_TECHNIQUE_LEVEL = 3;
