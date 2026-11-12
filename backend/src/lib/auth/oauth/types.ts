@@ -1,3 +1,9 @@
+import type { Config } from "@/lib/core/config.js";
+
+export type OAuthCredentialKey = "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET";
+
+export type OAuthCredentials = Pick<Config, OAuthCredentialKey>;
+
 export interface NormalizedProfile {
   providerAccountId: string;
   email: string | null;
@@ -13,8 +19,8 @@ export interface ProviderDefinition {
   tokenUrl: string;
   userInfoUrl: string;
   scopes: string[];
-  clientIdEnv: string;
-  clientSecretEnv: string;
+  clientIdEnv: OAuthCredentialKey;
+  clientSecretEnv: OAuthCredentialKey;
   mapProfile: (raw: unknown) => NormalizedProfile;
   // Spread into the authorize URL so provider-agnostic flow code stays generic.
   extraAuthParams?: Record<string, string>;

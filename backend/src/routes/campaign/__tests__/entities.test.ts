@@ -3,7 +3,7 @@ import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import sharp from "sharp";
 import supertest from "supertest";
 
@@ -11,7 +11,8 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
-import { __resetBlobStoreForTests, createBlobStore } from "@/lib/storage/index.js";
+import { config } from "@/lib/core/config.js";
+import { __setBlobStoreForTests, createBlobStore, getBlobStore } from "@/lib/storage/index.js";
 import { PORTRAIT_CACHE_CONTROL, PORTRAIT_FIELD } from "@/http/portrait-http.js";
 
 // Unique fixture ids for this file (parallel-safe on the shared dev DB).
@@ -352,16 +353,13 @@ describe("campaign entities (#248)", () => {
     const UUID_RE = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
     beforeAll(async () => {
-      // Reset after stubbing so getBlobStore's memo re-fills from this tmpdir, not a store memoized earlier.
-      vi.stubEnv("BLOB_STORE_DRIVER", "fs");
-      vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "entity-portrait-test-")));
-      __resetBlobStoreForTests();
+      const dir = await mkdtemp(path.join(os.tmpdir(), "entity-portrait-test-"));
+      __setBlobStoreForTests(createBlobStore({ ...config, BLOB_STORE_DRIVER: "fs", BLOB_FS_DIR: dir }));
     });
 
     afterAll(() => {
-      vi.unstubAllEnvs();
       // Otherwise a later suite in this file would inherit a store memoized on this suite's now-unstubbed tmpdir.
-      __resetBlobStoreForTests();
+      __setBlobStoreForTests();
     });
 
     async function pngFixture(): Promise<Buffer> {
@@ -458,7 +456,7 @@ describe("campaign entities (#248)", () => {
 
       const key = await storedKey(id);
       expect(key).toMatch(new RegExp(`^portraits/entities/${id}/${UUID_RE}\\.webp$`));
-      expect(await createBlobStore().exists(key as string)).toBe(true);
+      expect(await getBlobStore().exists(key as string)).toBe(true);
 
       const served = await getPortrait(cookieOwner, id)
         .buffer(true)
@@ -522,7 +520,7 @@ describe("campaign entities (#248)", () => {
       expect(second.status).toBe(200);
       expect(second.body.portraitUrl).not.toBe(first.body.portraitUrl);
 
-      const store = createBlobStore();
+      const store = getBlobStore();
       expect(await store.exists(firstKey as string)).toBe(false);
       expect(await store.exists((await storedKey(id)) as string)).toBe(true);
     });
@@ -546,7 +544,7 @@ describe("campaign entities (#248)", () => {
       expect(res.body.portraitUrl).toBeNull();
       expect(res.body).not.toHaveProperty("portraitKey");
       expect(await storedKey(id)).toBeNull();
-      expect(await createBlobStore().exists(key as string)).toBe(false);
+      expect(await getBlobStore().exists(key as string)).toBe(false);
       expect((await getPortrait(cookieOwner, id)).status).toBe(404);
     });
 
@@ -559,7 +557,7 @@ describe("campaign entities (#248)", () => {
         .delete(`/api/campaigns/${campaignId}/entities/${id}`)
         .set("Cookie", cookieOwner);
       expect(res.status).toBe(204);
-      expect(await createBlobStore().exists(key as string)).toBe(false);
+      expect(await getBlobStore().exists(key as string)).toBe(false);
     });
   });
 

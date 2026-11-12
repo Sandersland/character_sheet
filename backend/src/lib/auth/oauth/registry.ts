@@ -1,23 +1,22 @@
-import type { AuthProvider } from "./types.js";
+import type { AuthProvider, OAuthCredentials } from "./types.js";
 
+import { config } from "@/lib/core/config.js";
 import { PROVIDERS } from "@/lib/auth/oauth/providers/index.js";
 
-function readEnv(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-  return value ? value : undefined;
-}
-
-// Reads creds from LIVE env at call time (not a frozen snapshot) so a provider toggled on/off via env is reflected without re-importing — route tests rely on this.
-export function enabledProviders(): AuthProvider[] {
+// Reads creds from the config slice it is handed (the process config by default) so tests pass their own instead of mutating the frozen singleton.
+export function enabledProviders(credentials: OAuthCredentials = config): AuthProvider[] {
   return PROVIDERS.flatMap((definition) => {
-    const clientId = readEnv(definition.clientIdEnv);
-    const clientSecret = readEnv(definition.clientSecretEnv);
+    const clientId = credentials[definition.clientIdEnv];
+    const clientSecret = credentials[definition.clientSecretEnv];
     if (!clientId || !clientSecret) return [];
-    // clientIdEnv/clientSecretEnv ride along harmlessly in the spread — they're env-var NAMES, not secrets.
+    // clientIdEnv/clientSecretEnv ride along harmlessly in the spread — they're config key NAMES, not secrets.
     return [{ ...definition, clientId, clientSecret }];
   });
 }
 
-export function getProvider(id: string): AuthProvider | undefined {
-  return enabledProviders().find((provider) => provider.id === id);
+export function getProvider(
+  id: string,
+  credentials: OAuthCredentials = config,
+): AuthProvider | undefined {
+  return enabledProviders(credentials).find((provider) => provider.id === id);
 }

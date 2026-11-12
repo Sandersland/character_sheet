@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler } from "express";
 
+import { config } from "@/lib/core/config.js";
 import { logger } from "@/lib/core/logger.js";
 
 // Express recognizes a 4-arg middleware as an error handler; with express-async-errors installed, async throws in any route land here.
@@ -43,7 +44,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
       : err instanceof Error
         ? err.message
         : String(err);
-  const isProd = process.env.NODE_ENV === "production";
+  const isProd = config.isProd;
 
   const log = (req as { log?: typeof logger }).log ?? logger;
   if (status >= 500) {

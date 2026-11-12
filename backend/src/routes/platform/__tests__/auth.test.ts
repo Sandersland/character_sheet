@@ -8,13 +8,22 @@ import { prisma } from "@/lib/core/prisma.js";
 import { authRouter } from "@/routes/platform/auth.js";
 
 // config is frozen at import, so ALLOW_DEV_LOGIN can't be flipped via env at runtime; mock it to read from a hoisted, mutable holder instead.
-const hoisted = vi.hoisted(() => ({ devLoginEnabled: false }));
+const hoisted = vi.hoisted(() => ({
+  devLoginEnabled: false,
+  googleClientId: "client-abc" as string | undefined,
+  googleClientSecret: "secret-xyz" as string | undefined,
+}));
 vi.mock("@/lib/core/config.js", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/core/config.js")>();
   return {
     ...actual,
     get config() {
-      return { ...actual.config, ALLOW_DEV_LOGIN: hoisted.devLoginEnabled };
+      return {
+        ...actual.config,
+        ALLOW_DEV_LOGIN: hoisted.devLoginEnabled,
+        GOOGLE_CLIENT_ID: hoisted.googleClientId,
+        GOOGLE_CLIENT_SECRET: hoisted.googleClientSecret,
+      };
     },
   };
 });
@@ -107,13 +116,12 @@ async function beginFlow(agent: ReturnType<typeof supertest.agent>) {
 
 describe("auth router", () => {
   beforeEach(() => {
-    vi.stubEnv("GOOGLE_CLIENT_ID", "client-abc");
-    vi.stubEnv("GOOGLE_CLIENT_SECRET", "secret-xyz");
+    hoisted.googleClientId = "client-abc";
+    hoisted.googleClientSecret = "secret-xyz";
   });
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
     hoisted.devLoginEnabled = false;
     await cleanupSubs();
     await cleanupDevUser();
@@ -136,8 +144,8 @@ describe("auth router", () => {
     });
 
     it("is empty when creds are absent", async () => {
-      vi.stubEnv("GOOGLE_CLIENT_ID", "");
-      vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
+      hoisted.googleClientId = undefined;
+      hoisted.googleClientSecret = undefined;
       const res = await supertest(buildApp()).get("/api/auth/providers");
       expect(res.body.providers).toEqual([]);
     });
@@ -200,8 +208,8 @@ describe("auth router", () => {
     });
 
     it("404s for a known provider with no creds (disabled)", async () => {
-      vi.stubEnv("GOOGLE_CLIENT_ID", "");
-      vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
+      hoisted.googleClientId = undefined;
+      hoisted.googleClientSecret = undefined;
       const res = await supertest(buildApp()).get("/api/auth/google/start");
       expect(res.status).toBe(404);
     });
