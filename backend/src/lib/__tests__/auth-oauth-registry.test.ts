@@ -1,35 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import {
-  enabledProviders,
-  getProvider,
-} from "@/lib/auth/oauth/registry.js";
+import { enabledProviders, getProvider } from "@/lib/auth/oauth/registry.js";
+
+const none = { GOOGLE_CLIENT_ID: undefined, GOOGLE_CLIENT_SECRET: undefined };
+const both = { GOOGLE_CLIENT_ID: "client-abc", GOOGLE_CLIENT_SECRET: "secret-xyz" };
 
 describe("auth provider registry", () => {
-  beforeEach(() => {
-    vi.stubEnv("GOOGLE_CLIENT_ID", "");
-    vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   describe("enabledProviders", () => {
     it("is empty when creds are absent", () => {
-      expect(enabledProviders()).toEqual([]);
+      expect(enabledProviders(none)).toEqual([]);
     });
 
     it("is empty when only one of id/secret is set", () => {
-      vi.stubEnv("GOOGLE_CLIENT_ID", "client-only");
-      expect(enabledProviders()).toEqual([]);
+      expect(enabledProviders({ ...none, GOOGLE_CLIENT_ID: "client-only" })).toEqual([]);
     });
 
     it("includes google with creds attached when both are set", () => {
-      vi.stubEnv("GOOGLE_CLIENT_ID", "client-abc");
-      vi.stubEnv("GOOGLE_CLIENT_SECRET", "secret-xyz");
-
-      const providers = enabledProviders();
+      const providers = enabledProviders(both);
       expect(providers).toHaveLength(1);
       const google = providers[0];
       expect(google.id).toBe("google");
@@ -48,19 +35,15 @@ describe("auth provider registry", () => {
 
   describe("getProvider", () => {
     it("returns undefined for an unknown id", () => {
-      vi.stubEnv("GOOGLE_CLIENT_ID", "client-abc");
-      vi.stubEnv("GOOGLE_CLIENT_SECRET", "secret-xyz");
-      expect(getProvider("facebook")).toBeUndefined();
+      expect(getProvider("facebook", both)).toBeUndefined();
     });
 
     it("returns undefined for a known-but-disabled provider", () => {
-      expect(getProvider("google")).toBeUndefined();
+      expect(getProvider("google", none)).toBeUndefined();
     });
 
     it("returns the provider when enabled", () => {
-      vi.stubEnv("GOOGLE_CLIENT_ID", "client-abc");
-      vi.stubEnv("GOOGLE_CLIENT_SECRET", "secret-xyz");
-      expect(getProvider("google")?.id).toBe("google");
+      expect(getProvider("google", both)?.id).toBe("google");
     });
   });
 });

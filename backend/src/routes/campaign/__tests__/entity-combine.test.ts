@@ -13,7 +13,8 @@ import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { createTestCharacter } from "@/test-support/character.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
-import { __resetBlobStoreForTests, createBlobStore } from "@/lib/storage/index.js";
+import { config } from "@/lib/core/config.js";
+import { __setBlobStoreForTests, createBlobStore, getBlobStore } from "@/lib/storage/index.js";
 import { PORTRAIT_FIELD } from "@/http/portrait-http.js";
 import * as entityMergesModule from "@/lib/activity/entity-merges.js";
 
@@ -940,14 +941,12 @@ describe("entity combine-duplicates (#1942)", () => {
 
   describe("portrait cleanup (#1942)", () => {
     beforeAll(async () => {
-      vi.stubEnv("BLOB_STORE_DRIVER", "fs");
-      vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "entity-combine-portrait-test-")));
-      __resetBlobStoreForTests();
+      const dir = await mkdtemp(path.join(os.tmpdir(), "entity-combine-portrait-test-"));
+      __setBlobStoreForTests(createBlobStore({ ...config, BLOB_STORE_DRIVER: "fs", BLOB_FS_DIR: dir }));
     });
 
     afterAll(() => {
-      vi.unstubAllEnvs();
-      __resetBlobStoreForTests();
+      __setBlobStoreForTests();
     });
 
     async function pngFixture(): Promise<Buffer> {
@@ -968,12 +967,12 @@ describe("entity combine-duplicates (#1942)", () => {
       const key = (
         await prisma.campaignEntity.findUniqueOrThrow({ where: { id: dup }, select: { portraitKey: true } })
       ).portraitKey as string;
-      expect(await createBlobStore().exists(key)).toBe(true);
+      expect(await getBlobStore().exists(key)).toBe(true);
 
       const res = await combine(dup, surv);
       expect(res.status).toBe(200);
 
-      expect(await createBlobStore().exists(key)).toBe(false);
+      expect(await getBlobStore().exists(key)).toBe(false);
     });
   });
 });

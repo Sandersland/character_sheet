@@ -109,5 +109,22 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": ["error", { patterns: [EXPRESS_PATTERN] }],
     },
+  },
+  {
+    // process.env is read in exactly one place (#2008). Declared as its own block
+    // for a rule no-restricted-imports blocks don't touch, so the last-match-wins
+    // clobbering described above doesn't apply; the exemptions below are explicit.
+    files: ["src/**/*.ts"],
+    ignores: ["src/lib/core/config.ts", "src/**/__tests__/**", "src/**/*.test.ts"],
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        {
+          object: "process",
+          property: "env",
+          message: "Read configuration from `config` (@/lib/core/config.js); process.env is parsed once there (#2008).",
+        },
+      ],
+    },
   }
 );

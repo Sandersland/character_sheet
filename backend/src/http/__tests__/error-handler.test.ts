@@ -3,7 +3,7 @@ import "express-async-errors";
 
 import express from "express";
 import supertest from "supertest";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { errorHandler } from "@/http/error-handler.js";
 
@@ -20,12 +20,22 @@ function appThatThrows(thrower: () => void) {
   return app;
 }
 
-const originalNodeEnv = process.env.NODE_ENV;
-afterEach(() => {
-  process.env.NODE_ENV = originalNodeEnv;
+const hoisted = vi.hoisted(() => ({ isProd: false }));
+vi.mock("@/lib/core/config.js", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/core/config.js")>();
+  return {
+    ...actual,
+    get config() {
+      return { ...actual.config, isProd: hoisted.isProd };
+    },
+  };
 });
 
 describe("global error handler", () => {
+  afterEach(() => {
+    hoisted.isProd = false;
+  });
+
   it("returns a JSON 500 (not HTML, not a hang) for an unexpected sync throw", async () => {
     const app = appThatThrows(() => {
       throw new Error("boom");
@@ -69,7 +79,7 @@ describe("global error handler", () => {
   });
 
   it("does not leak the error message on a 500 in production", async () => {
-    process.env.NODE_ENV = "production";
+    hoisted.isProd = true;
     const app = appThatThrows(() => {
       throw new Error("secret internal detail");
     });

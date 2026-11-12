@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
-import { securityHeaders } from "@/http/security.js";
+import { createRateLimiters, securityHeaders } from "@/http/security.js";
+import { parseConfig } from "@/lib/core/config.js";
 
 const INLINE_BODY = "console.log('theme');";
 const INLINE_HASH = createHash("sha256").update(INLINE_BODY).digest("base64");
@@ -111,17 +112,9 @@ describe("securityHeaders API-only mode", () => {
   });
 });
 
-// In-suite VITEST=true would otherwise always short-circuit to the no-op, so this clears the test flags before re-importing security.ts.
-async function loadLimiters(env: Record<string, string | undefined>) {
-  const prev = { ...process.env };
-  vi.resetModules();
-  process.env.VITEST = "";
-  process.env.NODE_ENV = "production";
-  delete process.env.RATE_LIMIT_DISABLED;
-  Object.assign(process.env, env);
-  const mod = await import("@/http/security.js");
-  process.env = prev;
-  return mod;
+// A production-shaped config: unlike the ambient test config, isTest is false, so the limiters are live unless RATE_LIMIT_DISABLED says otherwise.
+function loadLimiters(env: Record<string, string | undefined>) {
+  return createRateLimiters(parseConfig({ DATABASE_URL: "postgres://unused", NODE_ENV: "production", ...env }));
 }
 
 // RateLimit headers are the observable difference between an active limiter and the no-op passthrough.
@@ -155,12 +148,8 @@ async function runOnce(handler: RequestHandler) {
 }
 
 describe("rate limiter disabling", () => {
-  afterEach(() => {
-    vi.resetModules();
-  });
-
   it("makes both limiters no-op passthroughs when RATE_LIMIT_DISABLED=true", async () => {
-    const { globalRateLimiter, creationRateLimiter } = await loadLimiters({
+    const { globalRateLimiter, creationRateLimiter } = loadLimiters({
       RATE_LIMIT_DISABLED: "true",
     });
     const global = await runOnce(globalRateLimiter);
@@ -172,7 +161,7 @@ describe("rate limiter disabling", () => {
   });
 
   it("keeps the global limiter active when RATE_LIMIT_DISABLED is unset", async () => {
-    const { globalRateLimiter } = await loadLimiters({ RATE_LIMIT_DISABLED: undefined });
+    const { globalRateLimiter } = loadLimiters({ RATE_LIMIT_DISABLED: undefined });
     const { nextCalled, limited } = await runOnce(globalRateLimiter);
     expect(nextCalled).toBe(true);
     expect(limited).toBe(true);
