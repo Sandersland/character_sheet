@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+// fallow-ignore-next-line boundary-violation -- fallow resolves new URL("../..") to the src/index.ts entry, but this is a directory path, not an import
 const backendSrcDir = fileURLToPath(new URL("../..", import.meta.url));
 const architectureDocPath = fileURLToPath(new URL("../../../../docs/architecture.md", import.meta.url));
 
