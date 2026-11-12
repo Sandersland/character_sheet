@@ -3,8 +3,8 @@ import type { Request } from "express";
 
 import { config } from "@/lib/core/config.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { clearCookie, getCookie, setCookie } from "@/lib/auth/cookies.js";
-import { AuthenticationError } from "@/lib/auth/errors.js";
+import { clearCookie, getCookie, setCookie } from "@/http/cookies.js";
+import { AuthenticationError } from "@/lib/core/errors.js";
 import { resolvePreferences } from "@/lib/preferences/preferences.js";
 import {
   createSession,

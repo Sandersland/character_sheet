@@ -18,7 +18,6 @@ import { runCharacterTransaction } from "@/lib/character/character-transaction.j
 import { logEvent } from "@/lib/activity/events.js";
 import {
   ABILITY_SLOT_SUBJECT,
-  InvalidSpellcastingOperationError,
   payAbilityCostInTx,
 } from "@/lib/spellcasting/ability-cost.js";
 import { castSpellForResolutionInTx, loadSlotPayContext } from "@/lib/spellcasting/spellcasting.js";
@@ -33,6 +32,7 @@ import {
 } from "./resolve-action-ops.js";
 import { writeStandaloneRollEvent } from "./standalone-roll-op.js";
 import type { CastSpellOperation, ResolveActionEventData } from "@character-sheet/shared-types";
+import { ValidationError } from "@/lib/core/errors.js";
 
 const RESOLVE_ACTION_SELECT = {
   id: true,
@@ -46,10 +46,7 @@ type ResolveActionRow = Prisma.CharacterGetPayload<{ select: typeof RESOLVE_ACTI
 
 export { resolveActionRequestOperationSchema, type ResolveActionRequestOperation };
 
-// status → the 400 the central `errorHandler` maps (client op-validation error).
-export class InvalidResolveActionOperationError extends Error {
-  status = 400;
-}
+class InvalidResolveActionOperationError extends ValidationError {}
 
 // Twin of the frontend sumInstanceEffects — same landed-filter/sum/undefined-when-none semantics on
 // either side of the wire; change the all-miss convention in both or neither.
@@ -275,5 +272,3 @@ export async function applyResolveActionOperations(
     },
   });
 }
-
-export { InvalidSpellcastingOperationError };

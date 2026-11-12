@@ -1,9 +1,9 @@
 import { Router } from "express";
 
 import { prisma } from "@/lib/core/prisma.js";
-import { parseAsiLevelOr400 } from "@/lib/http/parse-asi-level-param.js";
-import { parseClassesParam } from "@/lib/http/parse-class-param.js";
-import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
+import { parseAsiLevelOr400 } from "@/http/params/parse-asi-level-param.js";
+import { parseClassesParam } from "@/http/params/parse-class-param.js";
+import { requireEditionOr400 } from "@/http/params/parse-edition-param.js";
 import { resolveEditionCatalog } from "@/lib/rules/catalog-edition.js";
 import { featOfferedForAsiSlot, fightingStyleFeatOfferedForClasses, type FeatCategory } from "@/lib/srd/feats.js";
 

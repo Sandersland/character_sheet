@@ -2,7 +2,7 @@ import { Router } from "express";
 import { createJournalSchema, updateJournalSchema } from "@character-sheet/contracts";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
-import { parseBodyOr400 } from "@/lib/http/parse-body.js";
+import { parseBodyOr400 } from "@/http/parse-body.js";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client.js";
 import { extractEntityIds, reconcileEntryRefs } from "@/lib/activity/journal-refs.js";
 import { prisma } from "@/lib/core/prisma.js";

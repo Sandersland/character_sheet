@@ -3,9 +3,9 @@ import { Router } from "express";
 import type { CatalogMeta, RulesEdition } from "@character-sheet/shared-types";
 
 import type { Spell } from "@/generated/prisma/client.js";
-import { parseCharacterIdParam, parseClassFilterOr400, parseSubclassIdParam } from "@/lib/http/parse-class-param.js";
-import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
-import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
+import { parseCharacterIdParam, parseClassFilterOr400, parseSubclassIdParam } from "@/http/params/parse-class-param.js";
+import { parseMaxSpellLevelOr400 } from "@/http/params/parse-max-spell-level-param.js";
+import { requireEditionOr400 } from "@/http/params/parse-edition-param.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { EMPTY_CAMPAIGN_ID_SET, isCatalogEntryEditable, resolveDmCampaignIds, resolveVisibleEntries, type CatalogViewer } from "@/lib/catalog/entitlement.js";

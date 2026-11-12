@@ -5,7 +5,8 @@ import type { RequestHandler } from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 
-const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
+import type { Config } from "@/lib/core/config.js";
+import { config } from "@/lib/core/config.js";
 
 // Hashes the served index.html's inline scripts at boot so the CSP allowance tracks deployed markup rather than drifting from it.
 function inlineScriptHashes(staticDir: string): string[] {
@@ -51,34 +52,38 @@ export function securityHeaders(staticDir: string | undefined): RequestHandler {
   });
 }
 
-function intFromEnv(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+export type RateLimitConfig = Pick<
+  Config,
+  | "isTest"
+  | "RATE_LIMIT_DISABLED"
+  | "RATE_LIMIT_WINDOW_MS"
+  | "RATE_LIMIT_MAX"
+  | "RATE_LIMIT_CREATE_MAX"
+>;
+
+const passthrough: RequestHandler = (_req, _res, next) => next();
+
+export function createRateLimiters(cfg: RateLimitConfig): {
+  globalRateLimiter: RequestHandler;
+  creationRateLimiter: RequestHandler;
+} {
+  if (cfg.isTest || cfg.RATE_LIMIT_DISABLED) {
+    return { globalRateLimiter: passthrough, creationRateLimiter: passthrough };
+  }
+  const sharedOptions = {
+    windowMs: cfg.RATE_LIMIT_WINDOW_MS,
+    standardHeaders: true as const,
+    legacyHeaders: false as const,
+    message: { error: "Too many requests, please try again later." },
+  };
+  return {
+    globalRateLimiter: rateLimit({ ...sharedOptions, limit: cfg.RATE_LIMIT_MAX }),
+    creationRateLimiter: rateLimit({
+      ...sharedOptions,
+      limit: cfg.RATE_LIMIT_CREATE_MAX,
+      skip: (req) => !(req.method === "POST" && req.path === "/api/characters"),
+    }),
+  };
 }
 
-const windowMs = intFromEnv("RATE_LIMIT_WINDOW_MS", 15 * 60 * 1000);
-const globalMax = intFromEnv("RATE_LIMIT_MAX", 600);
-const createMax = intFromEnv("RATE_LIMIT_CREATE_MAX", 30);
-
-const disabled = isTest || process.env.RATE_LIMIT_DISABLED === "true";
-
-const sharedOptions = {
-  windowMs,
-  standardHeaders: true as const,
-  legacyHeaders: false as const,
-  message: { error: "Too many requests, please try again later." },
-};
-
-export const globalRateLimiter: RequestHandler = disabled
-  ? (_req, _res, next) => next()
-  : rateLimit({ ...sharedOptions, limit: globalMax });
-
-export const creationRateLimiter: RequestHandler = disabled
-  ? (_req, _res, next) => next()
-  : rateLimit({
-      ...sharedOptions,
-      limit: createMax,
-      skip: (req) => !(req.method === "POST" && req.path === "/api/characters"),
-    });
+export const { globalRateLimiter, creationRateLimiter } = createRateLimiters(config);

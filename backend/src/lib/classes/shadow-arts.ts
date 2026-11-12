@@ -19,8 +19,9 @@ import { applyConditionInTx } from "@/lib/combat/conditions.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { FOCUS_CAST_CHARACTER_SELECT, emitFocusCastEvents } from "./focus-cast.js";
 import type { Prisma } from "@/generated/prisma/client.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidShadowArtOperationError extends Error {}
+class InvalidShadowArtOperationError extends ValidationError {}
 
 // Prefix stamped on a Shadow Art's concentration entryId so its id space never overlaps a spellbook Spell.id.
 export const SHADOW_ART_CONCENTRATION_PREFIX = "shadow-art:";

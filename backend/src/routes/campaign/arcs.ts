@@ -3,7 +3,7 @@ import { createArcSchema, updateArcSchema } from "@character-sheet/contracts";
 
 import type { CampaignArc } from "@/generated/prisma/client.js";
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
-import { parseBodyOr400 } from "@/lib/http/parse-body.js";
+import { parseBodyOr400 } from "@/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 
 export const arcsRouter = Router();

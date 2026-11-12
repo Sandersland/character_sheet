@@ -1,6 +1,6 @@
 import type { CampaignRole, Prisma, PrismaClient } from "@/generated/prisma/client.js";
 
-import { AuthorizationError, NotFoundError } from "./errors.js";
+import { AuthorizationError, NotFoundError } from "@/lib/core/errors.js";
 
 // Accepts either the shared client or a $transaction callback's tx client, so a route can authorize inside the same transaction it mutates in.
 type Db = PrismaClient | Prisma.TransactionClient;

@@ -3,9 +3,10 @@ import "express-async-errors";
 
 import express from "express";
 import supertest from "supertest";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { errorHandler } from "@/lib/core/error-handler.js";
+import { errorHandler } from "@/http/error-handler.js";
+import { AuthorizationError, ConflictError, NotFoundError, ValidationError } from "@/lib/core/errors.js";
 
 function appThatThrows(thrower: () => void) {
   const app = express();
@@ -20,12 +21,22 @@ function appThatThrows(thrower: () => void) {
   return app;
 }
 
-const originalNodeEnv = process.env.NODE_ENV;
-afterEach(() => {
-  process.env.NODE_ENV = originalNodeEnv;
+const hoisted = vi.hoisted(() => ({ isProd: false }));
+vi.mock("@/lib/core/config.js", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/core/config.js")>();
+  return {
+    ...actual,
+    get config() {
+      return { ...actual.config, isProd: hoisted.isProd };
+    },
+  };
 });
 
 describe("global error handler", () => {
+  afterEach(() => {
+    hoisted.isProd = false;
+  });
+
   it("returns a JSON 500 (not HTML, not a hang) for an unexpected sync throw", async () => {
     const app = appThatThrows(() => {
       throw new Error("boom");
@@ -68,8 +79,40 @@ describe("global error handler", () => {
     expect(res.body).toEqual({ error: "Not found" });
   });
 
+  it.each([
+    ["ValidationError", () => new ValidationError("bad op"), 400],
+    ["NotFoundError", () => new NotFoundError("gone"), 404],
+    ["ConflictError", () => new ConflictError("clash"), 409],
+    ["AuthorizationError", () => new AuthorizationError("nope"), 403],
+  ])("maps a %s to its status with the standard { error } body", async (_name, make, status) => {
+    const app = appThatThrows(() => {
+      throw make();
+    });
+    const res = await supertest(app).get("/async");
+    expect(res.status).toBe(status);
+    expect(res.body).toEqual({ error: (make() as Error).message });
+  });
+
+  it("maps a Prisma P2002 (unique violation) to a masked 409", async () => {
+    const app = appThatThrows(() => {
+      throw Object.assign(new Error("Unique constraint failed on the fields: (`email`)"), { code: "P2002" });
+    });
+    const res = await supertest(app).get("/sync");
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: "That already exists" });
+  });
+
+  it("keeps a body-parser style { status: 400 } error at 400", async () => {
+    const app = appThatThrows(() => {
+      throw Object.assign(new SyntaxError("Unexpected token"), { status: 400, statusCode: 400, type: "entity.parse.failed" });
+    });
+    const res = await supertest(app).get("/sync");
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "Unexpected token" });
+  });
+
   it("does not leak the error message on a 500 in production", async () => {
-    process.env.NODE_ENV = "production";
+    hoisted.isProd = true;
     const app = appThatThrows(() => {
       throw new Error("secret internal detail");
     });

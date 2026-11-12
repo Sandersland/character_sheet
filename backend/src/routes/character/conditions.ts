@@ -4,9 +4,8 @@ import { z } from "zod";
 
 import {
   applyConditionsOperations,
-  InvalidConditionOperationError,
 } from "@/lib/combat/conditions.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
 export const conditionsRouter = Router({ mergeParams: true });
 
@@ -22,5 +21,4 @@ makeTransactionsEndpoint({
   router: conditionsRouter,
   schema: transactionsRequestSchema,
   apply: (characterId, data) => applyConditionsOperations(characterId, data.operations),
-  domainErrors: [InvalidConditionOperationError],
 });

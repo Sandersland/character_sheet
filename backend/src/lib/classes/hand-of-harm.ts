@@ -8,8 +8,9 @@ import { logEvent } from "@/lib/activity/events.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { applySpendResourceInTx } from "./resources.js";
 import { resolveSubclassSlug } from "./subclass-slug.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidHandOfHarmOperationError extends Error {}
+class InvalidHandOfHarmOperationError extends ValidationError {}
 
 export interface HandOfHarmResult {
   necroticDamage: number;

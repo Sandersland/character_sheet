@@ -13,15 +13,14 @@ vi.mock("@/lib/character/character-serialize.js", () => ({
 }));
 vi.mock("@/lib/character/character-include.js", () => ({ characterInclude: { marker: true } }));
 
-import { makeTransactionsEndpoint, runTransaction } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint, runTransaction } from "@/http/transactions-endpoint.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
+import { ConflictError, ValidationError } from "@/lib/core/errors.js";
 
 const findUnique = vi.mocked(prisma.character.findUnique);
 const access = vi.mocked(assertCharacterAccess);
 
-class DomainErrorA extends Error {}
-class DomainErrorB extends Error {}
 
 function register<S extends z.ZodTypeAny, R>(
   config: Omit<Parameters<typeof makeTransactionsEndpoint<S, R>>[0], "router">,
@@ -67,18 +66,18 @@ beforeEach(() => {
 
 describe("makeTransactionsEndpoint", () => {
   it("defaults the path to /transactions", () => {
-    const { path } = register({ schema, apply: vi.fn(), domainErrors: [] });
+    const { path } = register({ schema, apply: vi.fn() });
     expect(path).toBe("/transactions");
   });
 
   it("honors a path override (experience mounts on /)", () => {
-    const { path } = register({ schema, apply: vi.fn(), domainErrors: [], path: "/" });
+    const { path } = register({ schema, apply: vi.fn(), path: "/" });
     expect(path).toBe("/");
   });
 
   it("happy path: asserts edit access, applies, re-fetches, returns serialized character", async () => {
     const apply = vi.fn().mockResolvedValue(undefined);
-    const { handler } = register({ schema, apply, domainErrors: [] });
+    const { handler } = register({ schema, apply });
     const res = makeRes();
 
     await handler(req({ operations: [{ type: "go" }] }), res);
@@ -95,7 +94,7 @@ describe("makeTransactionsEndpoint", () => {
 
   it("400s on a malformed body without calling apply", async () => {
     const apply = vi.fn();
-    const { handler } = register({ schema, apply, domainErrors: [] });
+    const { handler } = register({ schema, apply });
     const res = makeRes();
 
     await handler(req({ operations: [] }), res);
@@ -107,9 +106,9 @@ describe("makeTransactionsEndpoint", () => {
     expect(findUnique).not.toHaveBeenCalled();
   });
 
-  it("maps a listed domain error to 400 { error: message }", async () => {
-    const apply = vi.fn().mockRejectedValue(new DomainErrorA("bad op"));
-    const { handler } = register({ schema, apply, domainErrors: [DomainErrorA] });
+  it("maps a DomainError to its status with { error: message }", async () => {
+    const apply = vi.fn().mockRejectedValue(new ValidationError("bad op"));
+    const { handler } = register({ schema, apply });
     const res = makeRes();
 
     await handler(req({ operations: [{ type: "go" }] }), res);
@@ -119,20 +118,20 @@ describe("makeTransactionsEndpoint", () => {
     expect(findUnique).not.toHaveBeenCalled();
   });
 
-  it("matches any error class in the list (multi-error routes)", async () => {
-    const apply = vi.fn().mockRejectedValue(new DomainErrorB("also bad"));
-    const { handler } = register({ schema, apply, domainErrors: [DomainErrorA, DomainErrorB] });
+  it("maps an unlisted-by-anyone DomainError subclass to its own status (409)", async () => {
+    const apply = vi.fn().mockRejectedValue(new ConflictError("also bad"));
+    const { handler } = register({ schema, apply });
     const res = makeRes();
 
     await handler(req({ operations: [{ type: "go" }] }), res);
 
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.status).toHaveBeenCalledWith(409);
     expect(res.body).toEqual({ error: "also bad" });
   });
 
-  it("rethrows an unlisted error (no 400, no response)", async () => {
+  it("rethrows a non-domain error (no response)", async () => {
     const apply = vi.fn().mockRejectedValue(new Error("boom"));
-    const { handler } = register({ schema, apply, domainErrors: [DomainErrorA] });
+    const { handler } = register({ schema, apply });
     const res = makeRes();
 
     await expect(handler(req({ operations: [{ type: "go" }] }), res)).rejects.toThrow("boom");
@@ -145,7 +144,6 @@ describe("makeTransactionsEndpoint", () => {
     const { handler } = register({
       schema,
       apply,
-      domainErrors: [],
       respond: (character, results) => ({ character, results }),
     });
     const res = makeRes();
@@ -161,7 +159,7 @@ describe("makeTransactionsEndpoint", () => {
   it("propagates an access failure before parsing (never touches apply)", async () => {
     access.mockRejectedValue(new Error("Character not found"));
     const apply = vi.fn();
-    const { handler } = register({ schema, apply, domainErrors: [] });
+    const { handler } = register({ schema, apply });
     const res = makeRes();
 
     await expect(handler(req({ operations: [] }), res)).rejects.toThrow("Character not found");
@@ -188,7 +186,7 @@ describe("runTransaction", () => {
     const res = makeRes();
 
     await call(
-      { schema, apply, domainErrors: [], respond: (character, result) => ({ character, results: result }) },
+      { schema, apply, respond: (character, result) => ({ character, results: result }) },
       { operations: [{ type: "go" }] },
       res,
     );
@@ -198,11 +196,11 @@ describe("runTransaction", () => {
     expect(res.body).toEqual({ character: { id: "c1", serialized: true }, results: [{ roll: 5 }] });
   });
 
-  it("maps a listed domain error to 400 { error: message }", async () => {
-    const apply = vi.fn().mockRejectedValue(new DomainErrorA("bad op"));
+  it("maps a DomainError to its status with { error: message }", async () => {
+    const apply = vi.fn().mockRejectedValue(new ValidationError("bad op"));
     const res = makeRes();
 
-    await call({ schema, apply, domainErrors: [DomainErrorA] }, { operations: [{ type: "go" }] }, res);
+    await call({ schema, apply }, { operations: [{ type: "go" }] }, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.body).toEqual({ error: "bad op" });

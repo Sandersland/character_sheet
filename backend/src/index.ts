@@ -1,10 +1,9 @@
 import { createApp } from "./app.js";
+import { config } from "@/lib/core/config.js";
 import { logger } from "@/lib/core/logger.js";
-
-const port = process.env.PORT ? Number(process.env.PORT) : 4000;
 
 const app = createApp();
 
-app.listen(port, () => {
-  logger.info({ port }, "Backend listening");
+app.listen(config.PORT, () => {
+  logger.info({ port: config.PORT }, "Backend listening");
 });

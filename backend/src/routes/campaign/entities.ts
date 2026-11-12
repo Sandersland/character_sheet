@@ -10,7 +10,7 @@ import {
 } from "@character-sheet/contracts";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
-import { NotFoundError } from "@/lib/auth/errors.js";
+import { NotFoundError } from "@/lib/core/errors.js";
 import { matchEntityQuery } from "@/lib/activity/entity-stats.js";
 import {
   buildEntityActivityFeed,
@@ -24,11 +24,11 @@ import {
   prepareMerge,
   withEntityStats,
 } from "@/lib/campaign/entities.js";
-import { parseBodyOr400 } from "@/lib/http/parse-body.js";
+import { parseBodyOr400 } from "@/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getBlobStore } from "@/lib/storage/index.js";
 import { deletePortraitBlobBestEffort, portraitKeyVersion } from "@/lib/storage/portrait-blob.js";
-import { PORTRAIT_FIELD, portraitMultipart, sendStoredPortrait } from "@/lib/storage/portrait-http.js";
+import { PORTRAIT_FIELD, portraitMultipart, sendStoredPortrait } from "@/http/portrait-http.js";
 import { PORTRAIT_CONTENT_TYPE, reencodePortrait } from "@/lib/storage/portrait-image.js";
 
 export const entitiesRouter = Router();

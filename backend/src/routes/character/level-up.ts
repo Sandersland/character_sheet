@@ -9,12 +9,7 @@ import { applyLevelUpTransaction, resolveLevelUpContext } from "@/lib/leveling/l
 import { grantedSpellsGained, type GrantedSpellSource } from "@/lib/spellcasting/granted-spells.js";
 import { casterModelFor } from "@/lib/srd/spellcasting-tables.js";
 import { InvalidLevelUpError, resolveLevelUpPlan } from "@/lib/leveling/level-up-submission.js";
-import { InvalidHitPointOperationError } from "@/lib/combat/hitpoints.js";
-import { InvalidAdvancementOperationError } from "@/lib/leveling/advancement.js";
-import { InvalidClassOperationError } from "@/lib/classes/class.js";
-import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
-import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/spellcasting.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 import { takeAsiOpSchema, takeFeatOpSchema } from "@/routes/character/advancement.js";
 import {
   forgetManeuverOpSchema,
@@ -84,48 +79,40 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
     return;
   }
 
-  try {
-    const target = await resolvePlanTarget(req.params.id, parsed.data);
-    const context = await resolveLevelUpContext(req.params.id, target, parsed.data.subclassId);
-    // context.pickedSubclassFeatureRows carries the not-yet-committed pick's own rows through the re-plan splice.
-    const steps = resolveLevelUpPlan(
-      context.planCharacter,
-      context.targetEntry,
-      context.chosenSubclassName,
-      context.pickedSubclassFeatureRows,
-      context.chosenSubclassCasterRef,
-    );
-    const persisted = await persistedGrantSource(target);
-    const picked = await pickedGrantSource(parsed.data.subclassId);
-    const gained = grantedSpellsGained(
-      persisted,
-      context.targetEntry.newLevel - 1,
-      picked ?? persisted,
-      context.targetEntry.newLevel,
-      context.planCharacter.edition,
-    );
-    const targetSubclass = context.chosenSubclassName ?? context.targetEntry.subclass ?? null;
-    // Same persisted/picked precedence as targetSubclass above — the not-yet-committed pick's own third-caster identity wins when this same level-up sets a new subclass.
-    const targetSubclassCasterRef = context.chosenSubclassCasterRef ?? context.targetEntry.subclassCasterRef ?? null;
-    res.json({
-      target: {
-        className: context.targetEntry.name,
-        subclass: targetSubclass,
-        newLevel: context.targetEntry.newLevel,
-        isPrimary: context.targetIsPrimary,
-        // Served so the Review step's granted-spells footnote can render the right noun without re-deriving the rule — null for a non-caster target.
-        casterModel: casterModelFor(context.targetEntry.name, targetSubclassCasterRef, context.planCharacter.edition),
-      },
-      steps,
-      grantedSpells: gained.map((s) => ({ name: s.name, level: s.level, school: s.school })),
-    });
-  } catch (error) {
-    if (error instanceof InvalidLevelUpError) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
+  const target = await resolvePlanTarget(req.params.id, parsed.data);
+  const context = await resolveLevelUpContext(req.params.id, target, parsed.data.subclassId);
+  // context.pickedSubclassFeatureRows carries the not-yet-committed pick's own rows through the re-plan splice.
+  const steps = resolveLevelUpPlan(
+    context.planCharacter,
+    context.targetEntry,
+    context.chosenSubclassName,
+    context.pickedSubclassFeatureRows,
+    context.chosenSubclassCasterRef,
+  );
+  const persisted = await persistedGrantSource(target);
+  const picked = await pickedGrantSource(parsed.data.subclassId);
+  const gained = grantedSpellsGained(
+    persisted,
+    context.targetEntry.newLevel - 1,
+    picked ?? persisted,
+    context.targetEntry.newLevel,
+    context.planCharacter.edition,
+  );
+  const targetSubclass = context.chosenSubclassName ?? context.targetEntry.subclass ?? null;
+  // Same persisted/picked precedence as targetSubclass above — the not-yet-committed pick's own third-caster identity wins when this same level-up sets a new subclass.
+  const targetSubclassCasterRef = context.chosenSubclassCasterRef ?? context.targetEntry.subclassCasterRef ?? null;
+  res.json({
+    target: {
+      className: context.targetEntry.name,
+      subclass: targetSubclass,
+      newLevel: context.targetEntry.newLevel,
+      isPrimary: context.targetIsPrimary,
+      // Served so the Review step's granted-spells footnote can render the right noun without re-deriving the rule — null for a non-caster target.
+      casterModel: casterModelFor(context.targetEntry.name, targetSubclassCasterRef, context.planCharacter.edition),
+    },
+    steps,
+    grantedSpells: gained.map((s) => ({ name: s.name, level: s.level, school: s.school })),
+  });
 });
 
 // z.infer of this schema must satisfy LevelUpSubmission — each field reuses the exact op schema its domain already validates.
@@ -158,12 +145,4 @@ makeTransactionsEndpoint({
   router: levelUpRouter,
   schema: levelUpSubmissionSchema,
   apply: (characterId, data, userId) => applyLevelUpTransaction(characterId, data, userId),
-  domainErrors: [
-    InvalidLevelUpError,
-    InvalidHitPointOperationError,
-    InvalidAdvancementOperationError,
-    InvalidClassOperationError,
-    InvalidResourceOperationError,
-    InvalidSpellcastingOperationError,
-  ],
 });

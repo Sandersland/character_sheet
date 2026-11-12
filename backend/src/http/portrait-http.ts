@@ -1,10 +1,10 @@
 import type { RequestHandler, Response } from "express";
 import multer from "multer";
 
-import { NotFoundError } from "@/lib/auth/errors.js";
-import { BlobNotFoundError, type BlobObject } from "./blob-store.js";
-import { getBlobStore } from "./index.js";
-import { PORTRAIT_MAX_UPLOAD_BYTES } from "./portrait-image.js";
+import { DomainError, NotFoundError, ValidationError } from "@/lib/core/errors.js";
+import { BlobNotFoundError, type BlobObject } from "@/lib/storage/blob-store.js";
+import { getBlobStore } from "@/lib/storage/index.js";
+import { PORTRAIT_MAX_UPLOAD_BYTES } from "@/lib/storage/portrait-image.js";
 
 // Cross-plan contract pinned with the upload UI (#1616), like PORTRAIT_MAX_UPLOAD_BYTES.
 export const PORTRAIT_FIELD = "portrait";
@@ -12,11 +12,9 @@ export const PORTRAIT_FIELD = "portrait";
 // Safe to cache this hard only because the wire URL is versioned (?v=<uuid>): a re-upload changes the URL, never the bytes behind an old one.
 export const PORTRAIT_CACHE_CONTROL = "private, max-age=31536000, immutable";
 
-class PortraitTooLargeError extends Error {
-  readonly status = 413;
+class PortraitTooLargeError extends DomainError {
   constructor() {
-    super(`Portrait exceeds the ${PORTRAIT_MAX_UPLOAD_BYTES / (1024 * 1024)} MB limit`);
-    this.name = "PortraitTooLargeError";
+    super(`Portrait exceeds the ${PORTRAIT_MAX_UPLOAD_BYTES / (1024 * 1024)} MB limit`, 413);
   }
 }
 
@@ -26,7 +24,7 @@ const upload = multer({
   limits: { fileSize: PORTRAIT_MAX_UPLOAD_BYTES, files: 1 },
 }).single(PORTRAIT_FIELD);
 
-// Maps multer's errors onto the app's status-carrying error contract: the size limit becomes 413, every other MulterError becomes 400 instead of multer's status-less default falling through to a 500.
+// Maps multer's errors onto DomainError: the size limit becomes 413, every other MulterError becomes 400 instead of multer's status-less default falling through to a 500.
 export const portraitMultipart: RequestHandler = (req, res, next) => {
   upload(req, res, (err: unknown) => {
     if (!err) {
@@ -38,7 +36,7 @@ export const portraitMultipart: RequestHandler = (req, res, next) => {
         next(new PortraitTooLargeError());
         return;
       }
-      next(Object.assign(new Error(`Invalid upload: ${err.message}`), { status: 400 }));
+      next(new ValidationError(`Invalid upload: ${err.message}`));
       return;
     }
     next(err);

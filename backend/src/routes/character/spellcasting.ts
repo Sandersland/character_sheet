@@ -3,9 +3,8 @@ import { z } from "zod";
 
 import {
   applySpellcastingOperations,
-  InvalidSpellcastingOperationError,
 } from "@/lib/spellcasting/spellcasting.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
 export const spellcastingRouter = Router({ mergeParams: true });
 
@@ -119,5 +118,4 @@ makeTransactionsEndpoint({
   router: spellcastingRouter,
   schema: transactionsRequestSchema,
   apply: (characterId, data, userId) => applySpellcastingOperations(characterId, data.operations, userId),
-  domainErrors: [InvalidSpellcastingOperationError],
 });

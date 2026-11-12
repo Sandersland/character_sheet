@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { describe, expect, it, vi } from "vitest";
 
-import { parseAsiLevelOr400 } from "@/lib/http/parse-asi-level-param.js";
+import { parseAsiLevelOr400 } from "@/http/params/parse-asi-level-param.js";
 import { MAX_LEVEL } from "@/lib/leveling/experience.js";
 
 function mockRes() {

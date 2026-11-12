@@ -14,8 +14,9 @@ import { abilityModifier } from "@/lib/srd/srd.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidChannelDivinityOperationError extends Error {}
+class InvalidChannelDivinityOperationError extends ValidationError {}
 
 export type ChannelDivinityKind = "announce" | "buff" | "advantage" | "invisible" | "reminder";
 

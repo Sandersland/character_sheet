@@ -20,9 +20,10 @@ import {
   type TargetClassEntry,
 } from "./level-up-plan.js";
 import type { SubclassCasterRef } from "@/lib/srd/spellcasting-tables.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
 // Untyped status → the transactions-endpoint scaffold defaults domain errors to 400 (the #1007 typed-error system), so no `status` field here.
-export class InvalidLevelUpError extends Error {}
+export class InvalidLevelUpError extends ValidationError {}
 
 // Op payloads reuse the exact op types their domains export (only takeAsi/takeFeat for `advancement`); zod validation lives in the route, not here.
 export interface LevelUpSubmission {

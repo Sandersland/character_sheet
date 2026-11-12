@@ -3,10 +3,9 @@ import { z } from "zod";
 
 import {
   applyAdvancementOperations,
-  InvalidAdvancementOperationError,
 } from "@/lib/leveling/advancement.js";
 import { featImprovementSchema } from "@/lib/srd/srd.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
 export const advancementRouter = Router({ mergeParams: true });
 
@@ -65,5 +64,4 @@ makeTransactionsEndpoint({
   router: advancementRouter,
   schema: transactionsRequestSchema,
   apply: (characterId, data) => applyAdvancementOperations(characterId, data.operations),
-  domainErrors: [InvalidAdvancementOperationError],
 });

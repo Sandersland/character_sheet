@@ -2,7 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import sharp from "sharp";
 import supertest from "supertest";
 
@@ -10,8 +10,9 @@ import { app } from "@/test-support/app-server.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
-import { __resetBlobStoreForTests, createBlobStore } from "@/lib/storage/index.js";
-import { PORTRAIT_CACHE_CONTROL, PORTRAIT_FIELD } from "@/lib/storage/portrait-http.js";
+import { config } from "@/lib/core/config.js";
+import { __setBlobStoreForTests, createBlobStore, getBlobStore } from "@/lib/storage/index.js";
+import { PORTRAIT_CACHE_CONTROL, PORTRAIT_FIELD } from "@/http/portrait-http.js";
 
 const OWNER = { id: "portrait-owner", email: "portrait-owner@test.local" };
 const INTRUDER = { id: "portrait-intruder", email: "portrait-intruder@test.local" };
@@ -58,10 +59,9 @@ async function storedKey(): Promise<string | null> {
 
 describe("portrait endpoints (#1615)", () => {
   beforeEach(async () => {
-    // __resetBlobStoreForTests clears getBlobStore's memo so each test re-reads the stubbed env — otherwise every test would write into the first test's tmpdir.
-    vi.stubEnv("BLOB_STORE_DRIVER", "fs");
-    vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "portrait-route-test-")));
-    __resetBlobStoreForTests();
+    // A fresh store per test so no test writes into an earlier test's tmpdir.
+    const dir = await mkdtemp(path.join(os.tmpdir(), "portrait-route-test-"));
+    __setBlobStoreForTests(createBlobStore({ ...config, BLOB_STORE_DRIVER: "fs", BLOB_FS_DIR: dir }));
 
     for (const user of [OWNER, INTRUDER]) {
       await prisma.user.upsert({ where: { id: user.id }, create: user, update: user });
@@ -102,8 +102,7 @@ describe("portrait endpoints (#1615)", () => {
 
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { id: CHARACTER_ID } });
-    vi.unstubAllEnvs();
-    __resetBlobStoreForTests();
+    __setBlobStoreForTests();
   });
 
   afterAll(async () => {
@@ -204,7 +203,7 @@ describe("portrait endpoints (#1615)", () => {
       expect(second.status).toBe(200);
       expect(second.body.portraitUrl).not.toBe(first.body.portraitUrl);
 
-      const store = createBlobStore();
+      const store = getBlobStore();
       expect(await store.exists(firstKey as string)).toBe(false);
       expect(await store.exists((await storedKey()) as string)).toBe(true);
     });
@@ -269,7 +268,7 @@ describe("portrait endpoints (#1615)", () => {
       expect(response.body.id).toBe(CHARACTER_ID);
       expect(response.body.portraitUrl).toBeUndefined();
       expect(await storedKey()).toBeNull();
-      expect(await createBlobStore().exists(key as string)).toBe(false);
+      expect(await getBlobStore().exists(key as string)).toBe(false);
 
       const get = await supertest
         .agent(app)
@@ -312,6 +311,6 @@ describe("portrait endpoints (#1615)", () => {
       .delete(`/api/characters/${CHARACTER_ID}`);
 
     expect(response.status).toBe(204);
-    expect(await createBlobStore().exists(key as string)).toBe(false);
+    expect(await getBlobStore().exists(key as string)).toBe(false);
   });
 });

@@ -9,7 +9,7 @@ import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getBlobStore } from "@/lib/storage/index.js";
 import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
-import { PORTRAIT_FIELD, portraitMultipart, sendStoredPortrait } from "@/lib/storage/portrait-http.js";
+import { PORTRAIT_FIELD, portraitMultipart, sendStoredPortrait } from "@/http/portrait-http.js";
 import { PORTRAIT_CONTENT_TYPE, reencodePortrait } from "@/lib/storage/portrait-image.js";
 
 // Dedicated REST endpoints, not a transaction op, because a multipart binary body cannot ride a JSON ops array; no audit events are written.

@@ -4,8 +4,8 @@ import { customSpellSchema, type CustomSpellInput } from "@character-sheet/contr
 
 import { Prisma, type CatalogEntry, type Spell } from "@/generated/prisma/client.js";
 import { assertCharacterAccess, assertSpellOwnership } from "@/lib/auth/access.js";
-import { NotFoundError } from "@/lib/auth/errors.js";
-import { parseBodyOr400 } from "@/lib/http/parse-body.js";
+import { NotFoundError } from "@/lib/core/errors.js";
+import { parseBodyOr400 } from "@/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { editionOf, type RulesEdition } from "@/lib/rules/edition.js";
 import { reconcileSpellClasses } from "@/lib/spellcasting/spell-classes.js";

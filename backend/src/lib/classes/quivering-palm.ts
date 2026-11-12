@@ -16,8 +16,9 @@ import { clearBuffByKeyInTx } from "@/lib/combat/buff-end.js";
 import { applySpendResourceInTx } from "./resources.js";
 import { monkSaveDC, monkPoolKey } from "./ki-focus.js";
 import { resolveSubclassSlug, type SubclassSlug } from "./subclass-slug.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidQuiveringPalmOperationError extends Error {}
+class InvalidQuiveringPalmOperationError extends ValidationError {}
 
 export const QUIVERING_PALM_BUFF_KEY = "quiveringPalm";
 

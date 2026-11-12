@@ -21,13 +21,14 @@
   // literal `// fallow-ignore-file` comment isn't usable here: `//` isn't a valid
   // CSS comment token and risks swallowing the real rule below it during parsing.
   "ignorePatterns": ["backend/scripts/**", "frontend/e2e/screenshot.css"],
-  // Error classes carry a numeric `status` read duck-typed by the Express error
-  // middleware (backend/src/lib/auth/errors.ts, lib/inventory/inventory.ts) — never a static reference.
-  "usedClassMembers": ["status"],
   // The frontend/backend 5e-rules boundary (#1272, epic #1369), as a machine
-  // check instead of a paragraph. Four disjoint zones; a violation needs BOTH
+  // check instead of a paragraph. Disjoint zones; a violation needs BOTH
   // files zoned, so unzoned trees (backend/prisma/seed, frontend/e2e,
   // node_modules, the generated Prisma client) are unconstrained by design.
+  // The backend is split into layers (#2007): lib <- http <- routes <- entry,
+  // imports pointing only inward. test-support is its own zone because tests
+  // in every layer import it. Zones only see file imports; the "lib/ never
+  // imports Express" half is an eslint no-restricted-imports rule.
   //
   // What this mechanically enforces:
   //   1. Neither tier may import the other AT ALL. Nothing else stops it —
@@ -54,13 +55,33 @@
   // (CLAUDE.md) plus the per-module follow-ups.
   "boundaries": {
     "zones": [
-      { "name": "backend", "patterns": ["backend/src/**"] },
+      { "name": "backend-lib", "patterns": ["backend/src/lib/**"] },
+      { "name": "backend-http", "patterns": ["backend/src/http/**"] },
+      { "name": "backend-routes", "patterns": ["backend/src/routes/**"] },
+      { "name": "backend-test-support", "patterns": ["backend/src/test-support/**"] },
+      { "name": "backend-entry", "patterns": ["backend/src/app.ts", "backend/src/index.ts", "backend/src/types/**"] },
       { "name": "frontend", "patterns": ["frontend/src/**"] },
       { "name": "shared-types", "patterns": ["packages/shared-types/src/**"] },
       { "name": "contracts", "patterns": ["packages/contracts/src/**"] }
     ],
     "rules": [
-      { "from": "backend", "allow": ["contracts"], "allowTypeOnly": ["shared-types"] },
+      { "from": "backend-lib", "allow": ["backend-lib", "backend-test-support", "contracts"], "allowTypeOnly": ["shared-types"] },
+      { "from": "backend-http", "allow": ["backend-http", "backend-lib", "backend-test-support", "contracts"], "allowTypeOnly": ["shared-types"] },
+      {
+        "from": "backend-routes",
+        "allow": ["backend-routes", "backend-http", "backend-lib", "backend-test-support", "contracts"],
+        "allowTypeOnly": ["shared-types"]
+      },
+      {
+        "from": "backend-test-support",
+        "allow": ["backend-test-support", "backend-entry", "backend-routes", "backend-http", "backend-lib", "contracts"],
+        "allowTypeOnly": ["shared-types"]
+      },
+      {
+        "from": "backend-entry",
+        "allow": ["backend-entry", "backend-routes", "backend-http", "backend-lib", "backend-test-support", "contracts"],
+        "allowTypeOnly": ["shared-types"]
+      },
       { "from": "frontend", "allow": [], "allowTypeOnly": ["shared-types", "contracts"] },
       { "from": "shared-types", "allow": [] },
       { "from": "contracts", "allow": [] }

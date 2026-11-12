@@ -9,12 +9,11 @@ import { asCurrency } from "@/lib/inventory/inventory-currency.js";
 import { buildInventorySnapshot } from "@/lib/inventory/inventory-snapshot-build.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";
+import { DomainError } from "@/lib/core/errors.js";
 
-class CampaignItemAwardError extends Error {
-  status: number;
+class CampaignItemAwardError extends DomainError {
   constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
+    super(message, status);
   }
 }
 
