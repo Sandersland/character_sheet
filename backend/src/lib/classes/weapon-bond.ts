@@ -13,15 +13,12 @@ import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { lockCharacterRow, runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
 import type { BondWeaponOperation, UnbondWeaponOperation, WeaponBondOperation } from "@character-sheet/contracts";
+import { ConflictError, ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidWeaponBondOperationError extends Error {
-  status = 400;
-}
+class InvalidWeaponBondOperationError extends ValidationError {}
 
-// Cap breach -> explicit 409, mirroring AttunementLimitError. Not exported: domainErrors registers only the base InvalidWeaponBondOperationError (instanceof matches this subclass too).
-class WeaponBondLimitError extends InvalidWeaponBondOperationError {
-  status = 409;
-}
+// Cap breach -> 409, mirroring AttunementLimitError.
+class WeaponBondLimitError extends ConflictError {}
 
 export const WEAPON_BOND_LEVEL = 3;
 export const WEAPON_BOND_LIMIT = 2;

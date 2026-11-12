@@ -12,6 +12,7 @@ import {
 import { mentionToken, mentionTokenPattern } from "@/lib/activity/journal-refs.js";
 import { logger } from "@/lib/core/logger.js";
 import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
+import { DomainError } from "@/lib/core/errors.js";
 
 async function loadSessionContext(db: PrismaClient, campaignId: string) {
   const sessions = await db.session.findMany({
@@ -217,12 +218,10 @@ type LinkedEntity = Prisma.CampaignEntityGetPayload<{ select: typeof duplicateSu
 type Tx = Prisma.TransactionClient;
 
 // Thrown from inside the tx and mapped back to ok:false after it unwinds; Prisma rolls back automatically on the throw.
-class CombineGuardError extends Error {
-  constructor(
-    public status: 400 | 404 | 409,
-    message: string,
-  ) {
-    super(message);
+class CombineGuardError extends DomainError {
+  declare readonly status: 400 | 404 | 409;
+  constructor(status: 400 | 404 | 409, message: string) {
+    super(message, status);
   }
 }
 

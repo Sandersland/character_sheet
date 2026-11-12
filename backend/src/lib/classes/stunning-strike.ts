@@ -12,8 +12,9 @@ import { editionOf } from "@/lib/rules/edition.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { applySpendResourceInTx } from "./resources.js";
 import { monkSaveDC, monkPoolKey } from "./ki-focus.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidStunningStrikeOperationError extends Error {}
+class InvalidStunningStrikeOperationError extends ValidationError {}
 
 // SRD 5.1 / PHB'14 p.77; SRD 5.2 / PHB'24 p.88 — edition-invariant grant level.
 export const STUNNING_STRIKE_LEVEL = 5;

@@ -5,7 +5,7 @@ import { payAbilityCostInTx, type AbilityCost, type PayCostContext, type SlotCos
 import { appendActiveBuffInTx } from "@/lib/combat/active-effects.js";
 import { clearBuffsForSourceInTx } from "@/lib/combat/buff-end.js";
 import { assertCampaignMembership } from "@/lib/auth/access.js";
-import { AuthorizationError } from "@/lib/auth/errors.js";
+import { AuthorizationError } from "@/lib/core/errors.js";
 import { resolveBuffSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { logEvent, type EventType } from "@/lib/activity/events.js";
 import { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "@/lib/combat/hitpoints.js";

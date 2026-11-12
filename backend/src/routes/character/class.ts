@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import {
   applyClassOperations,
-  InvalidClassOperationError,
 } from "@/lib/classes/class.js";
 import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
@@ -39,5 +38,4 @@ makeTransactionsEndpoint({
   router: classRouter,
   schema: transactionsRequestSchema,
   apply: (characterId, data) => applyClassOperations(characterId, data.operations),
-  domainErrors: [InvalidClassOperationError],
 });

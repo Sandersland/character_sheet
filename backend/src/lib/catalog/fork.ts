@@ -1,6 +1,6 @@
 import type { CatalogEntry, CatalogKind, Spell } from "@/generated/prisma/client.js";
 import { Prisma } from "@/generated/prisma/client.js";
-import { NotFoundError } from "@/lib/auth/errors.js";
+import { NotFoundError } from "@/lib/core/errors.js";
 import { prisma } from "@/lib/core/prisma.js";
 
 // Mirrors catalogForkSchema's scope/campaignId pairing one-to-one.

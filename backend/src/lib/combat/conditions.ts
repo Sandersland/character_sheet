@@ -41,8 +41,9 @@ import {
   type HitDice,
   type HitPoints,
 } from "./hp-core.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidConditionOperationError extends Error {}
+class InvalidConditionOperationError extends ValidationError {}
 
 export interface ConditionEntry {
   key: ConditionKey;

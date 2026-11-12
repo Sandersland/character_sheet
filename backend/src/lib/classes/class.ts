@@ -22,8 +22,9 @@ import {
   multiclassPrerequisitesMet,
   type MulticlassPrerequisiteOption,
 } from "@/lib/srd/srd.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidClassOperationError extends Error {}
+export class InvalidClassOperationError extends ValidationError {}
 
 export interface SetSubclassOperation {
   type: "setSubclass";

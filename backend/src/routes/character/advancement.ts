@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import {
   applyAdvancementOperations,
-  InvalidAdvancementOperationError,
 } from "@/lib/leveling/advancement.js";
 import { featImprovementSchema } from "@/lib/srd/srd.js";
 import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
@@ -65,5 +64,4 @@ makeTransactionsEndpoint({
   router: advancementRouter,
   schema: transactionsRequestSchema,
   apply: (characterId, data) => applyAdvancementOperations(characterId, data.operations),
-  domainErrors: [InvalidAdvancementOperationError],
 });

@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 
 import { getCookie } from "./cookies.js";
-import { AuthenticationError } from "@/lib/auth/errors.js";
+import { AuthenticationError } from "@/lib/core/errors.js";
 import { lookupSession, SESSION_COOKIE } from "@/lib/auth/session.js";
 
 // The gate every non-public /api router sits behind — reuses the same session/cookie helpers the auth router uses, so there is one code path for "who is this caller".

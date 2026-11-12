@@ -10,7 +10,7 @@ import {
 } from "@character-sheet/contracts";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
-import { NotFoundError } from "@/lib/auth/errors.js";
+import { NotFoundError } from "@/lib/core/errors.js";
 import { matchEntityQuery } from "@/lib/activity/entity-stats.js";
 import {
   buildEntityActivityFeed,

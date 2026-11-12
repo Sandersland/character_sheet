@@ -11,12 +11,13 @@ import { logEvent } from "@/lib/activity/events.js";
 import { normalizeResourcesMutable, type ManeuverEntry } from "./resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { abilityModifier } from "@/lib/srd/srd.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
 function abbr(ability: string): string {
   return ability.slice(0, 3).replace(/^./, (c) => c.toUpperCase());
 }
 
-export class InvalidManeuverOperationError extends Error {}
+class InvalidManeuverOperationError extends ValidationError {}
 
 export interface ManeuverCastResult {
   roll: number;

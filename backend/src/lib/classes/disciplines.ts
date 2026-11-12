@@ -16,8 +16,9 @@ import { catalogEffectSpec, resolveEffectSpec, type EffectSpec } from "@/lib/com
 import { normalizeResourcesMutable, type ChoiceEntry } from "./resources.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { FOCUS_CAST_CHARACTER_SELECT, emitFocusCastEvents } from "./focus-cast.js";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidDisciplineOperationError extends Error {}
+class InvalidDisciplineOperationError extends ValidationError {}
 
 // PHB'14 p.80's Elemental Disciplines table.
 export function maxKiPerDiscipline(monkLevel: number): number {

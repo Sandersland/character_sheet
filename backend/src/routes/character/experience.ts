@@ -2,7 +2,7 @@ import { experienceOperationSchema } from "@character-sheet/contracts";
 import { Router } from "express";
 import { z } from "zod";
 
-import { applyExperienceOperations, InvalidExperienceOperationError } from "@/lib/leveling/experience-ops.js";
+import { applyExperienceOperations } from "@/lib/leveling/experience-ops.js";
 import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
 export const experienceRouter = Router({ mergeParams: true });
@@ -21,5 +21,4 @@ makeTransactionsEndpoint({
   schema: experienceRequestSchema,
   apply: (characterId, data) =>
     applyExperienceOperations(characterId, data.operations, data.sessionId),
-  domainErrors: [InvalidExperienceOperationError],
 });

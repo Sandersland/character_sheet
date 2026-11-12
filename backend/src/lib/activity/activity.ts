@@ -6,6 +6,7 @@ import {
   PrismaClient,
 } from "@/generated/prisma/client.js";
 import {
+  AttunementLimitError,
   InsufficientCurrencyError,
   InvalidInventoryOperationError,
   revertInventoryEvent,
@@ -13,6 +14,7 @@ import {
 import { mirrorCapabilityUsedSet, mirrorUsesRemaining } from "@/lib/inventory/inventory-capability-use.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { lockCharacterRow } from "@/lib/character/character-transaction.js";
+import { ConflictError } from "@/lib/core/errors.js";
 
 // Derived from the Prisma-generated enum so it can never drift from the schema.
 const CATEGORY_VALUES = new Set<string>(Object.values(CharacterEventCategory));
@@ -76,7 +78,7 @@ type RevertResult = { ok: true } | { ok: false; status: 404 | 409; error: string
 // revertPreflight's already-reverted check runs OUTSIDE the transaction (it's a cheap early
 // exit); applyBatchReversal must re-verify under lockCharacterRow's lock, or two concurrent
 // reverts of the same batch both pass preflight and both apply reverseEvent (#1980 TOCTOU).
-class BatchAlreadyRevertedError extends Error {}
+class BatchAlreadyRevertedError extends ConflictError {}
 
 // Handlers stay here, not in domain libs: moving them would create an activity → domainlib → … → activity import cycle.
 
@@ -567,10 +569,11 @@ export async function revertBatch(
       { timeout: 30_000 },
     );
   } catch (error) {
-    // InsufficientCurrencyError/InvalidInventoryOperationError carry their own 400, remapped to 409 here: an undo blocked by later state (e.g. sale proceeds already spent) is a conflict, not a bad request.
+    // InsufficientCurrencyError/InvalidInventoryOperationError are 400s, remapped to 409 here: an undo blocked by later state (e.g. sale proceeds already spent) is a conflict, not a bad request.
     if (
       error instanceof InsufficientCurrencyError ||
       error instanceof InvalidInventoryOperationError ||
+      error instanceof AttunementLimitError ||
       error instanceof BatchAlreadyRevertedError
     ) {
       return { ok: false, status: 409, error: error.message };

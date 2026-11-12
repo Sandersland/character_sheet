@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { forkContent } from "@/lib/catalog/fork.js";
-import { NotFoundError } from "@/lib/auth/errors.js";
+import { NotFoundError } from "@/lib/core/errors.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 

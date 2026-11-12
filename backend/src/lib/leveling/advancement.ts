@@ -21,8 +21,9 @@ import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js
 import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection, resolveEditionRow } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
+import { ValidationError } from "@/lib/core/errors.js";
 
-export class InvalidAdvancementOperationError extends Error {}
+export class InvalidAdvancementOperationError extends ValidationError {}
 
 const ABILITY_NAMES = new Set([
   "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma",

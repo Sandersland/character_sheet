@@ -50,6 +50,7 @@ import type {
   RestoreResourceOperation,
   SpendResourceOperation,
 } from "@character-sheet/shared-types";
+import { ValidationError } from "@/lib/core/errors.js";
 
 // The op shapes + audit payload live in shared-types; re-exported so modules importing them from here (level-up submission/transaction, ability-cost, the actions + resources routes) keep resolving them unchanged.
 export type {
@@ -84,9 +85,7 @@ export type {
   ToolProfEntry,
 };
 
-export class InvalidResourceOperationError extends Error {
-  status = 400;
-}
+export class InvalidResourceOperationError extends ValidationError {}
 
 // Each op applier validates + mutates `state` in place (throwing on any illegal op) and returns the audit payload the dispatcher writes to the event log.
 
