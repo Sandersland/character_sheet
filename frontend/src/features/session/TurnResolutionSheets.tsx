@@ -90,18 +90,33 @@ function LoadoutResolutionSheet({
   );
 }
 
+// An Opportunity Attack is one swing paid for by the reaction on its to-hit roll (so backing out pre-roll is free). It never touches the Attack action's counter or tally, even when it interrupts an unfinished Extra Attack on your own turn.
+function reactionAttackTurnState(turnState: TurnState & TurnStateActions): TurnState & TurnStateActions {
+  return {
+    ...turnState,
+    attack: null,
+    attackTally: [],
+    recordAttack: () => turnState.consumeReaction(),
+  };
+}
+
 function AttackResolutionSheet({
   turnState,
+  activeResolution,
   closeResolution,
   setShowActionMenu,
   onLogChanged,
 }: Pick<
   TurnResolutionSheetsProps,
   | "turnState"
+  | "activeResolution"
   | "closeResolution"
   | "setShowActionMenu"
   | "onLogChanged"
 >) {
+  if (activeResolution?.resolver.slot === "reaction") {
+    return <ReactionAttackSheet turnState={turnState} closeResolution={closeResolution} onLogChanged={onLogChanged} />;
+  }
   const attack = turnState.attack;
   const exhausted = attack !== null && attack.used >= attack.total;
   const closeAttackSheet = () => {
@@ -120,6 +135,24 @@ function AttackResolutionSheet({
           setShowActionMenu(true);
         }}
         onLogChanged={onLogChanged}
+      />
+    </BottomSheet>
+  );
+}
+
+function ReactionAttackSheet({
+  turnState,
+  closeResolution,
+  onLogChanged,
+}: Pick<TurnResolutionSheetsProps, "turnState" | "closeResolution" | "onLogChanged">) {
+  return (
+    <BottomSheet title="Attack" subtitle={attackKicker(null)} wide onClose={closeResolution}>
+      <InlineAttackPicker
+        turnState={reactionAttackTurnState(turnState)}
+        onClose={closeResolution}
+        onCancel={closeResolution}
+        onLogChanged={onLogChanged}
+        refundLabel="Cancel"
       />
     </BottomSheet>
   );

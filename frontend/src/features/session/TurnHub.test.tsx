@@ -657,6 +657,76 @@ describe("TurnHub — Other reaction catch-all", () => {
   });
 });
 
+describe("TurnHub — off-turn reactions", () => {
+  it("Opportunity Attack opens the attack sheet between turns, without starting a turn", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await user.click(screen.getByRole("button", { name: /Start combat/ }));
+
+    await user.click(screen.getByRole("button", { name: /Use Reaction/ }));
+    await user.click(screen.getByRole("button", { name: /Opportunity Attack/ }));
+
+    const sheet = within(await screen.findByRole("dialog"));
+    expect(sheet.getByRole("button", { name: /Roll to hit/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start my turn" })).toBeInTheDocument();
+  });
+
+  it("cancelling an off-turn Opportunity Attack doesn't leave the Action menu open for the next turn", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await user.click(screen.getByRole("button", { name: /Start combat/ }));
+    await user.click(screen.getByRole("button", { name: /Use Reaction/ }));
+    await user.click(screen.getByRole("button", { name: /Opportunity Attack/ }));
+
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /^Cancel/ }));
+    await user.click(screen.getByRole("button", { name: "Start my turn" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  async function openOpportunityAttack(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /Start combat/ }));
+    await user.click(screen.getByRole("button", { name: /Use Reaction/ }));
+    await user.click(screen.getByRole("button", { name: /Opportunity Attack/ }));
+    return within(await screen.findByRole("dialog"));
+  }
+
+  it("cancelling an Opportunity Attack before rolling keeps the reaction", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    const sheet = await openOpportunityAttack(user);
+
+    await user.click(sheet.getByRole("button", { name: /^Cancel$/ }));
+
+    expect(screen.getByRole("button", { name: /Use Reaction/ })).toBeInTheDocument();
+  });
+
+  it("dismissing the Opportunity Attack sheet before rolling keeps the reaction", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await openOpportunityAttack(user);
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Use Reaction/ })).toBeInTheDocument();
+  });
+
+  it("rolling to hit on an Opportunity Attack spends the reaction", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const user = userEvent.setup();
+    renderHub();
+    const sheet = await openOpportunityAttack(user);
+
+    await user.click(sheet.getByRole("button", { name: /Roll to hit/ }));
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /Use Reaction/ })).not.toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+});
+
 describe("TurnHub — Battle Master maneuvers", () => {
   it("routes a reaction maneuver by its entry placement and casts via the server", async () => {
     const user = userEvent.setup();
@@ -824,6 +894,29 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
 
     await user.click(resume);
     expect(within(screen.getByRole("dialog")).getByText("This action")).toBeInTheDocument();
+  });
+
+  it("an Opportunity Attack mid-Extra-Attack is its own single swing and leaves the Action's remaining attack alone", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const user = userEvent.setup();
+    renderHub(extraAttackFighter());
+    await openAttackPicker(user);
+    const sheet = () => within(screen.getByRole("dialog"));
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    const closeBtns = sheet().getAllByRole("button", { name: /^Close$/ });
+    await user.click(closeBtns[closeBtns.length - 1]);
+
+    await user.click(screen.getByRole("button", { name: /Use Reaction/ }));
+    await user.click(screen.getByRole("button", { name: /Opportunity Attack/ }));
+    expect(sheet().getByText(/^1 attack · /)).toBeInTheDocument();
+    expect(sheet().getByRole("button", { name: /^Cancel$/ })).toBeInTheDocument();
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Resume attack — 1 of 2 remaining/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Use Reaction/ })).not.toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 
   it("Turn-summary banner: appears with tally lines once the sheet is closed, dismissible (#802/#812)", async () => {

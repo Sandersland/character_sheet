@@ -214,6 +214,7 @@ interface InlineAttackPickerProps {
   onClose: () => void;
   onCancel: () => void;
   onLogChanged: () => void;
+  refundLabel?: string;
 }
 
 export default function InlineAttackPicker({
@@ -221,6 +222,7 @@ export default function InlineAttackPicker({
   onClose,
   onCancel,
   onLogChanged,
+  refundLabel,
 }: InlineAttackPickerProps) {
   const { character } = useCurrentCharacter();
 
@@ -368,6 +370,7 @@ export default function InlineAttackPicker({
       attacksRemain={attacksRemain}
       onCancel={onCancel}
       onClose={onClose}
+      refundLabel={refundLabel}
     />
   );
   const weaponRow = (
