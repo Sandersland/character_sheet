@@ -4,7 +4,7 @@ import { patchSessionSchema, type PatchSessionInput } from "@character-sheet/con
 import type { CampaignRole } from "@/generated/prisma/client.js";
 import { serializeActivityEvent } from "@/lib/activity/activity.js";
 import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
-import { parseBodyOr400 } from "@/lib/http/parse-body.js";
+import { parseBodyOr400 } from "@/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 import {
   startCampaignSession,

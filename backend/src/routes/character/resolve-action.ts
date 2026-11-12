@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 import {
   applyResolveActionOperations,
   InvalidResolveActionOperationError,

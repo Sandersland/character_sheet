@@ -14,7 +14,7 @@ import { InvalidAdvancementOperationError } from "@/lib/leveling/advancement.js"
 import { InvalidClassOperationError } from "@/lib/classes/class.js";
 import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
 import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/spellcasting.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 import { takeAsiOpSchema, takeFeatOpSchema } from "@/routes/character/advancement.js";
 import {
   forgetManeuverOpSchema,

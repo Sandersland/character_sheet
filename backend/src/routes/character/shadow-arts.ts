@@ -3,7 +3,7 @@ import { Router } from "express";
 import { readAbilityCost } from "@/lib/spellcasting/ability-cost.js";
 import { shadowArtEffectSpec } from "@/lib/classes/shadow-arts.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
+import { requireEditionOr400 } from "@/http/params/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 
 export const shadowArtsRouter = Router({ mergeParams: true });

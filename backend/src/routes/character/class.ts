@@ -5,7 +5,7 @@ import {
   applyClassOperations,
   InvalidClassOperationError,
 } from "@/lib/classes/class.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
 export const classRouter = Router({ mergeParams: true });
 

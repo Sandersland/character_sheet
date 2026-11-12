@@ -13,7 +13,7 @@ vi.mock("@/lib/character/character-serialize.js", () => ({
 }));
 vi.mock("@/lib/character/character-include.js", () => ({ characterInclude: { marker: true } }));
 
-import { makeTransactionsEndpoint, runTransaction } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint, runTransaction } from "@/http/transactions-endpoint.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 

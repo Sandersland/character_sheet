@@ -6,7 +6,7 @@ import {
   applyConditionsOperations,
   InvalidConditionOperationError,
 } from "@/lib/combat/conditions.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
 export const conditionsRouter = Router({ mergeParams: true });
 

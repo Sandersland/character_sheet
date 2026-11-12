@@ -3,7 +3,7 @@ import express from "express";
 import supertest from "supertest";
 import "express-async-errors";
 
-import { errorHandler } from "@/lib/core/error-handler.js";
+import { errorHandler } from "@/http/error-handler.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authRouter } from "@/routes/platform/auth.js";
 

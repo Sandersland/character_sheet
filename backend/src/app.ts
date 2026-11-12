@@ -6,11 +6,11 @@ import cors from "cors";
 import type { CorsOptions } from "cors";
 import express, { type Express } from "express";
 
-import { requireAuth } from "@/lib/auth/middleware.js";
+import { requireAuth } from "@/http/middleware.js";
 import { config } from "@/lib/core/config.js";
-import { errorHandler } from "@/lib/core/error-handler.js";
+import { errorHandler } from "@/http/error-handler.js";
 import { httpLogger } from "@/lib/core/logger.js";
-import { creationRateLimiter, globalRateLimiter, securityHeaders } from "@/lib/core/security.js";
+import { creationRateLimiter, globalRateLimiter, securityHeaders } from "@/http/security.js";
 import { routeManifest, type RouteMount } from "@/routes/manifest.js";
 
 function mountPass(app: Express, scope: RouteMount["scope"]): void {

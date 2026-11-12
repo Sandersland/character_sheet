@@ -5,7 +5,7 @@ import type { GrantWire } from "@character-sheet/shared-types";
 import { Prisma, type CatalogGrant } from "@/generated/prisma/client.js";
 import { AuthorizationError, NotFoundError } from "@/lib/auth/errors.js";
 import { assertCampaignMembership } from "@/lib/auth/access.js";
-import { parseBodyOr400 } from "@/lib/http/parse-body.js";
+import { parseBodyOr400 } from "@/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 
 export const grantsRouter = Router();

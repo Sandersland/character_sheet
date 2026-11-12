@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseCookies, serializeCookie } from "@/lib/auth/cookies.js";
+import { parseCookies, serializeCookie } from "@/http/cookies.js";
 
 describe("parseCookies", () => {
   it("returns {} for a missing header", () => {

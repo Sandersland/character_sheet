@@ -11,7 +11,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { __resetBlobStoreForTests, createBlobStore } from "@/lib/storage/index.js";
-import { PORTRAIT_CACHE_CONTROL, PORTRAIT_FIELD } from "@/lib/storage/portrait-http.js";
+import { PORTRAIT_CACHE_CONTROL, PORTRAIT_FIELD } from "@/http/portrait-http.js";
 
 const OWNER = { id: "portrait-owner", email: "portrait-owner@test.local" };
 const INTRUDER = { id: "portrait-intruder", email: "portrait-intruder@test.local" };

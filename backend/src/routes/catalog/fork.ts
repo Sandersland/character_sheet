@@ -6,7 +6,7 @@ import { assertCampaignOwner } from "@/lib/auth/access.js";
 import { AuthorizationError, NotFoundError } from "@/lib/auth/errors.js";
 import { forkContent, type ForkTarget } from "@/lib/catalog/fork.js";
 import { isCatalogEntryVisibleToUser } from "@/lib/catalog/entitlement.js";
-import { parseBodyOr400 } from "@/lib/http/parse-body.js";
+import { parseBodyOr400 } from "@/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { undefinedSpellEffectFields } from "@/lib/spellcasting/spell-effect-fields.js";
 

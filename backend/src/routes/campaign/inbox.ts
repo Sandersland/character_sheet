@@ -3,7 +3,7 @@ import { dismissInboxFlagSchema } from "@character-sheet/contracts";
 
 import { assertCampaignOwner } from "@/lib/auth/access.js";
 import { buildInboxRows, filterDismissed, signatureBelongsToCampaign } from "@/lib/campaign/inbox.js";
-import { parseBodyOr400 } from "@/lib/http/parse-body.js";
+import { parseBodyOr400 } from "@/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 
 // Rows are recomputed on every GET; only a dismissal is ever persisted.
