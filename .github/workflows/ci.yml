@@ -374,6 +374,7 @@ jobs:
         with:
           name: backend-blob-${{ matrix.shard }}
           path: backend/.vitest-reports/
+          include-hidden-files: true
           retention-days: 1
           # Fail loudly here if vitest didn't write its blob, rather than letting
           # the fallow job's merge fail with a confusing missing-shard error.
