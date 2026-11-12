@@ -19,6 +19,14 @@ const PARENT_RELATIVE_PATTERN = {
   message: "Use the '@/' alias instead of '../' for a cross-directory import — CLAUDE.md reserves relative imports for same-directory siblings (./x.js).",
 };
 
+// lib/ is the HTTP-free domain layer: Express and its middleware live in
+// src/http (#2006, #2007). fallow zones only see file imports, so package
+// imports are fenced here instead.
+const EXPRESS_PATTERN = {
+  group: ["express", "express-*", "helmet", "cookie-parser", "multer"],
+  message: "lib/ must not import Express or its middleware — HTTP-aware code belongs in src/http (#2007).",
+};
+
 export default tseslint.config(
   {
     // Never lint generated output: dist/ (compiled) and anything under
@@ -64,10 +72,17 @@ export default tseslint.config(
     },
   },
   {
+    // lib/ adds the Express ban. See the re-declare why-comment on the block above.
+    files: ["src/lib/**/*.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [AWS_SDK_PATTERN, PARENT_RELATIVE_PATTERN, EXPRESS_PATTERN] }],
+    },
+  },
+  {
     // The storage domain itself. See the re-declare why-comment on the block above.
     files: ["src/lib/storage/**/*.ts"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [PARENT_RELATIVE_PATTERN] }],
+      "no-restricted-imports": ["error", { patterns: [PARENT_RELATIVE_PATTERN, EXPRESS_PATTERN] }],
     },
   },
   {
@@ -79,11 +94,20 @@ export default tseslint.config(
     },
   },
   {
+    // lib/ tests keep the Express ban the __tests__ block above would otherwise drop.
+    files: ["src/lib/**/__tests__/*.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [AWS_SDK_PATTERN, EXPRESS_PATTERN] }],
+    },
+  },
+  {
     // The genuine double exemption: storage-domain test files are both
     // legitimate aws-sdk callers AND the __tests__ "../foo.js" convention.
-    // Ordered after both single exemptions above so it wins outright for
-    // this narrower glob.
+    // Ordered after every block above so it wins outright for this narrower
+    // glob; only the Express ban still applies.
     files: ["src/lib/storage/**/__tests__/*.ts"],
-    rules: { "no-restricted-imports": "off" },
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [EXPRESS_PATTERN] }],
+    },
   }
 );

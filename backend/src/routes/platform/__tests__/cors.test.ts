@@ -5,6 +5,7 @@ import supertest from "supertest";
 async function appWithCorsOrigin(value: string) {
   vi.stubEnv("CORS_ORIGIN", value);
   vi.resetModules();
+  // fallow-ignore-next-line boundary-violation -- the test must build the real app to assert its CORS middleware
   const { createApp } = await import("@/app.js");
   return createApp();
 }
