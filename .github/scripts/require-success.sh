@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Usage: require-success.sh <name>=<result>...
-# Fails unless every needs.<job>.result passed in is "success".
+# Usage: require-success.sh <job>=<result>...
 set -euo pipefail
 
 status=0

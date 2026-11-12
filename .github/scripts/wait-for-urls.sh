@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Usage: wait-for-urls.sh <timeout-seconds> <url>... [-- <log-file>...]
-# Polls until every URL answers 2xx; on timeout prints the log files and fails.
+# Usage: wait-for-urls.sh <seconds> <url>... [-- <log-file>...]
 set -uo pipefail
 
 timeout=$1; shift

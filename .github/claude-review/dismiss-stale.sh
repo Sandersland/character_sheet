@@ -1,14 +1,6 @@
 #!/usr/bin/env bash
-# A clean run leaves the CHECK green, but a CHANGES_REQUESTED review the bot
-# submitted on an EARLIER run is never auto-dismissed (main/staging keep
-# dismiss_stale_reviews:false so human approvals survive a push). That stale
-# verdict keeps reviewDecision = CHANGES_REQUESTED and blocks merge until a
-# human dismisses it. Only call this after a run that actually reviewed and
-# passed enforce-verdict.sh: then any remaining bot CHANGES_REQUESTED is
-# provably stale. Scoped to the bot's login so a HUMAN change-request is never
-# touched. REST /reviews, because the dismissals endpoint needs the integer id.
-#
-# Env: GH_TOKEN, REPO, PR.
+# Dismiss the bot's own leftover change-requests after a clean review;
+# dismiss_stale_reviews is off, so they would otherwise block merge.
 set -euo pipefail
 
 bot='claude[bot]'

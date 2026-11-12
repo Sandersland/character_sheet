@@ -12,12 +12,8 @@ concurrency:
 jobs:
   claude-review:
     runs-on: ubuntu-latest
-    # Skip draft PRs, fork PRs (forks can't access repo secrets), and the
-    # staging->main promote PR — every line in a promote was already reviewed on
-    # its feature PR, so re-reviewing the aggregate is pure latency. This skip
-    # must stay JOB-level: a skipped job still reports a "skipped" conclusion,
-    # which satisfies main's required claude-review check; a workflow-level
-    # filter would report nothing and block the promote's auto-merge forever.
+    # Skips drafts, forks and staging->main promotes. Must stay job-level: a
+    # skipped job satisfies the required check, a workflow filter never reports.
     timeout-minutes: 20
     if: >-
       github.event.pull_request.draft == false &&
@@ -35,10 +31,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      # The prompt and every script live in .github/claude-review/, not inline:
-      # the action skips itself on any PR that edits THIS file (it must match
-      # the default branch), so keeping it to wiring means prompt and logic
-      # changes still get reviewed on their own PR.
+      # Logic lives in .github/claude-review/: the action skips any PR that edits this file.
       - name: Prepare review scope
         id: scope
         env:
@@ -49,20 +42,12 @@ jobs:
           EVENT_ACTION: ${{ github.event.action }}
         run: .github/claude-review/prepare-scope.sh
 
-      # enforce-verdict.sh only counts reviews submitted after this instant, so a
-      # stale CHANGES_REQUESTED from an earlier run (or a human) can't fail or
-      # pass the check on its own.
+      # enforce-verdict.sh only counts reviews after this instant.
       - name: Mark review start
         id: marker
         run: echo "ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      # One focused reviewer instead of the multi-agent code-review plugin (#1995):
-      # the plugin's sequential stages (gate -> summary -> 4 parallel reviewers ->
-      # one validator per finding), each re-reading CLAUDE.md, took 20-30 min per
-      # non-trivial PR. The prompt's self-verification rule stands in for the
-      # plugin's separate validator stage, and its INVESTIGATE step is mandatory:
-      # without it the reviewer read only the diff and returned "No issues" on a
-      # 554-line PR in 6 turns.
+      # Single reviewer, not the multi-agent plugin, which took 20-30 min (#1995).
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -74,7 +59,6 @@ jobs:
             --allowed-tools "Bash(gh:*)" "Read" "Grep" "Glob" "mcp__github_inline_comment__create_inline_comment"
           prompt: ${{ steps.scope.outputs.prompt }}
 
-      # Applies to BOTH base branches so main gets a red check too.
       - name: Enforce verdict
         id: verdict
         env:
@@ -84,8 +68,7 @@ jobs:
           MARKER: ${{ steps.marker.outputs.ts }}
         run: .github/claude-review/enforce-verdict.sh
 
-      # Only after a run that actually reviewed: when the action skipped itself,
-      # an earlier change-request was never re-checked, so it is not stale.
+      # A skipped run never re-checked them, so they aren't stale.
       - name: Dismiss stale bot change-request
         if: success() && steps.verdict.outputs.reviewed == 'true'
         env:

@@ -1,17 +1,6 @@
 #!/usr/bin/env bash
-# claude-code-action@v1 exits 0 regardless of the review verdict and exposes no
-# verdict output, so a REQUEST_CHANGES review it submits would not, on its own,
-# fail the check. Re-read the PR's reviews and fail when a blocking review
-# landed during this run. Filters by submit time (the concurrency group
-# guarantees one in-flight run per PR) rather than reviewer identity, which the
-# action doesn't expose.
-#
-# Also reports `reviewed` — whether claude[bot] submitted any review during
-# this run. It is false when the action skipped itself (a PR that edits the
-# review workflow file) or the reviewer never submitted its formal review.
-#
-# Env: GH_TOKEN, REPO, PR, MARKER (UTC timestamp taken just before the review),
-# GITHUB_OUTPUT.
+# The action always exits 0, so fail here on a REQUEST_CHANGES from this run.
+# Outputs reviewed=false when claude[bot] submitted nothing (e.g. it skipped itself).
 set -euo pipefail
 
 reviews=$(gh api "/repos/$REPO/pulls/$PR/reviews" --paginate --jq '[.[] | select(.submitted_at > "'"$MARKER"'")]' | jq -s 'add // []')
