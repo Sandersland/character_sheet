@@ -387,10 +387,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Both test halves passed
-        run: >-
-          .github/scripts/require-success.sh
-          test-backend=${{ needs.test-backend.result }}
-          test-frontend=${{ needs.test-frontend.result }}
+        run: |
+          [ "${{ needs.test-backend.result }}" = success ] && [ "${{ needs.test-frontend.result }}" = success ] \
+            || { echo "test-backend=${{ needs.test-backend.result }} test-frontend=${{ needs.test-frontend.result }}"; exit 1; }
 
   e2e:
     # Playwright smoke suite against a booted dev stack (same postgres service as
