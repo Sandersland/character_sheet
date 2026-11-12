@@ -23,7 +23,7 @@ const PARENT_RELATIVE_PATTERN = {
 // src/http (#2006, #2007). fallow zones only see file imports, so package
 // imports are fenced here instead.
 const EXPRESS_PATTERN = {
-  group: ["express", "express-*", "helmet", "cookie-parser", "multer"],
+  group: ["express", "express-*", "helmet", "cookie-parser", "multer", "pino-http"],
   message: "lib/ must not import Express or its middleware — HTTP-aware code belongs in src/http (#2007).",
 };
 

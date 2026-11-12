@@ -1,5 +1,4 @@
 import pino from "pino";
-import { pinoHttp } from "pino-http";
 
 import { config } from "@/lib/core/config.js";
 
@@ -18,15 +17,5 @@ export const logger = pino({
   redact: {
     paths: ["req.headers.authorization", "req.headers.cookie", "password", "passwordHash"],
     remove: true,
-  },
-});
-
-export const httpLogger = pinoHttp({
-  logger,
-  autoLogging: !isTest,
-  customLogLevel(_req, res, err) {
-    if (err || res.statusCode >= 500) return "error";
-    if (res.statusCode >= 400) return "warn";
-    return "info";
   },
 });
