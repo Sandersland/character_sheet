@@ -2,6 +2,7 @@ node_modules/
 dist/
 build/
 coverage/
+.vitest-reports/
 .env
 # Vite's mode-scoped variants, generated per worktree slot (#1458).
 .env.development
