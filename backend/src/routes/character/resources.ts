@@ -5,7 +5,7 @@ import {
   applyResourceOperations,
   InvalidResourceOperationError,
 } from "@/lib/classes/resources.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
 export const resourcesRouter = Router({ mergeParams: true });
 

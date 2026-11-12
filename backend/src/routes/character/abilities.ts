@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { ABILITY_REGISTRY } from "@/lib/classes/ability-registry.js";
-import { runTransaction } from "@/lib/http/transactions-endpoint.js";
+import { runTransaction } from "@/http/transactions-endpoint.js";
 
 export const abilitiesRouter = Router({ mergeParams: true });
 

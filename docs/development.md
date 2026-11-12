@@ -96,7 +96,7 @@ The repeatable pattern (inventory → HP → XP → spellcasting …):
 1. **Schema + migration** — models/enums in `schema.prisma`, `migrate dev`, `generate`.
 2. **Rules data** — 5e logic goes in `lib/srd/` (or `lib/leveling/experience.ts`, or a seeded `ClassFeature` row for a class/subclass feature). Level-gated? Also follow `docs/leveling.md` (reconciler + read-clamp).
 3. **`lib/<domain>/…` operation handler** — op discriminated union + domain error classes + `apply<Domain>Operations`; delegate the transaction preamble to `runCharacterTransaction`. Reference: `lib/inventory/inventory.ts`.
-4. **Route** — use `makeTransactionsEndpoint` (`lib/http/transactions-endpoint.ts`) unless the response shape is non-uniform; register the router in `routes/manifest.ts`.
+4. **Route** — use `makeTransactionsEndpoint` (`http/transactions-endpoint.ts`) unless the response shape is non-uniform; register the router in `routes/manifest.ts`.
 5. **`api/<domain>.ts` function** — delegate to `postTransactions`/`request<T>` (from `api/http.ts`); `api/client.ts` re-exports it via `export *`, no edit needed there.
 6. **Component(s)** — orchestrator/row pattern (see `docs/frontend.md`).
 7. **Tests** — mirror `routes/character/__tests__/inventory.test.ts`; lib unit tests for non-trivial pure logic.

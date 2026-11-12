@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler } from "express";
 
-import { logger } from "./logger.js";
+import { logger } from "@/lib/core/logger.js";
 
 // Express recognizes a 4-arg middleware as an error handler; with express-async-errors installed, async throws in any route land here.
 function isPrismaRecordNotFound(err: unknown): boolean {

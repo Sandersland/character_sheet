@@ -2,9 +2,9 @@ import type { RequestHandler, Response } from "express";
 import multer from "multer";
 
 import { NotFoundError } from "@/lib/auth/errors.js";
-import { BlobNotFoundError, type BlobObject } from "./blob-store.js";
-import { getBlobStore } from "./index.js";
-import { PORTRAIT_MAX_UPLOAD_BYTES } from "./portrait-image.js";
+import { BlobNotFoundError, type BlobObject } from "@/lib/storage/blob-store.js";
+import { getBlobStore } from "@/lib/storage/index.js";
+import { PORTRAIT_MAX_UPLOAD_BYTES } from "@/lib/storage/portrait-image.js";
 
 // Cross-plan contract pinned with the upload UI (#1616), like PORTRAIT_MAX_UPLOAD_BYTES.
 export const PORTRAIT_FIELD = "portrait";

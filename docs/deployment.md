@@ -37,7 +37,7 @@ CI builds this image on every PR (#1454) and reports status, so a stage rename o
 
 ### CSP notes (single-origin mode)
 
-`backend/src/lib/core/security.ts` owns helmet/CSP. First-party inline scripts (the pre-paint theme snippet) are allowlisted by **hash computed at boot from the served `index.html`** — so editing the snippet needs no CSP change. Cloudflare edge injections get a per-request nonce (their hashes churn per request; a **stable** hash on a CSP violation means a first-party script — this misread once cost an afternoon). If a future asset is blocked, adjust directives in that file.
+`backend/src/http/security.ts` owns helmet/CSP. First-party inline scripts (the pre-paint theme snippet) are allowlisted by **hash computed at boot from the served `index.html`** — so editing the snippet needs no CSP change. Cloudflare edge injections get a per-request nonce (their hashes churn per request; a **stable** hash on a CSP violation means a first-party script — this misread once cost an afternoon). If a future asset is blocked, adjust directives in that file.
 
 ## Local production smoke test
 

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
-import { securityHeaders } from "@/lib/core/security.js";
+import { securityHeaders } from "@/http/security.js";
 
 const INLINE_BODY = "console.log('theme');";
 const INLINE_HASH = createHash("sha256").update(INLINE_BODY).digest("base64");
@@ -119,7 +119,7 @@ async function loadLimiters(env: Record<string, string | undefined>) {
   process.env.NODE_ENV = "production";
   delete process.env.RATE_LIMIT_DISABLED;
   Object.assign(process.env, env);
-  const mod = await import("@/lib/core/security.js");
+  const mod = await import("@/http/security.js");
   process.env = prev;
   return mod;
 }

@@ -25,7 +25,7 @@ import {
 } from "@/lib/inventory/starting-equipment-package.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
-import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
+import { requireEditionOr400 } from "@/http/params/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 import { backgroundGrantsAbilitySpread, backgroundGrantsOriginFeat } from "@/lib/rules/background-grants.js";
 import type { AbilityIncreaseSpec } from "@/lib/srd/species-ability-increases.js";

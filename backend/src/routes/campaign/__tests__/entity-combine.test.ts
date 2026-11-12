@@ -14,7 +14,7 @@ import { authCookie } from "@/test-support/auth.js";
 import { createTestCharacter } from "@/test-support/character.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { __resetBlobStoreForTests, createBlobStore } from "@/lib/storage/index.js";
-import { PORTRAIT_FIELD } from "@/lib/storage/portrait-http.js";
+import { PORTRAIT_FIELD } from "@/http/portrait-http.js";
 import * as entityMergesModule from "@/lib/activity/entity-merges.js";
 
 // Unique fixture ids for this file (parallel-safe on the shared dev DB).

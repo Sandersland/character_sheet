@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
 import { describe, expect, it, vi } from "vitest";
 
-import { parseClassFilterOr400 } from "@/lib/http/parse-class-param.js";
-import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
+import { parseClassFilterOr400 } from "@/http/params/parse-class-param.js";
+import { parseMaxSpellLevelOr400 } from "@/http/params/parse-max-spell-level-param.js";
 
 function mockRes() {
   const res = {

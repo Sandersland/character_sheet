@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
-import { parseBodyOr400 } from "@/lib/http/parse-body.js";
+import { parseBodyOr400 } from "@/http/parse-body.js";
 import {
   awardCampaignItem,
   campaignItemHolders,

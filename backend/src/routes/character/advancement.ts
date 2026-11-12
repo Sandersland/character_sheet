@@ -6,7 +6,7 @@ import {
   InvalidAdvancementOperationError,
 } from "@/lib/leveling/advancement.js";
 import { featImprovementSchema } from "@/lib/srd/srd.js";
-import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/http/transactions-endpoint.js";
 
 export const advancementRouter = Router({ mergeParams: true });
 

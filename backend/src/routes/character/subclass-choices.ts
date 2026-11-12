@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { prisma } from "@/lib/core/prisma.js";
-import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
+import { requireEditionOr400 } from "@/http/params/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 import { readAbilityCost } from "@/lib/spellcasting/ability-cost.js";
 

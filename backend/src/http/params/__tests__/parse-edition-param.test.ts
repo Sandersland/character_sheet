@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { describe, expect, it, vi } from "vitest";
 
-import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
+import { requireEditionOr400 } from "@/http/params/parse-edition-param.js";
 
 function mockRes() {
   const res = {

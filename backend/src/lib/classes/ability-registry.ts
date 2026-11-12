@@ -15,7 +15,7 @@ import {
   useHandOfUltimateMercyOpSchema,
 } from "@character-sheet/contracts";
 
-import type { TransactionHandler } from "@/lib/http/transactions-endpoint.js";
+import type { TransactionHandler } from "@/lib/character/transaction-handler.js";
 import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/ability-cost.js";
 import {
   applyChannelDivinityOperations,
