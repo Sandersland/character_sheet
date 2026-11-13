@@ -35,14 +35,14 @@
   //      eslint has no relative-parent ban, so `../../../backend/src/lib/...`
   //      compiles today.
   //   2. shared-types is reachable type-only. That invariant is currently
-  //      self-policing (the backend emits `dist/` and `node dist/index.js` on
-  //      node:22-alpine would try to load a raw `.ts`); allowTypeOnly makes it
+  //      self-policing (the backend emits `dist/` and `node dist/index.js`
+  //      would try to load a raw `.ts`); allowTypeOnly makes it
   //      a check that fails at audit time instead of at container start.
   //   3. shared-types imports nothing but itself — a rule can never sneak in
   //      by way of a tier import.
   //   4. contracts is reachable as a VALUE from the backend (it calls .parse())
   //      and type-only from the frontend (#1370). That asymmetry IS the
-  //      design: the package builds to dist/ so node:22-alpine can load it,
+  //      design: the package builds to dist/ so plain node can load it,
   //      and the frontend's type-only side erases, so zod never enters the
   //      client bundle (scripts/check-no-zod-in-client-bundle.sh is the check).
   //   5. contracts imports nothing zoned — not even shared-types. Keeping the
