@@ -118,7 +118,8 @@
   },
   "rules": {
     // Pinned, not inherited: boundary-violation is fallow 3.2.0's default
-    // `error`, and the bar for OUR boundary is ours to hold across versi    // bumps (same reasoning as the `health` ceilings above).
+    // `error`, and the bar for OUR boundary is ours to hold across version
+    // bumps (same reasoning as the `health` ceilings above).
     "boundary-violation": "error"
   }
 }
