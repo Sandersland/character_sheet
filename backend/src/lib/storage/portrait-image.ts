@@ -9,6 +9,9 @@ export const PORTRAIT_CONTENT_TYPE = "image/webp";
 
 const PORTRAIT_EDGE_PX = 512;
 
+// A 5 MB PNG can declare far more pixels than it has bytes; sharp's default cap (~268 MP) still allows a multi-GB decode. 100 MP clears every phone camera (48-50 MP sensors).
+const PORTRAIT_SHARP_OPTIONS = { limitInputPixels: 100_000_000 } as const;
+
 export class PortraitImageError extends ValidationError {}
 
 // SVG is deliberately absent — sharp can sniff and rasterize it, but as a document format it's a classic stored-XSS/script-smuggling carrier. "image/jpg" is a common non-IANA alias accepted alongside "image/jpeg" so a programmatic client declaring it over honest JPEG bytes doesn't 400.
@@ -24,7 +27,7 @@ const ACCEPTED_MIME_BY_FORMAT: Readonly<Record<string, readonly string[]>> = {
 export async function reencodePortrait(input: Buffer, declaredContentType: string): Promise<Buffer> {
   let sniffed: { format?: string; compression?: string };
   try {
-    sniffed = await sharp(input).metadata();
+    sniffed = await sharp(input, PORTRAIT_SHARP_OPTIONS).metadata();
   } catch {
     throw new PortraitImageError("Uploaded file is not a decodable image");
   }
@@ -48,7 +51,7 @@ export async function reencodePortrait(input: Buffer, declaredContentType: strin
 
   try {
     // .webp() without {animated: true} keeps only a GIF's first frame — deliberate, since portraits are static.
-    return await sharp(input)
+    return await sharp(input, PORTRAIT_SHARP_OPTIONS)
       .rotate()
       .resize(PORTRAIT_EDGE_PX, PORTRAIT_EDGE_PX, { fit: "inside", withoutEnlargement: true })
       .webp()
