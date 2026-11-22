@@ -31,7 +31,17 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Logic lives in .github/claude-review/: the action skips any PR that edits this file.
+      # The gate's own logic must come from the base branch: run from the PR
+      # checkout, a PR could edit enforce-verdict.sh and pass its own required check.
+      # The action only skips PRs that edit this workflow file, not these scripts.
+      - name: Checkout review scripts from base
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .review-base
+          fetch-depth: 1
+          sparse-checkout: .github/claude-review
+
       - name: Prepare review scope
         id: scope
         env:
@@ -40,7 +50,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           EVENT_ACTION: ${{ github.event.action }}
-        run: .github/claude-review/prepare-scope.sh
+        run: .review-base/.github/claude-review/prepare-scope.sh
 
       # enforce-verdict.sh only counts reviews after this instant.
       - name: Mark review start
@@ -66,7 +76,7 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           MARKER: ${{ steps.marker.outputs.ts }}
-        run: .github/claude-review/enforce-verdict.sh
+        run: .review-base/.github/claude-review/enforce-verdict.sh
 
       # A skipped run never re-checked them, so they aren't stale.
       - name: Dismiss stale bot change-request
@@ -75,11 +85,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
-        run: .github/claude-review/dismiss-stale.sh
+        run: .review-base/.github/claude-review/dismiss-stale.sh
 
       - name: Flag a run that did not review
         if: success() && steps.verdict.outputs.reviewed != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
-        run: .github/claude-review/notify-not-reviewed.sh
+        run: .review-base/.github/claude-review/notify-not-reviewed.sh
