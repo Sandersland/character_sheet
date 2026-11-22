@@ -12,6 +12,7 @@ import {
 import { Prisma, type SpellCastKind } from "@/generated/prisma/client.js";
 import type { CombatState } from "@character-sheet/shared-types";
 import { DomainError } from "@/lib/core/errors.js";
+import { journalVisibleTo } from "./journal-visibility.js";
 
 // Default 409 (conflict); pass 404 at not-found throw sites.
 export class SessionError extends DomainError {
@@ -398,7 +399,7 @@ export async function leaveSession(sessionId: string, characterId: string) {
   });
 }
 
-export async function endSession(sessionId: string) {
+export async function endSession(sessionId: string, viewerUserId: string) {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
     include: sessionWithParticipants,
@@ -413,7 +414,7 @@ export async function endSession(sessionId: string) {
     include: sessionWithParticipants,
   });
   const journalEntries = await prisma.journalEntry.findMany({
-    where: { sessionId },
+    where: { sessionId, ...journalVisibleTo(viewerUserId) },
     orderBy: { date: "desc" },
   });
   return { ...updated, journalEntries };

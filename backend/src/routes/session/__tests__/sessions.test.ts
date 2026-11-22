@@ -854,4 +854,23 @@ describe("session-detail journal entry privacy (#2017)", () => {
     expect(res.status).toBe(200);
     expect(bodies(res)).toEqual(["owner private", "player shared"]);
   });
+
+  it("campaign end route filters the returned journal entries for the caller", async () => {
+    const { campaignId, sessionId } = await seedEntries();
+    const res = await agent(cookieOwner).post(`${startUrl(campaignId)}/${sessionId}/end`).send({});
+    expect(res.status).toBe(200);
+    expect(bodies({ body: { journalEntries: res.body.session.journalEntries } })).toEqual(["owner private", "player shared"]);
+  });
+
+  it("solo end route filters the returned journal entries for the caller", async () => {
+    const started = await agent(cookieOwner).post(`/api/characters/${CHAR_OWNER}/sessions`).send({});
+    const sessionId = started.body.session.id as string;
+    const entry = (authorUserId: string, body: string, visibility: "PRIVATE" | "CAMPAIGN") =>
+      prisma.journalEntry.create({ data: { characterId: CHAR_OWNER, sessionId, date: new Date(), body, authorUserId, visibility } });
+    await entry(OWNER, "mine", "PRIVATE");
+    await entry(PLAYER, "other private", "PRIVATE");
+    const res = await agent(cookieOwner).post(`/api/characters/${CHAR_OWNER}/sessions/${sessionId}/end`).send({});
+    expect(res.status).toBe(200);
+    expect(bodies({ body: { journalEntries: res.body.session.journalEntries } })).toEqual(["mine"]);
+  });
 });
