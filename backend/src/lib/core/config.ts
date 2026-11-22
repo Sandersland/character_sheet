@@ -30,7 +30,7 @@ function parsePositiveInt(raw: string | undefined): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-// Express's own `trust proxy` vocabulary: a hop count, a boolean, or a subnet/address list. Default is one hop (the Railway edge) so req.ip is the real client, not the proxy.
+// Express's own `trust proxy` vocabulary: a hop count, false, or a subnet/address list; `true` is rejected by the schema because it trusts every X-Forwarded-For hop and lets any client spoof its IP. Default is one hop (the Railway edge) so req.ip is the real client, not the proxy.
 function parseTrustProxy(raw: string | undefined): number | boolean | string {
   const value = clean(raw);
   if (value === undefined) return 1;
@@ -61,7 +61,7 @@ const schema = z.object({
   RATE_LIMIT_AUTH_MAX: z.number().default(20),
   RATE_LIMIT_JOIN_MAX: z.number().default(20),
   RATE_LIMIT_UPLOAD_MAX: z.number().default(30),
-  TRUST_PROXY: z.union([z.number(), z.boolean(), z.string()]),
+  TRUST_PROXY: z.union([z.number(), z.literal(false), z.string()]),
   BLOB_STORE_DRIVER: z.string().optional(),
   BLOB_FS_DIR: z.string().optional(),
   S3_ENDPOINT: z.string().optional(),

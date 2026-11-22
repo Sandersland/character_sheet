@@ -27,7 +27,7 @@ CI builds this image on every PR (#1454) and reports status, so a stage rename o
 | `NODE_ENV` | The image sets `production` (#2019); it gates the Secure cookie default, dev-login force-off, blob-store fail-closed and 5xx detail hiding. |
 | `SERVE_STATIC_DIR` | Set → API serves the SPA from this dir (single-origin; combined image sets `/app/public`). Unset → API-only. |
 | `CORS_ORIGIN` | Comma-separated allowlist. Unset/empty sends no CORS headers at all (single-origin; dev rides the Vite proxy). Credentials are always sent, so the origin is never `*` — set explicitly for split-origin prod. |
-| `TRUST_PROXY` | Express `trust proxy` setting: hop count, `true`/`false`, or a subnet list. Default `1` (one proxy hop, e.g. Railway's edge) so rate limits key on the real client IP rather than the proxy. Raise it if another proxy (e.g. Cloudflare) sits in front of the edge. |
+| `TRUST_PROXY` | Express `trust proxy` hop count (or a subnet list); `true` is rejected because it lets any client spoof `X-Forwarded-For` and defeat per-client rate limits. Default `1`. Staging and prod run behind Cloudflare and Railway's edge, so they require `TRUST_PROXY=2`; with `1` every user shares Cloudflare's IP. |
 | `APP_BASE_URL` | Browser-facing origin; builds the OAuth `redirect_uri` + post-login redirect. Dev default `http://localhost:5173` (the SPA proxies `/api`). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Provider enabled only when both set; absent → app boots with no providers. |
 | `SESSION_COOKIE_SECURE` | Tri-state: default on in production, off elsewhere. The image sets `NODE_ENV=production`, so `docker-compose.prod.yml` needs a TLS proxy in front, or `SESSION_COOKIE_SECURE=false` for plain http. |

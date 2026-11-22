@@ -10,14 +10,7 @@ import { requireAuth } from "@/http/middleware.js";
 import { config } from "@/lib/core/config.js";
 import { errorHandler } from "@/http/error-handler.js";
 import { httpLogger } from "@/http/http-logger.js";
-import {
-  authRateLimiter,
-  creationRateLimiter,
-  globalRateLimiter,
-  joinRateLimiter,
-  securityHeaders,
-  uploadRateLimiter,
-} from "@/http/security.js";
+import { globalRateLimiter, securityHeaders } from "@/http/security.js";
 import { routeManifest, type RouteMount } from "@/routes/manifest.js";
 
 function mountPass(app: Express, scope: RouteMount["scope"]): void {
@@ -53,10 +46,6 @@ export function createApp() {
   app.use(express.json());
   app.use(httpLogger);
   app.use(globalRateLimiter);
-  app.use(creationRateLimiter);
-  app.use(authRateLimiter);
-  app.use(joinRateLimiter);
-  app.use(uploadRateLimiter);
 
   mountPass(app, "public");
   app.use("/api", requireAuth);

@@ -26,7 +26,7 @@ describe("fetchLevelUpPlan", () => {
       fetchLevelUpPlan("c1", { kind: "existing", classEntryId: "entry-1" }, "sub-1")
     ).resolves.toEqual(plan);
 
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0][0] as string, "http://localhost");
     expect(url.pathname).toContain("/characters/c1/level-up/plan");
     expect(url.searchParams.get("classEntryId")).toBe("entry-1");
     expect(url.searchParams.get("subclassId")).toBe("sub-1");
@@ -39,7 +39,7 @@ describe("fetchLevelUpPlan", () => {
 
     await fetchLevelUpPlan("c1", { kind: "new", classId: "class-9" });
 
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0][0] as string, "http://localhost");
     expect(url.searchParams.get("classId")).toBe("class-9");
     expect(url.searchParams.get("classEntryId")).toBeNull();
     expect(url.searchParams.get("subclassId")).toBeNull();

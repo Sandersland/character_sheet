@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Request, RequestHandler } from "express";
+import type { RequestHandler } from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 
@@ -66,9 +66,6 @@ export type RateLimitConfig = Pick<
 
 const passthrough: RequestHandler = (_req, _res, next) => next();
 
-const AUTH_PATH = /^\/api\/auth\/(dev-login|[^/]+\/(start|callback))$/;
-const PORTRAIT_UPLOAD_PATH = /^\/api\/(characters\/[^/]+|campaigns\/[^/]+\/entities\/[^/]+)\/portrait$/;
-
 export type RateLimiters = {
   globalRateLimiter: RequestHandler;
   creationRateLimiter: RequestHandler;
@@ -77,7 +74,6 @@ export type RateLimiters = {
   uploadRateLimiter: RequestHandler;
 };
 
-// Each limiter is its own rateLimit instance, so each keeps its own per-client bucket.
 export function createRateLimiters(cfg: RateLimitConfig): RateLimiters {
   if (cfg.isTest || cfg.RATE_LIMIT_DISABLED) {
     return {
@@ -88,30 +84,20 @@ export function createRateLimiters(cfg: RateLimitConfig): RateLimiters {
       uploadRateLimiter: passthrough,
     };
   }
-  const scoped = (limit: number, applies: (req: Request) => boolean) =>
+  const limiter = (limit: number) =>
     rateLimit({
       windowMs: cfg.RATE_LIMIT_WINDOW_MS,
       standardHeaders: true,
       legacyHeaders: false,
       message: { error: "Too many requests, please try again later." },
       limit,
-      skip: (req) => !applies(req),
     });
   return {
-    globalRateLimiter: scoped(cfg.RATE_LIMIT_MAX, () => true),
-    creationRateLimiter: scoped(
-      cfg.RATE_LIMIT_CREATE_MAX,
-      (req) => req.method === "POST" && req.path === "/api/characters",
-    ),
-    authRateLimiter: scoped(cfg.RATE_LIMIT_AUTH_MAX, (req) => AUTH_PATH.test(req.path)),
-    joinRateLimiter: scoped(
-      cfg.RATE_LIMIT_JOIN_MAX,
-      (req) => req.method === "POST" && req.path === "/api/campaigns/join",
-    ),
-    uploadRateLimiter: scoped(
-      cfg.RATE_LIMIT_UPLOAD_MAX,
-      (req) => req.method === "POST" && PORTRAIT_UPLOAD_PATH.test(req.path),
-    ),
+    globalRateLimiter: limiter(cfg.RATE_LIMIT_MAX),
+    creationRateLimiter: limiter(cfg.RATE_LIMIT_CREATE_MAX),
+    authRateLimiter: limiter(cfg.RATE_LIMIT_AUTH_MAX),
+    joinRateLimiter: limiter(cfg.RATE_LIMIT_JOIN_MAX),
+    uploadRateLimiter: limiter(cfg.RATE_LIMIT_UPLOAD_MAX),
   };
 }
 

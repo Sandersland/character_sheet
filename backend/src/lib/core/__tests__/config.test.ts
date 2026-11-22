@@ -151,7 +151,7 @@ describe("parseConfig", () => {
     expect(parseConfig({ ...baseEnv, RATE_LIMIT_AUTH_MAX: "3" }).RATE_LIMIT_AUTH_MAX).toBe(3);
     expect(parseConfig({ ...baseEnv, TRUST_PROXY: "2" }).TRUST_PROXY).toBe(2);
     expect(parseConfig({ ...baseEnv, TRUST_PROXY: "false" }).TRUST_PROXY).toBe(false);
-    expect(parseConfig({ ...baseEnv, TRUST_PROXY: "true" }).TRUST_PROXY).toBe(true);
+    expect(() => parseConfig({ ...baseEnv, TRUST_PROXY: "true" })).toThrow();
     expect(parseConfig({ ...baseEnv, TRUST_PROXY: "loopback, 10.0.0.0/8" }).TRUST_PROXY).toBe("loopback, 10.0.0.0/8");
   });
 

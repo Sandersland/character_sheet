@@ -2,7 +2,7 @@ import type { Character } from "@/types/character";
 
 // Module-private: apiFetch/rawFetch prefix it internally so no sibling
 // module builds its own URL or drifts from this one.
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
+const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 
 // AuthProvider registers a handler here so a 401 from ANY domain call is
 // handled in one place, never per call site. fetchMe deliberately bypasses
@@ -20,7 +20,7 @@ export async function rawFetch(path: string, init?: RequestInit): Promise<Respon
   return fetch(`${API_URL}${path}`, { credentials: "include", ...init });
 }
 
-// Always sends the session cookie (cross-origin in dev: 5173 → 4000) and
+// Always sends the session cookie and
 // routes every response through the shared 401 handler.
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const response = await rawFetch(path, init);

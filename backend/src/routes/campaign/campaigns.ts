@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 
+import { joinRateLimiter } from "@/http/security.js";
 import { Router } from "express";
 import {
   attachCharacterSchema,
@@ -130,7 +131,7 @@ campaignsRouter.delete("/campaigns/:id", async (req, res) => {
   res.status(204).end();
 });
 
-campaignsRouter.post("/campaigns/join", async (req, res) => {
+campaignsRouter.post("/campaigns/join", joinRateLimiter, async (req, res) => {
   const data = parseBodyOr400(joinCampaignSchema, req.body, res);
   if (data === undefined) return;
 
