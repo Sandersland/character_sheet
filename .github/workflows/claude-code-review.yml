@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -35,7 +35,7 @@ jobs:
       # checkout, a PR could edit enforce-verdict.sh and pass its own required check.
       # The action only skips PRs that edit this workflow file, not these scripts.
       - name: Checkout review scripts from base
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .review-base
