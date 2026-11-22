@@ -36,3 +36,6 @@ lefthook-local.yml
 # repo documentation, so they live in the session scratchpad instead.
 docs/superpowers/
 .superpowers/
+
+# Per-agent memory is local working state, not repo docs (#2030).
+.claude/agent-memory/

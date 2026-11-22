@@ -1,9 +1,4 @@
----
-name: design-system
-description: Color/type/component tokens and conventions established for the character_sheet frontend (fantasy-tactile parchment direction)
-metadata:
-  type: project
----
+# Design system
 
 Established the design system during Phase 1 scaffold (2026-06-17), when the
 repo had only bare-bones stub pages and no design tokens at all (no

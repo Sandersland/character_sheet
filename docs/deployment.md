@@ -82,7 +82,7 @@ docker compose exec -T db pg_restore -U character_sheet -d character_sheet \
   --clean --if-exists < backup-YYYYMMDD-HHMMSS.dump
 ```
 
-One database holds everything, so `pg_dump character_sheet` is a complete backup. After a restore, restart the backend and verify `/api/health` + `/api/characters` + an audit log. (The restore path was verified end-to-end 2026-06-26 — re-run the dry run into a throwaway DB after major schema changes.)
+`pg_dump` covers everything except uploaded portraits, which live in the blob store (`BLOB_STORE_DRIVER`), so a complete backup is a dump **plus** a copy of the bucket (or `BLOB_FS_DIR`). Automation for both is tracked in #2031. After a restore, restart the backend and verify `/api/health` + `/api/characters` + an audit log. (The restore path was verified end-to-end 2026-06-26 — re-run the dry run into a throwaway DB after major schema changes.)
 
 On Railway, `railway run -- sh -c 'pg_dump "$DATABASE_PUBLIC_URL" -Fc'` works directly — `DATABASE_URL` is the internal host and will not resolve from a laptop. Automate with a cron service uploading to **off-box** object storage (a backup living in the same Railway project dies with it). Retention ~7 daily + 4 weekly via the storage provider's lifecycle rules. If automation is deferred: manual dump before every migration/deploy and at least weekly during active play.
 
@@ -137,7 +137,7 @@ railway run -- node your-read-only-check.mjs   # reads process.env.DATABASE_PUBL
 
 ### Catalog content ships in the seed, not in migrations (#1277)
 
-Every boot command runs `prisma migrate deploy && prisma db seed` as one step (root `Dockerfile`, `backend/Dockerfile`; `scripts/check-seed-required.sh` enforces this in CI/lefthook) — a database that only migrated and never seeded 500s the moment a route reads a catalog row it type-checked fine against. Catalog content (subclasses, spells, feats, packs, …) is **not** moved into data migrations, for four reasons:
+Every boot command runs `prisma migrate deploy && prisma db seed` as one step (root `Dockerfile`; `scripts/check-seed-required.sh` enforces this in CI/lefthook) — a database that only migrated and never seeded 500s the moment a route reads a catalog row it type-checked fine against. Catalog content (subclasses, spells, feats, packs, …) is **not** moved into data migrations, for four reasons:
 
 1. **The failure mode is already structurally prevented** — there is no deployment path that runs `migrate deploy` without also running `db seed` (enforced above), so this is a defense-in-depth gate, not a live gap.
 2. **Data migrations can't express what the seed does.** Several seeders (`seedFeats`, `seedSpells`, `seedShadowArts`) prune stale rows, and spell seeding layers over `SPELL_COLUMN_DEFAULTS` so a removed optional field actually resets on re-seed (#1132's Barkskin fix) — an append-only migration history can only add UPDATEs, never re-derive a row.
