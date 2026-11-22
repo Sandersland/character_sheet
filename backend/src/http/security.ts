@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 
@@ -59,31 +59,66 @@ export type RateLimitConfig = Pick<
   | "RATE_LIMIT_WINDOW_MS"
   | "RATE_LIMIT_MAX"
   | "RATE_LIMIT_CREATE_MAX"
+  | "RATE_LIMIT_AUTH_MAX"
+  | "RATE_LIMIT_JOIN_MAX"
+  | "RATE_LIMIT_UPLOAD_MAX"
 >;
 
 const passthrough: RequestHandler = (_req, _res, next) => next();
 
-export function createRateLimiters(cfg: RateLimitConfig): {
+const AUTH_PATH = /^\/api\/auth\/(dev-login|[^/]+\/(start|callback))$/;
+const PORTRAIT_UPLOAD_PATH = /^\/api\/(characters\/[^/]+|campaigns\/[^/]+\/entities\/[^/]+)\/portrait$/;
+
+export type RateLimiters = {
   globalRateLimiter: RequestHandler;
   creationRateLimiter: RequestHandler;
-} {
+  authRateLimiter: RequestHandler;
+  joinRateLimiter: RequestHandler;
+  uploadRateLimiter: RequestHandler;
+};
+
+// Each limiter is its own rateLimit instance, so each keeps its own per-client bucket.
+export function createRateLimiters(cfg: RateLimitConfig): RateLimiters {
   if (cfg.isTest || cfg.RATE_LIMIT_DISABLED) {
-    return { globalRateLimiter: passthrough, creationRateLimiter: passthrough };
+    return {
+      globalRateLimiter: passthrough,
+      creationRateLimiter: passthrough,
+      authRateLimiter: passthrough,
+      joinRateLimiter: passthrough,
+      uploadRateLimiter: passthrough,
+    };
   }
-  const sharedOptions = {
-    windowMs: cfg.RATE_LIMIT_WINDOW_MS,
-    standardHeaders: true as const,
-    legacyHeaders: false as const,
-    message: { error: "Too many requests, please try again later." },
-  };
+  const scoped = (limit: number, applies: (req: Request) => boolean) =>
+    rateLimit({
+      windowMs: cfg.RATE_LIMIT_WINDOW_MS,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: "Too many requests, please try again later." },
+      limit,
+      skip: (req) => !applies(req),
+    });
   return {
-    globalRateLimiter: rateLimit({ ...sharedOptions, limit: cfg.RATE_LIMIT_MAX }),
-    creationRateLimiter: rateLimit({
-      ...sharedOptions,
-      limit: cfg.RATE_LIMIT_CREATE_MAX,
-      skip: (req) => !(req.method === "POST" && req.path === "/api/characters"),
-    }),
+    globalRateLimiter: scoped(cfg.RATE_LIMIT_MAX, () => true),
+    creationRateLimiter: scoped(
+      cfg.RATE_LIMIT_CREATE_MAX,
+      (req) => req.method === "POST" && req.path === "/api/characters",
+    ),
+    authRateLimiter: scoped(cfg.RATE_LIMIT_AUTH_MAX, (req) => AUTH_PATH.test(req.path)),
+    joinRateLimiter: scoped(
+      cfg.RATE_LIMIT_JOIN_MAX,
+      (req) => req.method === "POST" && req.path === "/api/campaigns/join",
+    ),
+    uploadRateLimiter: scoped(
+      cfg.RATE_LIMIT_UPLOAD_MAX,
+      (req) => req.method === "POST" && PORTRAIT_UPLOAD_PATH.test(req.path),
+    ),
   };
 }
 
-export const { globalRateLimiter, creationRateLimiter } = createRateLimiters(config);
+export const {
+  globalRateLimiter,
+  creationRateLimiter,
+  authRateLimiter,
+  joinRateLimiter,
+  uploadRateLimiter,
+} = createRateLimiters(config);

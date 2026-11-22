@@ -54,7 +54,7 @@ services:
       BLOB_STORE_DRIVER: ${BLOB_STORE_DRIVER:-fs}
       BLOB_FS_DIR: ${BLOB_FS_DIR:-/var/lib/character-sheet/blobs}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-}
-      # Single-origin → no CORS needed. For split mode, set CORS_ORIGIN here.
+      # Single-origin → unset sends no CORS headers. For split mode, set CORS_ORIGIN here.
       CORS_ORIGIN: ${CORS_ORIGIN:-}
     volumes:
       - blobs:/var/lib/character-sheet/blobs

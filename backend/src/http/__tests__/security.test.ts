@@ -3,6 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import express from "express";
+import supertest from "supertest";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 import { createRateLimiters, securityHeaders } from "@/http/security.js";
@@ -165,5 +167,51 @@ describe("rate limiter disabling", () => {
     const { nextCalled, limited } = await runOnce(globalRateLimiter);
     expect(nextCalled).toBe(true);
     expect(limited).toBe(true);
+  });
+});
+
+describe("per-client and per-route limiting", () => {
+  function limitedApp(env: Record<string, string>) {
+    const limiters = loadLimiters(env);
+    const app = express();
+    app.set("trust proxy", 1);
+    app.use(limiters.globalRateLimiter);
+    app.use(limiters.authRateLimiter);
+    app.use(limiters.joinRateLimiter);
+    app.use(limiters.uploadRateLimiter);
+    app.all("*", (_req, res) => {
+      res.json({ ok: true });
+    });
+    return app;
+  }
+
+  it("gives each X-Forwarded-For client its own bucket", async () => {
+    const app = limitedApp({ RATE_LIMIT_MAX: "1" });
+    const first = await supertest(app).get("/api/x").set("X-Forwarded-For", "1.1.1.1");
+    const again = await supertest(app).get("/api/x").set("X-Forwarded-For", "1.1.1.1");
+    const other = await supertest(app).get("/api/x").set("X-Forwarded-For", "2.2.2.2");
+    expect([first.status, again.status, other.status]).toEqual([200, 429, 200]);
+  });
+
+  it("429s auth start/callback/dev-login past RATE_LIMIT_AUTH_MAX but not /auth/providers", async () => {
+    const app = limitedApp({ RATE_LIMIT_AUTH_MAX: "1" });
+    expect((await supertest(app).post("/api/auth/dev-login")).status).toBe(200);
+    expect((await supertest(app).post("/api/auth/dev-login")).status).toBe(429);
+    expect((await supertest(app).get("/api/auth/google/start")).status).toBe(429);
+    expect((await supertest(app).get("/api/auth/providers")).status).toBe(200);
+  });
+
+  it("429s POST /campaigns/join past RATE_LIMIT_JOIN_MAX", async () => {
+    const app = limitedApp({ RATE_LIMIT_JOIN_MAX: "1" });
+    expect((await supertest(app).post("/api/campaigns/join")).status).toBe(200);
+    expect((await supertest(app).post("/api/campaigns/join")).status).toBe(429);
+  });
+
+  it("429s portrait uploads (character and campaign entity) past RATE_LIMIT_UPLOAD_MAX, not reads", async () => {
+    const app = limitedApp({ RATE_LIMIT_UPLOAD_MAX: "2" });
+    expect((await supertest(app).post("/api/characters/c1/portrait")).status).toBe(200);
+    expect((await supertest(app).post("/api/campaigns/k1/entities/e1/portrait")).status).toBe(200);
+    expect((await supertest(app).post("/api/characters/c1/portrait")).status).toBe(429);
+    expect((await supertest(app).get("/api/characters/c1/portrait")).status).toBe(200);
   });
 });

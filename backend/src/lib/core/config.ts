@@ -30,6 +30,17 @@ function parsePositiveInt(raw: string | undefined): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+// Express's own `trust proxy` vocabulary: a hop count, a boolean, or a subnet/address list. Default is one hop (the Railway edge) so req.ip is the real client, not the proxy.
+function parseTrustProxy(raw: string | undefined): number | boolean | string {
+  const value = clean(raw);
+  if (value === undefined) return 1;
+  const lowered = value.toLowerCase();
+  if (lowered === "true") return true;
+  if (lowered === "false") return false;
+  const hops = Number(value);
+  return Number.isInteger(hops) && hops >= 0 ? hops : value;
+}
+
 const schema = z.object({
   DATABASE_URL: z.string().min(1),
   PORT: z.number().int().min(1).max(65535).default(4000),
@@ -47,6 +58,10 @@ const schema = z.object({
   RATE_LIMIT_WINDOW_MS: z.number().default(15 * 60 * 1000),
   RATE_LIMIT_MAX: z.number().default(600),
   RATE_LIMIT_CREATE_MAX: z.number().default(30),
+  RATE_LIMIT_AUTH_MAX: z.number().default(20),
+  RATE_LIMIT_JOIN_MAX: z.number().default(20),
+  RATE_LIMIT_UPLOAD_MAX: z.number().default(30),
+  TRUST_PROXY: z.union([z.number(), z.boolean(), z.string()]),
   BLOB_STORE_DRIVER: z.string().optional(),
   BLOB_FS_DIR: z.string().optional(),
   S3_ENDPOINT: z.string().optional(),
@@ -81,6 +96,10 @@ export function parseConfig(env: NodeJS.ProcessEnv): Readonly<Config> {
     RATE_LIMIT_WINDOW_MS: parsePositiveInt(env.RATE_LIMIT_WINDOW_MS),
     RATE_LIMIT_MAX: parsePositiveInt(env.RATE_LIMIT_MAX),
     RATE_LIMIT_CREATE_MAX: parsePositiveInt(env.RATE_LIMIT_CREATE_MAX),
+    RATE_LIMIT_AUTH_MAX: parsePositiveInt(env.RATE_LIMIT_AUTH_MAX),
+    RATE_LIMIT_JOIN_MAX: parsePositiveInt(env.RATE_LIMIT_JOIN_MAX),
+    RATE_LIMIT_UPLOAD_MAX: parsePositiveInt(env.RATE_LIMIT_UPLOAD_MAX),
+    TRUST_PROXY: parseTrustProxy(env.TRUST_PROXY),
     BLOB_STORE_DRIVER: clean(env.BLOB_STORE_DRIVER),
     BLOB_FS_DIR: clean(env.BLOB_FS_DIR),
     S3_ENDPOINT: clean(env.S3_ENDPOINT),

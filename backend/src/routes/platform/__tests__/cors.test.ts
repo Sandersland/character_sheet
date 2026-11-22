@@ -15,13 +15,13 @@ describe("CORS credentials", () => {
     vi.unstubAllEnvs();
   });
 
-  it("reflects the request origin + allows credentials when CORS_ORIGIN is unset", async () => {
+  it("sends no CORS headers when CORS_ORIGIN is unset", async () => {
     const res = await supertest(await appWithCorsOrigin(""))
       .get("/api/health")
-      .set("Origin", "http://localhost:5173");
+      .set("Origin", "https://evil.example.com");
 
-    expect(res.headers["access-control-allow-credentials"]).toBe("true");
-    expect(res.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(res.headers["access-control-allow-credentials"]).toBeUndefined();
   });
 
   it("allows credentials for an allowlisted origin when CORS_ORIGIN is set", async () => {
