@@ -9,8 +9,8 @@ export const PORTRAIT_CONTENT_TYPE = "image/webp";
 
 const PORTRAIT_EDGE_PX = 512;
 
-// A 5 MB PNG can declare far more pixels than it has bytes; sharp's default cap (~268 MP) still allows a multi-GB decode. 40 MP is far above any real portrait.
-const PORTRAIT_SHARP_OPTIONS = { limitInputPixels: 40_000_000 } as const;
+// A 5 MB PNG can declare far more pixels than it has bytes; sharp's default cap (~268 MP) still allows a multi-GB decode. 100 MP clears every phone camera (48-50 MP sensors).
+const PORTRAIT_SHARP_OPTIONS = { limitInputPixels: 100_000_000 } as const;
 
 export class PortraitImageError extends ValidationError {}
 

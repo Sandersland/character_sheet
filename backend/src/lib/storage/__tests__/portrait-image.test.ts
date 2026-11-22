@@ -85,7 +85,7 @@ describe("reencodePortrait", () => {
   });
 
   it("rejects a tiny-on-disk image whose decoded pixel count exceeds the cap with a 400", async () => {
-    const huge = await sharp({ create: { width: 10000, height: 10000, channels: 3, background: "#000" } })
+    const huge = await sharp({ create: { width: 12000, height: 12000, channels: 3, background: "#000" } })
       .png({ compressionLevel: 9 })
       .toBuffer();
     expect(huge.length).toBeLessThan(PORTRAIT_MAX_UPLOAD_BYTES);
