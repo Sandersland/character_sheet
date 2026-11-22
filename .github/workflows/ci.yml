@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Migration-shape gate (#1373): an enum-narrowing migration whose USING
       # cast aborts on populated rows leaves the DB in P3009, which blocks every
@@ -105,7 +105,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # Full history: `fallow audit --base` needs the base branch and the
           # merge-base commits, which the default shallow clone doesn't have.
@@ -197,7 +197,7 @@ jobs:
       # stricter than the frontend step's `high` bar: it fails on ANY backend
       # production finding.
       - name: Download backend test shard reports (from test-backend)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: backend-blob-*
           path: backend/.vitest-reports
@@ -222,7 +222,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-deps
 
@@ -278,13 +278,13 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # The default docker driver cannot export to a remote cache at all;
       # buildx's container driver is what makes cache-to below work.
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           # Repo root, never a subdirectory: `npm ci --workspace` has to link
           # packages/* (#820), so a narrower context can't resolve the install.
@@ -333,7 +333,7 @@ jobs:
       DATABASE_URL: postgresql://character_sheet:character_sheet@localhost:5432/character_sheet
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-deps
 
@@ -370,7 +370,7 @@ jobs:
         run: npm run test:coverage --workspace backend -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=default --reporter=blob
 
       - name: Upload backend shard report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-blob-${{ matrix.shard }}
           path: backend/.vitest-reports/
@@ -387,7 +387,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-deps
 
@@ -413,7 +413,7 @@ jobs:
     outputs:
       version: ${{ steps.pw.outputs.version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: |
             frontend/package.json
@@ -457,7 +457,7 @@ jobs:
       DATABASE_URL: postgresql://character_sheet:character_sheet@postgres:5432/character_sheet
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-deps
 
@@ -508,7 +508,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
