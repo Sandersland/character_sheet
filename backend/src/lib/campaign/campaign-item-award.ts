@@ -101,8 +101,9 @@ export async function awardCampaignItem(params: {
   const sessionId = await resolveAwardSessionId(params.campaignId, character.id, params.sessionId);
 
   await prisma.$transaction(async (tx) => {
-    // Unique-item check happens inside the tx (not before it) so a concurrent award can't slip in between check and write.
+    // READ COMMITTED alone lets two awards both pass the held check below, so unique awards serialize on the Item row (#2026); non-unique awards skip the lock.
     if (item.isUnique) {
+      await tx.$queryRaw`SELECT id FROM "Item" WHERE id = ${item.id} FOR UPDATE`;
       const held = await tx.inventoryItem.findFirst({
         where: { itemId: item.id },
         select: { character: { select: { name: true } } },
