@@ -137,19 +137,15 @@ railway run -- node your-read-only-check.mjs   # reads process.env.DATABASE_PUBL
 
 ### Marking an existing database as baselined (#2029)
 
-The pre-production history was squashed into one `0_baseline` migration whose schema is identical to the old history's. A database built from the old history (staging) already has that schema but records the old migration names, so `migrate deploy` would replay `0_baseline` and fail on its first `CREATE TYPE` (then P3009, above). Do this once, before the squash's first deploy reaches that database — from a checkout that contains `0_baseline`, linked to the environment as above:
+The pre-production history was squashed into one `0_baseline` migration whose schema is identical to the old history's. A database built from the old history (staging) already has that schema but records the old migration names, so `migrate deploy` would replay `0_baseline` and fail on its first `CREATE TYPE` (then P3009, above). Record `0_baseline` as applied **alongside** the old rows, before the squash deploys. `migrate deploy` ignores applied rows it has no directory for, so both the old code and the new code deploy cleanly against that table (verified 2026-11-22), and there's no window where a deploy can fail:
 
-```bash
-# 1. Take a dump first (backup command above).
-
-# 2. Forget the old history (in `railway connect` psql):
-DELETE FROM "_prisma_migrations";
-
-# 3. Record the baseline as applied. Also repairs a failed 0_baseline attempt
-#    if a deploy got there first.
-railway run -- sh -c 'cd backend && DATABASE_URL="$DATABASE_PUBLIC_URL" npx prisma migrate resolve --applied 0_baseline'
-railway run -- sh -c 'cd backend && DATABASE_URL="$DATABASE_PUBLIC_URL" npx prisma migrate status'   # up to date
+```sql
+-- checksum = sha256 of 0_baseline/migration.sql (`shasum -a 256`)
+INSERT INTO "_prisma_migrations" (id, checksum, migration_name, started_at, finished_at, applied_steps_count)
+VALUES (gen_random_uuid()::text, '<sha256>', '0_baseline', now(), now(), 0);
 ```
+
+Once the squash is live, the old rows are inert; `DELETE FROM "_prisma_migrations" WHERE migration_name <> '0_baseline'` tidies them up.
 
 A database that never ran the old history (production, a fresh dev database) needs none of this: `migrate deploy` applies `0_baseline` normally.
 
