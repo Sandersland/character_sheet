@@ -59,6 +59,11 @@ async function assertSoloSessionForCharacter(sessionId: string, characterId: str
   }
 }
 
+// Entries default to PRIVATE, so a session's entries from other members are only visible once their author chose CAMPAIGN.
+function sessionJournalWhere(sessionId: string, userId: string) {
+  return { sessionId, OR: [{ authorUserId: userId }, { visibility: "CAMPAIGN" as const }] };
+}
+
 /** POST /api/campaigns/:campaignId/sessions — starts a shared session with the given character as first participant; 409 if one is already active. Returns { session, character }. */
 sessionsRouter.post(
   "/campaigns/:campaignId/sessions",
@@ -274,7 +279,7 @@ sessionsRouter.get("/campaigns/:campaignId/sessions/:sessionId", async (req, res
     orderBy: { createdAt: "desc" },
   });
   const journalEntries = await prisma.journalEntry.findMany({
-    where: { sessionId: session.id },
+    where: sessionJournalWhere(session.id, req.user!.id),
     orderBy: { date: "desc" },
   });
 
@@ -347,7 +352,7 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
     orderBy: { createdAt: "desc" },
   });
   const journalEntries = await prisma.journalEntry.findMany({
-    where: { sessionId: session.id },
+    where: sessionJournalWhere(session.id, req.user!.id),
     orderBy: { date: "desc" },
   });
 
