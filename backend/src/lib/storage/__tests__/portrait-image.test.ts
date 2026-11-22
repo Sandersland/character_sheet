@@ -84,6 +84,18 @@ describe("reencodePortrait", () => {
     expect((error as PortraitImageError).status).toBe(400);
   });
 
+  it("rejects a tiny-on-disk image whose decoded pixel count exceeds the cap with a 400", async () => {
+    const huge = await sharp({ create: { width: 10000, height: 10000, channels: 3, background: "#000" } })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    expect(huge.length).toBeLessThan(PORTRAIT_MAX_UPLOAD_BYTES);
+
+    const error = await reencodePortrait(huge, "image/png").catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(PortraitImageError);
+    expect((error as PortraitImageError).status).toBe(400);
+  });
+
   it("pins the 5 MB cross-plan upload cap (#1616/#1617)", () => {
     expect(PORTRAIT_MAX_UPLOAD_BYTES).toBe(5 * 1024 * 1024);
   });
