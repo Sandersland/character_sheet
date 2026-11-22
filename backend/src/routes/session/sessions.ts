@@ -20,6 +20,7 @@ import {
   getCombatState,
   SessionError,
 } from "@/lib/session/sessions.js";
+import { journalVisibleTo } from "@/lib/session/journal-visibility.js";
 import { getSessionDoorway } from "@/lib/session/doorway.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
@@ -122,7 +123,7 @@ sessionsRouter.post(
     await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
 
     await assertSessionInCampaign(req.params.sessionId, req.params.campaignId);
-    const session = await endSession(req.params.sessionId);
+    const session = await endSession(req.params.sessionId, req.user!.id);
     res.json({ session });
   },
 );
@@ -274,7 +275,7 @@ sessionsRouter.get("/campaigns/:campaignId/sessions/:sessionId", async (req, res
     orderBy: { createdAt: "desc" },
   });
   const journalEntries = await prisma.journalEntry.findMany({
-    where: { sessionId: session.id },
+    where: { sessionId: session.id, ...journalVisibleTo(req.user!.id) },
     orderBy: { date: "desc" },
   });
 
@@ -309,7 +310,7 @@ sessionsRouter.post("/characters/:id/sessions", async (req, res) => {
 sessionsRouter.post("/characters/:id/sessions/:sessionId/end", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
   await assertSoloSessionForCharacter(req.params.sessionId, req.params.id);
-  const session = await endSession(req.params.sessionId);
+  const session = await endSession(req.params.sessionId, req.user!.id);
   res.json({ session });
 });
 
@@ -347,7 +348,7 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
     orderBy: { createdAt: "desc" },
   });
   const journalEntries = await prisma.journalEntry.findMany({
-    where: { sessionId: session.id },
+    where: { sessionId: session.id, ...journalVisibleTo(req.user!.id) },
     orderBy: { date: "desc" },
   });
 

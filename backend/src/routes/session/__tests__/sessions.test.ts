@@ -823,3 +823,54 @@ describe("retroactive XP to a past session", () => {
     expect(res.body.error).toMatch(/not a participant/i);
   });
 });
+
+describe("session-detail journal entry privacy (#2017)", () => {
+  async function seedEntries() {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    const sessionId = start.body.session.id as string;
+    await agent(cookiePlayer).post(`${startUrl(campaignId)}/${sessionId}/join`).send({ characterId: CHAR_PLAYER });
+    const entry = (characterId: string, authorUserId: string, body: string, visibility: "PRIVATE" | "CAMPAIGN") =>
+      prisma.journalEntry.create({ data: { characterId, sessionId, date: new Date(), body, authorUserId, visibility } });
+    await entry(CHAR_PLAYER, PLAYER, "player private", "PRIVATE");
+    await entry(CHAR_PLAYER, PLAYER, "player shared", "CAMPAIGN");
+    await entry(CHAR_OWNER, OWNER, "owner private", "PRIVATE");
+    return { campaignId, sessionId };
+  }
+
+  const bodies = (res: { body: { journalEntries: { body: string }[] } }) =>
+    res.body.journalEntries.map((e) => e.body).sort();
+
+  it("campaign route hides another member's PRIVATE entry but shows their CAMPAIGN entry and the caller's own PRIVATE entry", async () => {
+    const { campaignId, sessionId } = await seedEntries();
+    const res = await agent(cookieOwner).get(`/api/campaigns/${campaignId}/sessions/${sessionId}`);
+    expect(res.status).toBe(200);
+    expect(bodies(res)).toEqual(["owner private", "player shared"]);
+  });
+
+  it("character route hides another member's PRIVATE entry but shows their CAMPAIGN entry and the caller's own PRIVATE entry", async () => {
+    const { sessionId } = await seedEntries();
+    const res = await agent(cookieOwner).get(`/api/characters/${CHAR_OWNER}/sessions/${sessionId}`);
+    expect(res.status).toBe(200);
+    expect(bodies(res)).toEqual(["owner private", "player shared"]);
+  });
+
+  it("campaign end route filters the returned journal entries for the caller", async () => {
+    const { campaignId, sessionId } = await seedEntries();
+    const res = await agent(cookieOwner).post(`${startUrl(campaignId)}/${sessionId}/end`).send({});
+    expect(res.status).toBe(200);
+    expect(bodies({ body: { journalEntries: res.body.session.journalEntries } })).toEqual(["owner private", "player shared"]);
+  });
+
+  it("solo end route filters the returned journal entries for the caller", async () => {
+    const started = await agent(cookieOwner).post(`/api/characters/${CHAR_OWNER}/sessions`).send({});
+    const sessionId = started.body.session.id as string;
+    const entry = (authorUserId: string, body: string, visibility: "PRIVATE" | "CAMPAIGN") =>
+      prisma.journalEntry.create({ data: { characterId: CHAR_OWNER, sessionId, date: new Date(), body, authorUserId, visibility } });
+    await entry(OWNER, "mine", "PRIVATE");
+    await entry(PLAYER, "other private", "PRIVATE");
+    const res = await agent(cookieOwner).post(`/api/characters/${CHAR_OWNER}/sessions/${sessionId}/end`).send({});
+    expect(res.status).toBe(200);
+    expect(bodies({ body: { journalEntries: res.body.session.journalEntries } })).toEqual(["mine"]);
+  });
+});
