@@ -95,7 +95,7 @@ On Railway, `railway run -- sh -c 'pg_dump "$DATABASE_PUBLIC_URL" -Fc'` works di
 
 ### A failed migration blocks every later one (P3009)
 
-`migrate deploy` refuses to apply **anything** once one migration has failed, so the schema stops advancing while later migrations' models and columns appear simply "missing" and the backend container exits 1 on every boot. Look here first — it reads like an unrelated feature being broken. One instance cost 13 hours (#1373). Recovery is always operational: a fix-up migration can never run (it sits behind the failed one) and editing the failed migration's SQL changes its checksum, after which `migrate dev` reports it "was modified after it was applied".
+`migrate deploy` refuses to apply **anything** once one migration has failed, so the schema stops advancing while later migrations' models and columns appear simply "missing": Railway's preDeployCommand fails and every deploy halts, and in compose the `migrate` service fails so `app` never starts. Look here first — it reads like an unrelated feature being broken. One instance cost 13 hours (#1373). Recovery is always operational: a fix-up migration can never run (it sits behind the failed one) and editing the failed migration's SQL changes its checksum, after which `migrate dev` reports it "was modified after it was applied".
 
 ```bash
 # 1. Which migration failed, and why (logs holds the Postgres error):
