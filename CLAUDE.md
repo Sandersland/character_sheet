@@ -78,4 +78,4 @@ Read on demand — not auto-loaded:
 | `docs/class-features.md` | You're adding or changing class/subclass content, or touching a class feature's resource, action, or buff columns |
 | `docs/frontend.md` | You're writing frontend code (conventions, Tailwind/contrast rules, dice engine, bundle splitting) |
 | `docs/deployment.md` | You're packaging/hosting the app, or need the backup/restore runbook |
-| `.claude/agent-memory/frontend-design-architect/design_system.md` | You need exact design token names and the design rationale |
+| `docs/design-system.md` | You need exact design token names and the design rationale |

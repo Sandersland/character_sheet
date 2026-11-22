@@ -22,9 +22,9 @@ Use `@/` (→ `frontend/src/`) for **every** source import, including same-folde
 
 ## Design tokens & contrast
 
-Tokens live in `frontend/src/index.css` (`@theme`); the full reference and rationale is `.claude/agent-memory/frontend-design-architect/design_system.md`. Families: `parchment`/`garnet`/`arcane`/`gold`/`vitality` color ramps, the `garnet-surface`/`garnet-surface-hover`/`garnet-surface-deep`/`garnet-on-surface`/`garnet-on-surface-dim` brand-surface role (#994), `--font-display`/`--font-sans`, two radii (`card`/`control`), two shadows (`card`/`raised`).
+Tokens live in `frontend/src/index.css` (`@theme`); the full reference and rationale is `docs/design-system.md`. Families: `parchment`/`garnet`/`arcane`/`gold`/`vitality` color ramps, the `garnet-surface`/`garnet-surface-hover`/`garnet-surface-deep`/`garnet-on-surface`/`garnet-on-surface-dim` brand-surface role (#994), `--font-display`/`--font-sans`, two radii (`card`/`control`), two shadows (`card`/`raised`).
 
-WCAG AA rules that have shipped broken before (full rationale in `design_system.md`):
+WCAG AA rules that have shipped broken before (full rationale in `docs/design-system.md`):
 
 - Readable text on parchment uses `parchment-600` or darker; `-400`/`-500` are reserved for `placeholder:`, `disabled:`, and decorative glyphs only.
 - Accent text on light surfaces: `gold` ≥ 800, `arcane` ≥ 700, `garnet` ≥ 600 (one step darker on a tinted fill).
