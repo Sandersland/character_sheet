@@ -38,7 +38,7 @@ RUN npm ci --workspace backend
 # packages/contracts compiles to JS because the backend imports its zod schemas
 # as VALUES and plain `node` will not load its .ts sources (#1370). .dockerignore drops
 # **/dist, so the host's build never leaks in — this line is the only thing that
-# puts dist/ in the image, and stage 3's `COPY --from=backend /app /app` carries it.
+# puts dist/ in the image, and the runtime stage's `COPY --from=backend /app/packages` carries it.
 # The load assertion walks EVERY *Schema export rather than spot-checking one, so
 # a barrel that drops a schema fails the image build instead of at first request;
 # the count guard keeps an empty barrel from passing vacuously — it must be
@@ -52,10 +52,8 @@ WORKDIR /app/backend
 # placeholder is required even though `generate` never connects to a database.
 RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate && npm run build
 
-# 3. Production dependencies only. The Prisma CLI and tsx are devDependencies
-# but the pre-deploy migrate+seed step needs them at runtime, so they are
-# merged in at the versions the lockfile already pins: no manifest or lockfile
-# churn, and every other dev dependency stays out of the image.
+# 3. Production dependencies only. The Prisma CLI and tsx are regular
+# dependencies of backend because the pre-deploy migrate+seed step runs them.
 FROM ${NODE_IMAGE} AS prod-deps
 WORKDIR /app
 RUN npm install -g npm@11
@@ -63,18 +61,6 @@ COPY package.json package-lock.json ./
 COPY packages/ packages/
 COPY backend/package.json backend/
 RUN npm ci --workspace backend --omit=dev
-# npm would prune devDependencies again if tsx were installed into the workspace
-# tree, so it goes into a scratch dir and is merged without clobbering.
-RUN mkdir /tools && cd /tools && npm init -y >/dev/null \
- && npm install --no-package-lock \
-    "prisma@$(node -p "require('/app/package-lock.json').packages['node_modules/prisma'].version")" \
-    "tsx@$(node -p "require('/app/package-lock.json').packages['node_modules/tsx'].version")" \
- && cd /tools/node_modules \
- && for p in $(ls -d * @*/* 2>/dev/null | grep -v '^@[^/]*$'); do \
-      [ -e "/app/node_modules/$p" ] || { mkdir -p "/app/node_modules/$(dirname "$p")" && cp -r "$p" "/app/node_modules/$p"; }; \
-    done \
- && for b in .bin/*; do [ -e "/app/node_modules/$b" ] || cp -P "$b" "/app/node_modules/$b"; done \
- && rm -rf /tools
 
 # 4. Runtime: prod node_modules, the compiled backend + the sources migrate/seed
 # run from, and the built SPA served as static files. Boots the server only;
@@ -89,6 +75,7 @@ COPY --from=backend /app/packages /app/packages
 COPY --from=backend /app/package.json /app/package-lock.json /app/
 COPY --from=backend /app/backend /app/backend
 COPY --from=frontend /app/frontend/dist /app/public
+RUN mkdir -p /var/lib/character-sheet/blobs && chown -R node:node /var/lib/character-sheet
 ENV SERVE_STATIC_DIR=/app/public
 ENV PORT=4000
 EXPOSE 4000

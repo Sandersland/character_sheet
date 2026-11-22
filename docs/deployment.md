@@ -29,7 +29,7 @@ CI builds this image on every PR (#1454) and reports status, so a stage rename o
 | `CORS_ORIGIN` | Comma-separated allowlist; empty reflects the request origin. Credentials are always sent, so the origin is never `*` — set explicitly for split-origin prod. |
 | `APP_BASE_URL` | Browser-facing origin; builds the OAuth `redirect_uri` + post-login redirect. Dev default `http://localhost:5173` (the SPA proxies `/api`). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Provider enabled only when both set; absent → app boots with no providers. |
-| `SESSION_COOKIE_SECURE` | Tri-state: default on in production, off elsewhere. |
+| `SESSION_COOKIE_SECURE` | Tri-state: default on in production, off elsewhere. The image sets `NODE_ENV=production`, so `docker-compose.prod.yml` needs a TLS proxy in front, or `SESSION_COOKIE_SECURE=false` for plain http. |
 | `ALLOW_DEV_LOGIN` | Enables `POST /api/auth/dev-login`. Hard-forced off when `NODE_ENV=production`, which is why `.env.example` ships it on for local dev. |
 | `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `RATE_LIMIT_CREATE_MAX`, `RATE_LIMIT_DISABLED` | Logging + rate-limit knobs; limiter auto-off under test. |
 | `BLOB_STORE_DRIVER` | Blob storage driver, `s3` or `fs`. Defaults to `fs` outside production; required (throws at first use) in production. |
@@ -117,8 +117,8 @@ docker compose exec -T db psql -U character_sheet -d character_sheet -c \
 #    and can strand a sibling event from the same batch; note what you removed.
 
 # 5. Clear the failed attempt, then re-run. Both are safe to repeat.
-docker compose exec -T backend npx prisma migrate resolve --rolled-back <migration_name>
-docker compose exec -T backend npx prisma migrate deploy
+docker compose -f docker-compose.prod.yml run --rm migrate npx prisma migrate resolve --rolled-back <migration_name>
+docker compose -f docker-compose.prod.yml up migrate app
 ```
 
 Done when the step-1 query returns no unfinished row, `migrate status` reports all migrations applied, `/api/health` is ok, and an audit log renders.

@@ -43,6 +43,7 @@ services:
 
   app:
     image: character-sheet-app
+    pull_policy: never
     restart: unless-stopped
     ports:
       - "${APP_PORT:-4000}:4000"
@@ -50,8 +51,13 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://${POSTGRES_USER:-character_sheet}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-character_sheet}
       SERVE_STATIC_DIR: /app/public
+      BLOB_STORE_DRIVER: ${BLOB_STORE_DRIVER:-fs}
+      BLOB_FS_DIR: ${BLOB_FS_DIR:-/var/lib/character-sheet/blobs}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-}
       # Single-origin → no CORS needed. For split mode, set CORS_ORIGIN here.
       CORS_ORIGIN: ${CORS_ORIGIN:-}
+    volumes:
+      - blobs:/var/lib/character-sheet/blobs
     depends_on:
       db:
         condition: service_healthy
@@ -66,3 +72,4 @@ services:
 
 volumes:
   postgres_data:
+  blobs:
