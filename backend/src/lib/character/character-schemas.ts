@@ -73,44 +73,19 @@ export const createCharacterSchema = z
 
 export type CreateCharacterBody = z.infer<typeof createCharacterSchema>;
 
-// race/class/subclass/background/level/proficiencyBonus/experiencePoints/rulesEdition/inventory/spellcasting/journal
-// are deliberately absent: derived, relation-backed, or mutated only through their own
-// transaction/REST endpoint (never a blind PATCH) — .strict() 400s an attempt instead of silently
-// ignoring it. rulesEdition is write-once (#1281).
-// currency IS still patchable here; the handler logs a currencyAdjust event in the same transaction.
+// Everything else (tracked game state included) is mutated only through its own transaction/REST
+// endpoint (never a blind PATCH) — .strict() 400s an attempt instead of silently ignoring it.
+// rulesEdition is write-once (#1281). currency stays patchable; the handler logs a currencyAdjust event in the same transaction.
+// portraitUrl is absent (#1615): PATCH writing an arbitrary URL was the IDOR the dedicated upload/delete endpoints close.
 export const updateCharacterSchema = z
   .object({
     name: z.string().min(1),
     alignment: z.string().min(1),
-    // portraitUrl is absent (#1615): PATCH writing an arbitrary URL was the IDOR the dedicated upload/delete endpoints close.
-    initiativeBonus: z.number().int(),
-    speed: z.number().int().nonnegative(),
-    hitPoints: z.object({
-      current: z.number().int(),
-      max: z.number().int(),
-      temp: z.number().int(),
-      deathSaves: z.object({
-        successes: z.number().int().min(0).max(3),
-        failures: z.number().int().min(0).max(3),
-      }).optional(),
-    }),
-    hitDice: z.object({
-      total: z.number().int(),
-      die: z.string(),
-      spent: z.number().int().min(0).optional(),
-    }),
-    // The six named keys, not z.record: a record admits any key with any int value.
-    // PATCH also declares no generation method, so the route runs
-    // validateAbilityScores(undefined, ...) — the same sanity-bound rule
-    // createCharacter's omitted-method branch uses.
-    abilityScores: abilityScoresSchema,
-    savingThrowProficiencies: z.array(z.string()),
-    skills: z.array(z.unknown()),
     currency: z.object({
-      cp: z.number().int(),
-      sp: z.number().int(),
-      gp: z.number().int(),
-      pp: z.number().int(),
+      cp: z.number().int().nonnegative(),
+      sp: z.number().int().nonnegative(),
+      gp: z.number().int().nonnegative(),
+      pp: z.number().int().nonnegative(),
     }),
   })
   .partial()
