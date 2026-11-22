@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { authRateLimiter } from "@/http/security.js";
 import type { Request } from "express";
 
 import { config } from "@/lib/core/config.js";
@@ -69,7 +70,7 @@ const DEV_USER = {
 } as const;
 
 /** POST /api/auth/dev-login — mints a session for a fixed dev user without a real provider, guarded by config.ALLOW_DEV_LOGIN; 404s like an unknown provider when disabled. */
-authRouter.post("/auth/dev-login", async (_req, res) => {
+authRouter.post("/auth/dev-login", authRateLimiter, async (_req, res) => {
   if (!config.ALLOW_DEV_LOGIN) {
     res.status(404).json({ error: "Unknown or disabled provider" });
     return;
@@ -97,7 +98,7 @@ authRouter.post("/auth/dev-login", async (_req, res) => {
 });
 
 /** GET /api/auth/:provider/start — stashes state+PKCE in a short-lived cookie, then 302s to the provider's authorize endpoint. */
-authRouter.get("/auth/:provider/start", (req, res) => {
+authRouter.get("/auth/:provider/start", authRateLimiter, (req, res) => {
   const provider = getProvider(req.params.provider);
   if (!provider) {
     res.status(404).json({ error: "Unknown or disabled provider" });

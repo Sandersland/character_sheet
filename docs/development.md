@@ -27,7 +27,7 @@ The seed is **catalog-only** (no users/characters); use `npm run seed:verify` fo
 
 Nothing loads `backend/.env` implicitly — Prisma 7 dropped it and `tsx` never did it. The backend `dev`/`seed:verify` scripts pass `--env-file-if-exists`, `prisma.config.ts` loads it itself, and Vite reads `frontend/.env` through `loadEnv`; drop any of them and host dev breaks while CI keeps working, because CI injects the variables directly (#1463). Vite also pins `strictPort`, so a busy port fails loudly instead of silently serving on the next one.
 
-`VITE_API_URL` lives apart from `frontend/.env`, in the mode-scoped `frontend/.env.development` / `frontend/.env.production` copied above — vitest runs as mode `test` and would otherwise inherit an absolute `VITE_API_URL`, which breaks leveling tests that `new URL()` what the api layer builds. Without those two files the browser falls back to `http.ts`'s absolute default and can't reach the backend from inside the Playwright e2e container, which dials the host via `host.docker.internal`, not `localhost` (#1479). Worktrees get the same two files from `worktree.sh write_env`.
+`VITE_API_URL` defaults to the relative `/api` (Vite proxy in dev, same-origin in the built image), so the backend needs no CORS config; the mode-scoped `frontend/.env.development` / `.env.production` copies above just pin it explicitly (#1479). Worktrees get the same two files from `worktree.sh write_env`.
 
 ## Guardrails (lefthook)
 

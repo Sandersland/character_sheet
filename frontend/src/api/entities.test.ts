@@ -25,7 +25,7 @@ describe("fetchEntities", () => {
 
     await fetchEntities("camp-1");
 
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0][0] as string, "http://localhost");
     expect(url.pathname).toMatch(/\/campaigns\/camp-1\/entities$/);
     expect(url.search).toBe("");
   });
@@ -36,7 +36,7 @@ describe("fetchEntities", () => {
 
     await fetchEntities("camp-1", { q: "gorak", type: "NPC", includeStats: true });
 
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0][0] as string, "http://localhost");
     expect(url.searchParams.get("q")).toBe("gorak");
     expect(url.searchParams.get("type")).toBe("NPC");
     expect(url.searchParams.get("include")).toBe("stats");
@@ -126,7 +126,7 @@ describe("fetchEntityConnections", () => {
 
     await fetchEntityConnections("camp-1", "e1");
 
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0][0] as string, "http://localhost");
     expect(url.pathname).toMatch(/\/campaigns\/camp-1\/entities\/e1\/connections$/);
     expect(url.search).toBe("");
   });
@@ -137,7 +137,7 @@ describe("fetchEntityConnections", () => {
 
     await fetchEntityConnections("camp-1", "e1", { limit: 5 });
 
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0][0] as string, "http://localhost");
     expect(url.searchParams.get("limit")).toBe("5");
   });
 });

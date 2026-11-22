@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { creationRateLimiter } from "@/http/security.js";
 import { Router } from "express";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -50,7 +51,7 @@ charactersRouter.get("/characters/:id", async (req, res) => {
   res.json(await serializeCharacter(character));
 });
 
-charactersRouter.post("/characters", async (req, res) => {
+charactersRouter.post("/characters", creationRateLimiter, async (req, res) => {
   const parseResult = createCharacterSchema.safeParse(req.body);
 
   if (!parseResult.success) {

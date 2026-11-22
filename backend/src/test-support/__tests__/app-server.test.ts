@@ -56,6 +56,8 @@ describe("the shared test server binds exactly once (#1600)", () => {
     const ALLOWED = new Set([
       // Builds its own app under mutated CORS_ORIGIN, which is the thing it asserts.
       "routes/platform/__tests__/cors.test.ts",
+      // Builds its own app with limiting live (the shared app runs under isTest, where limiters are passthroughs).
+      "routes/platform/__tests__/rate-limit.test.ts",
     ]);
 
     const offenders = walk(root)

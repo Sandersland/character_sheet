@@ -289,7 +289,7 @@ describe("fetchActivity", () => {
 
     await fetchActivity("1");
 
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0][0] as string, "http://localhost");
     expect(url.pathname).toMatch(/\/characters\/1\/activity$/);
     expect(url.search).toBe("");
   });
@@ -306,7 +306,7 @@ describe("fetchActivity", () => {
       includeFields: true,
     });
 
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0][0] as string, "http://localhost");
     expect(url.searchParams.get("category")).toBe("inventory");
     expect(url.searchParams.get("type")).toBe("sold");
     expect(url.searchParams.get("sessionId")).toBe("sess-1");

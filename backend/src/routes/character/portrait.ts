@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { uploadRateLimiter } from "@/http/security.js";
 import { Router } from "express";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
@@ -18,6 +19,7 @@ export const portraitRouter = Router({ mergeParams: true });
 // Authorization runs BEFORE portraitMultipart so a non-owner can never make the server buffer a multi-megabyte body.
 portraitRouter.post<{ id: string }>(
   "/",
+  uploadRateLimiter,
   async (req, _res, next) => {
     await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
     next();

@@ -59,31 +59,52 @@ export type RateLimitConfig = Pick<
   | "RATE_LIMIT_WINDOW_MS"
   | "RATE_LIMIT_MAX"
   | "RATE_LIMIT_CREATE_MAX"
+  | "RATE_LIMIT_AUTH_MAX"
+  | "RATE_LIMIT_JOIN_MAX"
+  | "RATE_LIMIT_UPLOAD_MAX"
 >;
 
 const passthrough: RequestHandler = (_req, _res, next) => next();
 
-export function createRateLimiters(cfg: RateLimitConfig): {
+export type RateLimiters = {
   globalRateLimiter: RequestHandler;
   creationRateLimiter: RequestHandler;
-} {
+  authRateLimiter: RequestHandler;
+  joinRateLimiter: RequestHandler;
+  uploadRateLimiter: RequestHandler;
+};
+
+export function createRateLimiters(cfg: RateLimitConfig): RateLimiters {
   if (cfg.isTest || cfg.RATE_LIMIT_DISABLED) {
-    return { globalRateLimiter: passthrough, creationRateLimiter: passthrough };
+    return {
+      globalRateLimiter: passthrough,
+      creationRateLimiter: passthrough,
+      authRateLimiter: passthrough,
+      joinRateLimiter: passthrough,
+      uploadRateLimiter: passthrough,
+    };
   }
-  const sharedOptions = {
-    windowMs: cfg.RATE_LIMIT_WINDOW_MS,
-    standardHeaders: true as const,
-    legacyHeaders: false as const,
-    message: { error: "Too many requests, please try again later." },
-  };
+  const limiter = (limit: number) =>
+    rateLimit({
+      windowMs: cfg.RATE_LIMIT_WINDOW_MS,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: "Too many requests, please try again later." },
+      limit,
+    });
   return {
-    globalRateLimiter: rateLimit({ ...sharedOptions, limit: cfg.RATE_LIMIT_MAX }),
-    creationRateLimiter: rateLimit({
-      ...sharedOptions,
-      limit: cfg.RATE_LIMIT_CREATE_MAX,
-      skip: (req) => !(req.method === "POST" && req.path === "/api/characters"),
-    }),
+    globalRateLimiter: limiter(cfg.RATE_LIMIT_MAX),
+    creationRateLimiter: limiter(cfg.RATE_LIMIT_CREATE_MAX),
+    authRateLimiter: limiter(cfg.RATE_LIMIT_AUTH_MAX),
+    joinRateLimiter: limiter(cfg.RATE_LIMIT_JOIN_MAX),
+    uploadRateLimiter: limiter(cfg.RATE_LIMIT_UPLOAD_MAX),
   };
 }
 
-export const { globalRateLimiter, creationRateLimiter } = createRateLimiters(config);
+export const {
+  globalRateLimiter,
+  creationRateLimiter,
+  authRateLimiter,
+  joinRateLimiter,
+  uploadRateLimiter,
+} = createRateLimiters(config);

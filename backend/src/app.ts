@@ -10,7 +10,7 @@ import { requireAuth } from "@/http/middleware.js";
 import { config } from "@/lib/core/config.js";
 import { errorHandler } from "@/http/error-handler.js";
 import { httpLogger } from "@/http/http-logger.js";
-import { creationRateLimiter, globalRateLimiter, securityHeaders } from "@/http/security.js";
+import { globalRateLimiter, securityHeaders } from "@/http/security.js";
 import { routeManifest, type RouteMount } from "@/routes/manifest.js";
 
 function mountPass(app: Express, scope: RouteMount["scope"]): void {
@@ -22,11 +22,10 @@ function mountPass(app: Express, scope: RouteMount["scope"]): void {
   }
 }
 
-// `credentials: true` requires a concrete origin, never `*`; reflecting the request
-// origin here (when CORS_ORIGIN is unset) stays safe for that reason.
-function corsOptions(): CorsOptions {
+// The app is single-origin (the backend serves the SPA, dev rides the Vite proxy), so an unset CORS_ORIGIN means no CORS at all (#2021). `credentials: true` requires a concrete origin, never `*`.
+function corsOptions(): CorsOptions | undefined {
   const configured = config.CORS_ORIGIN;
-  if (!configured) return { origin: true, credentials: true };
+  if (!configured) return undefined;
   const allowlist = configured
     .split(",")
     .map((origin) => origin.trim())
@@ -39,12 +38,14 @@ export function createApp() {
 
   const staticDir = config.SERVE_STATIC_DIR;
 
+  app.set("trust proxy", config.TRUST_PROXY);
+
   app.use(securityHeaders(staticDir));
-  app.use(cors(corsOptions()));
+  const corsConfig = corsOptions();
+  if (corsConfig) app.use(cors(corsConfig));
   app.use(express.json());
   app.use(httpLogger);
   app.use(globalRateLimiter);
-  app.use(creationRateLimiter);
 
   mountPass(app, "public");
   app.use("/api", requireAuth);

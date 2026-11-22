@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { uploadRateLimiter } from "@/http/security.js";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import {
@@ -334,6 +335,7 @@ async function assertOwnedEntityForPortraitWrite(
 
 entitiesRouter.post(
   "/campaigns/:id/entities/:entityId/portrait",
+  uploadRateLimiter,
   async (req, _res, next) => {
     await assertOwnedEntityForPortraitWrite(
       req.user!.id,

@@ -26,12 +26,13 @@ CI builds this image on every PR (#1454) and reports status, so a stage rename o
 | `PORT` | Backend listen port (default 4000; Railway injects its own). |
 | `NODE_ENV` | The image sets `production` (#2019); it gates the Secure cookie default, dev-login force-off, blob-store fail-closed and 5xx detail hiding. |
 | `SERVE_STATIC_DIR` | Set → API serves the SPA from this dir (single-origin; combined image sets `/app/public`). Unset → API-only. |
-| `CORS_ORIGIN` | Comma-separated allowlist; empty reflects the request origin. Credentials are always sent, so the origin is never `*` — set explicitly for split-origin prod. |
+| `CORS_ORIGIN` | Comma-separated allowlist. Unset/empty sends no CORS headers at all (single-origin; dev rides the Vite proxy). Credentials are always sent, so the origin is never `*` — set explicitly for split-origin prod. |
+| `TRUST_PROXY` | Express `trust proxy` hop count (or a subnet list); `true` is rejected because it lets any client spoof `X-Forwarded-For` and defeat per-client rate limits. Default `1`. Staging and prod run behind Cloudflare and Railway's edge, so they require `TRUST_PROXY=2`; with `1` every user shares Cloudflare's IP. |
 | `APP_BASE_URL` | Browser-facing origin; builds the OAuth `redirect_uri` + post-login redirect. Dev default `http://localhost:5173` (the SPA proxies `/api`). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Provider enabled only when both set; absent → app boots with no providers. |
 | `SESSION_COOKIE_SECURE` | Tri-state: default on in production, off elsewhere. The image sets `NODE_ENV=production`, so `docker-compose.prod.yml` needs a TLS proxy in front, or `SESSION_COOKIE_SECURE=false` for plain http. |
 | `ALLOW_DEV_LOGIN` | Enables `POST /api/auth/dev-login`. Hard-forced off when `NODE_ENV=production`, which is why `.env.example` ships it on for local dev. |
-| `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `RATE_LIMIT_CREATE_MAX`, `RATE_LIMIT_DISABLED` | Logging + rate-limit knobs; limiter auto-off under test. |
+| `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `RATE_LIMIT_CREATE_MAX`, `RATE_LIMIT_AUTH_MAX`, `RATE_LIMIT_JOIN_MAX`, `RATE_LIMIT_UPLOAD_MAX`, `RATE_LIMIT_DISABLED` | Logging + rate-limit knobs (per client IP, per window); defaults 600 global, 30 character creations, 20 auth, 20 campaign joins, 30 portrait uploads. Limiters auto-off under test. |
 | `BLOB_STORE_DRIVER` | Blob storage driver, `s3` or `fs`. Defaults to `fs` outside production; required (throws at first use) in production. |
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | S3-compatible target when driver is `s3` (R2/S3/MinIO/B2/Spaces). Bucket + both creds required; endpoint required by every provider except AWS; region defaults to `auto`; path-style addressing defaults on — set `S3_FORCE_PATH_STYLE=false` only on real AWS. |
 | `BLOB_FS_DIR` | `fs` driver directory; defaults to a path under the OS tmpdir, outside the repo tree. |

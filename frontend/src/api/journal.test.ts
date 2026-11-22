@@ -91,7 +91,7 @@ describe("fetchChronicleSessions", () => {
 
     await fetchChronicleSessions("camp-1", "char-1");
 
-    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    const url = new URL(fetchMock.mock.calls[0][0] as string, "http://localhost");
     expect(url.pathname).toMatch(/\/campaigns\/camp-1\/sessions$/);
     expect(url.searchParams.get("characterId")).toBe("char-1");
   });
