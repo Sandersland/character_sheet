@@ -429,7 +429,7 @@ jobs:
   e2e:
     # Playwright suite against a booted stack, inside the Playwright image pinned
     # to @playwright/test's exact version, so screenshots render the same as the
-    # local docker-compose e2e runner. Required on staging (#2032).
+    # local docker-compose e2e runner (#2032).
     # Runs SERIALLY (playwright.config.ts sets workers: 1) — the specs share one
     # dev stack and a campaign allows only one active session, so parallel
     # workers overload the stack; don't reintroduce --workers here.
