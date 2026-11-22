@@ -364,27 +364,39 @@ describe("characters routes", () => {
     expect(response.status).toBe(400);
   });
 
-  // abilityScores is bound to the six named keys (.strict(), #1978) plus validateAbilityScores(undefined, ...) — never an unbounded record accepting any key with any int.
-  describe("PATCH abilityScores bound (#1383's ability-score wave)", () => {
-    const NAMED_SCORES = {
-      strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10,
-    };
-
-    it("rejects an out-of-bound score (strength 999)", async () => {
+  describe("PATCH is cosmetic + currency only (#2018)", () => {
+    it.each([
+      ["initiativeBonus", 5],
+      ["speed", 60],
+      ["hitPoints", { current: 1, max: 1, temp: 0 }],
+      ["hitDice", { total: 1, die: "d8" }],
+      ["abilityScores", { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 }],
+      ["savingThrowProficiencies", ["strength"]],
+      ["skills", []],
+    ])("rejects %s with 400", async (field, value) => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .patch(`/api/characters/${FIXTURE.id}`)
-        .send({ abilityScores: { ...NAMED_SCORES, strength: 999 } });
+        .send({ [field]: value });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toMatch(/1 and 30/);
     });
 
-    it("400s an unrecognized key (\"luck\") instead of silently stripping it", async () => {
+    it.each(["cp", "sp", "gp", "pp"])("rejects negative %s currency with 400", async (coin) => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .patch(`/api/characters/${FIXTURE.id}`)
-        .send({ abilityScores: { ...NAMED_SCORES, luck: 5 } });
+        .send({ currency: { cp: 0, sp: 0, gp: 0, pp: 0, [coin]: -1 } });
 
       expect(response.status).toBe(400);
+    });
+
+    it("still accepts name, alignment and currency", async () => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .patch(`/api/characters/${FIXTURE.id}`)
+        .send({ name: "Renamed", alignment: "Chaotic Good", currency: { cp: 0, sp: 0, gp: 7, pp: 0 } });
+
+      expect(response.status).toBe(200);
+      expect(response.body.name).toBe("Renamed");
+      expect(response.body.currency.gp).toBe(7);
     });
   });
 

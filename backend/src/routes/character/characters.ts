@@ -17,7 +17,6 @@ import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { storedPortraitKey } from "@/lib/character/character-portrait.js";
 import { lockCharacterRow } from "@/lib/character/character-transaction.js";
 import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
-import { validateAbilityScores } from "@/lib/srd/ability-generation.js";
 
 export const charactersRouter = Router();
 
@@ -99,18 +98,6 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
   }
 
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-
-  // PATCH declares no generation method — the omitted-method (sanity-bound)
-  // branch is exactly right here, the same rule createCharacter's own
-  // omitted-method case applies. Runs after ownership so a non-owner gets
-  // the 403, not a 400 that leaks whether the body would validate.
-  if (parseResult.data.abilityScores) {
-    const scoresResult = validateAbilityScores(undefined, parseResult.data.abilityScores);
-    if (!scoresResult.ok) {
-      res.status(400).json({ error: scoresResult.error });
-      return;
-    }
-  }
 
   const patchData = parseResult.data as Prisma.CharacterUpdateInput;
 
