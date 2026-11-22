@@ -52,17 +52,45 @@ WORKDIR /app/backend
 # placeholder is required even though `generate` never connects to a database.
 RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate && npm run build
 
-# 3. Runtime: the backend workspace tree (root node_modules carries the deps,
-# incl. the Prisma CLI + tsx needed by migrate/seed) plus the built SPA served
-# as static files.
+# 3. Production dependencies only. The Prisma CLI and tsx are devDependencies
+# but the pre-deploy migrate+seed step needs them at runtime, so they are
+# merged in at the versions the lockfile already pins: no manifest or lockfile
+# churn, and every other dev dependency stays out of the image.
+FROM ${NODE_IMAGE} AS prod-deps
+WORKDIR /app
+RUN npm install -g npm@11
+COPY package.json package-lock.json ./
+COPY packages/ packages/
+COPY backend/package.json backend/
+RUN npm ci --workspace backend --omit=dev
+# npm would prune devDependencies again if tsx were installed into the workspace
+# tree, so it goes into a scratch dir and is merged without clobbering.
+RUN mkdir /tools && cd /tools && npm init -y >/dev/null \
+ && npm install --no-package-lock \
+    "prisma@$(node -p "require('/app/package-lock.json').packages['node_modules/prisma'].version")" \
+    "tsx@$(node -p "require('/app/package-lock.json').packages['node_modules/tsx'].version")" \
+ && cd /tools/node_modules \
+ && for p in $(ls -d * @*/* 2>/dev/null | grep -v '^@[^/]*$'); do \
+      [ -e "/app/node_modules/$p" ] || { mkdir -p "/app/node_modules/$(dirname "$p")" && cp -r "$p" "/app/node_modules/$p"; }; \
+    done \
+ && for b in .bin/*; do [ -e "/app/node_modules/$b" ] || cp -P "$b" "/app/node_modules/$b"; done \
+ && rm -rf /tools
+
+# 4. Runtime: prod node_modules, the compiled backend + the sources migrate/seed
+# run from, and the built SPA served as static files. Boots the server only;
+# migrate+seed is a separate once-per-deploy step (railway.json
+# preDeployCommand, docker-compose.prod.yml `migrate` service) because the seed
+# prunes catalog rows, so an older image restarting must never re-run it.
 FROM ${NODE_IMAGE}
+ENV NODE_ENV=production
 WORKDIR /app/backend
-COPY --from=backend /app /app
+COPY --from=prod-deps /app/node_modules /app/node_modules
+COPY --from=backend /app/packages /app/packages
+COPY --from=backend /app/package.json /app/package-lock.json /app/
+COPY --from=backend /app/backend /app/backend
 COPY --from=frontend /app/frontend/dist /app/public
 ENV SERVE_STATIC_DIR=/app/public
 ENV PORT=4000
 EXPOSE 4000
-# Apply migrations, run the seed, then start the server. The seed is idempotent
-# (upserts only, catalog/reference data) so running it on every container start
-# is safe; it adds a little startup latency but keeps reference data current.
-CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node dist/index.js"]
+USER node
+CMD ["node", "dist/index.js"]
