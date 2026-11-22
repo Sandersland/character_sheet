@@ -408,17 +408,36 @@ jobs:
           [ "${{ needs.test-backend.result }}" = success ] && [ "${{ needs.test-frontend.result }}" = success ] \
             || { echo "test-backend=${{ needs.test-backend.result }} test-frontend=${{ needs.test-frontend.result }}"; exit 1; }
 
+  playwright-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pw.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            frontend/package.json
+            docker-compose.yml
+          sparse-checkout-cone-mode: false
+      - id: pw
+        run: |
+          version=$(jq -r '.devDependencies["@playwright/test"]' frontend/package.json)
+          grep -q "mcr.microsoft.com/playwright:v${version}-noble" docker-compose.yml \
+            || { echo "docker-compose.yml's Playwright image must match @playwright/test ${version}"; exit 1; }
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
   e2e:
-    # Playwright smoke suite against a booted dev stack (same postgres service as
-    # `test-backend`, plus the backend + Vite dev servers the e2e harness proxies through).
-    # Runs on every PR and reports status, but is NOT a required status check
-    # (branch protection lists claude-review/lint/test/build/fallow only) — a red
-    # run here does not block merge, so watch it manually on UI-layout changes.
+    # Playwright suite against a booted stack, inside the Playwright image pinned
+    # to @playwright/test's exact version, so screenshots render the same as the
+    # local docker-compose e2e runner (#2032).
     # Runs SERIALLY (playwright.config.ts sets workers: 1) — the specs share one
     # dev stack and a campaign allows only one active session, so parallel
     # workers overload the stack; don't reintroduce --workers here.
+    needs: playwright-version
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.playwright-version.outputs.version }}-noble
 
     services:
       postgres:
@@ -428,8 +447,6 @@ jobs:
           POSTGRES_USER: character_sheet
           POSTGRES_PASSWORD: character_sheet
           POSTGRES_DB: character_sheet
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U character_sheet"
           --health-interval 10s
@@ -437,12 +454,15 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://character_sheet:character_sheet@localhost:5432/character_sheet
+      DATABASE_URL: postgresql://character_sheet:character_sheet@postgres:5432/character_sheet
 
     steps:
       - uses: actions/checkout@v5
 
       - uses: ./.github/actions/setup-deps
+
+      - name: Install curl
+        run: command -v curl || (apt-get update && apt-get install -y --no-install-recommends curl)
 
       - name: Prisma generate / migrate / seed
         working-directory: backend
@@ -450,29 +470,6 @@ jobs:
           npx prisma generate
           npx prisma migrate deploy
           npx prisma db seed
-
-      - name: Playwright version
-        id: pw
-        working-directory: frontend
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-
-      # The browser download is cacheable; its apt system deps are not (they live
-      # outside the cached dir), so a cache hit still runs install-deps (#2001).
-      - id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
-
-      - name: Install Playwright chromium
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium
-
-      - name: Install Playwright system deps
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        working-directory: frontend
-        run: npx playwright install-deps chromium
 
       - name: Start backend
         # ALLOW_DEV_LOGIN powers the e2e harness's passwordless session mint; PORT
