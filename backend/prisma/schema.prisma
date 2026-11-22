@@ -187,6 +187,7 @@ model CampaignMembership {
   updatedAt  DateTime     @updatedAt
 
   @@unique([campaignId, userId])
+  @@index([userId])
 }
 
 // Fully polymorphic (one `type` discriminator, no per-type FK columns) — a new entity kind is an enum value, not a table (#248).
@@ -762,6 +763,8 @@ model CharacterClassEntry {
   subclassId  String?
   subclassRef Subclass?       @relation(fields: [subclassId], references: [id], onDelete: SetNull)
   position    Int             @default(0)
+
+  @@index([characterId])
 }
 
 enum ItemCategory {
@@ -1404,6 +1407,9 @@ model InventoryItem {
   usesRemaining         Int?
 
   capabilityUses InventoryCapabilityUse[]
+
+  @@index([characterId])
+  @@index([itemId])
 }
 
 // Keyed by the capability's `key` in the snapshot — an opaque string, not tied to any live row's id.
@@ -1573,6 +1579,7 @@ model CharacterEvent {
   @@index([characterId, createdAt])
   @@index([entityType, entityId])
   @@index([sessionId, createdAt])
+  @@index([batchId])
 }
 
 // At most one `active` session per campaign is DB-enforced by the hand-written partial unique index
