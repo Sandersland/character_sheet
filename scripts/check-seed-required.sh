@@ -7,22 +7,20 @@
 # 500s at runtime the moment a route reads a catalog row (#1370's lesson,
 # generalized): this is the boot-contract half of that guarantee.
 #
-# railway.json is in scope alongside the Dockerfiles because Railway's
-# preDeployCommand is a REAL boot path — it applies migrations before the new
-# version is allowed to serve (#1455). Gating only container CMDs would leave
-# the deployment path this repo actually ships through outside the invariant.
+# Both deploy paths are in scope: railway.json's preDeployCommand applies
+# migrations before the new version may serve (#1455), and docker-compose.prod.yml's
+# one-shot `migrate` service does the same. The image CMD only starts the server.
 #
-# Anti-vacuity: fail unless exactly 2 files matched `prisma migrate deploy` —
-# today's Dockerfile / railway.json, the deploy image and the Railway hook that
-# gates it. A count drift (a new deploy path added a third, or one was deleted)
-# means this check's premise changed and needs a human look, not a silent pass.
+# Anti-vacuity: fail unless exactly 2 files matched `prisma migrate deploy` (the
+# two paths above). A count drift means this check's premise changed and needs
+# a human look, not a silent pass.
 # Was 3 until #1458 retired the dev backend image; the dev database is migrated
 # by hand now, and a developer's shell is not a deploy path.
 set -eu
 
 MATCHED=0
 bad=""
-for f in $(git grep -lF 'prisma migrate deploy' -- ':(glob)**/Dockerfile*' 'railway.json'); do
+for f in $(git grep -lF 'prisma migrate deploy' -- ':(glob)**/Dockerfile*' 'railway.json' 'docker-compose.prod.yml'); do
   MATCHED=$((MATCHED + 1))
   # Skip comment lines (leading `#`, optional whitespace) — only a real
   # CMD/RUN instruction invoking migrate deploy needs the db seed twin.

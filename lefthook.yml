@@ -73,7 +73,7 @@ pre-commit:
     # #1527's subclassGateLevel pattern to every rule fn). Also a CI step.
     edition-branching:
       run: sh scripts/check-edition-branching.sh
-    # Boot-contract gate (#1277 defect 3): every Dockerfile running `prisma
+    # Boot-contract gate (#1277 defect 3): every deploy path running `prisma
     # migrate deploy` must also run `prisma db seed` — catalog content lives
     # in the seed, not migrations. Also a CI step.
     seed-required:

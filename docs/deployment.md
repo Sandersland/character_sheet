@@ -12,6 +12,10 @@ docker build -f Dockerfile .
 
 Single-origin is a commitment, not a default: one hostname → one Cloudflare Access policy, same-origin fetch, no CORS/cookie problems. A split-mode pair of images existed until #1456 deleted them — nothing had ever built them, and the backend one had silently become a duplicate of this image's backend stage.
 
+The image runs as the non-root `node` user with production dependencies only; the Prisma CLI and tsx are added at their lockfile versions (`prod-deps` stage) because the pre-deploy step runs them. The image does not migrate on boot.
+
+**Rollback: never re-run the seed from an older image.** The seed prunes catalog rows it no longer lists, so seeding from an older image deletes rows a newer version added. Roll the app back by redeploying the old image *without* its pre-deploy step (or with the migrate+seed command skipped); schema migrations are forward-only.
+
 CI builds this image on every PR (#1454) and reports status, so a stage rename or a broken `COPY` shows red on the PR instead of surfacing only at deploy time — but `docker-build` is not a required status check, so a red run does not block merge on its own.
 
 ### Environment variables
@@ -20,11 +24,12 @@ CI builds this image on every PR (#1454) and reports status, so a stage rename o
 |---|---|
 | `DATABASE_URL` | Required. |
 | `PORT` | Backend listen port (default 4000; Railway injects its own). |
+| `NODE_ENV` | The image sets `production` (#2019); it gates the Secure cookie default, dev-login force-off, blob-store fail-closed and 5xx detail hiding. |
 | `SERVE_STATIC_DIR` | Set → API serves the SPA from this dir (single-origin; combined image sets `/app/public`). Unset → API-only. |
 | `CORS_ORIGIN` | Comma-separated allowlist; empty reflects the request origin. Credentials are always sent, so the origin is never `*` — set explicitly for split-origin prod. |
 | `APP_BASE_URL` | Browser-facing origin; builds the OAuth `redirect_uri` + post-login redirect. Dev default `http://localhost:5173` (the SPA proxies `/api`). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Provider enabled only when both set; absent → app boots with no providers. |
-| `SESSION_COOKIE_SECURE` | Tri-state: default on in production, off elsewhere. |
+| `SESSION_COOKIE_SECURE` | Tri-state: default on in production, off elsewhere. The image sets `NODE_ENV=production`, so `docker-compose.prod.yml` needs a TLS proxy in front, or `SESSION_COOKIE_SECURE=false` for plain http. |
 | `ALLOW_DEV_LOGIN` | Enables `POST /api/auth/dev-login`. Hard-forced off when `NODE_ENV=production`, which is why `.env.example` ships it on for local dev. |
 | `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `RATE_LIMIT_CREATE_MAX`, `RATE_LIMIT_DISABLED` | Logging + rate-limit knobs; limiter auto-off under test. |
 | `BLOB_STORE_DRIVER` | Blob storage driver, `s3` or `fs`. Defaults to `fs` outside production; required (throws at first use) in production. |
@@ -61,7 +66,7 @@ Two environments, and the names matter because every CLI flag takes one:
 
 Setup per environment: Postgres plugin (`DATABASE_URL`) → service from the repo. Build and deploy settings live in `railway.json`, which **overrides the dashboard** — change them there, not in the UI. Add the custom domain and **disable the generated `*.up.railway.app` domain** (it would bypass Access).
 
-**Migrations run as a pre-deploy command, not just at boot.** Railway runs `preDeployCommand` after the build and before the new version is allowed to serve, and a non-zero exit halts the deploy. That is the difference between a bad migration being a red deploy and being the crash-loop that cost 13 hours (#1373). The container `CMD` still applies migrations too — that path is what `docker-compose.prod.yml` relies on, and the re-run is a no-op migration plus an idempotent seed.
+**Migrations run as a pre-deploy command, not just at boot.** Railway runs `preDeployCommand` after the build and before the new version is allowed to serve, and a non-zero exit halts the deploy. That is the difference between a bad migration being a red deploy and being the crash-loop that cost 13 hours (#1373). The image `CMD` only starts the server (#2028); `docker-compose.prod.yml` runs the same migrate+seed in a one-shot `migrate` service the app waits on with `service_completed_successfully`.
 
 Pre-deploy runs in a **separate container** from the app and cannot touch volumes or the filesystem, so nothing filesystem-bound may move into it.
 
@@ -90,7 +95,7 @@ On Railway, `railway run -- sh -c 'pg_dump "$DATABASE_PUBLIC_URL" -Fc'` works di
 
 ### A failed migration blocks every later one (P3009)
 
-`migrate deploy` refuses to apply **anything** once one migration has failed, so the schema stops advancing while later migrations' models and columns appear simply "missing" and the backend container exits 1 on every boot. Look here first — it reads like an unrelated feature being broken. One instance cost 13 hours (#1373). Recovery is always operational: a fix-up migration can never run (it sits behind the failed one) and editing the failed migration's SQL changes its checksum, after which `migrate dev` reports it "was modified after it was applied".
+`migrate deploy` refuses to apply **anything** once one migration has failed, so the schema stops advancing while later migrations' models and columns appear simply "missing": Railway's preDeployCommand fails and every deploy halts, and in compose the `migrate` service fails so `app` never starts. Look here first — it reads like an unrelated feature being broken. One instance cost 13 hours (#1373). Recovery is always operational: a fix-up migration can never run (it sits behind the failed one) and editing the failed migration's SQL changes its checksum, after which `migrate dev` reports it "was modified after it was applied".
 
 ```bash
 # 1. Which migration failed, and why (logs holds the Postgres error):
@@ -112,8 +117,8 @@ docker compose exec -T db psql -U character_sheet -d character_sheet -c \
 #    and can strand a sibling event from the same batch; note what you removed.
 
 # 5. Clear the failed attempt, then re-run. Both are safe to repeat.
-docker compose exec -T backend npx prisma migrate resolve --rolled-back <migration_name>
-docker compose exec -T backend npx prisma migrate deploy
+docker compose -f docker-compose.prod.yml run --rm migrate npx prisma migrate resolve --rolled-back <migration_name>
+docker compose -f docker-compose.prod.yml up migrate app
 ```
 
 Done when the step-1 query returns no unfinished row, `migrate status` reports all migrations applied, `/api/health` is ok, and an audit log renders.
@@ -151,7 +156,7 @@ A database that never ran the old history (production, a fresh dev database) nee
 
 ### Catalog content ships in the seed, not in migrations (#1277)
 
-Every boot command runs `prisma migrate deploy && prisma db seed` as one step (root `Dockerfile`; `scripts/check-seed-required.sh` enforces this in CI/lefthook) — a database that only migrated and never seeded 500s the moment a route reads a catalog row it type-checked fine against. Catalog content (subclasses, spells, feats, packs, …) is **not** moved into data migrations, for four reasons:
+Every deploy step that runs `prisma migrate deploy` runs `prisma db seed` with it (`railway.json` `preDeployCommand`, the `migrate` service in `docker-compose.prod.yml`; `scripts/check-seed-required.sh` enforces this in CI/lefthook) — a database that only migrated and never seeded 500s the moment a route reads a catalog row it type-checked fine against. Catalog content (subclasses, spells, feats, packs, …) is **not** moved into data migrations, for four reasons:
 
 1. **The failure mode is already structurally prevented** — there is no deployment path that runs `migrate deploy` without also running `db seed` (enforced above), so this is a defense-in-depth gate, not a live gap.
 2. **Data migrations can't express what the seed does.** Several seeders (`seedFeats`, `seedSpells`, `seedShadowArts`) prune stale rows, and spell seeding layers over `SPELL_COLUMN_DEFAULTS` so a removed optional field actually resets on re-seed (#1132's Barkskin fix) — an append-only migration history can only add UPDATEs, never re-derive a row.

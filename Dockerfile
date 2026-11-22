@@ -38,7 +38,7 @@ RUN npm ci --workspace backend
 # packages/contracts compiles to JS because the backend imports its zod schemas
 # as VALUES and plain `node` will not load its .ts sources (#1370). .dockerignore drops
 # **/dist, so the host's build never leaks in — this line is the only thing that
-# puts dist/ in the image, and stage 3's `COPY --from=backend /app /app` carries it.
+# puts dist/ in the image, and the runtime stage's `COPY --from=backend /app/packages` carries it.
 # The load assertion walks EVERY *Schema export rather than spot-checking one, so
 # a barrel that drops a schema fails the image build instead of at first request;
 # the count guard keeps an empty barrel from passing vacuously — it must be
@@ -52,17 +52,32 @@ WORKDIR /app/backend
 # placeholder is required even though `generate` never connects to a database.
 RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate && npm run build
 
-# 3. Runtime: the backend workspace tree (root node_modules carries the deps,
-# incl. the Prisma CLI + tsx needed by migrate/seed) plus the built SPA served
-# as static files.
+# 3. Production dependencies only. The Prisma CLI and tsx are regular
+# dependencies of backend because the pre-deploy migrate+seed step runs them.
+FROM ${NODE_IMAGE} AS prod-deps
+WORKDIR /app
+RUN npm install -g npm@11
+COPY package.json package-lock.json ./
+COPY packages/ packages/
+COPY backend/package.json backend/
+RUN npm ci --workspace backend --omit=dev
+
+# 4. Runtime: prod node_modules, the compiled backend + the sources migrate/seed
+# run from, and the built SPA served as static files. Boots the server only;
+# migrate+seed is a separate once-per-deploy step (railway.json
+# preDeployCommand, docker-compose.prod.yml `migrate` service) because the seed
+# prunes catalog rows, so an older image restarting must never re-run it.
 FROM ${NODE_IMAGE}
+ENV NODE_ENV=production
 WORKDIR /app/backend
-COPY --from=backend /app /app
+COPY --from=prod-deps /app/node_modules /app/node_modules
+COPY --from=backend /app/packages /app/packages
+COPY --from=backend /app/package.json /app/package-lock.json /app/
+COPY --from=backend /app/backend /app/backend
 COPY --from=frontend /app/frontend/dist /app/public
+RUN mkdir -p /var/lib/character-sheet/blobs && chown -R node:node /var/lib/character-sheet
 ENV SERVE_STATIC_DIR=/app/public
 ENV PORT=4000
 EXPOSE 4000
-# Apply migrations, run the seed, then start the server. The seed is idempotent
-# (upserts only, catalog/reference data) so running it on every container start
-# is safe; it adds a little startup latency but keeps reference data current.
-CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node dist/index.js"]
+USER node
+CMD ["node", "dist/index.js"]
