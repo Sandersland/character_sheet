@@ -113,7 +113,7 @@ export async function createCharacter(
   return id;
 }
 
-export async function setExperience(
+async function setExperience(
   request: APIRequestContext,
   characterId: string,
   value: number,
